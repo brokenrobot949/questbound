@@ -789,3 +789,27 @@ h3.debug-heading {
 .debug-table th {
   color: var(--accent);
 }
+
+/* "Update ready — tap to reload": shown when a new version has downloaded */
+
+.update-banner {
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  background: var(--accent);
+  color: var(--page);
+  border: none;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 50%);
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.update-banner[hidden] {
+  display: none;
+}

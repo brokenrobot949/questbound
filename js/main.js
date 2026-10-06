@@ -9,6 +9,7 @@ import { openSaveStore } from './engine/save/save-store.js';
 import { gameToSave, loadGame, newGame } from './engine/save/save-format.js';
 import { isBackupDue } from './engine/save/backup.js';
 import { PlaytestTracker } from './engine/save/playtest-log.js';
+import { setupOffline } from './engine/save/offline.js';
 import { renderTitleScreen } from './engine/ui/title-screen.js';
 import { startAdventureScreen } from './engine/ui/adventure-screen.js';
 import { setupDebugPanel } from './engine/ui/debug-panel.js';
@@ -18,7 +19,28 @@ import { testHero } from '../data/campaign/test-hero.js';
 const params = new URLSearchParams(window.location.search);
 const DEBUG = params.has('debug');
 
+// Set just before an update reloads the page, so play picks up where it was.
+const UPDATE_KEY = 'questbound:update-reload';
+
 async function start() {
+  // Home-screen install and offline play. When a new version has downloaded, the banner offers it.
+  const banner = document.getElementById('update-banner');
+  const offline = setupOffline({
+    debug: DEBUG,
+    onUpdateReady: (apply) => {
+      banner.hidden = false;
+      banner.onclick = () => {
+        banner.disabled = true;
+        banner.textContent = 'Updating2026';
+        rememberForUpdate();
+        apply();
+      };
+    },
+  }).catch((error) => {
+    console.warn("Offline play couldn't start:", error);
+    return 'failed';
+  });
+
   const story = await loadStory(new URL('../story/', import.meta.url));
   const runtime = { story, game: null };
   bindExternals(story, runtime);
@@ -35,6 +57,27 @@ async function start() {
   // A session is one visit: opening a slot counts once per page load, so going back to the
   // title screen and continuing again in the same visit doesn't add another.
   const openedThisVisit = new Set();
+
+  // An update reload carries the visit on: same slot, same session.
+  let resumeSlot = null;
+  try {
+    const carried = JSON.parse(sessionStorage.getItem(UPDATE_KEY));
+    sessionStorage.removeItem(UPDATE_KEY);
+    if (carried) {
+      for (const slot of carried.opened) openedThisVisit.add(slot);
+      resumeSlot = carried.resumeSlot;
+    }
+  } catch {
+    // Nothing carried over.
+  }
+  function rememberForUpdate() {
+    try {
+      const resume = runtime.game ? runtime.game.slot : null;
+      sessionStorage.setItem(UPDATE_KEY, JSON.stringify({ opened: [...openedThisVisit], resumeSlot: resume }));
+    } catch {
+      // Without it the update still works; play just reopens at the title screen.
+    }
+  }
 
   const saveStatus = document.getElementById('save-status');
   async function autosave(game) {
@@ -126,6 +169,7 @@ async function start() {
       root: document,
       getGame: () => runtime.game,
       tracker,
+      offline,
       actions: {
         jumpTo: (path) => change((game) => (game.page = jumpTo(game, path))),
         restartStory: () => change((game) => (game.page = restartStory(game))),
@@ -147,7 +191,8 @@ async function start() {
   }
 
   document.getElementById('to-title').addEventListener('click', () => showTitle());
-  await showTitle();
+  if (resumeSlot !== null) await titleActions.onContinue(resumeSlot);
+  else await showTitle();
 }
 
 start().catch(showFatalError);

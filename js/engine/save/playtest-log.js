@@ -28,12 +28,15 @@ export class PlaytestTracker {
     this.#closeDanglingScenes();
   }
 
-  // A game opened. Picks the session up again if it's the one already being tracked
-  // (back to the title screen and straight back in), otherwise starts a new entry.
+  // A game opened. Picks the session up again if it's the one already being tracked (back to
+  // the title screen and straight back in, or a reload for an update), otherwise starts a new entry.
   startSession(game) {
     const gameId = `${game.slot}:${game.createdAt}`;
-    const sameSession = this.current && this.current.gameId === gameId && this.current.session === game.sessionCount;
-    if (!sameSession) {
+    const latest = this.current || this.log.sessions[this.log.sessions.length - 1];
+    const sameSession = latest && latest.gameId === gameId && latest.session === game.sessionCount;
+    if (sameSession) {
+      this.current = latest;
+    } else {
       this.endSession();
       this.current = {
         gameId,

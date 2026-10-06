@@ -429,6 +429,16 @@ test('Playtest log: kept on the device, and a scene left open by a closed page i
   assertEqual(second.tracker.log.scenes.map((v) => [v.scene, v.ms]), [['gate', 40 * SECOND]]);
 });
 
+test('Playtest log: reloading for an update carries on the same session entry', () => {
+  const storage = memoryStorage();
+  const before = fakeTracker(storage);
+  before.tracker.startSession(fakeGame('gate', { session: 5 }));
+  const after = fakeTracker(storage);
+  after.tracker.startSession(fakeGame('gate', { session: 5 }));
+  after.tracker.startSession(fakeGame('gate', { session: 6 }));
+  assertEqual(after.tracker.log.sessions.map((s) => s.session), [5, 6]);
+});
+
 test('Playtest log: durations read naturally', () => {
   assertEqual([formatDuration(38 * SECOND), formatDuration(245 * SECOND), formatDuration(3720 * SECOND)], ['38s', '4m 05s', '1h 02m']);
 });

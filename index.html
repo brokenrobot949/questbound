@@ -5,12 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0d0f1a" />
     <title>Questbound</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="./assets/ui/favicon-32.png" />
+    <link rel="apple-touch-icon" href="./assets/ui/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="Questbound" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <link rel="stylesheet" href="./css/style.css" />
     <script type="module" src="./js/main.js"></script>
   </head>
   <body>
     <div class="app">
       <div id="error-area"></div>
+      <button class="update-banner" id="update-banner" type="button" hidden>Update ready &mdash; tap to reload</button>
 
       <section class="screen" id="boot-screen">
         <p class="boot-text">Loading&hellip;</p>

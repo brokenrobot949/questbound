@@ -6,13 +6,15 @@ import { listScenes } from '../story/story-runner.js';
 import { forceNextD20, peekForcedD20 } from '../rules/dice.js';
 import { getSetting, setSetting } from '../save/settings.js';
 import { formatDuration, summarizeLog } from '../save/playtest-log.js';
+import { offlineReport } from '../save/offline.js';
 import { actionButton } from './backup-panels.js';
 import { el } from './dom.js';
 
 // getGame(): the game being played, or null on the title screen.
+// offline: a promise of how offline play started ("on", "off-local", "off-debug", "unsupported").
 // actions: { jumpTo(path), restartStory(), setLevel(n), setFlags(list), setInkVariable(name, value), resetSave() }
 // Each action applies the change, saves and redraws; the panel then redraws itself.
-export function setupDebugPanel({ root, getGame, tracker, actions }) {
+export function setupDebugPanel({ root, getGame, tracker, offline, actions }) {
   const toggle = root.getElementById('debug-toggle');
   const panel = root.getElementById('debug-panel');
   toggle.hidden = false;
@@ -46,7 +48,7 @@ export function setupDebugPanel({ root, getGame, tracker, actions }) {
     }
     panel.append(diceSection(game));
     if (game) panel.append(saveSection(game));
-    panel.append(playtestSection());
+    panel.append(playtestSection(), offlineSection());
   }
 
   function sceneSection(game) {
@@ -232,6 +234,29 @@ export function setupDebugPanel({ root, getGame, tracker, actions }) {
     });
     area.append(clear);
     section.append(area);
+    return section;
+  }
+
+  // Filled in once the browser answers, so the rest of the panel doesn't wait for it.
+  function offlineSection() {
+    const section = el('section', 'debug-section');
+    const status = el('p', 'debug-note', 'Checking2026');
+    section.append(heading('Offline play', 'h3'), status);
+    Promise.all([offline, offlineReport()]).then(([mode, report]) => {
+      const lines = {
+        on: 'On: this page is using the offline copy.',
+        'off-local': 'Off on localhost, so every reload shows your latest changes. Add ?sw to the address to test offline play here.',
+        'off-debug': 'Off in debug mode: every file comes fresh from the server.',
+        unsupported: "This browser can't play offline.",
+        failed: "Offline play couldn't start; see the browser console.",
+      };
+      status.textContent = lines[mode] || mode;
+      if (report.names.length > 0) {
+        section.append(el('p', 'debug-note', `Offline copy on this device: ${report.names.join(', ')}, ${report.files} files.`));
+        const missing = report.missing.length ? report.missing.join(', ') : 'none';
+        section.append(el('p', report.missing.length ? 'debug-problem' : 'debug-note', `Files this page used that the copy lacks: ${missing}`));
+      }
+    });
     return section;
   }
 
