@@ -10,27 +10,45 @@
   </head>
   <body>
     <div class="app">
-      <header class="title-bar">
-        <h1 class="game-title">Questbound</h1>
-        <p class="build-note">Phase 0 &middot; test scene</p>
-      </header>
+      <div id="error-area"></div>
 
-      <p class="hero-strip" id="hero-strip"></p>
+      <section class="screen" id="boot-screen">
+        <p class="boot-text">Loading&hellip;</p>
+      </section>
 
-      <main class="dm-window" id="narration" aria-live="polite">
-        <p class="narration-text">Loading the story&hellip;</p>
-      </main>
+      <section class="screen" id="title-screen" hidden>
+        <header class="title-header">
+          <h1 class="game-title is-large">Questbound</h1>
+          <p class="title-tagline">Choose a save slot</p>
+        </header>
+        <p class="title-message" id="title-message" hidden></p>
+        <div class="slot-list" id="slot-list"></div>
+      </section>
 
-      <nav class="choices" id="choices" aria-label="Choices"></nav>
+      <section class="screen" id="adventure-screen" hidden>
+        <header class="title-bar">
+          <h1 class="game-title">Questbound</h1>
+          <button class="text-button" id="to-title" type="button">Save slots</button>
+        </header>
+        <p class="status-line">
+          <span id="slot-note"></span>
+          <span id="save-status"></span>
+        </p>
+        <p class="hero-strip" id="hero-strip"></p>
 
-      <details class="roll-log-drawer">
-        <summary>Roll log (<span id="roll-count">0</span>)</summary>
-        <ol class="roll-log" id="roll-log"></ol>
-      </details>
+        <main class="dm-window" id="narration" aria-live="polite"></main>
+
+        <nav class="choices" id="choices" aria-label="Choices"></nav>
+
+        <details class="roll-log-drawer">
+          <summary>Roll log (<span id="roll-count">0</span>)</summary>
+          <ol class="roll-log" id="roll-log"></ol>
+        </details>
+      </section>
 
       <footer class="footer">
         <span id="seed-note"></span>
-        <a href="./tests/rules.html">Rules tests</a>
+        <a href="./tests/rules.html">Tests</a>
       </footer>
     </div>
   </body>

@@ -10,4 +10,4 @@ The game uses JavaScript modules, so opening `index.html` straight from the fold
 2. Keep that window open while you play. Close it to stop the server.
 3. After changing files, reload the page (a hard refresh, Ctrl+Shift+R, is safest).
 
-Rules checks run at http://localhost:8000/tests/rules.html.
+Checks run in the browser: rules at http://localhost:8000/tests/rules.html and saves at http://localhost:8000/tests/saves.html. The save checks use their own test database, so they never touch your saves.

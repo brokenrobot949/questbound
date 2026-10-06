@@ -8,7 +8,7 @@ import { d20Test } from '../js/engine/rules/d20-test.js';
 import { abilityCheck } from '../js/engine/rules/ability-check.js';
 import { abilityModifier, proficiencyBonus, checkModifiers } from '../js/engine/character/sheet.js';
 import { difficultyName, rollLine } from '../js/engine/ui/roll-format.js';
-import { parseChoiceTags } from '../js/engine/story/tags.js';
+import { parseTags } from '../js/engine/story/tags.js';
 import { skills } from '../data/srd/skills.js';
 import { abilities } from '../data/srd/abilities.js';
 import { advancement } from '../data/srd/advancement.js';
@@ -283,9 +283,10 @@ test('Roll line names a Critical Hit', () => {
   assertEqual(rollLine(r), 'd20 (20) = 20 vs AC 15 — critical hit');
 });
 
-test('Ink choice tags: #check:persuasion:15 is read as a Persuasion check against DC 15', () => {
-  assertEqual(parseChoiceTags(['check:persuasion:15']), { check: { testId: 'persuasion', dc: 15 } });
-  assertEqual(parseChoiceTags(null), { check: null });
+test('Ink tags: #check:persuasion:15 is a Persuasion check against DC 15; #location sets the place', () => {
+  assertEqual(parseTags(['check:persuasion:15']), { check: { testId: 'persuasion', dc: 15 }, location: null });
+  assertEqual(parseTags(['location: Bramblegate, north gate']).location, 'Bramblegate, north gate');
+  assertEqual(parseTags(null), { check: null, location: null });
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

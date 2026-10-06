@@ -45,13 +45,177 @@ body {
   min-height: 100vh;
 }
 
-/* Title bar */
+/* Screens: only one shows at a time */
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.screen[hidden] {
+  display: none;
+}
+
+.boot-text {
+  margin: 40px 0;
+  text-align: center;
+  font-family: var(--font-ui);
+  color: var(--muted);
+}
+
+/* Title screen and save slots */
+
+.title-header {
+  text-align: center;
+  padding: 24px 0 8px;
+}
+
+.game-title.is-large {
+  font-size: 2rem;
+}
+
+.title-tagline {
+  margin: 4px 0 0;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.title-message {
+  margin: 0;
+  padding: 10px 12px;
+  border: 2px solid var(--bad);
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--bad);
+}
+
+.slot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.slot-card {
+  background: var(--box);
+  border: 3px solid var(--box-edge);
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+
+.slot-card.is-empty {
+  border-color: var(--box-edge-dark);
+}
+
+.slot-name {
+  margin: 0 0 4px;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.slot-hero {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.slot-detail {
+  margin: 2px 0 0;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.slot-detail.is-problem,
+.slot-warning {
+  color: var(--bad);
+}
+
+.slot-warning {
+  flex-basis: 100%;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+}
+
+.slot-actions,
+.slot-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.slot-confirm {
+  margin-top: 0;
+}
+
+.slot-button {
+  min-height: 44px;
+  padding: 8px 16px;
+  background: var(--card);
+  color: var(--text);
+  border: 2px solid var(--box-edge-dark);
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.slot-button:hover,
+.slot-button:focus-visible {
+  background: var(--card-hover);
+  border-color: var(--box-edge);
+  outline: none;
+}
+
+.slot-button.is-primary {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.slot-button.is-danger {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+/* Title bar and status line */
 
 .title-bar {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
+}
+
+.text-button {
+  padding: 6px 0;
+  background: none;
+  border: none;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.text-button:hover,
+.text-button:focus-visible {
+  color: var(--text);
+}
+
+.status-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  color: var(--muted);
 }
 
 .game-title {
@@ -63,7 +227,6 @@ body {
   color: var(--accent);
 }
 
-.build-note,
 .hero-strip,
 .footer {
   margin: 0;
@@ -85,6 +248,12 @@ body {
 
 .narration-text {
   margin: 0 0 0.9em;
+}
+
+.dm-note {
+  margin: 0 0 0.9em;
+  font-style: italic;
+  color: var(--accent);
 }
 
 .chosen-text {

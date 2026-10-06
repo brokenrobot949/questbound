@@ -41,12 +41,13 @@ export function scriptedRng(faces) {
   };
 }
 
-export function run(summaryEl, listEl) {
+// Runs every check in order, waiting for any that are async.
+export async function run(summaryEl, listEl) {
   let passed = 0;
   for (const t of tests) {
     const li = document.createElement('li');
     try {
-      t.fn();
+      await t.fn();
       passed += 1;
       li.className = 'pass';
       li.textContent = `PASS  ${t.name}`;
@@ -60,5 +61,15 @@ export function run(summaryEl, listEl) {
   const failed = tests.length - passed;
   summaryEl.textContent = `${passed} passed, ${failed} failed`;
   summaryEl.className = failed === 0 ? 'pass' : 'fail';
-  document.title = `${failed === 0 ? 'PASS' : 'FAIL'} · Questbound rules checks`;
+  document.title = `${failed === 0 ? 'PASS' : 'FAIL'} · ${document.title.replace(/^(PASS|FAIL) · /, '')}`;
+}
+
+// Like assertThrows, for async code.
+export async function assertRejects(fn, message = 'expected an error') {
+  try {
+    await fn();
+  } catch {
+    return;
+  }
+  throw new Error(message);
 }
