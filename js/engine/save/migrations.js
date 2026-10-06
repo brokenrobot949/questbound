@@ -10,4 +10,11 @@ export const migrations = {
   // Version 2 remembers which session the save was last backed up in, for the backup reminder.
   // Older saves have never been backed up.
   1: (save) => ({ ...save, version: 2, lastBackupSession: 0 }),
+
+  // Version 3 adds story flags (none set yet) and names the scene each page happens in.
+  2: (save) => ({
+    ...save,
+    version: 3,
+    game: { ...save.game, flags: [], page: { scene: null, ...save.game.page } },
+  }),
 };

@@ -3,7 +3,7 @@
 
 import { test, assertEqual, assertTrue, assertThrows, scriptedRng, run } from './harness.js';
 import { createRng } from '../js/engine/rules/rng.js';
-import { rollDie, rollDice } from '../js/engine/rules/dice.js';
+import { forceNextD20, peekForcedD20, rollDie, rollDice } from '../js/engine/rules/dice.js';
 import { d20Test } from '../js/engine/rules/d20-test.js';
 import { abilityCheck } from '../js/engine/rules/ability-check.js';
 import { abilityModifier, proficiencyBonus, checkModifiers } from '../js/engine/character/sheet.js';
@@ -287,6 +287,39 @@ test('Ink tags: #check:persuasion:15 is a Persuasion check against DC 15; #locat
   assertEqual(parseTags(['check:persuasion:15']), { check: { testId: 'persuasion', dc: 15 }, location: null });
   assertEqual(parseTags(['location: Bramblegate, north gate']).location, 'Bramblegate, north gate');
   assertEqual(parseTags(null), { check: null, location: null });
+});
+
+// ---- Debug mode: forcing the next d20 ----
+
+test('Debug: a forced d20 shows the chosen face once, marked as forced', () => {
+  forceNextD20(20);
+  const rng = createRng('forced');
+  const forced = d20Test({ rng, kind: 'check', target: { type: 'DC', value: 15 } });
+  const next = d20Test({ rng, kind: 'check', target: { type: 'DC', value: 15 } });
+  assertEqual([forced.natural, forced.forced, next.forced, peekForcedD20()], [20, true, false, null]);
+});
+
+test('Debug: forcing a d20 leaves the rest of the dice unchanged', () => {
+  const plain = createRng('same-dice');
+  const forcedRng = createRng('same-dice');
+  d20Test({ rng: plain, kind: 'check' });
+  forceNextD20(1);
+  d20Test({ rng: forcedRng, kind: 'check' });
+  assertEqual(forcedRng.getState(), plain.getState(), 'the RNG should move on exactly as it would have');
+});
+
+test('Debug: a forced d20 with Advantage lands both dice on the chosen face', () => {
+  forceNextD20(7);
+  const r = d20Test({ rng: createRng('adv'), kind: 'check', advantage: ['Help'] });
+  assertEqual([r.dice, r.natural], [[7, 7], 7]);
+});
+
+test('Debug: only faces 1 to 20 can be forced, and the roll line says "forced"', () => {
+  assertThrows(() => forceNextD20(0));
+  assertThrows(() => forceNextD20(21));
+  forceNextD20(12);
+  const r = d20Test({ rng: createRng('line'), kind: 'check', modifiers: plusFive, target: { type: 'DC', value: 15 } });
+  assertEqual(rollLine(r), 'd20 (12, forced) + Cha 3 + Proficiency 2 = 17 vs DC 15 — success');
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

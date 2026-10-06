@@ -2,6 +2,8 @@
 // the text and rolls since the last choice, in the order they happened.
 // A page is saved with the game, so a reload shows exactly what the player was looking at.
 //
+// A page: { beats, scene }. scene is the Ink knot the page happens in, for the playtest log.
+//
 // Page beats:
 //   { type: 'chosen', text }               the choice the player just made
 //   { type: 'text', text }                 a paragraph of narration
@@ -13,13 +15,15 @@ import { parseTags } from './tags.js';
 // How many rolls the roll log keeps in the save. Older ones drop off.
 export const ROLL_LOG_LIMIT = 200;
 
-// Runs Ink until it stops for a choice or ends. A roll made while Ink worked out a line
-// belongs before that line.
-export function runStory(game) {
+// Runs Ink until it stops for a choice or ends, and returns the page. A roll made while Ink
+// worked out a line belongs before that line. leadBeats go first (e.g. the choice just made).
+export function runPage(game, leadBeats = []) {
   const { story } = game;
-  const beats = [];
+  const beats = [...leadBeats];
+  let scene = null;
   while (story.canContinue) {
     const text = story.Continue().trim();
+    scene = currentKnot(story) || scene;
     for (const result of game.pendingRolls.splice(0)) {
       beats.push({ type: 'roll', result, revealed: false });
     }
@@ -27,7 +31,26 @@ export function runStory(game) {
     if (tags.location) beats.push({ type: 'location', value: tags.location });
     if (text) beats.push({ type: 'text', text });
   }
-  return beats;
+  return { beats, scene: scene || currentKnot(story) };
+}
+
+// Every knot and stitch in the story, e.g. "gate_test" and "gate_test.gate_opens".
+export function listScenes(story) {
+  const scenes = [];
+  for (const [name, knot] of story.mainContentContainer.namedContent) {
+    if (/\s/.test(name)) continue; // Ink's own entries, such as "global decl"
+    scenes.push(name);
+    for (const stitch of knot.namedContent.keys()) scenes.push(`${name}.${stitch}`);
+  }
+  return scenes;
+}
+
+// Debug mode: moves the story straight to a knot or stitch and runs on. Returns the new page.
+export function jumpTo(game, path) {
+  game.location = currentLocation(game);
+  game.pendingRolls.length = 0;
+  game.story.ChoosePathString(path);
+  return runPage(game);
 }
 
 // Where the hero is, as far as the player has seen: location changes count only up to the
@@ -46,16 +69,16 @@ export function makeChoice(game, choice) {
   const expected = parseTags(choice.tags).check;
   game.location = currentLocation(game);
   game.story.ChooseChoiceIndex(choice.index);
-  const beats = [{ type: 'chosen', text: choice.text }, ...runStory(game)];
-  warnIfTagMismatch(expected, beats.find((b) => b.type === 'roll'));
-  return { beats };
+  const page = runPage(game, [{ type: 'chosen', text: choice.text }]);
+  warnIfTagMismatch(expected, page.beats.find((b) => b.type === 'roll'));
+  return page;
 }
 
 // Starts the story over from the top, keeping the hero and the dice.
 export function restartStory(game) {
   game.location = currentLocation(game);
   game.story.ResetState();
-  return { beats: runStory(game) };
+  return runPage(game);
 }
 
 // Called once the player has seen a roll: marks it revealed and adds it to the roll log.
@@ -63,6 +86,16 @@ export function revealRoll(game, beat) {
   beat.revealed = true;
   game.rollLog.push({ session: game.sessionCount, result: beat.result });
   if (game.rollLog.length > ROLL_LOG_LIMIT) game.rollLog.splice(0, game.rollLog.length - ROLL_LOG_LIMIT);
+}
+
+// The knot Ink was last in, from its position in the story ("gate_test.gate_opens.0").
+function currentKnot(story) {
+  const pointer = story.state.previousPointer;
+  const path = pointer && pointer.path ? pointer.path.toString() : null;
+  const choice = story.currentChoices[0];
+  const fromChoice = choice && choice.sourcePath ? choice.sourcePath : null;
+  const knot = (path || fromChoice || '').split('.')[0];
+  return /^[A-Za-z_]/.test(knot) ? knot : null; // top-level story content has no knot
 }
 
 // Dev check: a choice's #check tag should match the check() the scene actually rolls.

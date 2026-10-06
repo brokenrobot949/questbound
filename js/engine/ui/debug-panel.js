@@ -1,0 +1,280 @@
+// Debug mode (add ?debug to the address): a "Debug" button that opens a panel of testing tools.
+// Jump to any scene, view and edit story flags and Ink variables, set the hero's level,
+// force the next d20, toggle auto-roll, reset the current save, and read the playtest log.
+
+import { listScenes } from '../story/story-runner.js';
+import { forceNextD20, peekForcedD20 } from '../rules/dice.js';
+import { getSetting, setSetting } from '../save/settings.js';
+import { formatDuration, summarizeLog } from '../save/playtest-log.js';
+import { actionButton } from './backup-panels.js';
+import { el } from './dom.js';
+
+// getGame(): the game being played, or null on the title screen.
+// actions: { jumpTo(path), restartStory(), setLevel(n), setFlags(list), setInkVariable(name, value), resetSave() }
+// Each action applies the change, saves and redraws; the panel then redraws itself.
+export function setupDebugPanel({ root, getGame, tracker, actions }) {
+  const toggle = root.getElementById('debug-toggle');
+  const panel = root.getElementById('debug-panel');
+  toggle.hidden = false;
+  toggle.addEventListener('click', () => {
+    panel.hidden = !panel.hidden;
+    toggle.setAttribute('aria-expanded', String(!panel.hidden));
+    if (!panel.hidden) render();
+  });
+
+  // Runs an action, then redraws the panel. Errors show in the panel rather than breaking it.
+  let problem = '';
+  const run = async (action) => {
+    problem = '';
+    try {
+      await action();
+    } catch (error) {
+      console.error(error);
+      problem = error.message;
+    }
+    render();
+  };
+
+  function render() {
+    const game = getGame();
+    panel.replaceChildren(heading('Debug mode'));
+    if (problem) panel.append(el('p', 'debug-problem', problem));
+    if (game) {
+      panel.append(sceneSection(game), flagSection(game), inkVariableSection(game), heroSection(game));
+    } else {
+      panel.append(el('p', 'debug-note', 'Open a save slot to use the scene, flag, hero and save tools.'));
+    }
+    panel.append(diceSection(game));
+    if (game) panel.append(saveSection(game));
+    panel.append(playtestSection());
+  }
+
+  function sceneSection(game) {
+    const section = el('section', 'debug-section');
+    section.append(heading('Scene', 'h3'), el('p', 'debug-note', `Now in: ${game.page.scene || 'unknown'}`));
+    const select = el('select', 'debug-input');
+    select.setAttribute('aria-label', 'Scene to jump to');
+    for (const path of listScenes(game.story)) {
+      const option = el('option', null, path);
+      option.value = path;
+      if (path === game.page.scene) option.selected = true;
+      select.append(option);
+    }
+    section.append(
+      row(select, actionButton('Jump', () => run(() => actions.jumpTo(select.value)))),
+      el(
+        'p',
+        'debug-note',
+        "Jump keeps the story's memory, so one-time choices already taken stay hidden. Restart forgets it.",
+      ),
+      actionButton('Restart story from the top', () => run(() => actions.restartStory())),
+    );
+    return section;
+  }
+
+  function flagSection(game) {
+    const section = el('section', 'debug-section');
+    section.append(heading('Story flags', 'h3'));
+    if (game.flags.length === 0) section.append(el('p', 'debug-note', 'No flags set.'));
+    const list = el('ul', 'debug-chips');
+    for (const flag of game.flags) {
+      const chip = el('li', 'debug-chip', flag);
+      const remove = el('button', 'debug-chip-remove', '×');
+      remove.type = 'button';
+      remove.setAttribute('aria-label', `Remove flag ${flag}`);
+      remove.addEventListener('click', () => run(() => actions.setFlags(game.flags.filter((f) => f !== flag))));
+      chip.append(remove);
+      list.append(chip);
+    }
+    section.append(list);
+    const input = el('input', 'debug-input');
+    input.placeholder = 'new_flag_name';
+    input.setAttribute('aria-label', 'Flag to add');
+    const add = actionButton('Add flag', () =>
+      run(() => {
+        const flag = input.value.trim();
+        if (!flag) throw new Error('Type a flag name first.');
+        if (!game.flags.includes(flag)) actions.setFlags([...game.flags, flag]);
+      }),
+    );
+    section.append(row(input, add));
+    return section;
+  }
+
+  function inkVariableSection(game) {
+    const section = el('section', 'debug-section');
+    section.append(heading('Ink variables', 'h3'));
+    const names = inkVariableNames(game.story);
+    if (names.length === 0) {
+      section.append(el('p', 'debug-note', 'The story has no VAR variables yet.'));
+      return section;
+    }
+    for (const name of names) {
+      const value = game.story.variablesState[name];
+      const input = el('input', 'debug-input');
+      input.value = String(value);
+      input.setAttribute('aria-label', `Value of ${name}`);
+      const editable = ['number', 'string', 'boolean'].includes(typeof value);
+      input.disabled = !editable;
+      const set = actionButton('Set', () => run(() => actions.setInkVariable(name, convert(input.value, value))));
+      set.disabled = !editable;
+      section.append(el('p', 'debug-label', name), row(input, set));
+    }
+    return section;
+  }
+
+  function heroSection(game) {
+    const section = el('section', 'debug-section');
+    section.append(heading('Hero', 'h3'));
+    const level = el('input', 'debug-input is-short');
+    level.type = 'number';
+    level.min = '1';
+    level.max = '20';
+    level.value = String(game.character.level);
+    level.setAttribute('aria-label', 'Level');
+    section.append(
+      el('p', 'debug-label', 'Level'),
+      row(level, actionButton('Set level', () => run(() => actions.setLevel(Number(level.value))))),
+      el('p', 'debug-note', 'Granting items and gold arrives with the inventory in Phase 1.'),
+    );
+    return section;
+  }
+
+  function diceSection(game) {
+    const section = el('section', 'debug-section');
+    section.append(heading('Dice', 'h3'));
+    const forced = peekForcedD20();
+    section.append(
+      el('p', 'debug-note', forced === null ? 'The next d20 rolls normally.' : `The next d20 test will show ${forced}.`),
+    );
+    const face = el('input', 'debug-input is-short');
+    face.type = 'number';
+    face.min = '1';
+    face.max = '20';
+    face.value = String(forced ?? 20);
+    face.setAttribute('aria-label', 'd20 face to force');
+    const buttons = [actionButton('Force next d20', () => run(() => forceNextD20(Number(face.value))))];
+    if (forced !== null) buttons.push(actionButton('Clear', () => run(() => forceNextD20(null))));
+    section.append(row(face, ...buttons));
+
+    const autoLabel = el('label', 'debug-check');
+    const auto = el('input');
+    auto.type = 'checkbox';
+    auto.checked = getSetting('autoRoll');
+    auto.addEventListener('change', () => run(() => setSetting('autoRoll', auto.checked)));
+    autoLabel.append(auto, ' Auto-roll (no tap needed)');
+    section.append(autoLabel);
+
+    if (game) section.append(el('p', 'debug-note', `Dice seed for this game: ${game.seed}`));
+    section.append(el('p', 'debug-note', 'Add &seed=anything to the address to start new games with the same dice.'));
+    return section;
+  }
+
+  function saveSection(game) {
+    const section = el('section', 'debug-section');
+    section.append(heading('Save', 'h3'));
+    const area = el('div', 'slot-confirm');
+    const reset = actionButton(`Reset save for slot ${game.slot}`, () => {
+      area.replaceChildren(
+        el('p', 'slot-warning', `Delete slot ${game.slot}'s save and go back to the title screen?`),
+        actionButton('Delete it', () => run(() => actions.resetSave()), 'is-danger'),
+        actionButton('Cancel', () => area.replaceChildren(reset)),
+      );
+    });
+    area.append(reset);
+    section.append(area);
+    return section;
+  }
+
+  function playtestSection() {
+    const section = el('section', 'debug-section');
+    section.append(heading('Playtest log', 'h3'));
+    const s = summarizeLog(tracker.log);
+    if (s.sessionCount === 0) {
+      section.append(el('p', 'debug-note', 'Nothing recorded yet. Play a session and come back.'));
+      return section;
+    }
+    const facts = el('ul', 'debug-facts');
+    for (const line of [
+      `${plural(s.sessionCount, 'session')} · average ${formatDuration(s.averageSessionMs)} · longest ${formatDuration(s.longestSessionMs)}`,
+      `${plural(s.sceneVisits, 'scene visit')} · average ${formatDuration(s.averageSceneMs)} each`,
+      `Highest level reached: ${s.highestLevel}`,
+      `Deaths: ${s.deaths} · ${s.deathsPerSession.toFixed(2)} per session`,
+    ]) {
+      facts.append(el('li', null, line));
+    }
+    section.append(facts);
+
+    if (s.scenes.length > 0) {
+      const table = el('table', 'debug-table');
+      table.append(tableRow('th', ['Scene', 'Visits', 'Average']));
+      for (const scene of s.scenes) {
+        table.append(tableRow('td', [scene.scene, String(scene.visits), formatDuration(scene.averageMs)]));
+      }
+      section.append(table);
+    }
+
+    const games = el('ul', 'debug-facts');
+    for (const g of s.games) {
+      games.append(
+        el('li', null, `${g.hero} (slot ${g.slot}): ${plural(g.sessions, 'session')}, reached level ${g.highestLevel}, ${plural(g.deaths, 'death')}`),
+      );
+    }
+    section.append(el('p', 'debug-label', 'By game'), games);
+
+    const area = el('div', 'slot-confirm');
+    const clear = actionButton('Clear the log', () => {
+      area.replaceChildren(
+        el('p', 'slot-warning', 'Clear every playtest record on this device?'),
+        actionButton('Clear', () => run(() => tracker.clear()), 'is-danger'),
+        actionButton('Cancel', () => area.replaceChildren(clear)),
+      );
+    });
+    area.append(clear);
+    section.append(area);
+    return section;
+  }
+
+  return { refresh: () => !panel.hidden && render() };
+}
+
+// The names of the story's VAR variables. inkjs has no public list, so this reads its own map.
+function inkVariableNames(story) {
+  const map = story.variablesState && story.variablesState._globalVariables;
+  return map ? [...map.keys()] : [];
+}
+
+// Turns typed text into the same kind of value the Ink variable already holds.
+function convert(text, current) {
+  if (typeof current === 'number') {
+    const n = Number(text);
+    if (Number.isNaN(n)) throw new Error(`"${text}" isn't a number.`);
+    return n;
+  }
+  if (typeof current === 'boolean') {
+    if (text !== 'true' && text !== 'false') throw new Error('Type true or false.');
+    return text === 'true';
+  }
+  return text;
+}
+
+// "1 session", "3 sessions"
+function plural(n, word) {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+function heading(text, tag = 'h2') {
+  return el(tag, 'debug-heading', text);
+}
+
+function row(...children) {
+  const r = el('div', 'debug-row');
+  r.append(...children);
+  return r;
+}
+
+function tableRow(cellTag, cells) {
+  const tr = el('tr');
+  for (const cell of cells) tr.append(el(cellTag, null, cell));
+  return tr;
+}

@@ -10,6 +10,7 @@ import { abilityModifier, abilityScore, findAbility, findSkill, proficiencyBonus
 import { abilities } from '../../../data/srd/abilities.js';
 import { dmVoice } from '../../../data/campaign/dm-voice.js';
 import { gameToSave } from '../save/save-format.js';
+import { getSetting } from '../save/settings.js';
 import { difficultyName, outcomeText, rollLine, signedNumber } from './roll-format.js';
 import { actionButton, backupPanel } from './backup-panels.js';
 import { el, showFatalError } from './dom.js';
@@ -26,7 +27,6 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
 
   root.getElementById('hero-strip').textContent = heroSummary(game.character);
   root.getElementById('slot-note').textContent = `Slot ${game.slot} · Session ${game.sessionCount}`;
-  root.getElementById('seed-note').textContent = `Dice seed: ${game.seed}`;
   narration.replaceChildren();
   choices.replaceChildren();
   notices.replaceChildren();
@@ -108,33 +108,43 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
     follow(choices);
   }
 
-  // Shows the d20 and waits for the player's tap, then reveals the roll in full and saves.
+  // Shows the d20 and waits for the player's tap (or rolls straight away with auto-roll on),
+  // then reveals the roll in full and saves.
   function rollPanelAwaitingTap(beat) {
     return new Promise((resolve) => {
       const { panel, die } = rollPanel(beat.result);
+      const autoRoll = getSetting('autoRoll');
       const hint = el('p', 'roll-hint', 'Tap the d20 to roll');
-      panel.append(hint);
+      if (!autoRoll) panel.append(hint);
       narration.append(panel);
       follow(panel);
 
-      die.button.addEventListener(
-        'click',
-        async () => {
-          holdView = false;
-          die.button.disabled = true;
-          hint.remove();
-          await tumble(die.face, beat.result.natural);
-          beat.aside = pickAside(game, beat.result);
-          revealRoll(game, beat);
-          markNatural(die.button, beat.result);
-          panel.append(resultBlock(beat));
-          renderRollLog(root, game);
-          onSave(game);
-          follow(panel);
-          resolve();
-        },
-        { once: true },
-      );
+      const reveal = async () => {
+        die.button.disabled = true;
+        hint.remove();
+        await tumble(die.face, beat.result.natural);
+        beat.aside = pickAside(game, beat.result);
+        revealRoll(game, beat);
+        markNatural(die.button, beat.result);
+        panel.append(resultBlock(beat));
+        renderRollLog(root, game);
+        onSave(game);
+        follow(panel);
+        resolve();
+      };
+
+      if (autoRoll) {
+        reveal();
+      } else {
+        die.button.addEventListener(
+          'click',
+          () => {
+            holdView = false;
+            reveal();
+          },
+          { once: true },
+        );
+      }
     });
   }
 }

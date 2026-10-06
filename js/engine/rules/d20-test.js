@@ -2,7 +2,7 @@
 // It rolls the dice and returns the full breakdown, so the UI and roll log can show exactly
 // what happened. Rules: SRD 5.2.1, "D20 Tests", "Advantage/Disadvantage", "Rolling 20 or 1".
 
-import { rollDie } from './dice.js';
+import { rollDie, takeForcedD20 } from './dice.js';
 
 const KINDS = ['check', 'save', 'attack'];
 
@@ -30,8 +30,15 @@ export function d20Test({
   if (advantage.length > 0 && disadvantage.length === 0) mode = 'advantage';
   if (disadvantage.length > 0 && advantage.length === 0) mode = 'disadvantage';
 
-  const dice = [rollDie(rng, 20)];
-  if (mode !== 'normal') dice.push(rollDie(rng, 20));
+  // Debug mode can force the result. The dice are still rolled, so the RNG moves on exactly
+  // as it would have, and the result is marked forced so the roll log stays honest.
+  const forced = takeForcedD20();
+  const roll = () => {
+    const face = rollDie(rng, 20);
+    return forced === null ? face : forced;
+  };
+  const dice = [roll()];
+  if (mode !== 'normal') dice.push(roll());
 
   let keptIndex = 0;
   if (mode === 'advantage' && dice[1] > dice[0]) keptIndex = 1;
@@ -67,6 +74,7 @@ export function d20Test({
     advantage: [...advantage],
     disadvantage: [...disadvantage],
     dice,
+    forced: forced !== null,
     keptIndex,
     natural,
     modifiers: modifiers.map((m) => ({ ...m })),

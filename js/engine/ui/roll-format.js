@@ -15,10 +15,12 @@ export function difficultyName(dc) {
 }
 
 // "d20 (14)", or with two dice "d20 with advantage (14 and 7, keep 14)".
+// A result forced in debug mode says so: "d20 (20, forced)".
 export function diceText(result) {
-  if (result.mode === 'normal') return `d20 (${result.dice[0]})`;
+  const forced = result.forced ? ', forced' : '';
+  if (result.mode === 'normal') return `d20 (${result.dice[0]}${forced})`;
   const [first, second] = result.dice;
-  return `d20 with ${result.mode} (${first} and ${second}, keep ${result.natural})`;
+  return `d20 with ${result.mode} (${first} and ${second}, keep ${result.natural}${forced})`;
 }
 
 // "+3", "+0" or "−1".

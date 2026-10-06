@@ -48,10 +48,13 @@
         </details>
       </section>
 
-      <footer class="footer">
-        <span id="seed-note"></span>
+      <footer class="footer" id="debug-footer" hidden>
+        <span>Debug mode</span>
         <a href="./tests/rules.html">Tests</a>
       </footer>
+
+      <button class="debug-toggle" id="debug-toggle" type="button" aria-controls="debug-panel" aria-expanded="false" hidden>Debug</button>
+      <aside class="debug-panel" id="debug-panel" aria-label="Debug tools" hidden></aside>
     </div>
   </body>
 </html>

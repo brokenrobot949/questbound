@@ -1,5 +1,26 @@
 // Dice. Every die is rolled with the game's seeded RNG (see rng.js), never Math.random().
 
+// Debug mode only: the face the next d20 test will show, or null to roll normally.
+let forcedD20 = null;
+
+export function forceNextD20(face) {
+  if (face !== null && (!Number.isInteger(face) || face < 1 || face > 20)) {
+    throw new Error(`A d20 can only show 1 to 20, not ${face}`);
+  }
+  forcedD20 = face;
+}
+
+export function peekForcedD20() {
+  return forcedD20;
+}
+
+// Used once by the next d20 test, then cleared.
+export function takeForcedD20() {
+  const face = forcedD20;
+  forcedD20 = null;
+  return face;
+}
+
 // One die with the given number of sides: a d20 gives 1 to 20.
 export function rollDie(rng, sides) {
   if (!Number.isInteger(sides) || sides < 1) {

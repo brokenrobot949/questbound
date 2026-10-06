@@ -7,6 +7,8 @@ import { bindExternals } from '../js/engine/story/externals.js';
 import { currentLocation, makeChoice, revealRoll, ROLL_LOG_LIMIT } from '../js/engine/story/story-runner.js';
 import { SAVE_VERSION, gameToSave, loadGame, migrateSave, newGame, validateSave } from '../js/engine/save/save-format.js';
 import { backupCode, backupFileName, backupFileText, isBackupDue, readBackup } from '../js/engine/save/backup.js';
+import { migrations } from '../js/engine/save/migrations.js';
+import { PlaytestTracker, IDLE_LIMIT_MS, formatDuration, summarizeLog } from '../js/engine/save/playtest-log.js';
 import { openSaveStore, deleteSaveDatabase } from '../js/engine/save/save-store.js';
 import { testHero } from '../data/campaign/test-hero.js';
 
@@ -79,7 +81,7 @@ test('A save holds game state, Ink state, dice state, session count and last-pla
   const game = newGame(runtime, { slot: 2, seed: 'contents', character: testHero, now: new Date('2026-10-01T09:00:00Z') });
   const record = gameToSave(game, new Date('2026-10-06T12:00:00Z'));
   assertEqual(Object.keys(record).sort(), ['createdAt', 'game', 'ink', 'lastBackupSession', 'rng', 'savedAt', 'seed', 'sessionCount', 'slot', 'version']);
-  assertEqual(Object.keys(record.game).sort(), ['character', 'location', 'page', 'rollLog']);
+  assertEqual(Object.keys(record.game).sort(), ['character', 'flags', 'location', 'page', 'rollLog']);
   assertEqual([record.version, record.slot, record.sessionCount, record.lastBackupSession], [SAVE_VERSION, 2, 1, 0]);
   assertEqual([record.createdAt, record.savedAt], ['2026-10-01T09:00:00.000Z', '2026-10-06T12:00:00.000Z']);
   assertTrue(record.rng.length === 4 && record.rng.every(Number.isInteger), 'dice state should be four whole numbers');
@@ -227,7 +229,7 @@ async function playedSave(seed = 'backup') {
 }
 
 test('Migration: a version 1 save gains a backup record and becomes version 2', () => {
-  const upgraded = migrateSave({ version: 1, slot: 2, sessionCount: 5 });
+  const upgraded = migrateSave({ version: 1, slot: 2, sessionCount: 5 }, migrations, 2);
   assertEqual(upgraded, { version: 2, slot: 2, sessionCount: 5, lastBackupSession: 0 });
 });
 
@@ -327,6 +329,108 @@ test('Backup reminder: every 10 sessions since the last backup', () => {
   const due = (session, lastBackup) => isBackupDue(session, lastBackup);
   assertEqual([due(10, 0), due(20, 0), due(15, 5), due(25, 5)], [true, true, true, true]);
   assertEqual([due(1, 0), due(9, 0), due(11, 0), due(10, 10), due(14, 5)], [false, false, false, false, false]);
+});
+
+test('Migration: a version 2 save gains story flags and a scene name, and becomes version 3', () => {
+  const v2 = { version: 2, slot: 1, game: { character: {}, page: { beats: [] } } };
+  const upgraded = migrateSave(v2, migrations, 3);
+  assertEqual(upgraded.version, 3);
+  assertEqual(upgraded.game.flags, []);
+  assertEqual(upgraded.game.page, { scene: null, beats: [] });
+});
+
+// ---- Playtest log ----
+
+// A pretend clock and storage, so the checks control time.
+function fakeTracker(storage = memoryStorage()) {
+  const clock = { t: 0 };
+  const tracker = new PlaytestTracker({ storage, now: () => clock.t });
+  return { tracker, clock, storage };
+}
+
+function memoryStorage() {
+  const data = {};
+  return { getItem: (k) => (k in data ? data[k] : null), setItem: (k, v) => (data[k] = String(v)) };
+}
+
+function fakeGame(scene, { slot = 1, session = 1, level = 1, createdAt = '2026-10-06T10:00:00Z' } = {}) {
+  return { slot, createdAt, sessionCount: session, character: { name: 'Wren', level }, page: { scene } };
+}
+
+const SECOND = 1000;
+
+test('Playtest log: times each session and each scene', () => {
+  const { tracker, clock } = fakeTracker();
+  tracker.startSession(fakeGame('gate'));
+  tracker.update(fakeGame('gate'));
+  clock.t = 30 * SECOND;
+  tracker.update(fakeGame('gate'));
+  clock.t = 60 * SECOND;
+  tracker.update(fakeGame('inn'));
+  clock.t = 90 * SECOND;
+  tracker.endSession();
+  const s = summarizeLog(tracker.log);
+  assertEqual([s.sessionCount, s.averageSessionMs, s.sceneVisits, s.averageSceneMs], [1, 90 * SECOND, 2, 45 * SECOND]);
+  assertEqual(s.scenes.map((x) => [x.scene, x.averageMs]).sort(), [['gate', 60 * SECOND], ['inn', 30 * SECOND]]);
+});
+
+test('Playtest log: a long gap between actions counts as at most five minutes', () => {
+  const { tracker, clock } = fakeTracker();
+  tracker.startSession(fakeGame('gate'));
+  clock.t = 60 * 60 * SECOND;
+  tracker.update(fakeGame('gate'));
+  assertEqual(tracker.current.activeMs, IDLE_LIMIT_MS);
+});
+
+test("Playtest log: time with the game off screen doesn't count", () => {
+  const { tracker, clock } = fakeTracker();
+  tracker.startSession(fakeGame('gate'));
+  clock.t = 10 * SECOND;
+  tracker.pause();
+  clock.t = 10 * 60 * SECOND;
+  tracker.resume();
+  clock.t = 10 * 60 * SECOND + 20 * SECOND;
+  tracker.update(fakeGame('gate'));
+  assertEqual(tracker.current.activeMs, 30 * SECOND);
+});
+
+test('Playtest log: back to the title and straight back in is still one session', () => {
+  const { tracker, clock } = fakeTracker();
+  tracker.startSession(fakeGame('gate'));
+  clock.t = 10 * SECOND;
+  tracker.endSession();
+  clock.t = 5 * 60 * SECOND;
+  tracker.startSession(fakeGame('gate'));
+  clock.t = 5 * 60 * SECOND + 10 * SECOND;
+  tracker.update(fakeGame('gate'));
+  assertEqual([tracker.log.sessions.length, tracker.current.activeMs], [1, 20 * SECOND]);
+});
+
+test('Playtest log: levels reached and deaths, per game', () => {
+  const { tracker } = fakeTracker();
+  tracker.startSession(fakeGame('gate', { session: 1, level: 1 }));
+  tracker.update(fakeGame('gate', { session: 1, level: 3 }));
+  tracker.recordDeath();
+  tracker.startSession(fakeGame('gate', { session: 2, level: 3 }));
+  tracker.startSession(fakeGame('gate', { slot: 2, createdAt: '2026-10-07T10:00:00Z', level: 1 }));
+  const s = summarizeLog(tracker.log);
+  assertEqual([s.sessionCount, s.highestLevel, s.deaths, s.deathsPerSession], [3, 3, 1, 1 / 3]);
+  assertEqual(s.games.map((g) => [g.slot, g.sessions, g.highestLevel, g.deaths]), [[1, 2, 3, 1], [2, 1, 1, 0]]);
+});
+
+test('Playtest log: kept on the device, and a scene left open by a closed page is still counted', () => {
+  const storage = memoryStorage();
+  const first = fakeTracker(storage);
+  first.tracker.startSession(fakeGame('gate'));
+  first.tracker.update(fakeGame('gate'));
+  first.clock.t = 40 * SECOND;
+  first.tracker.pause(); // the phone locks, then the page is closed
+  const second = fakeTracker(storage);
+  assertEqual(second.tracker.log.scenes.map((v) => [v.scene, v.ms]), [['gate', 40 * SECOND]]);
+});
+
+test('Playtest log: durations read naturally', () => {
+  assertEqual([formatDuration(38 * SECOND), formatDuration(245 * SECOND), formatDuration(3720 * SECOND)], ['38s', '4m 05s', '1h 02m']);
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

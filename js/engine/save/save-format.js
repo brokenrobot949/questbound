@@ -10,14 +10,15 @@
 //   seed           the dice seed the game began with (for reference)
 //   rng            the dice generator's state, so a reload rolls the same dice
 //   ink            Ink's story state (story.state.toJson())
-//   game           { character, location, page, rollLog }: what changes in play
+//   game           { character, location, flags, page, rollLog }: what changes in play
+//                  (flags: story flag ids set by set_flag in Ink, e.g. "saw_barrow_light")
 
 import { createRng, Rng } from '../rules/rng.js';
-import { currentLocation, runStory } from '../story/story-runner.js';
+import { currentLocation, runPage } from '../story/story-runner.js';
 import { migrations } from './migrations.js';
 import { abilities } from '../../../data/srd/abilities.js';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 // runtime: { story, game } — the compiled story, and whichever game is being played.
 
@@ -33,6 +34,7 @@ export function newGame(runtime, { slot, seed, character, now = new Date() }) {
     story: runtime.story,
     character: structuredClone(character),
     location: null,
+    flags: [],
     page: null,
     rollLog: [],
     pendingRolls: [],
@@ -40,7 +42,7 @@ export function newGame(runtime, { slot, seed, character, now = new Date() }) {
   };
   runtime.game = game;
   runtime.story.ResetState();
-  game.page = { beats: runStory(game) };
+  game.page = runPage(game);
   return game;
 }
 
@@ -59,6 +61,7 @@ export function gameToSave(game, now = new Date()) {
     game: structuredClone({
       character: game.character,
       location: currentLocation(game),
+      flags: game.flags,
       page: game.page,
       rollLog: game.rollLog,
     }),
@@ -80,6 +83,7 @@ export function loadGame(runtime, record) {
     story: runtime.story,
     character: save.game.character,
     location: save.game.location,
+    flags: save.game.flags,
     page: save.game.page,
     rollLog: save.game.rollLog,
     pendingRolls: [],
@@ -91,7 +95,7 @@ export function loadGame(runtime, record) {
   } catch (error) {
     console.warn("Couldn't restore the story position:", error);
     runtime.story.ResetState();
-    game.page = { beats: runStory(game) };
+    game.page = runPage(game);
     game.notice = 'The story has changed since this save, so the scene starts again.';
   }
   return game;
@@ -130,6 +134,7 @@ export function validateSave(save) {
       Array.isArray(hero.expertise);
     if (!heroOk) problems.push('hero');
     if (game.location !== null && !isText(game.location)) problems.push('location');
+    if (!Array.isArray(game.flags) || !game.flags.every(isText)) problems.push('story flags');
     const beatTypes = ['chosen', 'text', 'roll', 'location'];
     const pageOk = game.page && Array.isArray(game.page.beats) && game.page.beats.every((b) => b && beatTypes.includes(b.type));
     if (!pageOk) problems.push('current page');

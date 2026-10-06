@@ -6,6 +6,7 @@
 // Keep the tag's skill and DC the same as the check() call underneath it.
 //
 // A #location tag on a line says where the hero is now; the save slot shows it.
+// ~ set_flag("name") remembers that something happened, for later scenes to check.
 
 === gate_test ===
 #location:Bramblegate, north gate
@@ -26,6 +27,7 @@ Past her shoulder you can see warm windows and smoke curling from an inn chimney
     -> night_at_the_gate
 
 = gate_opens
+~ set_flag("warden_opened_gate")
 The warden studies you for a long moment. Then she sighs, sets her shoulder to the bar and heaves it aside.
 
 "Straight to the Tallow and Thistle, and stay off the walls," she says. "If anything follows you in, I'm telling the captain it was your idea."
@@ -34,6 +36,7 @@ The gate thuds shut behind you. Bramblegate smells of woodsmoke, wet stone and s
 -> END
 
 = gate_stays_shut
+~ set_flag("saw_barrow_light")
 She hears you out, then shakes her head. "Nice speech. Still no." She jerks her chin at the gatehouse. "There's a dry corner under the eaves. Better than the road."
 
 You settle in with your back to the stone. Near midnight, a pale light moves on the hills to the east, where the barrows are. It sways like a lantern, but no lantern burns that colour.
@@ -42,6 +45,7 @@ At dawn the bar comes off and the warden waves you through. Her eyes keep drifti
 -> END
 
 = night_at_the_gate
+~ set_flag("saw_barrow_light")
 You find a dry patch under the eaves and pull your cloak tight. The warden watches you for a while, then decides you're not worth worrying about.
 
 Near midnight, a pale light moves on the hills to the east, where the barrows are. You watch it until it gutters out.

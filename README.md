@@ -10,4 +10,14 @@ The game uses JavaScript modules, so opening `index.html` straight from the fold
 2. Keep that window open while you play. Close it to stop the server.
 3. After changing files, reload the page (a hard refresh, Ctrl+Shift+R, is safest).
 
-Checks run in the browser: rules at http://localhost:8000/tests/rules.html and saves at http://localhost:8000/tests/saves.html. The save checks use their own test database, so they never touch your saves.
+## Debug mode
+
+Open http://localhost:8000/?debug to get a red **Debug** button in the corner. It opens tools to jump to any scene, view and edit story flags and Ink variables, set the hero's level, force the next d20, turn on auto-roll, reset the current save, and read the playtest log (session and scene times, levels reached, deaths). In debug mode, adding `&seed=anything` to the address makes new games roll the same dice every time.
+
+## Checks
+
+Checks run in the browser, and are linked from the footer in debug mode:
+
+- Rules: http://localhost:8000/tests/rules.html
+- Story: http://localhost:8000/tests/story.html
+- Saves: http://localhost:8000/tests/saves.html (uses its own test database, so it never touches your saves)
