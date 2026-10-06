@@ -1,0 +1,366 @@
+/* Questbound styles. Mobile-first portrait; wider screens get a centred column.
+   Colours live in the variables below. Pixel fonts arrive in a later Phase 0 slice. */
+
+:root {
+  --page: #0d0f1a;
+  --box: #161a33;
+  --box-edge: #e9e4d4;
+  --box-edge-dark: #4a4f78;
+  --card: #20264a;
+  --card-hover: #2c3466;
+  --text: #f2eee3;
+  --muted: #a9a6c0;
+  --past: #8d8aa6;
+  --accent: #f0c85a;
+  --good: #7fd99a;
+  --bad: #ff8a7a;
+  --font-narration: Georgia, 'Times New Roman', serif;
+  --font-ui: ui-monospace, 'Cascadia Mono', Consolas, 'Courier New', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--font-narration);
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.app {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 12px 16px calc(24px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100vh;
+}
+
+/* Title bar */
+
+.title-bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.game-title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 1.25rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.build-note,
+.hero-strip,
+.footer {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* The DM window: a classic bordered RPG text box */
+
+.dm-window {
+  background: var(--box);
+  border: 3px solid var(--box-edge);
+  border-radius: 6px;
+  box-shadow: 0 0 0 3px var(--box), 0 0 0 5px var(--box-edge-dark);
+  padding: 14px 16px;
+  margin: 5px;
+}
+
+.narration-text {
+  margin: 0 0 0.9em;
+}
+
+.chosen-text {
+  margin: 0 0 0.9em;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--accent);
+}
+
+.chosen-text::before {
+  content: '\25B6\FE0E  ';
+}
+
+.is-past {
+  color: var(--past);
+}
+
+/* Choice cards */
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.choice-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  background: var(--card);
+  color: var(--text);
+  border: 2px solid var(--box-edge-dark);
+  border-radius: 6px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.choice-card:hover,
+.choice-card:focus-visible {
+  background: var(--card-hover);
+  border-color: var(--box-edge);
+  outline: none;
+}
+
+.choice-tag {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.end-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.end-text {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* The d20 and the roll panel */
+
+.roll-panel {
+  margin: 0 0 1em;
+  padding: 12px;
+  border: 2px dashed var(--box-edge-dark);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.roll-heading,
+.roll-hint {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.roll-heading {
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.d20 {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  margin: 8px auto;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: block;
+}
+
+.d20:disabled {
+  cursor: default;
+}
+
+.d20 svg {
+  width: 100%;
+  height: 100%;
+  shape-rendering: crispEdges;
+}
+
+.d20-body {
+  fill: var(--card);
+  stroke: var(--box-edge);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.d20-edge {
+  fill: none;
+  stroke: var(--box-edge-dark);
+  stroke-width: 2;
+}
+
+.d20-face {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 38%;
+  font-family: var(--font-ui);
+  font-size: 1.35rem;
+  font-weight: bold;
+  color: var(--text);
+}
+
+.d20:not(:disabled):hover .d20-body,
+.d20:focus-visible .d20-body {
+  fill: var(--card-hover);
+}
+
+.d20.is-tumbling svg {
+  animation: tumble 0.2s linear infinite;
+}
+
+.d20.is-natural-20 .d20-body {
+  animation: flash-20 0.9s ease-out;
+  stroke: var(--accent);
+}
+
+.d20.is-natural-1 .d20-body {
+  animation: flash-1 0.9s ease-out;
+  stroke: var(--bad);
+}
+
+@keyframes tumble {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes flash-20 {
+  0%,
+  40% {
+    fill: var(--accent);
+  }
+}
+
+@keyframes flash-1 {
+  0%,
+  40% {
+    fill: var(--bad);
+  }
+}
+
+.roll-result {
+  margin-top: 4px;
+}
+
+.roll-outcome {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 1.1rem;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.roll-result.is-good .roll-outcome {
+  color: var(--good);
+}
+
+.roll-result.is-bad .roll-outcome {
+  color: var(--bad);
+}
+
+.roll-line {
+  margin: 4px 0;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+}
+
+.roll-sources {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.dm-aside {
+  margin: 8px 0 0;
+  font-style: italic;
+  color: var(--accent);
+}
+
+/* Roll log */
+
+.roll-log-drawer {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--muted);
+  border-top: 1px solid var(--box-edge-dark);
+  padding-top: 8px;
+}
+
+.roll-log-drawer summary {
+  cursor: pointer;
+  color: var(--text);
+}
+
+.roll-log {
+  margin: 8px 0 0;
+  padding-left: 1.4em;
+}
+
+.roll-log li {
+  margin-bottom: 4px;
+}
+
+.log-label {
+  color: var(--text);
+}
+
+/* Footer and errors */
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.footer a {
+  color: var(--muted);
+}
+
+.error-box {
+  white-space: pre-wrap;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--bad);
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .d20.is-natural-20 .d20-body,
+  .d20.is-natural-1 .d20-body {
+    animation: none;
+  }
+}

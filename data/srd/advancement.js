@@ -1,0 +1,25 @@
+// Character Advancement table (SRD 5.2.1): the XP needed to reach each level,
+// and the Proficiency Bonus a character has at that level.
+
+export const advancement = [
+  { level: 1, xp: 0, proficiencyBonus: 2, source: 'SRD 5.2.1' },
+  { level: 2, xp: 300, proficiencyBonus: 2, source: 'SRD 5.2.1' },
+  { level: 3, xp: 900, proficiencyBonus: 2, source: 'SRD 5.2.1' },
+  { level: 4, xp: 2700, proficiencyBonus: 2, source: 'SRD 5.2.1' },
+  { level: 5, xp: 6500, proficiencyBonus: 3, source: 'SRD 5.2.1' },
+  { level: 6, xp: 14000, proficiencyBonus: 3, source: 'SRD 5.2.1' },
+  { level: 7, xp: 23000, proficiencyBonus: 3, source: 'SRD 5.2.1' },
+  { level: 8, xp: 34000, proficiencyBonus: 3, source: 'SRD 5.2.1' },
+  { level: 9, xp: 48000, proficiencyBonus: 4, source: 'SRD 5.2.1' },
+  { level: 10, xp: 64000, proficiencyBonus: 4, source: 'SRD 5.2.1' },
+  { level: 11, xp: 85000, proficiencyBonus: 4, source: 'SRD 5.2.1' },
+  { level: 12, xp: 100000, proficiencyBonus: 4, source: 'SRD 5.2.1' },
+  { level: 13, xp: 120000, proficiencyBonus: 5, source: 'SRD 5.2.1' },
+  { level: 14, xp: 140000, proficiencyBonus: 5, source: 'SRD 5.2.1' },
+  { level: 15, xp: 165000, proficiencyBonus: 5, source: 'SRD 5.2.1' },
+  { level: 16, xp: 195000, proficiencyBonus: 5, source: 'SRD 5.2.1' },
+  { level: 17, xp: 225000, proficiencyBonus: 6, source: 'SRD 5.2.1' },
+  { level: 18, xp: 265000, proficiencyBonus: 6, source: 'SRD 5.2.1' },
+  { level: 19, xp: 305000, proficiencyBonus: 6, source: 'SRD 5.2.1' },
+  { level: 20, xp: 355000, proficiencyBonus: 6, source: 'SRD 5.2.1' },
+];

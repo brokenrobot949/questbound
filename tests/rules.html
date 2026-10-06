@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Questbound rules checks</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 16px;
+        background: #0d0f1a;
+        color: #f2eee3;
+        font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      h1 {
+        font-size: 1.1rem;
+        color: #f0c85a;
+        margin: 0 0 8px;
+      }
+      #summary {
+        font-size: 1.1rem;
+        font-weight: bold;
+      }
+      ol {
+        padding-left: 1.6em;
+      }
+      li {
+        white-space: pre-wrap;
+        margin-bottom: 2px;
+      }
+      .pass {
+        color: #7fd99a;
+      }
+      .fail {
+        color: #ff8a7a;
+      }
+      a {
+        color: #a9a6c0;
+      }
+    </style>
+    <script type="module" src="./rules-tests.js"></script>
+  </head>
+  <body>
+    <h1>Questbound rules checks</h1>
+    <p id="summary">Running&hellip;</p>
+    <ol id="results"></ol>
+    <p><a href="../index.html">Back to the game</a></p>
+  </body>
+</html>

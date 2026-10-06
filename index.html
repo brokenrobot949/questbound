@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d0f1a" />
+    <title>Questbound</title>
+    <link rel="stylesheet" href="./css/style.css" />
+    <script type="module" src="./js/main.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <header class="title-bar">
+        <h1 class="game-title">Questbound</h1>
+        <p class="build-note">Phase 0 &middot; test scene</p>
+      </header>
+
+      <p class="hero-strip" id="hero-strip"></p>
+
+      <main class="dm-window" id="narration" aria-live="polite">
+        <p class="narration-text">Loading the story&hellip;</p>
+      </main>
+
+      <nav class="choices" id="choices" aria-label="Choices"></nav>
+
+      <details class="roll-log-drawer">
+        <summary>Roll log (<span id="roll-count">0</span>)</summary>
+        <ol class="roll-log" id="roll-log"></ol>
+      </details>
+
+      <footer class="footer">
+        <span id="seed-note"></span>
+        <a href="./tests/rules.html">Rules tests</a>
+      </footer>
+    </div>
+  </body>
+</html>
