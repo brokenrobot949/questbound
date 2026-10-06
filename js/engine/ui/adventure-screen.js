@@ -9,22 +9,35 @@ import { makeChoice, restartStory, revealRoll } from '../story/story-runner.js';
 import { abilityModifier, abilityScore, findAbility, findSkill, proficiencyBonus } from '../character/sheet.js';
 import { abilities } from '../../../data/srd/abilities.js';
 import { dmVoice } from '../../../data/campaign/dm-voice.js';
+import { gameToSave } from '../save/save-format.js';
 import { difficultyName, outcomeText, rollLine, signedNumber } from './roll-format.js';
+import { actionButton, backupPanel } from './backup-panels.js';
 import { el, showFatalError } from './dom.js';
 
 const TUMBLE_FACES = [7, 13, 2, 18, 9, 15, 4, 11, 19, 6];
 const TUMBLE_STEP_MS = 60;
 
 // game: the active game (see save/save-format.js). onSave(game) is called after every change.
-export function startAdventureScreen({ game, root, onSave }) {
+// backupReminder: true to open with the "time to back up" notice.
+export function startAdventureScreen({ game, root, onSave, backupReminder = false }) {
   const narration = root.getElementById('narration');
   const choices = root.getElementById('choices');
+  const notices = root.getElementById('notices');
 
   root.getElementById('hero-strip').textContent = heroSummary(game.character);
   root.getElementById('slot-note').textContent = `Slot ${game.slot} · Session ${game.sessionCount}`;
   root.getElementById('seed-note').textContent = `Dice seed: ${game.seed}`;
   narration.replaceChildren();
   choices.replaceChildren();
+  notices.replaceChildren();
+
+  // While the backup reminder is up, the view stays at the top so the player sees it.
+  // It follows the story again once they answer it or play on.
+  let holdView = backupReminder;
+  const follow = (node) => {
+    if (!holdView) scrollIntoView(node);
+  };
+  if (backupReminder) notices.append(backupReminderBox(game, onSave, () => (holdView = false)));
   renderRollLog(root, game);
   if (game.notice) narration.append(el('p', 'dm-note', game.notice));
   showPage();
@@ -55,10 +68,11 @@ export function startAdventureScreen({ game, root, onSave }) {
       card.addEventListener('click', () => choose(choice));
       choices.append(card);
     }
-    scrollIntoView(choices);
+    follow(choices);
   }
 
   function choose(choice) {
+    holdView = false;
     choices.replaceChildren();
     for (const node of narration.children) node.classList.add('is-past');
     try {
@@ -77,6 +91,7 @@ export function startAdventureScreen({ game, root, onSave }) {
     const again = el('button', 'choice-card', 'Play the scene again');
     again.type = 'button';
     again.addEventListener('click', () => {
+      holdView = false;
       choices.replaceChildren();
       try {
         game.page = restartStory(game);
@@ -90,7 +105,7 @@ export function startAdventureScreen({ game, root, onSave }) {
     });
     card.append(again);
     choices.append(card);
-    scrollIntoView(choices);
+    follow(choices);
   }
 
   // Shows the d20 and waits for the player's tap, then reveals the roll in full and saves.
@@ -100,11 +115,12 @@ export function startAdventureScreen({ game, root, onSave }) {
       const hint = el('p', 'roll-hint', 'Tap the d20 to roll');
       panel.append(hint);
       narration.append(panel);
-      scrollIntoView(panel);
+      follow(panel);
 
       die.button.addEventListener(
         'click',
         async () => {
+          holdView = false;
           die.button.disabled = true;
           hint.remove();
           await tumble(die.face, beat.result.natural);
@@ -114,13 +130,47 @@ export function startAdventureScreen({ game, root, onSave }) {
           panel.append(resultBlock(beat));
           renderRollLog(root, game);
           onSave(game);
-          scrollIntoView(panel);
+          follow(panel);
           resolve();
         },
         { once: true },
       );
     });
   }
+}
+
+// "Time to back up": shown at the start of every 10th session since the last backup.
+// onAnswered() runs when the player backs up or dismisses it.
+function backupReminderBox(game, onSave, onAnswered) {
+  const box = el('div', 'reminder');
+  const since = game.sessionCount - game.lastBackupSession;
+  const lead =
+    game.lastBackupSession === 0
+      ? `Session ${game.sessionCount}, and this save has never been backed up.`
+      : `It's been ${since} sessions since this save was last backed up.`;
+  box.append(
+    el('p', 'reminder-text', `${lead} Browsers sometimes clear their storage, so keep a copy somewhere safe.`),
+  );
+  const buttons = el('div', 'slot-actions');
+  buttons.append(
+    actionButton('Back up now', () => {
+      const panel = backupPanel({
+        save: gameToSave(game),
+        onBackedUp: () => {
+          game.lastBackupSession = game.sessionCount;
+          onSave(game);
+        },
+      });
+      box.replaceChildren(panel, actionButton('Done', () => box.remove()));
+      onAnswered();
+    }),
+    actionButton('Not now', () => {
+      box.remove();
+      onAnswered();
+    }),
+  );
+  box.append(buttons);
+  return box;
 }
 
 // A roll the player already saw, e.g. after a reload: shown at once, no tap needed.

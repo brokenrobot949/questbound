@@ -1,11 +1,12 @@
 // Save checks. Open tests/saves.html through the local server to run them.
 // They use a separate database ("questbound-test"), so real saves are never touched.
 
-import { test, assertEqual, assertTrue, assertThrows, run } from './harness.js';
+import { test, assertEqual, assertTrue, assertThrows, assertRejects, run } from './harness.js';
 import { loadStory } from '../js/engine/story/ink-loader.js';
 import { bindExternals } from '../js/engine/story/externals.js';
 import { currentLocation, makeChoice, revealRoll, ROLL_LOG_LIMIT } from '../js/engine/story/story-runner.js';
-import { SAVE_VERSION, gameToSave, loadGame, migrateSave, newGame } from '../js/engine/save/save-format.js';
+import { SAVE_VERSION, gameToSave, loadGame, migrateSave, newGame, validateSave } from '../js/engine/save/save-format.js';
+import { backupCode, backupFileName, backupFileText, isBackupDue, readBackup } from '../js/engine/save/backup.js';
 import { openSaveStore, deleteSaveDatabase } from '../js/engine/save/save-store.js';
 import { testHero } from '../data/campaign/test-hero.js';
 
@@ -77,9 +78,9 @@ test('A save holds game state, Ink state, dice state, session count and last-pla
   const runtime = await freshRuntime();
   const game = newGame(runtime, { slot: 2, seed: 'contents', character: testHero, now: new Date('2026-10-01T09:00:00Z') });
   const record = gameToSave(game, new Date('2026-10-06T12:00:00Z'));
-  assertEqual(Object.keys(record).sort(), ['createdAt', 'game', 'ink', 'rng', 'savedAt', 'seed', 'sessionCount', 'slot', 'version']);
+  assertEqual(Object.keys(record).sort(), ['createdAt', 'game', 'ink', 'lastBackupSession', 'rng', 'savedAt', 'seed', 'sessionCount', 'slot', 'version']);
   assertEqual(Object.keys(record.game).sort(), ['character', 'location', 'page', 'rollLog']);
-  assertEqual([record.version, record.slot, record.sessionCount], [SAVE_VERSION, 2, 1]);
+  assertEqual([record.version, record.slot, record.sessionCount, record.lastBackupSession], [SAVE_VERSION, 2, 1, 0]);
   assertEqual([record.createdAt, record.savedAt], ['2026-10-01T09:00:00.000Z', '2026-10-06T12:00:00.000Z']);
   assertTrue(record.rng.length === 4 && record.rng.every(Number.isInteger), 'dice state should be four whole numbers');
   assertTrue(typeof record.ink === 'string' && record.ink.length > 0, 'Ink state should be saved');
@@ -211,6 +212,121 @@ test("Save slots: saving again replaces the slot's save, and slots stay separate
     store.close();
     await deleteSaveDatabase(TEST_DB);
   }
+});
+
+// ---- Backups: save files and save codes ----
+
+// A finished test-scene save with one revealed roll, as a player would back it up.
+async function playedSave(seed = 'backup') {
+  const runtime = await freshRuntime();
+  const game = newGame(runtime, { slot: 1, seed, character: testHero });
+  game.page = makeChoice(game, checkChoice(game));
+  revealRoll(game, rollBeats(game.page)[0]);
+  game.sessionCount = 4;
+  return throughJson(gameToSave(game));
+}
+
+test('Migration: a version 1 save gains a backup record and becomes version 2', () => {
+  const upgraded = migrateSave({ version: 1, slot: 2, sessionCount: 5 });
+  assertEqual(upgraded, { version: 2, slot: 2, sessionCount: 5, lastBackupSession: 0 });
+});
+
+test('Backup file: a readable file that restores to the identical save', async () => {
+  const save = await playedSave();
+  const text = backupFileText(save);
+  assertTrue(text.includes('"format": "questbound-save"'), 'the file should say what it is');
+  assertEqual(await readBackup(text), save);
+});
+
+test('Backup file name: lowercase with hyphens, naming the hero and session', async () => {
+  const save = await playedSave();
+  assertEqual(backupFileName(save), 'questbound-wren-ashdown-session-4.json');
+  save.game.character.name = "  Sir Grümbold O'Hare  ";
+  assertEqual(backupFileName(save), 'questbound-sir-gr-mbold-o-hare-session-4.json');
+});
+
+test('Save code: one line of plain letters that restores to the identical save', async () => {
+  const save = await playedSave();
+  const code = await backupCode(save);
+  assertTrue(code.startsWith('QB1.'), 'codes start with QB1.');
+  assertTrue(/^QB1\.[A-Za-z0-9_-]+$/.test(code), 'only letters, digits, - and _');
+  assertEqual(await readBackup(code), save);
+});
+
+test('Save code: still works after a messaging app wraps it onto several lines', async () => {
+  const save = await playedSave();
+  const code = await backupCode(save);
+  const wrapped = `  ${code.match(/.{1,60}/g).join('\n')}  \n`;
+  assertEqual(await readBackup(wrapped), save);
+});
+
+test('Save code: a cut-short or altered code is refused', async () => {
+  const code = await backupCode(await playedSave());
+  await assertRejects(() => readBackup(code.slice(0, code.length - 20)), 'a cut-short code should fail');
+  const middle = Math.floor(code.length / 2);
+  const altered = code.slice(0, middle) + (code[middle] === 'A' ? 'B' : 'A') + code.slice(middle + 1);
+  await assertRejects(() => readBackup(altered), 'an altered code should fail');
+});
+
+test("Restore: things that aren't Questbound saves are refused with a reason", async () => {
+  for (const text of ['', 'hello', '{"format": "something-else", "save": {}}', '{ broken json']) {
+    let message = null;
+    try {
+      await readBackup(text);
+    } catch (error) {
+      message = error.message;
+    }
+    assertTrue(typeof message === 'string' && message.length > 0, `should refuse ${JSON.stringify(text)}`);
+  }
+});
+
+test('Restore: a backup from a newer version of the game is refused', async () => {
+  const save = await playedSave();
+  save.version = SAVE_VERSION + 1;
+  await assertRejects(() => readBackup(backupFileText(save)));
+});
+
+test('Restore: an older (version 1) backup file is upgraded', async () => {
+  const save = await playedSave();
+  delete save.lastBackupSession;
+  save.version = 1;
+  const restored = await readBackup(backupFileText(save));
+  assertEqual([restored.version, restored.lastBackupSession], [SAVE_VERSION, 0]);
+});
+
+test('Restore: a damaged save is refused, naming what is wrong', async () => {
+  const good = await playedSave();
+  validateSave(good);
+  const broken = structuredClone(good);
+  broken.rng = [1, 2];
+  delete broken.ink;
+  broken.game.character.baseAbilityScores.charisma = 'lots';
+  let message = '';
+  try {
+    validateSave(broken);
+  } catch (error) {
+    message = error.message;
+  }
+  for (const part of ['dice state', 'story position', 'hero']) {
+    assertTrue(message.includes(part), `the reason should mention the ${part}: "${message}"`);
+  }
+});
+
+test('Restore: a restored backup plays on from exactly where it was', async () => {
+  const runtime = await freshRuntime();
+  const game = newGame(runtime, { slot: 2, seed: 'restore-play', character: testHero });
+  const code = await backupCode(throughJson(gameToSave(game)));
+  const original = rollBeats(makeChoice(game, checkChoice(game)))[0].result;
+
+  const restored = loadGame(await freshRuntime(), await readBackup(code));
+  const again = rollBeats(makeChoice(restored, checkChoice(restored)))[0].result;
+  assertEqual(again, original, 'the restored save should roll the same dice');
+});
+
+test('Backup reminder: every 10 sessions since the last backup', () => {
+  const due = (session, lastBackup) => isBackupDue(session, lastBackup);
+  assertEqual([due(10, 0), due(20, 0), due(15, 5), due(25, 5)], [true, true, true, true]);
+  assertEqual([due(1, 0), due(9, 0), due(11, 0), due(10, 10), due(14, 5)], [false, false, false, false, false]);
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

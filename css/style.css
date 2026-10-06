@@ -85,11 +85,106 @@ body {
 .title-message {
   margin: 0;
   padding: 10px 12px;
-  border: 2px solid var(--bad);
+  border: 2px solid var(--good);
   border-radius: 6px;
   font-family: var(--font-ui);
   font-size: 0.8rem;
+  color: var(--good);
+}
+
+.title-message.is-problem {
+  border-color: var(--bad);
   color: var(--bad);
+}
+
+/* Back up and Restore panels, and the backup reminder */
+
+.slot-panel:not(:empty) {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--box-edge-dark);
+}
+
+.backup-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.backup-intro,
+.backup-or,
+.backup-status {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.backup-status:empty {
+  display: none;
+}
+
+.backup-status.is-problem {
+  color: var(--bad);
+}
+
+.backup-code {
+  width: 100%;
+  padding: 8px;
+  background: var(--page);
+  color: var(--text);
+  border: 2px solid var(--box-edge-dark);
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  word-break: break-all;
+  resize: vertical;
+}
+
+.backup-code:focus {
+  border-color: var(--box-edge);
+  outline: none;
+}
+
+.file-button {
+  display: inline-flex;
+  align-items: center;
+}
+
+.file-button:focus-within {
+  background: var(--card-hover);
+  border-color: var(--box-edge);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.notices:empty {
+  display: none;
+}
+
+.reminder {
+  padding: 12px 14px;
+  background: var(--box);
+  border: 2px solid var(--accent);
+  border-radius: 6px;
+}
+
+.reminder-text {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+}
+
+.reminder > .slot-button {
+  margin-top: 10px;
 }
 
 .slot-list {
