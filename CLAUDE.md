@@ -8,7 +8,7 @@ Questbound is a single-player, tabletop-style fantasy RPG where the game acts as
 - After each change, explain in plain language what changed, how to see it working, and anything Rob needs to do.
 - If the design is unclear, or a technical limit would change the design, ask Rob instead of guessing.
 - When Rob changes a design decision, update `docs/DESIGN.md` so it stays the source of truth.
-- Build in the phases from `docs/DESIGN.md`, in small, testable slices. **Current phase: Phase 0 (Foundations).**
+- Build in the phases from `docs/DESIGN.md`, in small, testable slices. **Current phase: Phase 1 (Vertical slice).** Phase 0 is complete.
 - Rob commits and pushes with GitHub Desktop. Do not run `git push` unless Rob asks.
 
 ## Hard constraints
@@ -39,6 +39,7 @@ Questbound is a single-player, tabletop-style fantasy RPG where the game acts as
 
 ## Story (Ink)
 
+- The campaign beats (secret history, cast, shards, chapter-by-chapter beats) are in `docs/STORY.md`. Claude Code writes and maintains them; draft every scene from them, and change the beats there first when the story changes.
 - Scenes live in `story/` as `.ink` files: `story/common/` for reusable scenes (shops, inns, rests, camp) and `story/act-1/` to `story/act-4/` for the campaign.
 - `vendor/ink-full.js` compiles the Ink files in the browser at startup. If compile time grows noticeable, cache the compiled story in IndexedDB keyed by a content hash.
 - The engine owns character state, inventory, HP and dice. Ink owns narrative flow. Ink reaches the engine only through EXTERNAL functions, all defined in one file under `js/engine/story/` with a comment for each: for example `check(skill, dc)`, `save(ability, dc)`, `has_class(id)`, `has_species(id)`, `has_background(id)`, `has_item(id)`, `give_item(id)`, `give_xp(n)`, `set_flag(id)`, `start_combat(encounter_id)`, `attitude(npc_id, change)`, `faction(id, change)`, `add_deed(text)`, `grant_inspiration()`.

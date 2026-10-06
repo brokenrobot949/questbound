@@ -275,7 +275,7 @@ Days pass with travel and rests, and day or night changes encounters and some sc
 
 ## Story
 
-The campaign is **The Shattered Crown**: four acts that match the four tiers of play, taking a nobody from a frontier town to the person who decides what the crown really was. All names here are working placeholders.
+The campaign is **The Shattered Crown**: four acts that match the four tiers of play, taking a nobody from a frontier town to the person who decides what the crown really was. All names here are working placeholders. The chapter-by-chapter beats, the secret history, the cast and the shards are in `docs/STORY.md`.
 
 **Campaign roadmap** (hours are planning targets, about 46 in all, tuned in playtests)
 
@@ -334,7 +334,7 @@ Classic high fantasy with some grit, warmth and humour in the people you meet, a
 
 **Writing volume**
 
-The writing is the biggest cost of this game, bigger than the code. A 40–60 hour campaign needs roughly 400–600 authored scenes. The plan: Rob sets the beats for each chapter, Claude Code drafts the scenes, and Rob edits and approves them.
+The writing is the biggest cost of this game, bigger than the code. A 40–60 hour campaign needs roughly 400–600 authored scenes. The plan: Claude Code writes the beats for each chapter (in `docs/STORY.md`) and drafts the scenes from them, and Rob reviews, edits and approves both.
 
 ## Companions
 
