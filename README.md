@@ -25,6 +25,10 @@ While building on localhost the offline copy is switched off, so reloads always 
 
 The icons in `assets/ui/` come from a DawnLike sprite. To use a different one, run `tools/make-icons.ps1` with the sprite's sheet, column and row (instructions are at the top of that file).
 
+## Fonts and settings
+
+The game uses three free fonts, stored in `assets/fonts/` with their licences: Press Start 2P for titles and big numbers, DotGothic16 for the story and buttons, and Atkinson Hyperlegible for players who turn on **Settings → Plain font for the story**. Settings (on the title screen, and at the top of the screen during play) also has **Roll the d20 automatically**. Settings belong to the device, not a save slot.
+
 ## Debug mode
 
 Open http://localhost:8000/?debug to get a red **Debug** button in the corner. It opens tools to jump to any scene, view and edit story flags and Ink variables, set the hero's level, force the next d20, turn on auto-roll, reset the current save, and read the playtest log (session and scene times, levels reached, deaths). In debug mode, adding `&seed=anything` to the address makes new games roll the same dice every time.

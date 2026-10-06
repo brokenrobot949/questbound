@@ -8,7 +8,7 @@
 // It stays out of the way while building: on localhost (unless the address has ?sw), in debug
 // mode (?debug) and on the test pages, every file comes straight from the server.
 
-const VERSION = 'questbound-v1';
+const VERSION = 'questbound-v2';
 
 // Where the copy starts. Every module these import, every story file main.ink INCLUDEs and every
 // url() in the stylesheet are found and copied too, so new code and scenes need no edits here.
@@ -16,6 +16,7 @@ const START_FILES = [
   './',
   './index.html',
   './manifest.webmanifest',
+  './CREDITS.md',
   './css/style.css',
   './js/main.js',
   './story/main.ink',

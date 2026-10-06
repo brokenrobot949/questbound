@@ -392,7 +392,11 @@ The LPC (Liberated Pixel Cup) art family was considered and set aside: better ch
 
 **Fonts**
 
-An open-licence pixel font for headings and numbers (such as Press Start 2P), and a more readable pixel font for narration, chosen in Phase 0. A setting switches narration to a plain font for comfort. All fonts are stored in the repo.
+Chosen in Phase 0, all under the SIL Open Font License and stored in the repo:
+
+- **Press Start 2P** for the title, headings and big numbers (the d20, SUCCESS and FAILURE).
+- **DotGothic16** for narration, choices and interface text: a readable pixel font in the classic Japanese console RPG style, with digits that can't be mistaken for letters (5 and S, 8 and B), which matters when every roll shows its maths. Pixelify Sans was tried first and set aside for that reason.
+- **Atkinson Hyperlegible** for the "Plain font for the story" setting, which switches narration and choices to it for comfort.
 
 **Audio (polish phase)**
 

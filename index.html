@@ -29,12 +29,21 @@
         </header>
         <p class="title-message" id="title-message" hidden></p>
         <div class="slot-list" id="slot-list"></div>
+        <div class="title-extras">
+          <button class="text-button" id="title-settings" type="button" aria-expanded="false">Settings</button>
+          <button class="text-button" id="title-credits" type="button" aria-expanded="false">Credits</button>
+        </div>
+        <div id="title-settings-panel"></div>
+        <div id="title-credits-panel"></div>
       </section>
 
       <section class="screen" id="adventure-screen" hidden>
         <header class="title-bar">
           <h1 class="game-title">Questbound</h1>
-          <button class="text-button" id="to-title" type="button">Save slots</button>
+          <nav class="title-bar-links" aria-label="Game menu">
+            <button class="text-button" id="play-settings" type="button" aria-expanded="false">Settings</button>
+            <button class="text-button" id="to-title" type="button">Save slots</button>
+          </nav>
         </header>
         <p class="status-line">
           <span id="slot-note"></span>

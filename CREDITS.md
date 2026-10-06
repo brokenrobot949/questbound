@@ -16,7 +16,11 @@ https://github.com/y-lohse/inkjs
 
 ## Fonts
 
-None yet; chosen later in Phase 0.
+All three are licensed under the SIL Open Font License 1.1. Each font's licence is in its folder under `assets/fonts/`.
+
+- **Press Start 2P** (headings and big numbers). Copyright 2012 The Press Start 2P Project Authors (cody@zone38.net), with Reserved Font Name "Press Start 2P". Included unmodified. `assets/fonts/press-start-2p/`
+- **DotGothic16** (story and interface text) by Fontworks. Copyright 2020 The DotGothic16 Project Authors (https://github.com/fontworks-fonts/DotGothic16). Included as the Latin and Latin Extended subsets served by Google Fonts. `assets/fonts/dotgothic16/`
+- **Atkinson Hyperlegible** (the "Plain font for the story" setting) by the Braille Institute of America. Copyright 2020 Braille Institute of America, Inc. Included unmodified. `assets/fonts/atkinson-hyperlegible/`
 
 ## Audio
 

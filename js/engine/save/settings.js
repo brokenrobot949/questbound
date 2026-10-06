@@ -7,6 +7,7 @@ const PREFIX = 'questbound:';
 // Each setting and its value when the player hasn't chosen one.
 const DEFAULTS = {
   autoRoll: false, // roll the d20 straight away instead of waiting for a tap
+  plainNarration: false, // show the story in a plain font instead of the pixel font
 };
 
 // Settings changed on this visit. If storage is full or blocked, they still last until the page closes.

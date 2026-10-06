@@ -13,11 +13,15 @@ import { setupOffline } from './engine/save/offline.js';
 import { renderTitleScreen } from './engine/ui/title-screen.js';
 import { startAdventureScreen } from './engine/ui/adventure-screen.js';
 import { setupDebugPanel } from './engine/ui/debug-panel.js';
+import { applySettings, settingsPanel } from './engine/ui/settings-panel.js';
+import { creditsPanel } from './engine/ui/credits-panel.js';
 import { showFatalError, showScreen } from './engine/ui/dom.js';
 import { testHero } from '../data/campaign/test-hero.js';
 
 const params = new URLSearchParams(window.location.search);
 const DEBUG = params.has('debug');
+
+applySettings();
 
 // Set just before an update reloads the page, so play picks up where it was.
 const UPDATE_KEY = 'questbound:update-reload';
@@ -94,6 +98,7 @@ async function start() {
   }
 
   function showAdventure(game, backupReminder = false) {
+    document.getElementById('play-settings').setAttribute('aria-expanded', 'false');
     startAdventureScreen({ game, root: document, onSave: autosave, backupReminder });
     if (debugPanel) debugPanel.refresh();
   }
@@ -189,6 +194,34 @@ async function start() {
       },
     });
   }
+
+  // Settings and Credits open in place: under the save slots, or above the story during play.
+  async function togglePanel(button, container, makePanel) {
+    const close = (panel) => {
+      panel.remove();
+      button.setAttribute('aria-expanded', 'false');
+    };
+    const open = container.querySelector('.settings-panel');
+    if (open) {
+      close(open);
+      return;
+    }
+    const panel = await makePanel({ onClose: () => close(panel) });
+    container.prepend(panel);
+    button.setAttribute('aria-expanded', 'true');
+  }
+  const titleSettings = document.getElementById('title-settings');
+  titleSettings.addEventListener('click', () =>
+    togglePanel(titleSettings, document.getElementById('title-settings-panel'), settingsPanel),
+  );
+  const titleCredits = document.getElementById('title-credits');
+  titleCredits.addEventListener('click', () =>
+    togglePanel(titleCredits, document.getElementById('title-credits-panel'), creditsPanel),
+  );
+  const playSettings = document.getElementById('play-settings');
+  playSettings.addEventListener('click', () =>
+    togglePanel(playSettings, document.getElementById('notices'), settingsPanel),
+  );
 
   document.getElementById('to-title').addEventListener('click', () => showTitle());
   if (resumeSlot !== null) await titleActions.onContinue(resumeSlot);
