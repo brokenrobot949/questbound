@@ -6,7 +6,32 @@ import { createRng } from '../js/engine/rules/rng.js';
 import { forceNextD20, peekForcedD20, rollDie, rollDice } from '../js/engine/rules/dice.js';
 import { d20Test } from '../js/engine/rules/d20-test.js';
 import { abilityCheck } from '../js/engine/rules/ability-check.js';
-import { abilityModifier, proficiencyBonus, checkModifiers } from '../js/engine/character/sheet.js';
+import {
+  abilityModifier,
+  abilityScore,
+  armorClass,
+  characterFeatures,
+  checkModifiers,
+  darkvision,
+  describeCharacter,
+  initiative,
+  maxHitPoints,
+  passivePerception,
+  proficiencyBonus,
+  resistances,
+  savingThrow,
+  skillBonus,
+  speed,
+  spellcasting,
+} from '../js/engine/character/sheet.js';
+import { validateCharacter } from '../js/engine/character/validate.js';
+import { classes } from '../data/srd/classes.js';
+import { species } from '../data/srd/species.js';
+import { backgrounds } from '../data/srd/backgrounds.js';
+import { feats } from '../data/srd/feats.js';
+import { armor, shield } from '../data/srd/armor.js';
+import { pointBuy, standardArray } from '../data/srd/character-creation.js';
+import { testHero } from '../data/campaign/test-hero.js';
 import { difficultyName, rollLine } from '../js/engine/ui/roll-format.js';
 import { parseTags } from '../js/engine/story/tags.js';
 import { skills } from '../data/srd/skills.js';
@@ -17,23 +42,52 @@ import { advancement } from '../data/srd/advancement.js';
 // saves would roll differently after loading, so the RNG algorithm must stay as it is.
 const KNOWN_QUESTBOUND_VALUES = [1614782848, 800264413, 564517817, 266011180, 1143897396];
 
-// A plain level 1 hero for checks; pass overrides to change any part.
+// A legal level 1 Human Fighter (Soldier) for checks: Str 8, Dex 14, Con 12, Int 10, Wis 13,
+// Cha 16 after the background's +1s. Pass overrides to change any part.
 function makeHero(overrides = {}) {
   return {
     name: 'Test Hero',
     level: 1,
-    baseAbilityScores: {
-      strength: 8,
-      dexterity: 14,
-      constitution: 12,
-      intelligence: 10,
-      wisdom: 13,
-      charisma: 16,
-    },
-    skillProficiencies: ['persuasion'],
-    expertise: [],
+    classId: 'fighter',
+    subclassId: null,
+    speciesId: 'human',
+    size: 'medium',
+    speciesChoice: null,
+    spellcastingAbility: null,
+    backgroundId: 'soldier',
+    abilityScoreMethod: 'manual',
+    baseAbilityScores: { strength: 7, dexterity: 13, constitution: 11, intelligence: 10, wisdom: 13, charisma: 16 },
+    backgroundIncreases: { strength: 1, dexterity: 1, constitution: 1 },
+    classSkills: ['persuasion', 'perception'],
+    speciesSkills: ['insight'],
+    featSkills: [],
+    originFeat: 'alert',
+    classChoices: { fightingStyle: 'defense' },
+    hitPointRolls: [],
+    armorId: null,
+    shield: false,
     ...overrides,
   };
+}
+
+// A legal level 1 High Elf Wizard (Sage): Int 17 and Wis 14 after the background's +2/+1.
+function makeWizard(overrides = {}) {
+  return makeHero({
+    name: 'Test Wizard',
+    classId: 'wizard',
+    speciesId: 'elf',
+    speciesChoice: 'high-elf',
+    spellcastingAbility: 'intelligence',
+    backgroundId: 'sage',
+    abilityScoreMethod: 'standard-array',
+    baseAbilityScores: { strength: 8, dexterity: 13, constitution: 14, intelligence: 15, wisdom: 12, charisma: 10 },
+    backgroundIncreases: { intelligence: 2, wisdom: 1 },
+    classSkills: ['investigation', 'medicine'],
+    speciesSkills: ['perception'],
+    originFeat: null,
+    classChoices: {},
+    ...overrides,
+  });
 }
 
 // ---- Seeded random numbers ----
@@ -235,14 +289,15 @@ test('Ability check: proficient Persuasion adds Charisma and Proficiency, with s
 });
 
 test('Ability check: without proficiency only the ability modifier is added', () => {
-  const r = checkModifiers(makeHero(), 'athletics');
-  assertEqual(r.modifiers.map((m) => [m.label, m.value]), [['Str', -1]]);
+  const r = checkModifiers(makeHero(), 'sleight-of-hand');
+  assertEqual(r.modifiers.map((m) => [m.label, m.value]), [['Dex', 2]]);
 });
 
-test('Ability check: Expertise doubles the Proficiency Bonus', () => {
-  const hero = makeHero({ skillProficiencies: ['stealth'], expertise: ['stealth'] });
-  const r = checkModifiers(hero, 'stealth');
-  assertEqual(r.modifiers.map((m) => [m.label, m.value]), [['Dex', 2], ['Expertise', 4]]);
+test("Ability check: Expertise (the Wizard's Scholar, from level 2) doubles the Proficiency Bonus", () => {
+  const wizard = makeWizard({ level: 2, classChoices: { scholarSkill: 'arcana' } });
+  const r = checkModifiers(wizard, 'arcana');
+  assertEqual(r.modifiers.map((m) => [m.label, m.value]), [['Int', 3], ['Expertise', 4]]);
+  assertEqual(checkModifiers(makeWizard({ classChoices: { scholarSkill: 'arcana' } }), 'arcana').total, 5, 'not before level 2');
 });
 
 test('Ability check: a plain ability check uses only the ability', () => {
@@ -320,6 +375,169 @@ test('Debug: only faces 1 to 20 can be forced, and the roll line says "forced"',
   forceNextD20(12);
   const r = d20Test({ rng: createRng('line'), kind: 'check', modifiers: plusFive, target: { type: 'DC', value: 15 } });
   assertEqual(rollLine(r), 'd20 (12, forced) + Cha 3 + Proficiency 2 = 17 vs DC 15 — success');
+});
+
+// ---- Rules data (SRD 5.2.1) ----
+
+const SKILL_IDS = skills.map((s) => s.id);
+const ABILITY_IDS = abilities.map((a) => a.id);
+
+test('Data: classes, species and backgrounds only name real skills, abilities and feats', () => {
+  for (const c of classes) {
+    for (const s of c.skillChoices.from) assertTrue(SKILL_IDS.includes(s), `${c.id} lists unknown skill ${s}`);
+    for (const a of [...c.savingThrows, ...c.primaryAbilities]) assertTrue(ABILITY_IDS.includes(a), `${c.id}: ${a}`);
+    assertEqual(Object.values(c.standardArray).sort((x, y) => y - x), standardArray, `${c.id} standard array`);
+    for (const row of c.levels) for (const f of row.features) assertTrue(f in c.features, `${c.id} level ${row.level}: ${f}`);
+  }
+  for (const b of backgrounds) {
+    assertEqual(b.abilities.length, 3, `${b.id} lists three abilities`);
+    for (const s of b.skills) assertTrue(SKILL_IDS.includes(s), `${b.id}: ${s}`);
+    assertTrue(feats.some((f) => f.id === b.feat.id && f.category === 'origin'), `${b.id} feat ${b.feat.id}`);
+  }
+  assertEqual(species.map((s) => s.id), ['dragonborn', 'dwarf', 'elf', 'gnome', 'goliath', 'halfling', 'human', 'orc', 'tiefling']);
+});
+
+test('Data: class numbers match the SRD tables', () => {
+  const fighter = classes.find((c) => c.id === 'fighter');
+  const wizard = classes.find((c) => c.id === 'wizard');
+  assertEqual([fighter.hitDie, fighter.hitPointsAtLevel1, fighter.hitPointsPerLevel, fighter.savingThrows], [10, 10, 6, ['strength', 'constitution']]);
+  assertEqual([wizard.hitDie, wizard.hitPointsAtLevel1, wizard.hitPointsPerLevel, wizard.savingThrows], [6, 6, 4, ['intelligence', 'wisdom']]);
+  assertEqual(wizard.levels.map((r) => [r.cantrips, r.preparedSpells, r.slots]), [[3, 4, [2]], [3, 5, [3]], [3, 6, [4, 2]]]);
+  assertEqual(fighter.levels.map((r) => r.secondWindUses), [2, 2, 2]);
+});
+
+test('Data: the armour table matches the SRD', () => {
+  const a = (id) => armor.find((x) => x.id === id);
+  assertEqual([a('leather-armor').baseAc, a('leather-armor').dexCap], [11, null]);
+  assertEqual([a('half-plate-armor').baseAc, a('half-plate-armor').dexCap, a('half-plate-armor').stealthDisadvantage], [15, 2, true]);
+  assertEqual([a('chain-mail').baseAc, a('chain-mail').strength, a('chain-mail').cost], [16, 13, 75]);
+  assertEqual([a('plate-armor').baseAc, a('plate-armor').strength, a('plate-armor').cost], [18, 15, 1500]);
+  assertEqual(shield.acBonus, 2);
+});
+
+// ---- Character creation rules ----
+
+test('Creation: the test heroes are legal characters', () => {
+  assertEqual(validateCharacter(testHero), []);
+  assertEqual(validateCharacter(makeHero()), []);
+  assertEqual(validateCharacter(makeWizard()), []);
+});
+
+test('Creation: the Standard Array must use each score once', () => {
+  const wrong = makeHero({
+    abilityScoreMethod: 'standard-array',
+    baseAbilityScores: { strength: 15, dexterity: 15, constitution: 13, intelligence: 12, wisdom: 10, charisma: 8 },
+  });
+  assertEqual(validateCharacter(wrong).length, 1);
+});
+
+test('Creation: Point Cost scores are 8 to 15 and cost at most 27 points', () => {
+  const scores = (s) => ({ strength: s[0], dexterity: s[1], constitution: s[2], intelligence: s[3], wisdom: s[4], charisma: s[5] });
+  const legal = makeHero({ abilityScoreMethod: 'point-buy', baseAbilityScores: scores([15, 15, 15, 8, 8, 8]) });
+  assertEqual(validateCharacter(legal), [], '9 + 9 + 9 = 27 points');
+  const tooDear = makeHero({ abilityScoreMethod: 'point-buy', baseAbilityScores: scores([15, 15, 15, 9, 8, 8]) });
+  assertEqual(validateCharacter(tooDear).length, 1);
+  assertEqual([pointBuy.costs[12], pointBuy.costs[13], pointBuy.costs[14], pointBuy.costs[15]], [4, 5, 7, 9]);
+});
+
+test("Creation: background increases are +2/+1 or +1/+1/+1, to the background's abilities, up to 20", () => {
+  assertEqual(validateCharacter(makeHero({ backgroundIncreases: { strength: 2, dexterity: 1 } })), []);
+  assertEqual(validateCharacter(makeHero({ backgroundIncreases: { strength: 2, charisma: 1 } })).length, 1, 'Charisma is not a Soldier ability');
+  assertEqual(validateCharacter(makeHero({ backgroundIncreases: { strength: 3 } })).length, 1, 'not a legal pattern');
+  const base = makeHero().baseAbilityScores;
+  const high = makeHero({ baseAbilityScores: { ...base, strength: 18 }, backgroundIncreases: { strength: 2, dexterity: 1 } });
+  assertEqual(validateCharacter(high), []);
+  const over = makeHero({ baseAbilityScores: { ...base, dexterity: 19 }, backgroundIncreases: { strength: 1, dexterity: 2 } });
+  assertTrue(validateCharacter(over).some((p) => p.includes('above 20')));
+});
+
+test('Creation: skills, species choices and Fighting Style must be legal', () => {
+  assertTrue(validateCharacter(makeHero({ classSkills: ['persuasion'] })).length > 0, 'two class skills needed');
+  assertTrue(validateCharacter(makeHero({ classSkills: ['persuasion', 'arcana'] })).length > 0, 'Arcana is not a Fighter skill');
+  assertTrue(validateCharacter(makeWizard({ speciesChoice: null })).length > 0, 'an Elf needs a lineage');
+  assertTrue(validateCharacter(makeWizard({ speciesSkills: ['arcana'] })).length > 0, 'Keen Senses is Insight, Perception or Survival');
+  assertTrue(validateCharacter(makeHero({ classChoices: {} })).length > 0, 'a Fighter needs a Fighting Style');
+  assertTrue(validateCharacter(makeHero({ classId: 'bard' })).length > 0, 'unknown class');
+});
+
+// ---- The character sheet ----
+
+test("Sheet: Wren (Human Fighter, Soldier) has the SRD's numbers", () => {
+  assertEqual(describeCharacter(testHero), 'Human Fighter 1');
+  assertEqual(['strength', 'constitution', 'charisma'].map((a) => abilityScore(testHero, a).value), [17, 15, 13]);
+  assertEqual(maxHitPoints(testHero).value, 12, 'Fighter 10 + Con 2');
+  assertEqual(armorClass(testHero).value, 17, 'Chain Mail 16 + Defense 1');
+  assertEqual(initiative(testHero).value, 3, 'Dex 1 + Alert proficiency 2');
+  assertEqual([savingThrow(testHero, 'strength').value, savingThrow(testHero, 'dexterity').value], [5, 1]);
+  const bonuses = ['athletics', 'persuasion', 'insight'].map((s) => skillBonus(testHero, s).value);
+  assertEqual(bonuses, [5, 3, 2]);
+  assertEqual([passivePerception(testHero).value, speed(testHero).value, darkvision(testHero)], [12, 30, 0]);
+  assertEqual(spellcasting(testHero), null);
+});
+
+test('Sheet: Hit Points use the fixed value or the roll at each level, and at least 1', () => {
+  assertEqual(maxHitPoints({ ...testHero, level: 3 }).value, 12 + 8 + 8, 'fixed 6 + Con 2 at levels 2 and 3');
+  assertEqual(maxHitPoints({ ...testHero, level: 3, hitPointRolls: [10, 1] }).value, 12 + 12 + 3);
+  const frailScores = { ...makeWizard().baseAbilityScores, constitution: 3 };
+  const frail = makeWizard({ abilityScoreMethod: 'manual', baseAbilityScores: frailScores, level: 2, hitPointRolls: [1] });
+  assertEqual(maxHitPoints(frail).value, 6 - 4 + 1, 'Con −4: level 1 gives 2, level 2 gives at least 1');
+});
+
+test('Sheet: a Wizard casts with Intelligence, with the SRD slots and spellbook', () => {
+  const casting = spellcasting(makeWizard({ level: 3 }));
+  assertEqual([casting.saveDc.value, casting.attackBonus.value], [13, 5], 'DC 8 + Int 3 + 2; attack Int 3 + 2');
+  assertEqual([casting.cantrips, casting.preparedSpells, casting.slots, casting.spellbookSize], [3, 6, [4, 2], 10]);
+  assertEqual(armorClass(makeWizard()).value, 11, 'unarmoured: 10 + Dex 1');
+  assertEqual(maxHitPoints(makeWizard()).value, 8, 'Wizard 6 + Con 2');
+  assertEqual(darkvision(makeWizard()), 60);
+});
+
+test('Sheet: species traits change speed, darkvision, Hit Points and resistances', () => {
+  const nonHuman = { speciesSkills: [], originFeat: null };
+  assertEqual(speed(makeWizard({ speciesChoice: 'wood-elf' })).value, 35);
+  assertEqual(darkvision(makeWizard({ speciesChoice: 'drow' })), 120);
+  const dwarf = makeHero({ ...nonHuman, speciesId: 'dwarf', level: 2 });
+  assertEqual(maxHitPoints(dwarf).value, 11 + 7 + 2, 'Fighter 10+1, fixed 6+1, plus Dwarven Toughness 1 per level');
+  assertEqual(resistances(dwarf), ['poison']);
+  assertEqual(resistances(makeHero({ ...nonHuman, speciesId: 'dragonborn', speciesChoice: 'silver' })), ['cold']);
+  const tiefling = makeHero({ ...nonHuman, speciesId: 'tiefling', speciesChoice: 'infernal', spellcastingAbility: 'charisma' });
+  assertEqual(resistances(tiefling), ['fire']);
+  assertEqual(speed(makeHero({ ...nonHuman, speciesId: 'goliath', speciesChoice: 'stone' })).value, 35);
+});
+
+test('Sheet: armour rules (Dex cap, Shield, Defense only in armour, heavy armour Strength)', () => {
+  const nimble = makeHero({ baseAbilityScores: { ...makeHero().baseAbilityScores, dexterity: 17 } });
+  assertEqual(armorClass({ ...nimble, armorId: 'half-plate-armor' }).value, 15 + 2 + 1, 'Dex +4 capped at +2, Defense +1');
+  assertEqual(armorClass({ ...nimble, armorId: 'leather-armor', shield: true }).value, 11 + 4 + 2 + 1);
+  assertEqual(armorClass({ ...nimble, armorId: null }).value, 10 + 4, 'Defense needs armour');
+  assertEqual(speed({ ...makeHero(), armorId: 'chain-mail' }).value, 20, "Str 8 is below Chain Mail's 13");
+  assertEqual(speed(testHero).value, 30, 'Str 17 is enough');
+});
+
+test('Sheet: features come with level, subclass and species', () => {
+  const names = (c) => characterFeatures(c).map((f) => f.name);
+  assertTrue(names(testHero).includes('Second Wind') && !names(testHero).includes('Action Surge'));
+  const champion = { ...testHero, level: 3, subclassId: 'champion' };
+  assertTrue(names(champion).includes('Action Surge') && names(champion).includes('Improved Critical'));
+  const dragonborn = makeHero({ speciesId: 'dragonborn', speciesChoice: 'red', speciesSkills: [], originFeat: null, level: 3 });
+  assertTrue(names(dragonborn).includes('Breath Weapon') && !names(dragonborn).includes('Draconic Flight'), 'Draconic Flight waits for level 5');
+  assertTrue(names(makeWizard({ level: 3, subclassId: 'evoker' })).includes('Potent Cantrip'));
+});
+
+test('Sheet: every number adds up from its parts, so tapping it can show the maths', () => {
+  const heroes = [testHero, { ...testHero, level: 3, hitPointRolls: [9] }, makeWizard({ level: 3 }), makeWizard({ speciesChoice: 'wood-elf' })];
+  for (const hero of heroes) {
+    const values = [
+      maxHitPoints(hero),
+      armorClass(hero),
+      initiative(hero),
+      passivePerception(hero),
+      speed(hero),
+      savingThrow(hero, 'wisdom'),
+      skillBonus(hero, 'stealth'),
+    ];
+    for (const v of values) assertEqual(v.parts.reduce((sum, p) => sum + p.value, 0), v.value);
+  }
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

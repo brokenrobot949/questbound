@@ -5,6 +5,7 @@ import { randomSeed } from './engine/rules/rng.js';
 import { loadStory } from './engine/story/ink-loader.js';
 import { bindExternals } from './engine/story/externals.js';
 import { jumpTo, restartStory } from './engine/story/story-runner.js';
+import { findClass } from './engine/character/sheet.js';
 import { openSaveStore } from './engine/save/save-store.js';
 import { gameToSave, loadGame, newGame } from './engine/save/save-format.js';
 import { isBackupDue } from './engine/save/backup.js';
@@ -182,8 +183,20 @@ async function start() {
         setInkVariable: (name, value) => change((game) => (game.story.variablesState[name] = value)),
         setLevel: (level) =>
           change((game) => {
-            if (!Number.isInteger(level) || level < 1 || level > 20) throw new Error('Level must be 1 to 20.');
+            const max = findClass(game.character.classId).levels.length;
+            if (!Number.isInteger(level) || level < 1 || level > max) {
+              throw new Error(`Level must be 1 to ${max}: the rules data covers levels 1–${max} so far.`);
+            }
             game.character.level = level;
+            if (level < 3) game.character.subclassId = null; // subclasses come at level 3
+            game.character.hitPointRolls = (game.character.hitPointRolls || []).slice(0, level - 1);
+          }),
+        setSubclass: (id) =>
+          change((game) => {
+            if (id && !findClass(game.character.classId).subclasses.some((s) => s.id === id)) {
+              throw new Error(`Unknown subclass: ${id}`);
+            }
+            game.character.subclassId = id;
           }),
         resetSave: async () => {
           const slot = runtime.game.slot;

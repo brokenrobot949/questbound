@@ -6,7 +6,15 @@
 
 import { parseTags } from '../story/tags.js';
 import { makeChoice, restartStory, revealRoll } from '../story/story-runner.js';
-import { abilityModifier, abilityScore, findAbility, findSkill, proficiencyBonus } from '../character/sheet.js';
+import {
+  abilityModifierOf,
+  armorClass,
+  describeCharacter,
+  findAbility,
+  findSkill,
+  maxHitPoints,
+  proficiencyBonus,
+} from '../character/sheet.js';
 import { abilities } from '../../../data/srd/abilities.js';
 import { dmVoice } from '../../../data/campaign/dm-voice.js';
 import { gameToSave } from '../save/save-format.js';
@@ -254,14 +262,15 @@ function checkLabel(check) {
   return `${name} · ${difficultyName(check.dc)}`;
 }
 
-// "Wren Ashdown · Level 1 · Str +0 Dex +2 … · Proficiency +2"
+// "Wren Ashdown · Human Fighter 1 · HP 12 · AC 17 · Str +3 Dex +1 … · Proficiency +2"
+// (HP is the maximum until combat tracks damage.)
 function heroSummary(character) {
-  const mods = abilities.map(
-    (a) => `${a.abbreviation} ${signedNumber(abilityModifier(abilityScore(character, a.id).value))}`,
-  );
+  const mods = abilities.map((a) => `${a.abbreviation} ${signedNumber(abilityModifierOf(character, a.id))}`);
   return [
     character.name,
-    `Level ${character.level}`,
+    describeCharacter(character),
+    `HP ${maxHitPoints(character).value}`,
+    `AC ${armorClass(character).value}`,
     mods.join(' '),
     `Proficiency +${proficiencyBonus(character.level)}`,
   ].join(' · ');

@@ -3,6 +3,7 @@
 // Restore. Back up, Restore and the "replace this save?" question open below the buttons.
 
 import { migrateSave } from '../save/save-format.js';
+import { describeCharacter } from '../character/sheet.js';
 import { actionButton, backupPanel, restorePanel } from './backup-panels.js';
 import { el } from './dom.js';
 
@@ -61,7 +62,7 @@ function slotCard(slot, record, actions) {
   }
 
   const { character, location } = save.game;
-  card.append(el('p', 'slot-hero', `${character.name} · Level ${character.level}`));
+  card.append(el('p', 'slot-hero', `${character.name} · ${describeCharacter(character)}`));
   if (location) card.append(el('p', 'slot-detail', location));
   card.append(el('p', 'slot-detail', `Session ${save.sessionCount} · Last played ${formatWhen(save.savedAt)}`));
   buttons.append(

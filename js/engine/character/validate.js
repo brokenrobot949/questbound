@@ -1,0 +1,131 @@
+// Checks a character's choices against the creation rules (SRD 5.2.1, "Character Creation").
+// Returns a list of plain-language problems; an empty list means the character is legal.
+// Character creation uses it to guide the player; loading a save uses it to refuse a hero
+// that has been damaged or tampered with.
+
+import { abilities } from '../../../data/srd/abilities.js';
+import { skills } from '../../../data/srd/skills.js';
+import { standardArray, pointBuy, maxAbilityScore } from '../../../data/srd/character-creation.js';
+import { findArmor, findBackground, findClass, findFeat, findSpecies } from './sheet.js';
+
+const ABILITY_IDS = abilities.map((a) => a.id);
+const SKILL_IDS = skills.map((s) => s.id);
+const SPELLCASTING_ABILITIES = ['intelligence', 'wisdom', 'charisma'];
+
+export function validateCharacter(character) {
+  const problems = [];
+  const need = (ok, message) => {
+    if (!ok) problems.push(message);
+  };
+
+  need(typeof character.name === 'string' && character.name.trim() !== '', 'The hero needs a name.');
+
+  const cls = findClass(character.classId);
+  const sp = findSpecies(character.speciesId);
+  const bg = findBackground(character.backgroundId);
+  need(cls, `Unknown class: ${character.classId}.`);
+  need(sp, `Unknown species: ${character.speciesId}.`);
+  need(bg, `Unknown background: ${character.backgroundId}.`);
+  if (!cls || !sp || !bg) return problems;
+
+  const maxLevel = cls.levels.length;
+  need(Number.isInteger(character.level) && character.level >= 1 && character.level <= maxLevel, `Level must be 1 to ${maxLevel} for now.`);
+
+  // Subclass: chosen at level 3, from the class's list.
+  if (character.subclassId !== null && character.subclassId !== undefined) {
+    need(cls.subclasses.some((s) => s.id === character.subclassId), `Unknown ${cls.name} subclass: ${character.subclassId}.`);
+    need(character.level >= 3, 'A subclass is chosen at level 3.');
+  }
+
+  // Species: size and any ancestry, lineage or legacy.
+  need(sp.sizes.includes(character.size), `A ${sp.name} can be ${sp.sizes.join(' or ')}.`);
+  if (sp.choice) {
+    need(sp.choice.options.some((o) => o.id === character.speciesChoice), `Choose a ${sp.choice.name}.`);
+  }
+  if (sp.spellcastingAbilityChoice) {
+    need(SPELLCASTING_ABILITIES.includes(character.spellcastingAbility), 'Choose Intelligence, Wisdom or Charisma for species spells.');
+  }
+
+  // Ability scores.
+  const base = character.baseAbilityScores || {};
+  const scores = ABILITY_IDS.map((id) => base[id]);
+  need(scores.every(Number.isInteger), 'Every ability needs a score.');
+  if (scores.every(Number.isInteger)) {
+    const method = character.abilityScoreMethod;
+    if (method === 'standard-array') {
+      const sorted = [...scores].sort((a, b) => b - a);
+      need(JSON.stringify(sorted) === JSON.stringify(standardArray), `The Standard Array is ${standardArray.join(', ')}, each used once.`);
+    } else if (method === 'point-buy') {
+      const inRange = scores.every((s) => s in pointBuy.costs);
+      need(inRange, 'Point Cost scores must be 8 to 15.');
+      if (inRange) {
+        const spent = scores.reduce((sum, s) => sum + pointBuy.costs[s], 0);
+        need(spent <= pointBuy.budget, `That costs ${spent} points; the limit is ${pointBuy.budget}.`);
+      }
+    } else if (method === 'random' || method === 'manual') {
+      need(scores.every((s) => s >= 3 && s <= 18), 'Rolled scores are 3 to 18.');
+    } else {
+      problems.push(`Unknown ability score method: ${method}.`);
+    }
+  }
+
+  // Background increases: +2/+1 to two listed abilities, or +1 to all three; none above 20.
+  const increases = Object.entries(character.backgroundIncreases || {}).filter(([, v]) => v !== 0);
+  const amounts = increases.map(([, v]) => v).sort();
+  const pattern = JSON.stringify(amounts);
+  need(
+    increases.every(([id]) => bg.abilities.includes(id)),
+    `The ${bg.name} background can only raise ${bg.abilities.join(', ')}.`,
+  );
+  need(pattern === '[1,2]' || pattern === '[1,1,1]', 'Background increases are +2 and +1, or +1 to all three.');
+  for (const [id, amount] of increases) {
+    if (Number.isInteger(base[id])) need(base[id] + amount <= maxAbilityScore, `No score can go above ${maxAbilityScore}.`);
+  }
+
+  // Skills.
+  const classSkills = character.classSkills || [];
+  need(
+    classSkills.length === cls.skillChoices.count && new Set(classSkills).size === classSkills.length,
+    `Choose ${cls.skillChoices.count} different ${cls.name} skills.`,
+  );
+  need(classSkills.every((s) => cls.skillChoices.from.includes(s)), `${cls.name} skills must come from the ${cls.name} list.`);
+  const speciesSkills = character.speciesSkills || [];
+  if (sp.skillChoice) {
+    const allowed = sp.skillChoice.from || SKILL_IDS;
+    need(speciesSkills.length === sp.skillChoice.count && speciesSkills.every((s) => allowed.includes(s)), `Choose ${sp.skillChoice.count} skill from your ${sp.name} traits.`);
+  } else {
+    need(speciesSkills.length === 0, `A ${sp.name} doesn't choose a skill.`);
+  }
+
+  // Feats: the Human's Origin feat, Skilled's skills, the Fighter's Fighting Style.
+  const originFeat = character.originFeat ? findFeat(character.originFeat) : null;
+  if (sp.originFeat) {
+    need(originFeat && originFeat.category === 'origin', 'Choose an Origin feat.');
+  } else {
+    need(!character.originFeat, `A ${sp.name} doesn't get an extra Origin feat.`);
+  }
+  const skilledCount = [bg.feat.id, character.originFeat].filter((id) => id === 'skilled').length * 3;
+  const featSkills = character.featSkills || [];
+  need(featSkills.length === skilledCount && featSkills.every((s) => SKILL_IDS.includes(s)), `Choose ${skilledCount} skills for Skilled.`);
+
+  const choices = character.classChoices || {};
+  if (character.classId === 'fighter') {
+    const style = findFeat(choices.fightingStyle);
+    need(style && style.category === 'fighting-style', 'Choose a Fighting Style.');
+  }
+  if (character.classId === 'wizard' && character.level >= 2) {
+    const ok = cls.scholarSkills.includes(choices.scholarSkill) && classSkills.concat(bg.skills, speciesSkills, featSkills).includes(choices.scholarSkill);
+    need(ok, 'Choose a Scholar skill you are proficient in.');
+  }
+
+  // Hit Point rolls for levels after 1: a Hit Die result, or null for the fixed value.
+  const rolls = character.hitPointRolls || [];
+  need(rolls.length <= Math.max(0, character.level - 1), 'There are more Hit Point rolls than levels.');
+  need(rolls.every((r) => r === null || (Number.isInteger(r) && r >= 1 && r <= cls.hitDie)), `Hit Point rolls must be 1 to ${cls.hitDie}.`);
+
+  // Armour must exist (wearing it untrained is allowed, but has penalties in play).
+  if (character.armorId) need(findArmor(character.armorId), `Unknown armor: ${character.armorId}.`);
+  need(typeof character.shield === 'boolean', 'Say whether the hero carries a Shield.');
+
+  return problems;
+}

@@ -3,6 +3,7 @@
 // force the next d20, toggle auto-roll, reset the current save, and read the playtest log.
 
 import { listScenes } from '../story/story-runner.js';
+import { describeCharacter, findClass } from '../character/sheet.js';
 import { forceNextD20, peekForcedD20 } from '../rules/dice.js';
 import { getSetting, setSetting } from '../save/settings.js';
 import { formatDuration, summarizeLog } from '../save/playtest-log.js';
@@ -12,7 +13,8 @@ import { el } from './dom.js';
 
 // getGame(): the game being played, or null on the title screen.
 // offline: a promise of how offline play started ("on", "off-local", "off-debug", "unsupported").
-// actions: { jumpTo(path), restartStory(), setLevel(n), setFlags(list), setInkVariable(name, value), resetSave() }
+// actions: { jumpTo(path), restartStory(), setLevel(n), setSubclass(id), setFlags(list),
+//            setInkVariable(name, value), resetSave() }
 // Each action applies the change, saves and redraws; the panel then redraws itself.
 export function setupDebugPanel({ root, getGame, tracker, offline, actions }) {
   const toggle = root.getElementById('debug-toggle');
@@ -127,18 +129,36 @@ export function setupDebugPanel({ root, getGame, tracker, offline, actions }) {
 
   function heroSection(game) {
     const section = el('section', 'debug-section');
-    section.append(heading('Hero', 'h3'));
+    const cls = findClass(game.character.classId);
+    const maxLevel = cls.levels.length;
+    section.append(heading('Hero', 'h3'), el('p', 'debug-note', `${game.character.name}: ${describeCharacter(game.character)}`));
     const level = el('input', 'debug-input is-short');
     level.type = 'number';
     level.min = '1';
-    level.max = '20';
+    level.max = String(maxLevel);
     level.value = String(game.character.level);
     level.setAttribute('aria-label', 'Level');
     section.append(
-      el('p', 'debug-label', 'Level'),
+      el('p', 'debug-label', `Level (the rules data covers 1–${maxLevel} so far)`),
       row(level, actionButton('Set level', () => run(() => actions.setLevel(Number(level.value))))),
-      el('p', 'debug-note', 'Granting items and gold arrives with the inventory in Phase 1.'),
     );
+
+    // Subclasses are chosen at level 3.
+    if (game.character.level >= 3) {
+      const pick = el('select', 'debug-input');
+      pick.setAttribute('aria-label', 'Subclass');
+      for (const option of [{ id: '', name: 'None yet' }, ...cls.subclasses]) {
+        const o = el('option', null, option.name);
+        o.value = option.id;
+        if ((game.character.subclassId || '') === option.id) o.selected = true;
+        pick.append(o);
+      }
+      section.append(
+        el('p', 'debug-label', `${cls.name} subclass`),
+        row(pick, actionButton('Set subclass', () => run(() => actions.setSubclass(pick.value || null)))),
+      );
+    }
+    section.append(el('p', 'debug-note', 'Granting items and gold arrives with the inventory in Phase 1.'));
     return section;
   }
 

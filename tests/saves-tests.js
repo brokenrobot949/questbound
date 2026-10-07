@@ -8,6 +8,7 @@ import { currentLocation, makeChoice, revealRoll, ROLL_LOG_LIMIT } from '../js/e
 import { SAVE_VERSION, gameToSave, loadGame, migrateSave, newGame, validateSave } from '../js/engine/save/save-format.js';
 import { backupCode, backupFileName, backupFileText, isBackupDue, readBackup } from '../js/engine/save/backup.js';
 import { migrations } from '../js/engine/save/migrations.js';
+import { validateCharacter } from '../js/engine/character/validate.js';
 import { PlaytestTracker, IDLE_LIMIT_MS, formatDuration, summarizeLog } from '../js/engine/save/playtest-log.js';
 import { openSaveStore, deleteSaveDatabase } from '../js/engine/save/save-store.js';
 import { testHero } from '../data/campaign/test-hero.js';
@@ -337,6 +338,23 @@ test('Migration: a version 2 save gains story flags and a scene name, and become
   assertEqual(upgraded.version, 3);
   assertEqual(upgraded.game.flags, []);
   assertEqual(upgraded.game.page, { scene: null, beats: [] });
+});
+
+test("Migration: a version 3 save's stand-in hero becomes a legal Human Fighter, keeping name and level", () => {
+  const oldHero = {
+    id: 'test-hero',
+    name: 'Bryn',
+    level: 5,
+    baseAbilityScores: { strength: 10, dexterity: 14, constitution: 12, intelligence: 13, wisdom: 8, charisma: 16 },
+    skillProficiencies: ['persuasion'],
+    expertise: [],
+    source: 'original',
+  };
+  const v3 = { version: 3, slot: 1, game: { character: oldHero, flags: [], page: { scene: null, beats: [] } } };
+  const upgraded = migrateSave(v3, migrations, 4);
+  const hero = upgraded.game.character;
+  assertEqual([upgraded.version, hero.name, hero.level, hero.classId, hero.speciesId, hero.backgroundId], [4, 'Bryn', 3, 'fighter', 'human', 'soldier']);
+  assertEqual(validateCharacter(hero), [], 'the upgraded hero must be legal');
 });
 
 // ---- Playtest log ----

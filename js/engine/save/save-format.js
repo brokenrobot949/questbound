@@ -16,9 +16,9 @@
 import { createRng, Rng } from '../rules/rng.js';
 import { currentLocation, runPage } from '../story/story-runner.js';
 import { migrations } from './migrations.js';
-import { abilities } from '../../../data/srd/abilities.js';
+import { validateCharacter } from '../character/validate.js';
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 // runtime: { story, game } — the compiled story, and whichever game is being played.
 
@@ -121,17 +121,16 @@ export function validateSave(save) {
   if (!game || typeof game !== 'object') {
     problems.push('game');
   } else {
+    // The hero must be a legal character under the creation rules.
     const hero = game.character;
-    const heroOk =
-      hero &&
-      isText(hero.name) &&
-      isWhole(hero.level) &&
-      hero.level >= 1 &&
-      hero.level <= 20 &&
-      hero.baseAbilityScores &&
-      abilities.every((a) => isWhole(hero.baseAbilityScores[a.id])) &&
-      Array.isArray(hero.skillProficiencies) &&
-      Array.isArray(hero.expertise);
+    let heroOk = hero && typeof hero === 'object' && hero.baseAbilityScores && typeof hero.baseAbilityScores === 'object';
+    if (heroOk) {
+      try {
+        heroOk = validateCharacter(hero).length === 0;
+      } catch {
+        heroOk = false;
+      }
+    }
     if (!heroOk) problems.push('hero');
     if (game.location !== null && !isText(game.location)) problems.push('location');
     if (!Array.isArray(game.flags) || !game.flags.every(isText)) problems.push('story flags');
