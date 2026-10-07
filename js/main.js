@@ -17,6 +17,7 @@ import { startCreationScreen } from './engine/ui/creation-screen.js';
 import { setupDebugPanel } from './engine/ui/debug-panel.js';
 import { applySettings, settingsPanel } from './engine/ui/settings-panel.js';
 import { creditsPanel } from './engine/ui/credits-panel.js';
+import { setupPlayTabs } from './engine/ui/play-tabs.js';
 import { showFatalError, showScreen } from './engine/ui/dom.js';
 
 const params = new URLSearchParams(window.location.search);
@@ -84,6 +85,18 @@ async function start() {
     }
   }
 
+  // The bar along the bottom during play. The Menu tab holds Settings, Credits and the way
+  // back to the save slots.
+  const tabs = setupPlayTabs({
+    root: document,
+    getGame: () => runtime.game,
+    onOpenMenu: () => {
+      const area = document.getElementById('menu-settings');
+      area.replaceChildren(settingsPanel({ onClose: () => tabs.show('adventure') }));
+    },
+    onJournalRead: (game) => autosave(game),
+  });
+
   const saveStatus = document.getElementById('save-status');
   async function autosave(game) {
     const record = gameToSave(game);
@@ -99,8 +112,8 @@ async function start() {
   }
 
   function showAdventure(game, backupReminder = false) {
-    document.getElementById('play-settings').setAttribute('aria-expanded', 'false');
-    startAdventureScreen({ game, root: document, onSave: autosave, backupReminder });
+    tabs.show('adventure');
+    startAdventureScreen({ game, root: document, onSave: autosave, backupReminder, onPageShown: () => tabs.refresh() });
     if (debugPanel) debugPanel.refresh();
   }
 
@@ -243,10 +256,8 @@ async function start() {
   titleCredits.addEventListener('click', () =>
     togglePanel(titleCredits, document.getElementById('title-credits-panel'), creditsPanel),
   );
-  const playSettings = document.getElementById('play-settings');
-  playSettings.addEventListener('click', () =>
-    togglePanel(playSettings, document.getElementById('notices'), settingsPanel),
-  );
+  const playCredits = document.getElementById('play-credits');
+  playCredits.addEventListener('click', () => togglePanel(playCredits, document.getElementById('menu-credits'), creditsPanel));
 
   document.getElementById('to-title').addEventListener('click', () => showTitle());
   if (resumeSlot !== null) await titleActions.onContinue(resumeSlot);

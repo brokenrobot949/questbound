@@ -9,8 +9,7 @@
 import { abilities } from '../../../data/srd/abilities.js';
 import { skills } from '../../../data/srd/skills.js';
 import { standardArray, pointBuy, randomGeneration, maxAbilityScore } from '../../../data/srd/character-creation.js';
-import { equipment } from '../../../data/srd/equipment.js';
-import { armor, shield } from '../../../data/srd/armor.js';
+import { findItem } from './inventory.js';
 import { drives } from '../../../data/campaign/drives.js';
 import { bonds } from '../../../data/campaign/bonds.js';
 import { nameTables } from '../../../data/campaign/names.js';
@@ -39,13 +38,8 @@ export const CREATION_STEPS = ['class', 'background', 'species', 'abilities', 's
 export const findDrive = (id) => drives.find((d) => d.id === id) || null;
 export const findBond = (id) => bonds.find((b) => b.id === id) || null;
 
-// Any item: armour, a Shield, or other equipment.
-export function findItem(id) {
-  if (id === shield.id) return { ...shield, category: 'shield' };
-  const worn = armor.find((a) => a.id === id);
-  if (worn) return { ...worn, category: 'armor', armorCategory: worn.category };
-  return equipment.find((e) => e.id === id) || null;
-}
+// Any item (armour, a Shield, or other equipment): see inventory.js.
+export { findItem };
 
 // A hero with every choice still to make.
 export function emptyDraft() {

@@ -15,3 +15,16 @@ export const dmVoice = {
   ],
   source: 'original',
 };
+
+// The DM's short notes in the story, when something lands in the journal or the pack.
+// {title}, {item} and {drive} are filled in by the game.
+export const dmNotes = {
+  inspirationFromDrive: 'That’s your Drive ({drive}) talking. You gain Heroic Inspiration.',
+  inspirationFromRest: 'You wake ready for anything. Resourceful: you gain Heroic Inspiration.',
+  alreadyInspired: 'That’s your Drive ({drive}) talking, though you already have Heroic Inspiration.',
+  questStarted: 'New quest: {title}. It’s in your journal.',
+  questUpdated: 'Journal: {title} updated.',
+  itemGained: 'You now have: {item}.',
+  itemBought: 'Bought: {item}, for {cost}.',
+  source: 'original',
+};

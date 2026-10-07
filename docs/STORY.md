@@ -165,8 +165,9 @@ The epilogue then shows each town, faction, companion and your Bond, built from 
 2. **Morning at the Tallow and Thistle.** Morwen Tallow brings breakfast and gossip: goblins hit the mill last night, and Garrick Dunn the miller is gone. The town opens up: the inn, the temple, Hob's forge, the market, the reeve's hall and the notice board.
    - Reeve Corbin's bounty: find the miller, end the raids, 50 gp. Captain Varrow adds "ten silver a goblin ear."
    - **Lark Dunn** corners you: "Goblins don't *take* people. Something else did."
-   - **Drive moments:** take the job for the silver (Wealth), or because nobody should vanish (Justice).
-   - It teaches shopping (buy a Potion of Healing) and the journal.
+   - **Drive moments:** every Drive gets one here. Take the job for the silver (Wealth), because nobody should vanish (Justice), or for the story they'll tell (Glory); pray for the miller at the temple (Faith); quiz Hob about the barrows (Knowledge); tear down a runaway's wanted notice (Freedom); promise Lark you'll bring her father home (Kinship).
+   - It teaches shopping and the journal. The market sells cheap gear, and Potions of Healing at 50 gold, which few new heroes can afford, so Morwen gives every hero one on the house ("I'm not baking with gravel").
+   - Small seeds: Hob's cousin saw goblins fleeing the barrow hills; Prior Crane flinches at "Kings' Barrow" (Insight); a lost cat called Biscuit on the notice board (Too Many Cats, Phase 2).
 3. **Dunn's Mill.** Flour drifts across the step like snow.
    - **Checks:** Investigation (goblin feet *and* human boots, one set dragging) and Perception (cold grey ash, grave dirt).
    - **Fighter:** "The door was barred from inside and broken *outward*." **Wizard:** "The ash marks a burned sigil: a staff of music notes." **Dwarf:** "This cellar floor is hollow, with old dressed stone underneath."

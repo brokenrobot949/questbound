@@ -56,7 +56,7 @@ test('Flags: choices can be hidden until a flag is set', () => {
   assertEqual(story.currentChoices.map((c) => c.text), ['Say the password', 'Leave']);
 });
 
-test('Flags: the test scene sets a flag for each outcome, and the save keeps it', async () => {
+test('Flags: the north gate sets a flag for each outcome, and the save keeps it', async () => {
   const runtime = await freshRuntime();
   const game = newGame(runtime, { slot: 1, seed: 'flags', character: testHero });
   forceNextD20(20);
@@ -75,7 +75,7 @@ test('Flags: the test scene sets a flag for each outcome, and the save keeps it'
 test('Scenes: every knot and stitch is listed for the jump menu', async () => {
   const { story } = await freshRuntime();
   const scenes = listScenes(story);
-  for (const name of ['gate_test', 'gate_test.gate_opens', 'gate_test.gate_stays_shut', 'gate_test.night_at_the_gate']) {
+  for (const name of ['ch1_arrival', 'ch1_arrival.gate_opens', 'ch1_arrival.night_at_the_gate', 'bramblegate', 'market.stall']) {
     assertTrue(scenes.includes(name), `${name} should be listed`);
   }
   assertTrue(!scenes.some((s) => /\s/.test(s)), "Ink's own entries (like 'global decl') should be left out");
@@ -84,7 +84,7 @@ test('Scenes: every knot and stitch is listed for the jump menu', async () => {
 test('Scenes: each page knows which knot it happens in', async () => {
   const runtime = await freshRuntime();
   const game = newGame(runtime, { slot: 1, seed: 'scene', character: testHero });
-  assertEqual(game.page.scene, 'gate_test');
+  assertEqual(game.page.scene, 'ch1_arrival');
   const { story, game: inline } = inlineStory(`${EXTERNALS}-> first\n=== first ===\nOne.\n* [Go] -> second\n=== second ===\nTwo.\n* [Stop] -> END\n`);
   inline.page = { beats: [], scene: null };
   assertEqual(jumpTo(inline, 'first').scene, 'first');
@@ -95,10 +95,11 @@ test('Scenes: each page knows which knot it happens in', async () => {
 test('Debug jump: moves straight to a stitch and runs on from there', async () => {
   const runtime = await freshRuntime();
   const game = newGame(runtime, { slot: 1, seed: 'jump', character: testHero });
-  game.page = jumpTo(game, 'gate_test.night_at_the_gate');
+  game.page = jumpTo(game, 'ch1_arrival.night_at_the_gate');
   const text = game.page.beats.filter((b) => b.type === 'text').map((b) => b.text).join(' ');
   assertTrue(text.includes('dry patch under the eaves'), 'the stitch text should show');
-  assertEqual([game.page.scene, game.flags, game.story.currentChoices.length], ['gate_test', ['saw_barrow_light'], 0]);
+  assertEqual([game.page.scene, game.flags], ['bramblegate', ['saw_barrow_light']]);
+  assertTrue(game.story.currentChoices.length > 0, 'it runs on to the town square');
 });
 
 test('Spells: the gate offers the Light trick only to heroes who can cast Light, tagged with the spell', async () => {
@@ -111,6 +112,73 @@ test('Spells: the gate offers the Light trick only to heroes who can cast Light,
   assertTrue(Boolean(choice), 'a Wizard who knows Light sees it');
   makeChoice(juniper, choice);
   assertEqual(juniper.flags, ['warden_opened_gate']);
+});
+
+// ---- Chapter 1 ----
+
+const juniperHero = quickStartHeroes.find((h) => h.id === 'juniper').character;
+
+// Takes the choice whose card text starts with these words.
+function pick(game, start) {
+  const choice = game.story.currentChoices.find((c) => c.text.startsWith(start));
+  if (!choice) throw new Error(`No choice starting "${start}": ${game.story.currentChoices.map((c) => c.text).join(' / ')}`);
+  game.page = makeChoice(game, choice);
+  return game.page;
+}
+const notesOn = (page) => page.beats.filter((b) => b.type === 'note').map((b) => b.text);
+const cards = (game) => game.story.currentChoices.map((c) => c.text);
+
+test('Chapter 1: the opening line follows the Drive, and the hero decides which ways in they see', async () => {
+  const runtime = await freshRuntime();
+  const wren = newGame(runtime, { slot: 1, seed: 'gate', character: testHero });
+  assertTrue(cards(wren).includes("Show her your old regiment's token"), 'a Soldier has a token');
+  const juniper = newGame(runtime, { slot: 1, seed: 'gate', character: juniperHero });
+  assertTrue(juniper.page.beats[0].text.startsWith('You came north for answers.'), 'Juniper’s Drive is Knowledge');
+  assertTrue(!cards(juniper).some((t) => t.includes('token')), 'a Sage has no regiment');
+  assertTrue(cards(juniper).includes('Make her lantern flame dance'), 'a Rock Gnome knows Prestidigitation');
+});
+
+test('Chapter 1: a night in Bramblegate is a long rest, and a Human wakes with Heroic Inspiration', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'night', character: testHero });
+  const page = pick(game, "Show her your old regiment's token");
+  assertEqual([game.day, game.inspiration], [2, true]);
+  assertTrue(notesOn(page).some((n) => n.includes('Resourceful')), 'the player is told why');
+  assertTrue(game.inventory.some((e) => e.id === 'potion-of-healing'), 'Morwen’s potion, on the house');
+  assertTrue(game.journal.deeds.some((d) => d.day === 1 && d.text.includes('regiment')), 'the deed is stamped day 1');
+  assertTrue(cards(game).includes("Go to the reeve's hall"), 'the town square opens up');
+});
+
+test('Chapter 1: the bounty starts the quest, Lark adds to it, and the hero’s own Drive earns Heroic Inspiration', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'bounty', character: juniperHero });
+  pick(game, 'Wait out the night');
+  assertEqual([game.day, game.inspiration], [2, false], 'a Gnome has no Resourceful trait');
+  pick(game, "Go to the reeve's hall");
+  const page = pick(game, 'Take the job. Fifty gold is fifty gold.');
+  assertEqual(game.inspiration, false, 'Wealth isn’t Juniper’s Drive');
+  assertTrue(notesOn(page).some((n) => n.startsWith('New quest: The Missing Miller')));
+  assertEqual([game.journal.quests[0].id, game.journal.unread], ['missing-miller', true]);
+  assertTrue(cards(game).some((t) => t.startsWith('Promise her')), 'Lark finds the hero');
+  pick(game, 'Ask what makes her so sure');
+  pick(game, "Call in at Hob's forge");
+  const knowledge = game.story.currentChoices.find((c) => c.text.startsWith('Ask Hob'));
+  assertTrue(knowledge.tags.includes('drive:knowledge'), 'the card is tagged with its Drive');
+  const inspired = pick(game, 'Ask Hob');
+  assertEqual(game.inspiration, true);
+  assertTrue(notesOn(inspired).some((n) => n.includes('Heroic Inspiration')));
+  const notes = game.journal.quests[0].notes.map((n) => n.text);
+  assertTrue(notes.some((n) => n.includes('Lark')) && notes.some((n) => n.includes('Hob')), 'Lark’s and Hob’s clues are in the journal');
+});
+
+test('Chapter 1: the market takes coins, fills the pack, and only offers what the hero can afford', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'market', character: testHero });
+  pick(game, "Show her your old regiment's token");
+  pick(game, 'Browse the market');
+  assertTrue(cards(game).includes('Buy a torch') && !cards(game).includes('Buy a Potion of Healing'), '18 GP won’t buy a 50 GP potion');
+  const before = game.money;
+  const page = pick(game, 'Buy a torch');
+  assertEqual(game.money, before - 1, 'a torch costs 1 CP');
+  assertEqual(game.inventory.find((e) => e.id === 'torch').quantity, 1);
+  assertTrue(notesOn(page).includes('Bought: Torch, for 1 CP.'));
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

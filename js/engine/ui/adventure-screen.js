@@ -1,11 +1,14 @@
-// The Adventure screen, Phase 0 version: narration, choice cards, the d20 and the roll log.
+// The Adventure tab: the status line, narration and the DM's notes, choice cards, the d20
+// and the roll log.
 //
 // The engine rolls a check the moment Ink calls check(); the seeded RNG has already decided
 // the result, and the game is saved with it straight away. Tapping the d20 only reveals it,
 // so neither the tap nor quitting and reloading can change the outcome.
 
 import { parseTags } from '../story/tags.js';
-import { makeChoice, restartStory, revealRoll } from '../story/story-runner.js';
+import { currentTime, makeChoice, revealRoll } from '../story/story-runner.js';
+import { moneyText, priceOf } from '../character/inventory.js';
+import { findDrive } from '../character/creation.js';
 import {
   abilityModifierOf,
   armorClass,
@@ -31,10 +34,19 @@ const TUMBLE_STEP_MS = 60;
 
 // game: the active game (see save/save-format.js). onSave(game) is called after every change.
 // backupReminder: true to open with the "time to back up" notice.
-export function startAdventureScreen({ game, root, onSave, backupReminder = false }) {
+// onPageShown(): called whenever new story has been shown (the Journal tab may have news).
+export function startAdventureScreen({ game, root, onSave, backupReminder = false, onPageShown = () => {} }) {
   const narration = root.getElementById('narration');
   const choices = root.getElementById('choices');
   const notices = root.getElementById('notices');
+  const status = root.getElementById('play-status');
+
+  // "Day 2 · Morning · 18 GP · ★ Inspiration": as far as the player has seen.
+  const updateStatus = () => {
+    const time = currentTime(game);
+    const parts = [`Day ${game.day}`, time, moneyText(game.money), game.inspiration ? '★ Inspiration' : null];
+    status.textContent = parts.filter(Boolean).join(' · ');
+  };
 
   root
     .getElementById('hero-strip')
@@ -57,13 +69,19 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
 
   // Shows the current page beat by beat, waiting for the player to tap any unrevealed d20.
   async function showPage() {
+    updateStatus();
     for (const beat of game.page.beats) {
       if (beat.type === 'chosen') narration.append(el('p', 'chosen-text', beat.text));
       else if (beat.type === 'text') narration.append(el('p', 'narration-text', beat.text));
+      else if (beat.type === 'note') narration.append(el('p', 'dm-note', beat.text));
       else if (beat.type === 'roll' && beat.revealed) narration.append(revealedRollPanel(beat));
-      else if (beat.type === 'roll') await rollPanelAwaitingTap(beat);
+      else if (beat.type === 'roll') {
+        await rollPanelAwaitingTap(beat);
+        updateStatus();
+      }
     }
     showChoices();
+    onPageShown();
   }
 
   function showChoices() {
@@ -78,6 +96,11 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
       card.type = 'button';
       if (tags.check) card.append(el('span', 'choice-tag', checkLabel(tags.check)));
       if (tags.spell) card.append(el('span', 'choice-tag', `Spell · ${spellName(tags.spell)}`));
+      if (tags.buy) card.append(el('span', 'choice-tag', `Buy · ${moneyText(priceOf(tags.buy))}`));
+      // Only the hero's own Drive is pointed out: that's the choice that earns Inspiration.
+      if (tags.drive && tags.drive === game.character.drive) {
+        card.append(el('span', 'choice-tag is-drive', `★ Your Drive · ${findDrive(tags.drive).name}`));
+      }
       card.append(el('span', 'choice-text', choice.text));
       card.addEventListener('click', () => choose(choice));
       choices.append(card);
@@ -99,25 +122,11 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
     showPage();
   }
 
+  // The story so far stops here. Your hero is saved at this point and carries on from it
+  // when the next part of the story arrives. (Debug mode can restart the story.)
   function showEnd() {
     const card = el('div', 'end-card');
-    card.append(el('p', 'end-text', 'End of the test scene.'));
-    const again = el('button', 'choice-card', 'Play the scene again');
-    again.type = 'button';
-    again.addEventListener('click', () => {
-      holdView = false;
-      choices.replaceChildren();
-      try {
-        game.page = restartStory(game);
-      } catch (error) {
-        showFatalError(error);
-        return;
-      }
-      onSave(game);
-      narration.replaceChildren();
-      showPage();
-    });
-    card.append(again);
+    card.append(el('p', 'end-text', 'That’s as far as the story goes for now. Your hero is saved here, and the tale picks up from this point in a later update.'));
     choices.append(card);
     follow(choices);
   }

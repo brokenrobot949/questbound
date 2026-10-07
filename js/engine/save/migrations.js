@@ -6,6 +6,8 @@
 //      and returns it in the new shape with version set one higher.
 // Never edit or remove a step once released: old saves on players' phones still need it.
 
+import { startingInventory } from '../character/inventory.js';
+
 export const migrations = {
   // Version 2 remembers which session the save was last backed up in, for the backup reminder.
   // Older saves have never been backed up.
@@ -113,5 +115,24 @@ export const migrations = {
     const [outfit, accent] = hero.classId === 'wizard' ? ['blue', 'red'] : ['red', 'brown'];
     const look = { skin, hairStyle, hairColor, beard, outfit, accent, headgear: 'none' };
     return { ...save, version: 7, game: { ...save.game, character: { ...hero, look } } };
+  },
+
+  // Version 8 adds the in-game day and time, Heroic Inspiration, the journal, and money and
+  // a pack. Games before it start on day 1 with an empty journal and the kits the hero chose.
+  7: (save) => {
+    const { inventory, money } = startingInventory(save.game.character);
+    return {
+      ...save,
+      version: 8,
+      game: {
+        ...save.game,
+        time: null,
+        day: 1,
+        inspiration: false,
+        journal: { quests: [], deeds: [], unread: false },
+        money,
+        inventory,
+      },
+    };
   },
 };

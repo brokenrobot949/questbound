@@ -4,7 +4,7 @@
 //
 // Only active time counts: the clock stops while the game is off screen, and a gap of more
 // than IDLE_LIMIT_MS between actions counts as that limit (the phone was probably put down).
-// A "scene" is an Ink knot, such as gate_test.
+// A "scene" is an Ink knot, such as ch1_arrival.
 
 const KEY = 'questbound:playtest-log';
 export const IDLE_LIMIT_MS = 5 * 60 * 1000;

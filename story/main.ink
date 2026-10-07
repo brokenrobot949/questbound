@@ -2,7 +2,8 @@
 // INCLUDE paths are relative to this story/ folder.
 
 INCLUDE externals.ink
-INCLUDE test/gate-test.ink
+INCLUDE act-1/ch1-arrival.ink
+INCLUDE act-1/ch1-bramblegate.ink
 
-// Where play begins. During Phase 0 that is the test scene.
--> gate_test
+// Where play begins: Chapter 1, on the road to Bramblegate.
+-> ch1_arrival

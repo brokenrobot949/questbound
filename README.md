@@ -27,7 +27,7 @@ The icons in `assets/ui/` come from a DawnLike sprite. To use a different one, r
 
 ## Fonts and settings
 
-The game uses three free fonts, stored in `assets/fonts/` with their licences: Press Start 2P for titles and big numbers, DotGothic16 for the story and buttons, and Atkinson Hyperlegible for players who turn on **Settings → Plain font for the story**. Settings (on the title screen, and at the top of the screen during play) also has **Roll the d20 automatically**. Settings belong to the device, not a save slot.
+The game uses three free fonts, stored in `assets/fonts/` with their licences: Press Start 2P for titles and big numbers, DotGothic16 for the story and buttons, and Atkinson Hyperlegible for players who turn on **Settings → Plain font for the story**. Settings (on the title screen, and under **Menu** in the bar along the bottom during play) also has **Roll the d20 automatically**. Settings belong to the device, not a save slot.
 
 ## Debug mode
 

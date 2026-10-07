@@ -10,15 +10,21 @@
 //   seed           the dice seed the game began with (for reference)
 //   rng            the dice generator's state, so a reload rolls the same dice
 //   ink            Ink's story state (story.state.toJson())
-//   game           { character, location, flags, page, rollLog }: what changes in play
-//                  (flags: story flag ids set by set_flag in Ink, e.g. "saw_barrow_light")
+//   game           what changes in play:
+//                  character, location, time (of day, from the story), day (in-game day,
+//                  from 1), inspiration (Heroic Inspiration: true or false), flags (story
+//                  flag ids set by set_flag in Ink, e.g. "saw_barrow_light"), journal (see
+//                  story/journal.js), money (in copper) and inventory (see
+//                  character/inventory.js), page, rollLog
 
 import { createRng, Rng } from '../rules/rng.js';
-import { currentLocation, runPage } from '../story/story-runner.js';
+import { currentLocation, currentTime, runPage } from '../story/story-runner.js';
+import { journalOk, newJournal } from '../story/journal.js';
+import { inventoryProblems, startingInventory } from '../character/inventory.js';
 import { migrations } from './migrations.js';
 import { validateCharacter } from '../character/validate.js';
 
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 
 // runtime: { story, game } — the compiled story, and whichever game is being played.
 
@@ -36,10 +42,16 @@ export function newGame(runtime, { slot, seed, character, rngState = null, now =
     story: runtime.story,
     character: structuredClone(character),
     location: null,
+    time: null,
+    day: 1,
+    inspiration: false,
     flags: [],
+    journal: newJournal(),
+    ...startingInventory(character),
     page: null,
     rollLog: [],
     pendingRolls: [],
+    pendingNotes: [],
     notice: null,
   };
   runtime.game = game;
@@ -63,7 +75,13 @@ export function gameToSave(game, now = new Date()) {
     game: structuredClone({
       character: game.character,
       location: currentLocation(game),
+      time: currentTime(game),
+      day: game.day,
+      inspiration: game.inspiration,
       flags: game.flags,
+      journal: game.journal,
+      money: game.money,
+      inventory: game.inventory,
       page: game.page,
       rollLog: game.rollLog,
     }),
@@ -85,10 +103,17 @@ export function loadGame(runtime, record) {
     story: runtime.story,
     character: save.game.character,
     location: save.game.location,
+    time: save.game.time,
+    day: save.game.day,
+    inspiration: save.game.inspiration,
     flags: save.game.flags,
+    journal: save.game.journal,
+    money: save.game.money,
+    inventory: save.game.inventory,
     page: save.game.page,
     rollLog: save.game.rollLog,
     pendingRolls: [],
+    pendingNotes: [],
     notice: null,
   };
   runtime.game = game;
@@ -135,8 +160,13 @@ export function validateSave(save) {
     }
     if (!heroOk) problems.push('hero');
     if (game.location !== null && !isText(game.location)) problems.push('location');
+    if (game.time !== null && !isText(game.time)) problems.push('time of day');
+    if (!isWhole(game.day) || game.day < 1) problems.push('day');
+    if (typeof game.inspiration !== 'boolean') problems.push('Heroic Inspiration');
     if (!Array.isArray(game.flags) || !game.flags.every(isText)) problems.push('story flags');
-    const beatTypes = ['chosen', 'text', 'roll', 'location'];
+    if (!journalOk(game.journal)) problems.push('journal');
+    problems.push(...inventoryProblems(game.money, game.inventory));
+    const beatTypes = ['chosen', 'text', 'roll', 'note', 'location', 'time'];
     const pageOk = game.page && Array.isArray(game.page.beats) && game.page.beats.every((b) => b && beatTypes.includes(b.type));
     if (!pageOk) problems.push('current page');
     if (!Array.isArray(game.rollLog)) problems.push('roll log');

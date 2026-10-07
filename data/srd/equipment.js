@@ -1,8 +1,10 @@
 // Equipment (SRD 5.2.1), other than armour (see armor.js). Only what the current phase needs:
-// the items in the Fighter, Wizard and background starting kits. The full tables, and the
-// weapons' damage, properties and mastery, arrive with combat and shops.
+// the items in the Fighter, Wizard and background starting kits, and what Bramblegate's
+// market sells. The full tables, and the weapons' damage, properties and mastery, arrive
+// with combat.
 //
-//   category   'weapon', 'ammunition', 'tool', 'pack' or 'gear'
+//   category   'weapon', 'ammunition', 'tool', 'pack', 'gear' or 'potion'
+//   text       what the item does, shown on the character sheet
 //   weaponType 'simple-melee', 'simple-ranged', 'martial-melee' or 'martial-ranged'
 //   weight     pounds (0 = "—" in the SRD, too light to count)
 //   cost       in coins: { gp: 2 } is 2 GP, { sp: 5 } is 5 SP; null = not sold
@@ -63,4 +65,53 @@ export const equipment = [
   // A Wizard's spellbook is made during their apprenticeship, so it has no shop price.
   { id: 'spellbook', name: 'Spellbook', category: 'gear', weight: 3, cost: null, source: 'SRD 5.2.1' },
   { id: 'travelers-clothes', name: 'Traveler’s Clothes', category: 'gear', weight: 4, cost: { gp: 2 }, source: 'SRD 5.2.1' },
+
+  // Sold in Bramblegate's market
+  {
+    id: 'oil',
+    name: 'Flask of Oil',
+    category: 'gear',
+    weight: 1,
+    cost: { sp: 1 },
+    text: 'You can douse a creature, object, or space with Oil, or use it as fuel, such as in a lamp.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'rations',
+    name: 'Rations',
+    category: 'gear',
+    weight: 2,
+    cost: { sp: 5 },
+    text: 'Rations consist of travel-ready food, including jerky, dried fruit, hardtack, and nuts.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'rope',
+    name: 'Rope',
+    category: 'gear',
+    weight: 5,
+    cost: { gp: 1 },
+    text: 'As a Utilize action, you can tie a knot with Rope if you succeed on a DC 10 Dexterity (Sleight of Hand) check. The Rope can be burst with a successful DC 20 Strength (Athletics) check.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'torch',
+    name: 'Torch',
+    category: 'gear',
+    weight: 1,
+    cost: { cp: 1 },
+    text: 'A Torch burns for 1 hour, casting Bright Light in a 20-foot radius and Dim Light for an additional 20 feet. When you take the Attack action, you can attack with the Torch, using it as a Simple Melee weapon. On a hit, the target takes 1 Fire damage.',
+    source: 'SRD 5.2.1',
+  },
+
+  // Potions
+  {
+    id: 'potion-of-healing',
+    name: 'Potion of Healing',
+    category: 'potion',
+    weight: 0.5,
+    cost: { gp: 50 },
+    text: 'This potion is a magic item. As a Bonus Action, you can drink it or administer it to another creature within 5 feet of yourself. The creature that drinks the magical red fluid in this vial regains 2d4 + 2 Hit Points.',
+    source: 'SRD 5.2.1',
+  },
 ];

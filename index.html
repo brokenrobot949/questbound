@@ -60,27 +60,43 @@
       <section class="screen" id="adventure-screen" hidden>
         <header class="title-bar">
           <h1 class="game-title">Questbound</h1>
-          <nav class="title-bar-links" aria-label="Game menu">
-            <button class="text-button" id="play-settings" type="button" aria-expanded="false">Settings</button>
-            <button class="text-button" id="to-title" type="button">Save slots</button>
-          </nav>
+          <span class="title-bar-note" id="save-status"></span>
         </header>
-        <p class="status-line">
-          <span id="slot-note"></span>
-          <span id="save-status"></span>
-        </p>
-        <p class="hero-strip" id="hero-strip"></p>
+        <p class="status-line" id="play-status"></p>
 
-        <div class="notices" id="notices"></div>
+        <!-- One tab shows at a time; the bottom bar switches between them. -->
+        <div class="play-tab" id="tab-adventure">
+          <p class="hero-strip" id="hero-strip"></p>
 
-        <main class="dm-window" id="narration" aria-live="polite"></main>
+          <div class="notices" id="notices"></div>
 
-        <nav class="choices" id="choices" aria-label="Choices"></nav>
+          <main class="dm-window" id="narration" aria-live="polite"></main>
 
-        <details class="roll-log-drawer">
-          <summary>Roll log (<span id="roll-count">0</span>)</summary>
-          <ol class="roll-log" id="roll-log"></ol>
-        </details>
+          <nav class="choices" id="choices" aria-label="Choices"></nav>
+
+          <details class="roll-log-drawer">
+            <summary>Roll log (<span id="roll-count">0</span>)</summary>
+            <ol class="roll-log" id="roll-log"></ol>
+          </details>
+        </div>
+        <div class="play-tab" id="tab-sheet" hidden></div>
+        <div class="play-tab" id="tab-journal" hidden></div>
+        <div class="play-tab" id="tab-menu" hidden>
+          <p class="menu-slot" id="slot-note"></p>
+          <div class="menu-actions">
+            <button class="slot-button" id="to-title" type="button">Save slots</button>
+            <button class="slot-button" id="play-credits" type="button" aria-expanded="false">Credits</button>
+          </div>
+          <div id="menu-credits"></div>
+          <div id="menu-settings"></div>
+        </div>
+
+        <nav class="bottom-nav" id="bottom-nav" aria-label="Game sections">
+          <button class="bottom-tab" type="button" data-tab="adventure" aria-current="page">Adventure</button>
+          <button class="bottom-tab" type="button" data-tab="sheet">Sheet</button>
+          <button class="bottom-tab" type="button" data-tab="journal">Journal</button>
+          <button class="bottom-tab" type="button" data-tab="menu">Menu</button>
+        </nav>
       </section>
 
       <footer class="footer" id="debug-footer" hidden>

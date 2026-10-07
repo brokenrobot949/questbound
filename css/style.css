@@ -1647,3 +1647,154 @@ h3.debug-heading {
   border-color: var(--page);
   box-shadow: 0 0 0 1px var(--page);
 }
+
+/* Play: tabs and the bar along the bottom (Adventure, Sheet, Journal, Menu) */
+
+#adventure-screen {
+  padding-bottom: calc(64px + env(safe-area-inset-bottom));
+}
+
+.play-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.play-tab[hidden] {
+  display: none;
+}
+
+#play-status {
+  color: var(--text);
+}
+
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  padding: 0 8px env(safe-area-inset-bottom);
+  background: var(--box);
+  border-top: 3px solid var(--box-edge-dark);
+}
+
+.bottom-tab {
+  position: relative;
+  flex: 1;
+  max-width: 8.5rem;
+  min-height: 52px;
+  padding: 6px 4px;
+  background: none;
+  border: none;
+  border-top: 3px solid transparent;
+  margin-top: -3px;
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: var(--size-ui);
+  cursor: pointer;
+}
+
+.bottom-tab:hover,
+.bottom-tab:focus-visible {
+  color: var(--text);
+  outline: none;
+}
+
+.bottom-tab[aria-current='page'] {
+  color: var(--accent);
+  border-top-color: var(--accent);
+}
+
+/* A dot on the Journal tab when there's something new in it */
+.bottom-tab.has-news::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  right: 18%;
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+}
+
+/* Above the bottom bar during play */
+.app:has(#adventure-screen:not([hidden])) .debug-toggle {
+  bottom: calc(64px + env(safe-area-inset-bottom));
+}
+
+.choice-tag.is-drive {
+  color: var(--good);
+}
+
+.menu-slot {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--size-ui);
+  color: var(--muted);
+}
+
+.menu-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#menu-credits:empty,
+#menu-settings:empty {
+  display: none;
+}
+
+/* The Sheet and Journal tabs */
+
+.sheet-panel,
+.journal-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pack-item {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--size-ui);
+}
+
+.quest {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--box-edge-dark);
+}
+
+.quest.is-done {
+  color: var(--past);
+}
+
+.quest-title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--size-ui);
+  font-weight: normal;
+  color: var(--text);
+}
+
+.quest-summary {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--size-ui);
+  color: var(--muted);
+}
+
+.journal-list {
+  margin: 0;
+  padding-left: 1.2em;
+  font-family: var(--font-ui);
+  font-size: var(--size-ui);
+}
+
+.journal-list li + li {
+  margin-top: 4px;
+}

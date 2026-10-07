@@ -8,7 +8,9 @@
 //   { type: 'chosen', text }               the choice the player just made
 //   { type: 'text', text }                 a paragraph of narration
 //   { type: 'roll', result, revealed }     a d20 test; revealed once the player has tapped the die
+//   { type: 'note', text }                 a short DM note ("New quest: …"), from an external
 //   { type: 'location', value }            the hero moved (from a #location tag); not shown as text
+//   { type: 'time', value }                the time of day changed (from a #time tag); not shown as text
 
 import { parseTags } from './tags.js';
 
@@ -27,14 +29,16 @@ export function runPage(game, leadBeats = []) {
     for (const result of game.pendingRolls.splice(0)) {
       beats.push({ type: 'roll', result, revealed: false });
     }
+    for (const note of (game.pendingNotes || []).splice(0)) beats.push({ type: 'note', text: note });
     const tags = parseTags(story.currentTags);
     if (tags.location) beats.push({ type: 'location', value: tags.location });
+    if (tags.time) beats.push({ type: 'time', value: tags.time });
     if (text) beats.push({ type: 'text', text });
   }
   return { beats, scene: scene || currentKnot(story) };
 }
 
-// Every knot and stitch in the story, e.g. "gate_test" and "gate_test.gate_opens".
+// Every knot and stitch in the story, e.g. "ch1_arrival" and "ch1_arrival.gate_opens".
 export function listScenes(story) {
   const scenes = [];
   for (const [name, knot] of story.mainContentContainer.namedContent) {
@@ -48,6 +52,7 @@ export function listScenes(story) {
 // Debug mode: moves the story straight to a knot or stitch and runs on. Returns the new page.
 export function jumpTo(game, path) {
   game.location = currentLocation(game);
+  game.time = currentTime(game);
   game.pendingRolls.length = 0;
   game.story.ChoosePathString(path);
   return runPage(game);
@@ -56,18 +61,28 @@ export function jumpTo(game, path) {
 // Where the hero is, as far as the player has seen: location changes count only up to the
 // first roll they haven't revealed, so the save slot can't give a result away early.
 export function currentLocation(game) {
-  let location = game.location;
+  return lastSeen(game, 'location', game.location);
+}
+
+// The time of day, as far as the player has seen ("Dusk"), or null if no scene has said.
+export function currentTime(game) {
+  return lastSeen(game, 'time', game.time || null);
+}
+
+function lastSeen(game, type, start) {
+  let value = start;
   for (const beat of game.page ? game.page.beats : []) {
     if (beat.type === 'roll' && !beat.revealed) break;
-    if (beat.type === 'location') location = beat.value;
+    if (beat.type === type) value = beat.value;
   }
-  return location;
+  return value;
 }
 
 // Takes one of story.currentChoices and runs on. Returns the new page.
 export function makeChoice(game, choice) {
   const expected = parseTags(choice.tags).check;
   game.location = currentLocation(game);
+  game.time = currentTime(game);
   game.story.ChooseChoiceIndex(choice.index);
   const page = runPage(game, [{ type: 'chosen', text: choice.text }]);
   warnIfTagMismatch(expected, page.beats.find((b) => b.type === 'roll'));
@@ -77,6 +92,7 @@ export function makeChoice(game, choice) {
 // Starts the story over from the top, keeping the hero and the dice.
 export function restartStory(game) {
   game.location = currentLocation(game);
+  game.time = currentTime(game);
   game.story.ResetState();
   return runPage(game);
 }
@@ -88,7 +104,7 @@ export function revealRoll(game, beat) {
   if (game.rollLog.length > ROLL_LOG_LIMIT) game.rollLog.splice(0, game.rollLog.length - ROLL_LOG_LIMIT);
 }
 
-// The knot Ink was last in, from its position in the story ("gate_test.gate_opens.0").
+// The knot Ink was last in, from its position in the story ("ch1_arrival.gate_opens.0").
 function currentKnot(story) {
   const pointer = story.state.previousPointer;
   const path = pointer && pointer.path ? pointer.path.toString() : null;

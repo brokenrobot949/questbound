@@ -34,6 +34,7 @@ import { pointBuy, standardArray } from '../data/srd/character-creation.js';
 import { quickStartHeroes } from '../data/campaign/quick-start.js';
 import { nameTables } from '../data/campaign/names.js';
 import * as creation from '../js/engine/character/creation.js';
+import { buyItem, costInCopper, moneyText, startingInventory } from '../js/engine/character/inventory.js';
 import { canCastSpell, findSpell, magicInitiateLists, spellGroups, spellNumbers, spellsOnList } from '../js/engine/character/spells.js';
 import { spells } from '../data/srd/spells.js';
 import { defaultLook, heroSprite, lookProblems, rollLook } from '../js/engine/character/look.js';
@@ -362,10 +363,12 @@ test('Roll line names a Critical Hit', () => {
 });
 
 test('Ink tags: #check:persuasion:15 is a Persuasion check against DC 15; #location sets the place', () => {
-  assertEqual(parseTags(['check:persuasion:15']), { check: { testId: 'persuasion', dc: 15 }, spell: null, location: null });
+  const none = { check: null, spell: null, location: null, time: null, drive: null, buy: null };
+  assertEqual(parseTags(['check:persuasion:15']), { ...none, check: { testId: 'persuasion', dc: 15 } });
   assertEqual(parseTags(['spell:light']).spell, 'light');
   assertEqual(parseTags(['location: Bramblegate, north gate']).location, 'Bramblegate, north gate');
-  assertEqual(parseTags(null), { check: null, spell: null, location: null });
+  assertEqual(parseTags(['time:Dusk', 'drive:wealth', 'buy:torch']), { ...none, time: 'Dusk', drive: 'wealth', buy: 'torch' });
+  assertEqual(parseTags(null), none);
 });
 
 // ---- Debug mode: forcing the next d20 ----
@@ -453,6 +456,24 @@ test('Creation: a hero needs a Drive, a named Bond and a starting equipment choi
   assertTrue(validateCharacter(makeHero({ bond: { type: 'cousin', name: 'Ada' } })).some((p) => p.includes('Choose a Bond')));
   assertTrue(validateCharacter(makeWizard({ startingEquipment: { class: 'C', background: 'A' } })).length > 0, 'the Wizard has no option C');
   assertTrue(validateCharacter(makeHero({ name: 'x'.repeat(41) })).some((p) => p.includes('up to 40')));
+});
+
+test('Money: prices count in copper, and show as gold, silver and copper', () => {
+  assertEqual([costInCopper({ gp: 50 }), costInCopper({ sp: 5 }), costInCopper({ cp: 1 }), costInCopper(75)], [5000, 50, 1, 7500]);
+  assertEqual([moneyText(1800), moneyText(1855), moneyText(7), moneyText(0)], ['18 GP', '18 GP, 5 SP, 5 CP', '7 CP', 'no money']);
+});
+
+test('Pack: a hero starts with their kits, buying takes the price, and nobody buys on credit', () => {
+  const juniper = quickStartHeroes.find((h) => h.id === 'juniper').character;
+  const start = startingInventory(juniper);
+  assertEqual(start.money, 1300, 'Wizard kit A 5 GP and Sage kit A 8 GP');
+  assertTrue(start.inventory.some((e) => e.id === 'spellbook') && start.inventory.some((e) => e.id === 'quarterstaff' && e.quantity === 2), 'both kits’ staves stack');
+  const game = { money: 5050, inventory: [] };
+  buyItem(game, 'potion-of-healing');
+  assertEqual([game.money, game.inventory], [50, [{ id: 'potion-of-healing', quantity: 1 }]]);
+  assertThrows(() => buyItem(game, 'potion-of-healing'));
+  assertEqual(game.money, 50, 'a refused purchase costs nothing');
+  assertThrows(() => buyItem(game, 'spellbook'), 'a spellbook is not for sale');
 });
 
 test('Data: every item in the starting kits is in the equipment data', () => {

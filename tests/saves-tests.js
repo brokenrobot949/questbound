@@ -4,7 +4,7 @@
 import { test, assertEqual, assertTrue, assertThrows, assertRejects, run } from './harness.js';
 import { loadStory } from '../js/engine/story/ink-loader.js';
 import { bindExternals } from '../js/engine/story/externals.js';
-import { currentLocation, makeChoice, revealRoll, ROLL_LOG_LIMIT } from '../js/engine/story/story-runner.js';
+import { currentLocation, currentTime, makeChoice, revealRoll, ROLL_LOG_LIMIT } from '../js/engine/story/story-runner.js';
 import { SAVE_VERSION, gameToSave, loadGame, migrateSave, newGame, validateSave } from '../js/engine/save/save-format.js';
 import { backupCode, backupFileName, backupFileText, isBackupDue, readBackup } from '../js/engine/save/backup.js';
 import { migrations } from '../js/engine/save/migrations.js';
@@ -71,14 +71,21 @@ test('Migration: a missing or faulty upgrade step is refused', () => {
 
 // ---- New games and save contents ----
 
-test('New game: the test scene starts with the hero in session 1 at the north gate', async () => {
+test('New game: the story starts with the hero in session 1 at the north gate, on day 1', async () => {
   const runtime = await freshRuntime();
   const game = newGame(runtime, { slot: 1, seed: 'new', character: testHero });
-  assertEqual([game.sessionCount, currentLocation(game)], [1, 'Bramblegate, north gate']);
-  assertEqual(game.page.beats.map((b) => b.type), ['location', 'text', 'text', 'text']);
-  assertEqual(game.story.currentChoices.length, 2);
+  assertEqual([game.sessionCount, currentLocation(game), currentTime(game), game.day], [1, 'Bramblegate, north gate', 'Dusk', 1]);
+  assertEqual(game.page.beats[0].text, 'You came north to set things right. A town is being bled dry, and nobody important seems to care.', 'Wren’s Drive is Justice');
+  assertEqual(game.story.currentChoices.length, 5, 'talk, bluster, lie, the Soldier’s token, or wait');
   assertTrue(game.character !== testHero, 'the hero should be a copy, not the data file itself');
   assertTrue(runtime.game === game, 'the new game should become the active game');
+});
+
+test('New game: the hero starts with the coins and pack from their kits, no Inspiration and an empty journal', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'kit', character: testHero });
+  assertEqual(game.money, 1800, 'Fighter kit A 4 GP and Soldier kit A 14 GP, in copper');
+  assertTrue(game.inventory.some((e) => e.id === 'chain-mail') && game.inventory.some((e) => e.id === 'arrow' && e.quantity === 20));
+  assertEqual([game.inspiration, game.journal], [false, { quests: [], deeds: [], unread: false }]);
 });
 
 test('A save holds game state, Ink state, dice state, session count and last-played time', async () => {
@@ -86,7 +93,7 @@ test('A save holds game state, Ink state, dice state, session count and last-pla
   const game = newGame(runtime, { slot: 2, seed: 'contents', character: testHero, now: new Date('2026-10-01T09:00:00Z') });
   const record = gameToSave(game, new Date('2026-10-06T12:00:00Z'));
   assertEqual(Object.keys(record).sort(), ['createdAt', 'game', 'ink', 'lastBackupSession', 'rng', 'savedAt', 'seed', 'sessionCount', 'slot', 'version']);
-  assertEqual(Object.keys(record.game).sort(), ['character', 'flags', 'location', 'page', 'rollLog']);
+  assertEqual(Object.keys(record.game).sort(), ['character', 'day', 'flags', 'inspiration', 'inventory', 'journal', 'location', 'money', 'page', 'rollLog', 'time']);
   assertEqual([record.version, record.slot, record.sessionCount, record.lastBackupSession], [SAVE_VERSION, 2, 1, 0]);
   assertEqual([record.createdAt, record.savedAt], ['2026-10-01T09:00:00.000Z', '2026-10-06T12:00:00.000Z']);
   assertTrue(record.rng.length === 4 && record.rng.every(Number.isInteger), 'dice state should be four whole numbers');
@@ -106,7 +113,7 @@ test('A save is a snapshot: playing on afterwards does not change it', async () 
 
 // ---- Reloading ----
 
-test('Phase 0 gate: the test scene rolls a check, saves and reloads correctly', async () => {
+test('The north gate: a check is rolled, saved and reloaded correctly', async () => {
   const first = await freshRuntime();
   const game = newGame(first, { slot: 1, seed: 's2', character: testHero });
   game.page = makeChoice(game, checkChoice(game));
@@ -122,7 +129,7 @@ test('Phase 0 gate: the test scene rolls a check, saves and reloads correctly', 
   assertEqual(reloaded.page, throughJson(game.page), 'the same page should show');
   assertEqual(reloaded.rng.getState(), game.rng.getState(), 'the dice should carry on from the same point');
   assertEqual(reloaded.rollLog, throughJson(game.rollLog), 'the roll log should come back');
-  assertEqual([currentLocation(reloaded), reloaded.notice], ['Bramblegate', null]);
+  assertEqual([currentLocation(reloaded), reloaded.notice], ['Bramblegate, the square', null]);
   assertEqual(reloaded.story.currentChoices.length, game.story.currentChoices.length);
 });
 
@@ -132,7 +139,7 @@ test("The save slot doesn't give a result away: a move after an unrevealed roll 
   game.page = makeChoice(game, checkChoice(game));
   assertEqual(gameToSave(game).game.location, 'Bramblegate, north gate');
   revealRoll(game, rollBeats(game.page)[0]);
-  assertEqual(gameToSave(game).game.location, 'Bramblegate');
+  assertEqual(gameToSave(game).game.location, 'Bramblegate, the square');
 });
 
 test("Reloading can't re-roll: loading the same save always gives the same dice", async () => {
@@ -177,7 +184,7 @@ test('If the story changed so much the save no longer fits, the scene starts ove
   record.ink = '{"not": "an ink save"}';
   const reloaded = loadGame(await freshRuntime(), record);
   assertTrue(typeof reloaded.notice === 'string', 'there should be a notice');
-  assertEqual(reloaded.story.currentChoices.length, 2);
+  assertEqual(reloaded.story.currentChoices.length, 5);
   assertEqual(reloaded.character, game.character, 'the hero should be kept');
 });
 
@@ -397,6 +404,26 @@ test('Migration: a version 6 hero gains the starting look for their species and 
   const hero = migrateSave(v6, migrations, 7).game.character;
   assertEqual([hero.look.skin, hero.look.hairStyle, hero.look.outfit, hero.look.headgear], ['green', 'long', 'red', 'none']);
   assertEqual(validateCharacter(hero), [], 'the upgraded hero must be legal');
+});
+
+test('Migration: a version 7 game gains a day, a journal, and coins and a pack from its kits, and becomes version 8', () => {
+  const v7 = { version: 7, slot: 1, game: { character: structuredClone(testHero), flags: [], page: { scene: null, beats: [] } } };
+  const game = migrateSave(v7, migrations, 8).game;
+  assertEqual([game.day, game.time, game.inspiration, game.money], [1, null, false, 1800]);
+  assertEqual(game.journal, { quests: [], deeds: [], unread: false });
+  assertTrue(game.inventory.some((e) => e.id === 'greatsword'), 'Fighter kit A');
+});
+
+test('Day, Inspiration, journal, coins and pack survive a save and reload', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'state', character: testHero });
+  Object.assign(game, { day: 3, inspiration: true, money: 1234 });
+  game.journal.deeds.push({ day: 2, text: 'Did a brave thing.' });
+  game.inventory.push({ id: 'potion-of-healing', quantity: 2 });
+  const reloaded = loadGame(await freshRuntime(), throughJson(gameToSave(game)));
+  assertEqual([reloaded.day, reloaded.inspiration, reloaded.money], [3, true, 1234]);
+  assertEqual(reloaded.journal.deeds, [{ day: 2, text: 'Did a brave thing.' }]);
+  assertEqual(reloaded.inventory.at(-1), { id: 'potion-of-healing', quantity: 2 });
+  assertEqual(validateSave(throughJson(gameToSave(reloaded))).version, SAVE_VERSION);
 });
 
 test('New game: dice rolled during character creation carry on into the game', async () => {
