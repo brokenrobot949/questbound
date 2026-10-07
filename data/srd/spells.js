@@ -10,12 +10,21 @@
 //   text          paragraphs are separated by a blank line
 //   upgrade       "Cantrip Upgrade" or "Using a Higher-Level Spell Slot" text, if any
 //
-// Combat effects (attack rolls, saves, damage) are added when combat arrives.
+// combat: how the spell works on the battle grid, for spells that do so far:
+//   kind     'attack' (a spell attack roll), 'save' (the target makes a saving throw), or
+//            'darts' (Magic Missile: automatic hits)
+//   attack   'melee' or 'ranged';  save: the ability the target saves with
+//   range    in feet;  damage: { dice, bonus, type };  darts: how many at the lowest level
+//   scales   a cantrip whose dice grow at character levels 5, 11 and 17
+//   rider    a lasting effect on a hit: 'slowed' (Speed −10 ft), 'no-reactions',
+//            'no-healing' (until the start of your next turn)
+// Spells without it can't be cast in a fight yet.
 
 export const spells = [
   // ---- Cantrips ----
   {
     id: 'chill-touch',
+    combat: { kind: 'attack', attack: 'melee', range: 5, damage: { dice: '1d10', type: 'necrotic' }, scales: true, rider: 'no-healing' },
     name: 'Chill Touch',
     level: 0,
     school: 'Necromancy',
@@ -62,6 +71,7 @@ export const spells = [
   },
   {
     id: 'fire-bolt',
+    combat: { kind: 'attack', attack: 'ranged', range: 120, damage: { dice: '1d10', type: 'fire' }, scales: true },
     name: 'Fire Bolt',
     level: 0,
     school: 'Evocation',
@@ -153,6 +163,7 @@ export const spells = [
   },
   {
     id: 'poison-spray',
+    combat: { kind: 'attack', attack: 'ranged', range: 30, damage: { dice: '1d12', type: 'poison' }, scales: true },
     name: 'Poison Spray',
     level: 0,
     school: 'Necromancy',
@@ -184,6 +195,7 @@ export const spells = [
   },
   {
     id: 'ray-of-frost',
+    combat: { kind: 'attack', attack: 'ranged', range: 60, damage: { dice: '1d8', type: 'cold' }, scales: true, rider: 'slowed' },
     name: 'Ray of Frost',
     level: 0,
     school: 'Evocation',
@@ -200,6 +212,7 @@ export const spells = [
   },
   {
     id: 'sacred-flame',
+    combat: { kind: 'save', save: 'dexterity', range: 60, damage: { dice: '1d8', type: 'radiant' }, scales: true },
     name: 'Sacred Flame',
     level: 0,
     school: 'Evocation',
@@ -216,6 +229,7 @@ export const spells = [
   },
   {
     id: 'shocking-grasp',
+    combat: { kind: 'attack', attack: 'melee', range: 5, damage: { dice: '1d8', type: 'lightning' }, scales: true, rider: 'no-reactions' },
     name: 'Shocking Grasp',
     level: 0,
     school: 'Evocation',
@@ -500,6 +514,7 @@ export const spells = [
   },
   {
     id: 'magic-missile',
+    combat: { kind: 'darts', range: 120, darts: 3, damage: { dice: '1d4', bonus: 1, type: 'force' } },
     name: 'Magic Missile',
     level: 1,
     school: 'Evocation',

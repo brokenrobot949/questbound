@@ -5,12 +5,13 @@
 //   #spell:light                  the choice uses this spell; the card shows "Spell · Light"
 //   #drive:wealth                 the choice fits that Drive; the card says so if it's the hero's
 //   #buy:torch                    the choice buys that item; the card shows the price
+//   #combat:mill-scavengers       the choice starts that fight; its content runs after it
 // Tags on a line of text:
 //   #location:Bramblegate, north gate   where the hero is now; shown on the save slot
 //   #time:Dusk                    the time of day now; shown in the status line
 
 export function parseTags(tags) {
-  const parsed = { check: null, spell: null, location: null, time: null, drive: null, buy: null };
+  const parsed = { check: null, spell: null, location: null, time: null, drive: null, buy: null, combat: null };
   for (const tag of tags || []) {
     const colon = tag.indexOf(':');
     const key = (colon < 0 ? tag : tag.slice(0, colon)).trim();
@@ -28,6 +29,8 @@ export function parseTags(tags) {
       parsed.drive = value;
     } else if (key === 'buy') {
       parsed.buy = value;
+    } else if (key === 'combat') {
+      parsed.combat = value;
     }
   }
   return parsed;

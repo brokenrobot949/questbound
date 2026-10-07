@@ -3,6 +3,8 @@
 
 import { findBond, findDrive } from '../character/creation.js';
 import { findItem, itemText, moneyText } from '../character/inventory.js';
+import { featureUsesLeft, featureUsesMax, maxHp, slotsAt, slotsLeft } from '../character/resources.js';
+import { advancement } from '../../../data/srd/advancement.js';
 import { heroSheet } from './hero-sheet.js';
 import { el } from './dom.js';
 import { expandable } from './widgets.js';
@@ -10,6 +12,23 @@ import { expandable } from './widgets.js';
 export function sheetPanel(game) {
   const { character } = game;
   const panel = el('div', 'sheet-panel');
+
+  // What's spent and what's left.
+  const now = el('section', 'sheet-block');
+  now.append(el('h3', 'section-heading', 'Right now'));
+  now.append(el('p', 'sheet-line', `Hit Points: ${game.hp} of ${maxHp(character)}`));
+  const next = advancement.find((row) => row.level === character.level + 1);
+  now.append(el('p', 'sheet-line', `XP: ${game.xp}${next ? ` (level ${next.level} at ${next.xp})` : ''}`));
+  const slotLevels = [1, 2, 3].filter((level) => slotsAt(character, level) > 0);
+  if (slotLevels.length) {
+    now.append(el('p', 'sheet-line', `Spell slots left: ${slotLevels.map((level) => `${slotsLeft(game, level)} of ${slotsAt(character, level)} level ${level}`).join(', ')}`));
+  }
+  if (featureUsesMax(character, 'second-wind')) {
+    now.append(el('p', 'sheet-line', `Second Wind: ${featureUsesLeft(game, 'second-wind')} of ${featureUsesMax(character, 'second-wind')} left`));
+  }
+  now.append(el('p', 'section-hint', 'A long rest brings back Hit Points, spell slots and Second Wind.'));
+  panel.append(now);
+
   panel.append(heroSheet(character));
 
   const drive = findDrive(character.drive);

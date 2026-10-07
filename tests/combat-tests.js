@@ -1,0 +1,292 @@
+// Combat checks. Open tests/combat.html through the local server to run them.
+// Add checks here whenever combat rules change.
+
+import { test, assertEqual, assertTrue, assertThrows, scriptedRng, run } from './harness.js';
+import { createRng } from '../js/engine/rules/rng.js';
+import { forceNextD20 } from '../js/engine/rules/dice.js';
+import { parseMap, reachableSquares, squaresBetween, key } from '../js/engine/combat/grid.js';
+import { heroAttackOptions, hitChance, rollDamage } from '../js/engine/combat/attacks.js';
+import * as fight from '../js/engine/combat/battle.js';
+import { startingInventory } from '../js/engine/character/inventory.js';
+import { freshResources } from '../js/engine/character/resources.js';
+import { monsters } from '../data/srd/monsters.js';
+import { quickStartHeroes } from '../data/campaign/quick-start.js';
+import { loadStory } from '../js/engine/story/ink-loader.js';
+import { bindExternals } from '../js/engine/story/externals.js';
+import { continueAfterBattle, makeChoice, startFight } from '../js/engine/story/story-runner.js';
+import { gameToSave, loadGame, newGame } from '../js/engine/save/save-format.js';
+
+const wren = quickStartHeroes.find((h) => h.id === 'wren').character;
+const juniper = quickStartHeroes.find((h) => h.id === 'juniper').character;
+
+// A game with just what combat needs: the hero, their kit, full Hit Points and seeded dice.
+function gameFor(character, seed = 'combat') {
+  return { character, rng: createRng(seed), ...startingInventory(character), ...freshResources(character), battle: null, lastBattle: null };
+}
+
+// ---- The grid ----
+
+const legend = { '#': { terrain: 'wall' }, '.': { terrain: 'floor' }, '~': { terrain: 'difficult' } };
+
+test('Grid: diagonals cost the same as straight lines', () => {
+  assertEqual([squaresBetween({ x: 0, y: 0 }, { x: 3, y: 3 }), squaresBetween({ x: 0, y: 0 }, { x: 3, y: 1 })], [3, 3]);
+});
+
+test('Grid: walls block, corners can’t be cut, difficult terrain costs double', () => {
+  const map = parseMap(['....', '.#..', '..~.', '....'], legend);
+  const reach = reachableSquares(map, { x: 0, y: 0 }, 5);
+  assertTrue(!reach.has(key({ x: 1, y: 1 })), 'a wall');
+  const corner = reachableSquares(parseMap(['.#', '..'], legend), { x: 0, y: 0 }, 5);
+  assertTrue(!corner.has(key({ x: 1, y: 1 })), 'no cutting past the corner of a wall');
+  const mud = reachableSquares(map, { x: 2, y: 3 }, 5);
+  assertTrue(!mud.has(key({ x: 2, y: 2 })), 'difficult terrain needs 10 feet');
+  assertEqual(reachableSquares(map, { x: 2, y: 3 }, 10).get(key({ x: 2, y: 2 })).cost, 10);
+});
+
+test('Grid: pass through an ally but not an enemy, and stop in nobody’s square', () => {
+  const map = parseMap(['...'], legend);
+  const ally = reachableSquares(map, { x: 0, y: 0 }, 10, (p) => (p.x === 1 ? 'ally' : null));
+  assertTrue(ally.has(key({ x: 2, y: 0 })) && !ally.has(key({ x: 1, y: 0 })));
+  const foe = reachableSquares(map, { x: 0, y: 0 }, 10, (p) => (p.x === 1 ? 'enemy' : null));
+  assertTrue(!foe.has(key({ x: 2, y: 0 })));
+});
+
+// ---- Attack options and maths ----
+
+test('Attacks: a Fighter attacks with every weapon in the pack, at the right bonus', () => {
+  const options = heroAttackOptions(gameFor(wren));
+  const names = options.map((o) => o.id);
+  assertTrue(['greatsword-melee', 'flail-melee', 'javelin-melee', 'javelin-ranged', 'spear-ranged', 'shortbow-ranged'].every((id) => names.includes(id)), names.join(', '));
+  const greatsword = options.find((o) => o.id === 'greatsword-melee');
+  assertEqual(greatsword.modifiers.reduce((s, m) => s + m.value, 0), 5, 'Str +3, Proficiency +2');
+  assertEqual([greatsword.damage.dice, greatsword.damage.bonus], ['2d6', 3]);
+  assertEqual(options.find((o) => o.id === 'spear-melee').damage.dice, '1d8', 'a Versatile spear in two hands');
+});
+
+test('Attacks: a Shield rules out two-handed weapons; arrows are needed for a bow', () => {
+  const game = gameFor({ ...wren, shield: true });
+  const ids = heroAttackOptions(game).map((o) => o.id);
+  assertTrue(!ids.includes('greatsword-melee') && !ids.includes('shortbow-ranged'));
+  assertEqual(heroAttackOptions(game).find((o) => o.id === 'spear-melee').damage.dice, '1d6', 'one-handed with a Shield');
+  const noArrows = gameFor(wren);
+  noArrows.inventory = noArrows.inventory.filter((e) => e.id !== 'arrow');
+  assertTrue(!heroAttackOptions(noArrows).some((o) => o.id === 'shortbow-ranged'));
+});
+
+test('Attacks: a Wizard has attack cantrips and Magic Missile while slots last', () => {
+  const game = gameFor(juniper);
+  const ids = heroAttackOptions(game).map((o) => o.id);
+  assertTrue(['spell-fire-bolt', 'spell-ray-of-frost', 'spell-magic-missile'].every((id) => ids.includes(id)), ids.join(', '));
+  const fireBolt = heroAttackOptions(game).find((o) => o.id === 'spell-fire-bolt');
+  assertEqual([fireBolt.modifiers.reduce((s, m) => s + m.value, 0), fireBolt.damage.dice, fireBolt.range], [5, '1d10', [120, 120]]);
+  game.slotsUsed = [2];
+  assertTrue(!heroAttackOptions(game).some((o) => o.id === 'spell-magic-missile'), 'no slots, no Magic Missile');
+  assertEqual(heroAttackOptions(gameFor({ ...juniper, level: 5, classChoices: { scholarSkill: 'arcana' } })).find((o) => o.id === 'spell-fire-bolt').damage.dice, '2d10', 'cantrips grow at level 5');
+});
+
+test('Attacks: the chance to hit counts a natural 1 as a miss and a 20 as a hit', () => {
+  assertEqual(hitChance(5, 12), 0.7, 'need 7 or better');
+  assertEqual(hitChance(0, 30), 0.05, 'only a 20');
+  assertEqual(hitChance(20, 5), 0.95, 'all but a 1');
+  assertEqual(Math.round(hitChance(5, 12, 'advantage') * 100), 91);
+});
+
+test('Damage: a Critical Hit doubles the dice; Great Weapon Fighting and Savage Attacker', () => {
+  const crit = rollDamage(createRng('d'), { dice: '2d6', bonus: 3, type: 'slashing' }, { critical: true });
+  assertEqual([crit.dice.length, crit.total], [4, crit.dice.reduce((s, v) => s + v, 0) + 3]);
+  const gwf = rollDamage(createRng('gwf'), { dice: '20d6', bonus: 0, type: 'slashing' }, { greatWeapon: true });
+  assertTrue(gwf.dice.every((d) => d >= 3), 'ones and twos count as threes');
+  const savage = rollDamage(createRng('sav'), { dice: '1d8', bonus: 0, type: 'slashing' }, { savage: true });
+  const sum = (l) => l.reduce((s, v) => s + v, 0);
+  assertEqual(sum(savage.dice), Math.max(sum(savage.savaged.first), sum(savage.savaged.second)), 'keeps the better roll');
+  const goblin = monsters.find((m) => m.id === 'goblin-warrior').attacks[0];
+  const withAdvantage = rollDamage(createRng('adv'), { ...goblin.damage, extraOnAdvantage: goblin.advantageExtra }, { advantage: true });
+  assertEqual(withAdvantage.extra.length, 1, 'the extra 1d4 with Advantage');
+});
+
+// ---- A fight ----
+
+// Starts the mill fight with the hero going first (forced Initiative), for checks that need it.
+function millFight(character = wren, seed = 'fight') {
+  const game = gameFor(character, seed);
+  forceNextD20(20);
+  fight.startBattle(game, 'mill-scavengers', 0);
+  return game;
+}
+
+test('Fight: everyone rolls Initiative and the order is set', () => {
+  const game = millFight();
+  const battle = game.battle;
+  assertEqual(battle.order.length, 3);
+  assertEqual(battle.order[0], 'hero', 'a natural 20 goes first');
+  assertEqual(fight.enemies(battle).map((c) => c.name), ['Goblin Minion 1', 'Goblin Minion 2']);
+  assertTrue(fight.isHeroTurn(game));
+  assertTrue(battle.log.filter((e) => e.roll && e.roll.label === 'Initiative').length === 3, 'every roll is in the log');
+});
+
+test('Fight: the hero moves within their Speed, then attacks once per turn', () => {
+  const game = millFight();
+  const battle = game.battle;
+  const hero = fight.heroCombatant(battle);
+  const goblin = fight.enemies(battle)[0];
+  // Bring the goblin next to the hero's path, so the test controls the distance.
+  goblin.pos = { x: 3, y: 4 };
+  fight.heroMove(game, { x: 4, y: 3 }); // (3, 3) is a barrel
+  assertEqual([hero.pos, battle.turnState.movementLeft], [{ x: 4, y: 3 }, 20]);
+  assertThrows(() => fight.heroMove(game, goblin.pos), 'nobody can stop in a foe’s square');
+  assertThrows(() => fight.heroMove(game, { x: 0, y: 3 }), 'nor walk into a wall');
+  goblin.hp = 1;
+  forceNextD20(15);
+  fight.heroAttack(game, 'greatsword-melee', goblin.id);
+  assertEqual(goblin.hp, 0, 'a hit with a greatsword drops a 1 HP goblin');
+  assertThrows(() => fight.heroAttack(game, 'greatsword-melee', fight.enemies(battle)[1].id), 'one action per turn');
+});
+
+test('Fight: leaving a foe’s reach provokes an Opportunity Attack, unless you Disengage', () => {
+  const game = millFight();
+  const battle = game.battle;
+  const goblin = fight.enemies(battle)[0];
+  goblin.pos = { x: 3, y: 2 }; // next to the hero at (3, 1)
+  fight.heroMove(game, { x: 1, y: 2 });
+  assertTrue(battle.log.some((e) => e.text.includes('an Opportunity Attack!')), 'the goblin lashes out');
+
+  const careful = millFight(wren, 'careful');
+  const nearby = fight.enemies(careful.battle)[0];
+  nearby.pos = { x: 3, y: 2 };
+  fight.heroDisengage(careful);
+  fight.heroMove(careful, { x: 1, y: 2 });
+  assertTrue(!careful.battle.log.some((e) => e.text.includes('an Opportunity Attack!')));
+});
+
+test('Fight: goblins close in and attack on their turn', () => {
+  const game = millFight();
+  fight.endHeroTurn(game);
+  const battle = game.battle;
+  const hero = fight.heroCombatant(battle);
+  assertTrue(fight.isHeroTurn(game) || battle.outcome !== null, 'back to the hero');
+  const adjacent = fight.enemies(battle).filter((c) => squaresBetween(c.pos, hero.pos) === 1);
+  assertTrue(adjacent.length >= 1, 'the goblins reached the hero');
+  assertTrue(battle.log.some((e) => e.roll && e.roll.kind === 'attack' && e.text.includes('Goblin Minion')), 'and attacked');
+});
+
+test('Fight: Second Wind and a Potion of Healing are Bonus Actions', () => {
+  const game = millFight();
+  game.hp = 3;
+  game.inventory.push({ id: 'potion-of-healing', quantity: 1 });
+  fight.heroSecondWind(game);
+  assertTrue(game.hp > 3 && game.featureUses['second-wind'] === 1);
+  assertThrows(() => fight.heroDrinkPotion(game), 'one Bonus Action per turn');
+});
+
+// A fight that starts with the hero already at 0 Hit Points, with scripted d20s: the hero's
+// Initiative, the two goblins' (who go first), then each death save in turn. The goblins
+// don't attack a fallen hero, so only death saves are rolled after Initiative.
+function downedFight(deathSaves) {
+  const game = gameFor(wren);
+  game.hp = 0;
+  game.rng = scriptedRng([2, 15, 15, ...deathSaves]);
+  fight.startBattle(game, 'mill-scavengers', 0);
+  return game;
+}
+
+test('Fight: at 0 Hit Points the hero makes death saves; a natural 20 brings them back', () => {
+  const game = downedFight([20]);
+  assertEqual([game.battle.heroState, game.hp, fight.isHeroTurn(game)], ['up', 1, true]);
+  assertTrue(game.battle.log.some((e) => e.text.includes('rummages')), 'the goblins went for the flour instead');
+});
+
+test('Fight: three failed death saves (a natural 1 counts twice) end the fight in defeat', () => {
+  const game = downedFight([1, 5]);
+  assertEqual([game.battle.heroState, game.battle.outcome, game.battle.deathSaves.failures], ['dead', 'defeat', 3]);
+});
+
+test('Fight: three successful death saves leave the hero stable, which still loses the fight', () => {
+  const game = downedFight([12, 14, 10]);
+  assertEqual([game.battle.heroState, game.battle.outcome, game.battle.deathSaves.successes], ['stable', 'defeat', 3]);
+});
+
+test('Fight: winning gives the monsters’ XP once the player carries on', () => {
+  const game = millFight();
+  for (const goblin of fight.enemies(game.battle)) goblin.hp = 0;
+  const goblin = fight.enemies(game.battle)[1];
+  goblin.hp = 1;
+  goblin.pos = { x: 4, y: 2 };
+  forceNextD20(19);
+  fight.heroAttack(game, 'greatsword-melee', goblin.id);
+  assertEqual([game.battle.outcome, game.battle.xp], ['victory', 50]);
+  const { outcome, choiceIndex } = fight.finishBattle(game);
+  assertEqual([outcome, choiceIndex, game.xp, game.battle, game.lastBattle.outcome], ['victory', 0, 50, null, 'victory']);
+});
+
+// ---- The story ----
+
+async function storyGame(character, seed) {
+  const story = await loadStory(new URL('../story/', import.meta.url));
+  const runtime = { story, game: null };
+  bindExternals(story, runtime);
+  return newGame(runtime, { slot: 1, seed, character });
+}
+
+function pick(game, start) {
+  const choice = game.story.currentChoices.find((c) => c.text.startsWith(start));
+  if (!choice) throw new Error(`No choice "${start}": ${game.story.currentChoices.map((c) => c.text).join(' / ')}`);
+  game.page = makeChoice(game, choice);
+  return game.page;
+}
+
+// Plays from the gate to the goblins in the mill cellar.
+async function toTheCellar(seed) {
+  const game = await storyGame(wren, seed);
+  pick(game, "Show her your old regiment's token");
+  pick(game, "Go to the reeve's hall");
+  pick(game, 'Take the job, and ask');
+  pick(game, 'Tell her to go home');
+  pick(game, 'Set out for Dunn');
+  pick(game, 'Go down to the cellar');
+  return game;
+}
+
+test('Story: the mill fight starts from a tagged choice, and winning carries the scene on', async () => {
+  const game = await toTheCellar('mill-win');
+  const choice = game.story.currentChoices.find((c) => (c.tags || []).includes('combat:mill-scavengers'));
+  assertTrue(Boolean(choice), 'the Fight choice is tagged');
+  startFight(game, choice);
+  assertTrue(game.battle !== null && game.battle.choiceIndex === choice.index);
+  // Settle it quickly: both goblins fall.
+  for (const goblin of fight.enemies(game.battle)) goblin.hp = 0;
+  game.battle.outcome = 'victory';
+  game.battle.xp = 50;
+  const xpBefore = game.xp;
+  const page = continueAfterBattle(game);
+  assertTrue(game.flags.includes('mill_goblins_fought'), 'the scene knew it was won');
+  assertEqual(game.xp, xpBefore + 50);
+  assertTrue(page.beats.some((b) => b.type === 'note' && b.text.includes('Victory')));
+});
+
+test('Story: losing the mill fight is Fate’s Mercy: robbed, rested, and the story goes on', async () => {
+  const game = await toTheCellar('mill-lose');
+  const choice = game.story.currentChoices.find((c) => (c.tags || []).includes('combat:mill-scavengers'));
+  startFight(game, choice);
+  game.hp = 0;
+  game.battle.heroState = 'dead';
+  game.battle.outcome = 'defeat';
+  const day = game.day;
+  continueAfterBattle(game);
+  assertEqual([game.money, game.day, game.hp > 0], [0, day + 1, true], 'no purse, a new day, Hit Points back');
+  assertTrue(game.journal.deeds.some((d) => d.text.includes('carried home by Lark')));
+});
+
+test('Story: a fight in progress is saved and reloaded exactly', async () => {
+  const game = await toTheCellar('mill-save');
+  const choice = game.story.currentChoices.find((c) => (c.tags || []).includes('combat:mill-scavengers'));
+  startFight(game, choice);
+  const record = JSON.parse(JSON.stringify(gameToSave(game)));
+  const story = await loadStory(new URL('../story/', import.meta.url));
+  const runtime = { story, game: null };
+  bindExternals(story, runtime);
+  const reloaded = loadGame(runtime, record);
+  assertEqual(reloaded.battle, JSON.parse(JSON.stringify(game.battle)));
+  assertTrue(reloaded.story.currentChoices.some((c) => c.index === reloaded.battle.choiceIndex), 'the story waits at the same choice');
+});
+
+run(document.getElementById('summary'), document.getElementById('results'));

@@ -182,12 +182,9 @@ You've barely stepped back into the square when a girl of about fourteen plants 
 ~ quest_note("missing-miller", "Lark Dunn, the miller's daughter, says goblins don't take people. Something else took her father.")
 -> bramblegate
 
-// The end of what's written so far: beat 3, Dunn's Mill, comes with combat.
 === ch1_to_the_mill ===
 You take the brook road south, out past the last cottages and the drowned turnip fields. The rain has stopped, but everything still drips. #location:The brook road
-
-Dunn's Mill sits where the brook bends, its great wheel still and silent. The door hangs off one hinge. Flour drifts across the step like snow. #location:Dunn's Mill
--> END
+-> ch1_mill
 
 === function note_goblins_fled() ===
 ~ quest_note("missing-miller", "Hob says goblins were seen running down off the barrow hills a week before the raid, as if something had scared them.")

@@ -7,6 +7,7 @@
 // Never edit or remove a step once released: old saves on players' phones still need it.
 
 import { startingInventory } from '../character/inventory.js';
+import { maxHitPoints } from '../character/sheet.js';
 
 export const migrations = {
   // Version 2 remembers which session the save was last backed up in, for the backup reminder.
@@ -135,4 +136,20 @@ export const migrations = {
       },
     };
   },
+
+  // Version 9 adds what a hero spends in a fight: Hit Points, spell slots and feature uses,
+  // plus XP and a fight in progress. Heroes before it were never hurt: full Hit Points.
+  8: (save) => ({
+    ...save,
+    version: 9,
+    game: {
+      ...save.game,
+      hp: maxHitPoints(save.game.character).value,
+      slotsUsed: [],
+      featureUses: {},
+      xp: 0,
+      battle: null,
+      lastBattle: null,
+    },
+  }),
 };

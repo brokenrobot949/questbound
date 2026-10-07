@@ -13,6 +13,8 @@
 //   { type: 'time', value }                the time of day changed (from a #time tag); not shown as text
 
 import { parseTags } from './tags.js';
+import { finishBattle, startBattle } from '../combat/battle.js';
+import { dmNotes } from '../../../data/campaign/dm-voice.js';
 
 // How many rolls the roll log keeps in the save. Older ones drop off.
 export const ROLL_LOG_LIMIT = 200;
@@ -87,6 +89,27 @@ export function makeChoice(game, choice) {
   const page = runPage(game, [{ type: 'chosen', text: choice.text }]);
   warnIfTagMismatch(expected, page.beats.find((b) => b.type === 'roll'));
   return page;
+}
+
+// A choice tagged #combat:encounter-id starts a fight instead of running on. The story waits
+// at the same choice until the fight ends (see continueAfterBattle).
+export function startFight(game, choice) {
+  const encounterId = parseTags(choice.tags).combat;
+  if (!encounterId) throw new Error('That choice does not start a fight');
+  game.location = currentLocation(game);
+  game.time = currentTime(game);
+  return startBattle(game, encounterId, choice.index);
+}
+
+// Once the player has seen how the fight ended: banks its XP, then takes the story choice
+// that started it, so the scene carries on (combat_won() tells it who won). Returns the page.
+export function continueAfterBattle(game) {
+  const xp = game.battle.outcome === 'victory' ? game.battle.xp : 0;
+  const { choiceIndex } = finishBattle(game);
+  if (xp) game.pendingNotes.push(dmNotes.fightWon.replace('{xp}', xp));
+  const choice = game.story.currentChoices[choiceIndex];
+  if (!choice) throw new Error('The story moved on during the fight');
+  return makeChoice(game, choice);
 }
 
 // Starts the story over from the top, keeping the hero and the dice.

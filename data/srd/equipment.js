@@ -1,7 +1,6 @@
 // Equipment (SRD 5.2.1), other than armour (see armor.js). Only what the current phase needs:
 // the items in the Fighter, Wizard and background starting kits, and what Bramblegate's
-// market sells. The full tables, and the weapons' damage, properties and mastery, arrive
-// with combat.
+// market sells. The full tables arrive with shops.
 //
 //   category   'weapon', 'ammunition', 'tool', 'pack', 'gear' or 'potion'
 //   text       what the item does, shown on the character sheet
@@ -9,19 +8,26 @@
 //   weight     pounds (0 = "—" in the SRD, too light to count)
 //   cost       in coins: { gp: 2 } is 2 GP, { sp: 5 } is 5 SP; null = not sold
 //   bundle     for ammunition, how many come together for that weight and cost
+//
+// Weapons also have (from the SRD's Weapons table):
+//   damage     { dice: '1d8', type: 'slashing' }
+//   versatile  the damage dice when held in two hands (Versatile property)
+//   range      [normal, long] in feet, for Thrown and Ammunition weapons
+//   properties 'finesse', 'light', 'heavy', 'two-handed', 'thrown', 'ammunition', 'versatile'
+//   mastery    the Weapon Mastery property (used once masteries arrive)
 
 export const equipment = [
   // Weapons
-  { id: 'dagger', name: 'Dagger', category: 'weapon', weaponType: 'simple-melee', weight: 1, cost: { gp: 2 }, source: 'SRD 5.2.1' },
-  { id: 'javelin', name: 'Javelin', category: 'weapon', weaponType: 'simple-melee', weight: 2, cost: { sp: 5 }, source: 'SRD 5.2.1' },
-  { id: 'quarterstaff', name: 'Quarterstaff', category: 'weapon', weaponType: 'simple-melee', weight: 4, cost: { sp: 2 }, source: 'SRD 5.2.1' },
-  { id: 'spear', name: 'Spear', category: 'weapon', weaponType: 'simple-melee', weight: 3, cost: { gp: 1 }, source: 'SRD 5.2.1' },
-  { id: 'shortbow', name: 'Shortbow', category: 'weapon', weaponType: 'simple-ranged', weight: 2, cost: { gp: 25 }, source: 'SRD 5.2.1' },
-  { id: 'flail', name: 'Flail', category: 'weapon', weaponType: 'martial-melee', weight: 2, cost: { gp: 10 }, source: 'SRD 5.2.1' },
-  { id: 'greatsword', name: 'Greatsword', category: 'weapon', weaponType: 'martial-melee', weight: 6, cost: { gp: 50 }, source: 'SRD 5.2.1' },
-  { id: 'scimitar', name: 'Scimitar', category: 'weapon', weaponType: 'martial-melee', weight: 3, cost: { gp: 25 }, source: 'SRD 5.2.1' },
-  { id: 'shortsword', name: 'Shortsword', category: 'weapon', weaponType: 'martial-melee', weight: 2, cost: { gp: 10 }, source: 'SRD 5.2.1' },
-  { id: 'longbow', name: 'Longbow', category: 'weapon', weaponType: 'martial-ranged', weight: 2, cost: { gp: 50 }, source: 'SRD 5.2.1' },
+  { id: 'dagger', name: 'Dagger', category: 'weapon', weaponType: 'simple-melee', damage: { dice: '1d4', type: 'piercing' }, range: [20, 60], properties: ['finesse', 'light', 'thrown'], mastery: 'nick', weight: 1, cost: { gp: 2 }, source: 'SRD 5.2.1' },
+  { id: 'javelin', name: 'Javelin', category: 'weapon', weaponType: 'simple-melee', damage: { dice: '1d6', type: 'piercing' }, range: [30, 120], properties: ['thrown'], mastery: 'slow', weight: 2, cost: { sp: 5 }, source: 'SRD 5.2.1' },
+  { id: 'quarterstaff', name: 'Quarterstaff', category: 'weapon', weaponType: 'simple-melee', damage: { dice: '1d6', type: 'bludgeoning' }, versatile: '1d8', properties: ['versatile'], mastery: 'topple', weight: 4, cost: { sp: 2 }, source: 'SRD 5.2.1' },
+  { id: 'spear', name: 'Spear', category: 'weapon', weaponType: 'simple-melee', damage: { dice: '1d6', type: 'piercing' }, versatile: '1d8', range: [20, 60], properties: ['thrown', 'versatile'], mastery: 'sap', weight: 3, cost: { gp: 1 }, source: 'SRD 5.2.1' },
+  { id: 'shortbow', name: 'Shortbow', category: 'weapon', weaponType: 'simple-ranged', damage: { dice: '1d6', type: 'piercing' }, range: [80, 320], ammunition: 'arrow', properties: ['ammunition', 'two-handed'], mastery: 'vex', weight: 2, cost: { gp: 25 }, source: 'SRD 5.2.1' },
+  { id: 'flail', name: 'Flail', category: 'weapon', weaponType: 'martial-melee', damage: { dice: '1d8', type: 'bludgeoning' }, properties: [], mastery: 'sap', weight: 2, cost: { gp: 10 }, source: 'SRD 5.2.1' },
+  { id: 'greatsword', name: 'Greatsword', category: 'weapon', weaponType: 'martial-melee', damage: { dice: '2d6', type: 'slashing' }, properties: ['heavy', 'two-handed'], mastery: 'graze', weight: 6, cost: { gp: 50 }, source: 'SRD 5.2.1' },
+  { id: 'scimitar', name: 'Scimitar', category: 'weapon', weaponType: 'martial-melee', damage: { dice: '1d6', type: 'slashing' }, properties: ['finesse', 'light'], mastery: 'nick', weight: 3, cost: { gp: 25 }, source: 'SRD 5.2.1' },
+  { id: 'shortsword', name: 'Shortsword', category: 'weapon', weaponType: 'martial-melee', damage: { dice: '1d6', type: 'piercing' }, properties: ['finesse', 'light'], mastery: 'vex', weight: 2, cost: { gp: 10 }, source: 'SRD 5.2.1' },
+  { id: 'longbow', name: 'Longbow', category: 'weapon', weaponType: 'martial-ranged', damage: { dice: '1d8', type: 'piercing' }, range: [150, 600], ammunition: 'arrow', properties: ['ammunition', 'heavy', 'two-handed'], mastery: 'slow', weight: 2, cost: { gp: 50 }, source: 'SRD 5.2.1' },
 
   // Ammunition
   { id: 'arrow', name: 'Arrow', category: 'ammunition', bundle: 20, weight: 1, cost: { gp: 1 }, source: 'SRD 5.2.1' },

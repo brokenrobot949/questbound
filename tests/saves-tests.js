@@ -93,7 +93,7 @@ test('A save holds game state, Ink state, dice state, session count and last-pla
   const game = newGame(runtime, { slot: 2, seed: 'contents', character: testHero, now: new Date('2026-10-01T09:00:00Z') });
   const record = gameToSave(game, new Date('2026-10-06T12:00:00Z'));
   assertEqual(Object.keys(record).sort(), ['createdAt', 'game', 'ink', 'lastBackupSession', 'rng', 'savedAt', 'seed', 'sessionCount', 'slot', 'version']);
-  assertEqual(Object.keys(record.game).sort(), ['character', 'day', 'flags', 'inspiration', 'inventory', 'journal', 'location', 'money', 'page', 'rollLog', 'time']);
+  assertEqual(Object.keys(record.game).sort(), ['battle', 'character', 'day', 'featureUses', 'flags', 'hp', 'inspiration', 'inventory', 'journal', 'lastBattle', 'location', 'money', 'page', 'rollLog', 'slotsUsed', 'time', 'xp']);
   assertEqual([record.version, record.slot, record.sessionCount, record.lastBackupSession], [SAVE_VERSION, 2, 1, 0]);
   assertEqual([record.createdAt, record.savedAt], ['2026-10-01T09:00:00.000Z', '2026-10-06T12:00:00.000Z']);
   assertTrue(record.rng.length === 4 && record.rng.every(Number.isInteger), 'dice state should be four whole numbers');
@@ -404,6 +404,12 @@ test('Migration: a version 6 hero gains the starting look for their species and 
   const hero = migrateSave(v6, migrations, 7).game.character;
   assertEqual([hero.look.skin, hero.look.hairStyle, hero.look.outfit, hero.look.headgear], ['green', 'long', 'red', 'none']);
   assertEqual(validateCharacter(hero), [], 'the upgraded hero must be legal');
+});
+
+test('Migration: a version 8 game gains full Hit Points, unspent slots, no XP and no fight, and becomes version 9', () => {
+  const v8 = { version: 8, slot: 1, game: { character: structuredClone(testHero), flags: [], page: { scene: null, beats: [] } } };
+  const game = migrateSave(v8, migrations, 9).game;
+  assertEqual([game.hp, game.slotsUsed, game.featureUses, game.xp, game.battle, game.lastBattle], [12, [], {}, 0, null, null]);
 });
 
 test('Migration: a version 7 game gains a day, a journal, and coins and a pack from its kits, and becomes version 8', () => {

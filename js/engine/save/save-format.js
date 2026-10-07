@@ -15,16 +15,21 @@
 //                  from 1), inspiration (Heroic Inspiration: true or false), flags (story
 //                  flag ids set by set_flag in Ink, e.g. "saw_barrow_light"), journal (see
 //                  story/journal.js), money (in copper) and inventory (see
-//                  character/inventory.js), page, rollLog
+//                  character/inventory.js), hp, slotsUsed, featureUses and xp (see
+//                  character/resources.js), battle (a fight in progress, or null; see
+//                  combat/battle.js), lastBattle ({ encounterId, outcome } of the last fight),
+//                  page, rollLog
 
 import { createRng, Rng } from '../rules/rng.js';
 import { currentLocation, currentTime, runPage } from '../story/story-runner.js';
 import { journalOk, newJournal } from '../story/journal.js';
 import { inventoryProblems, startingInventory } from '../character/inventory.js';
+import { freshResources, resourceProblems } from '../character/resources.js';
+import { battleOk } from '../combat/battle.js';
 import { migrations } from './migrations.js';
 import { validateCharacter } from '../character/validate.js';
 
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 
 // runtime: { story, game } — the compiled story, and whichever game is being played.
 
@@ -48,6 +53,9 @@ export function newGame(runtime, { slot, seed, character, rngState = null, now =
     flags: [],
     journal: newJournal(),
     ...startingInventory(character),
+    ...freshResources(character),
+    battle: null,
+    lastBattle: null,
     page: null,
     rollLog: [],
     pendingRolls: [],
@@ -82,6 +90,12 @@ export function gameToSave(game, now = new Date()) {
       journal: game.journal,
       money: game.money,
       inventory: game.inventory,
+      hp: game.hp,
+      slotsUsed: game.slotsUsed,
+      featureUses: game.featureUses,
+      xp: game.xp,
+      battle: game.battle,
+      lastBattle: game.lastBattle,
       page: game.page,
       rollLog: game.rollLog,
     }),
@@ -110,6 +124,12 @@ export function loadGame(runtime, record) {
     journal: save.game.journal,
     money: save.game.money,
     inventory: save.game.inventory,
+    hp: save.game.hp,
+    slotsUsed: save.game.slotsUsed,
+    featureUses: save.game.featureUses,
+    xp: save.game.xp,
+    battle: save.game.battle,
+    lastBattle: save.game.lastBattle,
     page: save.game.page,
     rollLog: save.game.rollLog,
     pendingRolls: [],
@@ -166,6 +186,9 @@ export function validateSave(save) {
     if (!Array.isArray(game.flags) || !game.flags.every(isText)) problems.push('story flags');
     if (!journalOk(game.journal)) problems.push('journal');
     problems.push(...inventoryProblems(game.money, game.inventory));
+    problems.push(...resourceProblems(game));
+    if (game.battle !== null && !battleOk(game.battle)) problems.push('fight in progress');
+    if (game.lastBattle !== null && !(game.lastBattle && isText(game.lastBattle.outcome))) problems.push('last fight');
     const beatTypes = ['chosen', 'text', 'roll', 'note', 'location', 'time'];
     const pageOk = game.page && Array.isArray(game.page.beats) && game.page.beats.every((b) => b && beatTypes.includes(b.type));
     if (!pageOk) problems.push('current page');

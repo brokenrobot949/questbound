@@ -58,3 +58,20 @@ EXTERNAL buy(item)
 // give_item(item): the hero is given one of an item, free. has_item(item): they carry one.
 EXTERNAL give_item(item)
 EXTERNAL has_item(item)
+
+// Fights: a choice tagged #combat:encounter-id (from data/campaign/encounters.js) starts a
+// fight on the battle grid. The choice's content runs once the fight is over, and
+// combat_won() says how it went:
+//   * [Fight them #combat:mill-scavengers]
+//       { combat_won():
+//           The goblins lie still…
+//       - else:
+//           You wake somewhere else… (Fate's Mercy: failure moves the story on)
+//       }
+EXTERNAL combat_won()
+
+// give_xp(n): the hero earns XP for a quest or discovery. Fights give their own XP.
+EXTERNAL give_xp(n)
+
+// lose_coins(): the hero's purse is gone (for Fate's Mercy: robbed while unconscious).
+EXTERNAL lose_coins()

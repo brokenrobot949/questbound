@@ -6,7 +6,9 @@
 // so neither the tap nor quitting and reloading can change the outcome.
 
 import { parseTags } from '../story/tags.js';
-import { currentTime, makeChoice, revealRoll } from '../story/story-runner.js';
+import { continueAfterBattle, currentTime, makeChoice, revealRoll, startFight } from '../story/story-runner.js';
+import { maxHp } from '../character/resources.js';
+import { showBattle } from './battle-screen.js';
 import { moneyText, priceOf } from '../character/inventory.js';
 import { findDrive } from '../character/creation.js';
 import {
@@ -41,10 +43,13 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
   const notices = root.getElementById('notices');
   const status = root.getElementById('play-status');
 
-  // "Day 2 · Morning · 18 GP · ★ Inspiration": as far as the player has seen.
+  const battleArea = root.getElementById('battle-area');
+
+  // "Day 2 · Morning · HP 12/12 · 18 GP · ★ Inspiration": as far as the player has seen.
   const updateStatus = () => {
     const time = currentTime(game);
-    const parts = [`Day ${game.day}`, time, moneyText(game.money), game.inspiration ? '★ Inspiration' : null];
+    const hp = `HP ${game.hp}/${maxHp(game.character)}`;
+    const parts = [`Day ${game.day}`, time, hp, moneyText(game.money), game.inspiration ? '★ Inspiration' : null];
     status.textContent = parts.filter(Boolean).join(' · ');
   };
 
@@ -55,6 +60,7 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
   narration.replaceChildren();
   choices.replaceChildren();
   notices.replaceChildren();
+  battleArea.replaceChildren();
 
   // While the backup reminder is up, the view stays at the top so the player sees it.
   // It follows the story again once they answer it or play on.
@@ -80,8 +86,35 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
         updateStatus();
       }
     }
-    showChoices();
+    if (game.battle) showFight();
+    else showChoices();
     onPageShown();
+  }
+
+  // A fight takes the place of the choices until it's over; then the story carries on.
+  function showFight() {
+    choices.replaceChildren();
+    showBattle({
+      container: battleArea,
+      game,
+      onSave: (g) => {
+        onSave(g);
+        updateStatus();
+      },
+      onDone: () => {
+        battleArea.replaceChildren();
+        for (const node of narration.children) node.classList.add('is-past');
+        try {
+          game.page = continueAfterBattle(game);
+        } catch (error) {
+          showFatalError(error);
+          return;
+        }
+        onSave(game);
+        showPage();
+      },
+    }).catch(showFatalError);
+    follow(battleArea);
   }
 
   function showChoices() {
@@ -97,6 +130,7 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
       if (tags.check) card.append(el('span', 'choice-tag', checkLabel(tags.check)));
       if (tags.spell) card.append(el('span', 'choice-tag', `Spell · ${spellName(tags.spell)}`));
       if (tags.buy) card.append(el('span', 'choice-tag', `Buy · ${moneyText(priceOf(tags.buy))}`));
+      if (tags.combat) card.append(el('span', 'choice-tag is-fight', 'Fight'));
       // Only the hero's own Drive is pointed out: that's the choice that earns Inspiration.
       if (tags.drive && tags.drive === game.character.drive) {
         card.append(el('span', 'choice-tag is-drive', `★ Your Drive · ${findDrive(tags.drive).name}`));
@@ -112,6 +146,19 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
     holdView = false;
     choices.replaceChildren();
     for (const node of narration.children) node.classList.add('is-past');
+    // A fight: the story waits at this choice until the fight is over.
+    if (parseTags(choice.tags).combat) {
+      try {
+        startFight(game, choice);
+      } catch (error) {
+        showFatalError(error);
+        return;
+      }
+      narration.append(el('p', 'chosen-text', choice.text));
+      onSave(game);
+      showFight();
+      return;
+    }
     try {
       game.page = makeChoice(game, choice);
     } catch (error) {

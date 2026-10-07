@@ -12,6 +12,7 @@ import { canCastSpell } from '../character/spells.js';
 import { addItem, buyItem, canAfford, findItem, hasItem, moneyText } from '../character/inventory.js';
 import { findDrive } from '../character/creation.js';
 import { addDeed, findQuest, questNote, startQuest } from './journal.js';
+import { longRestRecovery } from '../character/resources.js';
 import { dmNotes } from '../../../data/campaign/dm-voice.js';
 
 export function bindExternals(story, runtime) {
@@ -78,13 +79,14 @@ export function bindExternals(story, runtime) {
     false,
   );
 
-  // long_rest(): the hero sleeps the night through, and the next day begins.
-  // (Hit Points, spell slots and Hit Dice come back here once play uses them.)
+  // long_rest(): the hero sleeps the night through: all Hit Points, spell slots and feature
+  // uses come back, and the next day begins.
   story.BindExternalFunction(
     'long_rest',
     () => {
       const { game } = runtime;
       game.day += 1;
+      longRestRecovery(game);
       // The Human's Resourceful trait.
       if (game.character.speciesId === 'human' && !game.inspiration) {
         game.inspiration = true;
@@ -144,6 +146,33 @@ export function bindExternals(story, runtime) {
     false,
   );
   story.BindExternalFunction('has_item', (id) => hasItem(runtime.game, id), false);
+
+  // combat_won(): true if the hero won the last fight. A choice tagged #combat:encounter-id
+  // starts a fight on the battle grid; its content runs once the fight is over, e.g.
+  //   * [Fight them #combat:mill-scavengers]
+  //       { combat_won(): You stand over the goblins… - else: … }
+  story.BindExternalFunction('combat_won', () => Boolean(runtime.game.lastBattle && runtime.game.lastBattle.outcome === 'victory'), false);
+
+  // give_xp(n): the hero earns XP for a quest or discovery (fights give their own).
+  story.BindExternalFunction(
+    'give_xp',
+    (amount) => {
+      if (!Number.isInteger(amount) || amount < 0) throw new Error(`give_xp needs a whole number, got ${amount}`);
+      runtime.game.xp += amount;
+      note(runtime.game, dmNotes.xpGained, { xp: amount });
+    },
+    false,
+  );
+
+  // lose_coins(): the hero's purse is taken (Fate's Mercy: robbed while unconscious).
+  story.BindExternalFunction(
+    'lose_coins',
+    () => {
+      runtime.game.money = 0;
+      note(runtime.game, dmNotes.coinsLost);
+    },
+    false,
+  );
 }
 
 // A short DM note for the page ("New quest: …"), shown where it happened in the story.

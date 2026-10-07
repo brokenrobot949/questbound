@@ -8,7 +8,7 @@
 // It stays out of the way while building: on localhost (unless the address has ?sw), in debug
 // mode (?debug) and on the test pages, every file comes straight from the server.
 
-const VERSION = 'questbound-v7';
+const VERSION = 'questbound-v8';
 
 // Where the copy starts. Every module these import, every story file main.ink INCLUDEs and every
 // url() in the stylesheet are found and copied too, so new code and scenes need no edits here.
@@ -105,7 +105,8 @@ async function copyGame() {
   }
 }
 
-// The files a file refers to: imports in JavaScript, INCLUDEs in Ink, url()s in CSS.
+// The files a file refers to: imports and asset paths in JavaScript, INCLUDEs in Ink,
+// url()s in CSS.
 function filesUsedBy(href, text) {
   const path = new URL(href).pathname;
   const found = [];
@@ -114,6 +115,8 @@ function filesUsedBy(href, text) {
     const dynamicImports = /\bimport\(\s*['"]([^'"]+)['"]\s*\)/g;
     for (const match of text.matchAll(staticImports)) found.push(new URL(match[1], href).href);
     for (const match of text.matchAll(dynamicImports)) found.push(new URL(match[1], href).href);
+    // Pictures named in data files, such as 'assets/dawnlike/Characters/Player0.png'.
+    for (const match of text.matchAll(/['"](assets\/[^'"]+\.png)['"]/g)) found.push(new URL(match[1], SCOPE).href);
   } else if (path.endsWith('.ink')) {
     for (const match of text.matchAll(/^[ \t]*INCLUDE[ \t]+(.+?)[ \t]*$/gm)) found.push(new URL(match[1], STORY_ROOT).href);
   } else if (path.endsWith('.css')) {
