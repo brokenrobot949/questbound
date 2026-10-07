@@ -12,3 +12,8 @@ EXTERNAL set_flag(id)
 
 // has_flag(id): true if that flag has been set, e.g. { has_flag("saw_barrow_light"): ... }
 EXTERNAL has_flag(id)
+
+// has_spell(id): true if the hero can cast that spell now, e.g. { has_spell("knock"): ... }
+// A known cantrip, a prepared spell, or a ritual in a Wizard's spellbook all count.
+// id is a spell id from data/srd/spells.js, such as "light" or "detect-magic".
+EXTERNAL has_spell(id)

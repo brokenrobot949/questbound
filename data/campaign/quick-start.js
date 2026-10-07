@@ -32,6 +32,8 @@ export const quickStartHeroes = [
       drive: 'justice',
       bond: { type: 'sibling', name: 'Kit Ashdown' },
       startingEquipment: { class: 'A', background: 'A' }, // the kits, not the gold
+      spells: null, // Fighters have no Spellcasting feature
+      magicInitiate: [], // only for Magic Initiate feats
 
       hitPointRolls: [], // levels after 1; null means "took the fixed value"
       armorId: 'chain-mail',
@@ -67,6 +69,15 @@ export const quickStartHeroes = [
       drive: 'knowledge',
       bond: { type: 'mentor', name: 'Orrin Mossbottom' },
       startingEquipment: { class: 'A', background: 'A' },
+      // Three cantrips and six level 1 spells in the spellbook, four of them prepared. Detect
+      // Magic and Comprehend Languages are rituals, so she can cast them from the book.
+      spells: {
+        cantrips: ['fire-bolt', 'light', 'mage-hand'],
+        spellbook: ['comprehend-languages', 'detect-magic', 'mage-armor', 'magic-missile', 'shield', 'sleep'],
+        prepared: ['mage-armor', 'magic-missile', 'shield', 'sleep'],
+      },
+      // The Sage's Magic Initiate (Wizard). Her Rock Gnome cantrips are Mending and Prestidigitation.
+      magicInitiate: [{ source: 'background', list: 'wizard', ability: 'intelligence', cantrips: ['minor-illusion', 'ray-of-frost'], spell: 'thunderwave' }],
 
       hitPointRolls: [],
       armorId: null,

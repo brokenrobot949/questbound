@@ -9,6 +9,7 @@ import { standardArray, pointBuy, maxAbilityScore } from '../../../data/srd/char
 import { drives } from '../../../data/campaign/drives.js';
 import { bonds } from '../../../data/campaign/bonds.js';
 import { findArmor, findBackground, findClass, findFeat, findSpecies } from './sheet.js';
+import { spellProblems } from './spells.js';
 
 const ABILITY_IDS = abilities.map((a) => a.id);
 const SKILL_IDS = skills.map((s) => s.id);
@@ -135,6 +136,9 @@ export function validateCharacter(character) {
   const kit = character.startingEquipment || {};
   need(cls.startingEquipment.some((o) => o.option === kit.class), `Choose ${cls.name} starting equipment.`);
   need(bg.equipment.some((o) => o.option === kit.background), `Choose ${bg.name} starting equipment.`);
+
+  // Spells: the class's cantrips, spellbook and prepared spells, and Magic Initiate's choices.
+  problems.push(...spellProblems(character));
 
   // Hit Point rolls for levels after 1: a Hit Die result, or null for the fixed value.
   const rolls = character.hitPointRolls || [];

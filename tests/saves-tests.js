@@ -374,6 +374,22 @@ test('Migration: a version 4 hero gains a Drive, a Bond and a starting kit, and 
   assertEqual(validateCharacter(hero), [], 'the upgraded hero must be legal');
 });
 
+test('Migration: a version 5 Wizard (Sage) gains a spellbook and Magic Initiate spells, and becomes version 6', () => {
+  const juniper = structuredClone(quickStartHeroes.find((h) => h.id === 'juniper').character);
+  delete juniper.spells;
+  delete juniper.magicInitiate;
+  const v5 = { version: 5, slot: 3, game: { character: juniper, flags: [], page: { scene: null, beats: [] } } };
+  const hero = migrateSave(v5, migrations, 6).game.character;
+  assertEqual([hero.spells.cantrips.length, hero.spells.spellbook.length, hero.spells.prepared.length], [3, 6, 4]);
+  assertEqual(hero.magicInitiate.map((e) => [e.source, e.list]), [['background', 'wizard']]);
+  assertEqual(validateCharacter(hero), [], 'the upgraded hero must be legal');
+  const fighter = { ...testHero };
+  delete fighter.spells;
+  delete fighter.magicInitiate;
+  const upgraded = migrateSave({ ...v5, game: { ...v5.game, character: fighter } }, migrations, 6).game.character;
+  assertEqual([upgraded.spells, upgraded.magicInitiate], [null, []]);
+});
+
 test('New game: dice rolled during character creation carry on into the game', async () => {
   const runtime = await freshRuntime();
   const creationDice = createRng('carry-on');

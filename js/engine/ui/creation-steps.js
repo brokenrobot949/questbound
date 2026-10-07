@@ -36,6 +36,8 @@ import { signedNumber } from './roll-format.js';
 import { el } from './dom.js';
 import { chip, chipRow, expandable, optionCard, optionList, section, textField } from './widgets.js';
 import { heroSheet } from './hero-sheet.js';
+import { findSpell, magicInitiateLists, speciesSpells, spellsOnList } from '../character/spells.js';
+import { spellDetails, spellMeta } from './spell-text.js';
 
 const abilityName = (id) => findAbility(id).name;
 const skillName = (id) => findSkill(id).name;
@@ -119,7 +121,7 @@ export function classStep(ctx) {
     );
     nodes.push(styles);
   }
-  if (cls.spellcasting) nodes.push(note('You’ll choose your cantrips and spellbook spells in a later update, when spells arrive.'));
+  if (cls.spellcasting) nodes.push(note('You choose your cantrips and spellbook after your skills.'));
   return nodes;
 }
 
@@ -157,7 +159,7 @@ export function backgroundStep(ctx) {
   const feat = findFeat(bg.feat.id);
   const box = section(`Feat: ${featName(feat, bg.feat.spellList)}`);
   box.append(el('p', 'section-text', feat.text));
-  if (feat.spellLists) box.append(note('You’ll choose this feat’s spells in a later update, when spells arrive.'));
+  if (feat.spellLists) box.append(note('You choose this feat’s spells after your skills.'));
   nodes.push(box);
   return nodes;
 }
@@ -225,18 +227,16 @@ export function speciesStep(ctx) {
       optionList(
         feats
           .filter((f) => f.category === 'origin')
-          .map((feat) => {
-            const later = creation.ORIGIN_FEATS_NOT_YET.includes(feat.id);
-            return optionCard({
+          .map((feat) =>
+            optionCard({
               key: `origin-${feat.id}`,
               title: feat.name,
-              tag: later ? 'Arrives with spells' : feat.id === 'skilled' ? 'Recommended' : '',
+              tag: feat.id === 'skilled' ? 'Recommended' : '',
               lines: [feat.text],
               selected: draft.originFeat === feat.id,
-              disabled: later,
               onSelect: () => ctx.set(creation.chooseOriginFeat(ctx.draft, feat.id)),
-            });
-          }),
+            }),
+          ),
       ),
     );
     nodes.push(box);
@@ -490,6 +490,158 @@ export function skillsStep(ctx) {
   summary.append(el('p', 'section-text', known.map((s) => `${s.name} ${signedNumber(skillBonus(draft, s.id).value)}`).join(' · ')));
   nodes.push(summary);
   return nodes;
+}
+
+// ---- Spells (Wizards, and heroes with Magic Initiate) ----
+
+const TAKEN_TEXT = {
+  species: 'from your species',
+  'class-cantrips': 'already a class cantrip',
+  'class-spellbook': 'already in your spellbook',
+  'initiate-background': 'already from Magic Initiate',
+  'initiate-species': 'already from Magic Initiate',
+};
+
+export function spellsStep(ctx) {
+  const { draft } = ctx;
+  const cls = findClass(draft.classId);
+  const nodes = [heading('Choose your spells'), intro('Tap a spell to choose it, or “What it does” to read it.')];
+
+  const fromSpecies = speciesSpells(draft);
+  if (fromSpecies && fromSpecies.cantrips.length + fromSpecies.always.length > 0) {
+    const box = section(`From your species (${fromSpecies.label})`, 'You know these already, so they’re not offered below.');
+    const names = [...fromSpecies.cantrips.map((id) => `${findSpell(id).name} (cantrip)`), ...fromSpecies.always.map(({ id }) => findSpell(id).name)];
+    box.append(el('p', 'section-text', andList(names)));
+    nodes.push(box);
+  }
+
+  if (creation.classSpellPicks(draft, 'cantrips')) {
+    const hints = {
+      cantrips: (p) => `Choose ${p.count}: ${p.chosen.length} chosen. You can cast cantrips as often as you like.`,
+      spellbook: (p) => `Choose ${p.count} level 1 spells to copy into your spellbook: ${p.chosen.length} chosen.`,
+      prepared: (p) => `Choose ${p.count} spellbook spells to have ready: ${p.chosen.length} chosen. You can change them after a Long Rest, and cast rituals from your spellbook without preparing them.`,
+    };
+    const titles = { cantrips: `${cls.name} cantrips`, spellbook: 'Your spellbook', prepared: 'Prepared spells' };
+    for (const which of ['cantrips', 'spellbook', 'prepared']) {
+      const picks = creation.classSpellPicks(draft, which);
+      const box = section(titles[which], hints[which](picks));
+      if (which === 'prepared' && picks.from.length === 0) {
+        box.append(note('Choose your spellbook spells first.'));
+      } else {
+        box.append(
+          spellList({
+            keyPrefix: `class-${which}`,
+            ids: picks.from,
+            chosen: picks.chosen,
+            full: picks.chosen.length >= picks.count,
+            taken: (id) => (which === 'prepared' ? null : creation.spellTakenBy(draft, id, `class-${which}`)),
+            onToggle: (id) => ctx.set(creation.toggleClassSpell(ctx.draft, which, id)),
+            details: which !== 'prepared',
+          }),
+        );
+      }
+      nodes.push(box);
+    }
+  }
+
+  for (const entry of draft.magicInitiate) nodes.push(initiateSection(ctx, entry));
+  return nodes;
+}
+
+// One Magic Initiate feat: its list (Versatile only), ability, two cantrips and a level 1 spell.
+function initiateSection(ctx, entry) {
+  const { draft } = ctx;
+  const from = entry.source === 'background' ? `your ${findBackground(draft.backgroundId).name} background` : 'your Versatile trait';
+  const listName = entry.list ? ` (${capitalise(entry.list)})` : '';
+  const box = section(`Magic Initiate${listName}`, `From ${from}.`);
+
+  if (entry.source === 'species') {
+    const allowed = magicInitiateLists(draft, entry.source);
+    const all = findFeat('magic-initiate').spellLists;
+    box.append(el('p', 'section-text', 'Spell list'));
+    box.append(
+      chipRow(
+        all.map((list) =>
+          chip({
+            key: `initiate-list-${list}`,
+            label: allowed.includes(list) ? capitalise(list) : `${capitalise(list)} · already taken`,
+            selected: entry.list === list,
+            disabled: !allowed.includes(list),
+            onToggle: () => ctx.set(creation.setInitiateList(ctx.draft, entry.source, list)),
+          }),
+        ),
+        'Magic Initiate spell list',
+      ),
+    );
+  }
+  if (!entry.list) return box;
+
+  box.append(el('p', 'section-text', 'Spellcasting ability'));
+  box.append(
+    chipRow(
+      ['intelligence', 'wisdom', 'charisma'].map((id) =>
+        chip({
+          key: `initiate-${entry.source}-ability-${id}`,
+          label: abilityName(id),
+          selected: entry.ability === id,
+          onToggle: () => ctx.set(creation.setInitiateAbility(ctx.draft, entry.source, id)),
+        }),
+      ),
+      'Magic Initiate spellcasting ability',
+    ),
+  );
+
+  const where = `initiate-${entry.source}`;
+  const cantripIds = spellIdsOn(entry.list, 0);
+  box.append(el('p', 'section-text', `Two cantrips: ${entry.cantrips.length} chosen.`));
+  box.append(
+    spellList({
+      keyPrefix: `${where}-cantrip`,
+      ids: cantripIds,
+      chosen: entry.cantrips,
+      full: entry.cantrips.length >= 2,
+      taken: (id) => creation.spellTakenBy(draft, id, where),
+      onToggle: (id) => ctx.set(creation.toggleInitiateCantrip(ctx.draft, entry.source, id)),
+    }),
+  );
+  box.append(el('p', 'section-text', 'One level 1 spell. It’s always prepared, and you can cast it once per Long Rest without a spell slot.'));
+  box.append(
+    spellList({
+      keyPrefix: `${where}-spell`,
+      ids: spellIdsOn(entry.list, 1),
+      chosen: entry.spell ? [entry.spell] : [],
+      full: false, // choosing another swaps it
+      taken: (id) => creation.spellTakenBy(draft, id, where),
+      onToggle: (id) => ctx.set(creation.chooseInitiateSpell(ctx.draft, entry.source, id)),
+    }),
+  );
+  return box;
+}
+
+function spellIdsOn(list, level) {
+  return spellsOnList(list, level).map((s) => s.id);
+}
+
+// A list of spells to pick from. Each row toggles the spell; "What it does" opens its text.
+function spellList({ keyPrefix, ids, chosen, full, taken, onToggle, details = true }) {
+  const list = el('div', 'spell-list');
+  for (const id of ids) {
+    const spell = findSpell(id);
+    const picked = chosen.includes(id);
+    const takenBy = taken(id);
+    const row = el('div', 'spell-option');
+    const button = el('button', 'spell-toggle');
+    button.type = 'button';
+    button.dataset.key = `${keyPrefix}-${id}`;
+    button.setAttribute('aria-pressed', String(picked));
+    button.disabled = !picked && (full || Boolean(takenBy));
+    button.append(el('span', 'spell-name', spell.name), el('span', 'spell-meta', takenBy ? TAKEN_TEXT[takenBy] : spellMeta(spell)));
+    button.addEventListener('click', () => onToggle(id));
+    row.append(button);
+    if (details) row.append(expandable('What it does', spellDetails(spell)));
+    list.append(row);
+  }
+  return list;
 }
 
 // ---- Step 6: Name, Drive and Bond ----

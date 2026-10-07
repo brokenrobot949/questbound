@@ -5,6 +5,9 @@
 // The card then shows "Persuasion · Medium" and the player taps a d20 to roll.
 // Keep the tag's skill and DC the same as the check() call underneath it.
 //
+// A choice that needs a spell checks has_spell() and carries a #spell tag; heroes who
+// can't cast it never see the choice.
+//
 // A #location tag on a line says where the hero is now; the save slot shows it.
 // ~ set_flag("name") remembers that something happened, for later scenes to check.
 
@@ -23,6 +26,9 @@ Past her shoulder you can see warm windows and smoke curling from an inn chimney
     - else:
         -> gate_stays_shut
     }
+* {has_spell("light")} [Show her you're no barrow-thing #spell:light]
+    You touch the clasp of your cloak and speak a word. It blazes with clean white light, bright enough to show the warden your face, your empty hands and nothing of the barrow about you.
+    -> lantern_trick
 * [Wait out the night under the gatehouse eaves]
     -> night_at_the_gate
 
@@ -31,6 +37,13 @@ Past her shoulder you can see warm windows and smoke curling from an inn chimney
 The warden studies you for a long moment. Then she sighs, sets her shoulder to the bar and heaves it aside.
 
 "Straight to the Tallow and Thistle, and stay off the walls," she says. "If anything follows you in, I'm telling the captain it was your idea."
+
+The gate thuds shut behind you. Bramblegate smells of woodsmoke, wet stone and somebody's burnt supper. You're in. #location:Bramblegate
+-> END
+
+= lantern_trick
+~ set_flag("warden_opened_gate")
+The warden shields her eyes, then laughs despite herself. "Well, the dead don't do tricks." She sets her shoulder to the bar and heaves it aside. "In you come, before you blind the whole watch."
 
 The gate thuds shut behind you. Bramblegate smells of woodsmoke, wet stone and somebody's burnt supper. You're in. #location:Bramblegate
 -> END

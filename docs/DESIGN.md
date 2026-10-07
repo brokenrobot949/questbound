@@ -154,6 +154,8 @@ The free rules include one subclass per class, such as Champion, Thief, Life Dom
 
 The free rules hold over 300 spells, and each needs either combat code or a story use. Launch ships a curated set of about 60 Cleric and Wizard spells across spell levels 1–9, growing with each phase. Utility spells such as Detect Magic, Speak with Dead and Knock double as keys that unlock choice cards in scenes. Concentration and ritual casting work as written.
 
+Phase 1 ships 44 spells (16 cantrips, 22 level 1, 6 level 2): enough choice for a Wizard of levels 1–3, for Magic Initiate on the Cleric, Druid or Wizard list, and every spell a species grants by character level 3. In a scene, a choice that needs a spell is shown only to heroes who can cast it: a known cantrip, a prepared or always-prepared spell, or a ritual in a Wizard's spellbook.
+
 **Rests**
 
 - **Short rest** (1 hour): spend Hit Dice to heal; recharge short-rest features. Allowed anywhere you're not in danger.

@@ -10,6 +10,7 @@ import {
   armorClass,
   characterFeatures,
   darkvision,
+  findAbility,
   findBackground,
   findClass,
   findSpecies,
@@ -25,7 +26,9 @@ import {
   spellcasting,
   speed,
 } from '../character/sheet.js';
+import { spellGroups, spellNumbers } from '../character/spells.js';
 import { signedNumber } from './roll-format.js';
+import { spellDetails } from './spell-text.js';
 import { el } from './dom.js';
 import { expandable, mathsNumber } from './widgets.js';
 
@@ -86,14 +89,31 @@ export function heroSheet(character) {
   const known = skills.filter((s) => skillProficiency(character, s.id).level !== 'none');
   sheet.append(grid('Skills you’re proficient in', known.map((s) => mathsNumber({ label: s.name, stat: skillBonus(character, s.id), format: signedNumber }))));
 
+  // Spells, one block per source (class, Magic Initiate, species), each with its own
+  // spellcasting ability.
   const magic = spellcasting(character);
-  if (magic) {
-    const box = grid('Spellcasting', [
-      mathsNumber({ label: 'Spell save DC', stat: magic.saveDc }),
-      mathsNumber({ label: 'Spell attack', stat: magic.attackBonus, format: signedNumber }),
+  for (const group of spellGroups(character)) {
+    if (!group.ability) continue; // not chosen yet
+    const numbers = spellNumbers(character, group.ability);
+    const box = grid(`${group.label} spells`, [
+      mathsNumber({ label: 'Spell save DC', stat: numbers.saveDc }),
+      mathsNumber({ label: 'Spell attack', stat: numbers.attackBonus, format: signedNumber }),
     ]);
-    const slots = magic.slots.map((count, i) => `${count} level ${i + 1}`).join(', ');
-    box.append(el('p', 'sheet-line', `Cantrips ${magic.cantrips} · Prepared spells ${magic.preparedSpells} · Spell slots: ${slots}`));
+    box.querySelector('.section-heading').after(el('p', 'section-hint', `Spellcasting ability: ${findAbility(group.ability).name}`));
+    if (magic && group.label === findClass(character.classId).name) {
+      const slots = magic.slots.map((count, i) => `${count} level ${i + 1}`).join(', ');
+      box.append(el('p', 'sheet-line', `Spell slots: ${slots}`));
+    }
+    const listed = (title, entries) => {
+      if (entries.length === 0) return;
+      box.append(el('p', 'sheet-line', title));
+      for (const { spell, note } of entries) box.append(expandable(note ? `${spell.name} · ${note}` : spell.name, spellDetails(spell)));
+    };
+    listed('Cantrips', group.cantrips.map((spell) => ({ spell })));
+    listed('Prepared', group.prepared.map((spell) => ({ spell })));
+    listed('Always prepared', group.always);
+    const unprepared = group.spellbook.filter((spell) => !group.prepared.includes(spell));
+    listed('Also in the spellbook', unprepared.map((spell) => ({ spell, note: spell.ritual ? 'ritual' : '' })));
     sheet.append(box);
   }
 

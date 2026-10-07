@@ -6,7 +6,7 @@
 
 import { quickStartHeroes } from '../../../data/campaign/quick-start.js';
 import { createRng } from '../rules/rng.js';
-import { CREATION_STEPS, emptyDraft, finishCharacter, findBond, findDrive, prepareStep, stepProblems } from '../character/creation.js';
+import { creationSteps, emptyDraft, finishCharacter, findBond, findDrive, prepareStep, stepProblems } from '../character/creation.js';
 import { describeCharacter, findBackground } from '../character/sheet.js';
 import { actionButton } from './backup-panels.js';
 import {
@@ -19,6 +19,7 @@ import {
   reviewStep,
   skillsStep,
   speciesStep,
+  spellsStep,
 } from './creation-steps.js';
 import { el } from './dom.js';
 import { keepFocus, optionCard, optionList, section } from './widgets.js';
@@ -29,6 +30,7 @@ const STEP_NAMES = {
   species: 'Species',
   abilities: 'Ability scores',
   skills: 'Skills',
+  spells: 'Spells',
   details: 'Name, Drive and Bond',
   equipment: 'Equipment',
   review: 'Review',
@@ -40,6 +42,7 @@ const RENDER = {
   species: speciesStep,
   abilities: abilitiesStep,
   skills: skillsStep,
+  spells: spellsStep,
   details: detailsStep,
   equipment: equipmentStep,
 };
@@ -79,7 +82,7 @@ export function startCreationScreen({ root, slot, seed, onCancel, onFinish }) {
     rng: createRng(seed),
   };
 
-  const steps = () => (state.mode === 'quick' ? ['review'] : CREATION_STEPS);
+  const steps = () => (state.mode === 'quick' ? ['review'] : creationSteps(ctx.draft));
 
   function goTo(step) {
     state.step = step;
@@ -122,7 +125,9 @@ export function startCreationScreen({ root, slot, seed, onCancel, onFinish }) {
 
     footer.hidden = state.step === 'start';
     const blocking = problems();
-    needs.textContent = blocking.join(' ');
+    // The first thing still to do, so the bar stays small on a phone.
+    const more = blocking.length > 1 ? ` · ${blocking.length - 1} more to do` : '';
+    needs.textContent = blocking.length ? `${blocking[0].replace(/\.$/, '')}${more}` : '';
     back.hidden = state.step === 'start';
     next.hidden = state.step === 'start';
     next.textContent = state.step === 'review' ? 'Begin adventure' : 'Next';

@@ -101,4 +101,16 @@ test('Debug jump: moves straight to a stitch and runs on from there', async () =
   assertEqual([game.page.scene, game.flags, game.story.currentChoices.length], ['gate_test', ['saw_barrow_light'], 0]);
 });
 
+test('Spells: the gate offers the Light trick only to heroes who can cast Light, tagged with the spell', async () => {
+  const runtime = await freshRuntime();
+  const lightChoice = (game) => game.story.currentChoices.find((c) => (c.tags || []).includes('spell:light'));
+  const wren = newGame(runtime, { slot: 1, seed: 'light', character: testHero });
+  assertEqual(lightChoice(wren), undefined, 'a Fighter without spells never sees it');
+  const juniper = newGame(runtime, { slot: 1, seed: 'light', character: quickStartHeroes.find((h) => h.id === 'juniper').character });
+  const choice = lightChoice(juniper);
+  assertTrue(Boolean(choice), 'a Wizard who knows Light sees it');
+  makeChoice(juniper, choice);
+  assertEqual(juniper.flags, ['warden_opened_gate']);
+});
+
 run(document.getElementById('summary'), document.getElementById('results'));

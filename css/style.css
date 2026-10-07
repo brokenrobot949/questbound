@@ -1167,6 +1167,70 @@ h3.debug-heading {
   font-family: var(--font-ui);
   font-size: var(--size-ui);
   color: var(--muted);
+  white-space: pre-line; /* keeps a spell's paragraphs apart */
+}
+
+/* Spell picking: each spell toggles on tap, and "What it does" opens its text */
+
+.spell-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.spell-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.spell-toggle {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 12px;
+  background: var(--card);
+  color: var(--text);
+  border: 2px solid var(--box-edge-dark);
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  font-size: var(--size-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.spell-toggle:hover:not(:disabled),
+.spell-toggle:focus-visible {
+  border-color: var(--box-edge);
+  outline: none;
+}
+
+.spell-toggle[aria-pressed='true'] {
+  background: var(--card-hover);
+  border-color: var(--accent);
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
+.spell-toggle[aria-pressed='true'] .spell-name {
+  color: var(--accent);
+}
+
+.spell-toggle:disabled {
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+.spell-toggle:disabled .spell-name {
+  color: var(--past);
+}
+
+.spell-meta {
+  color: var(--muted);
+}
+
+.spell-option .expandable {
+  padding-left: 12px;
 }
 
 /* Names */

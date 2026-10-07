@@ -15,6 +15,7 @@ import {
   maxHitPoints,
   proficiencyBonus,
 } from '../character/sheet.js';
+import { findSpell } from '../character/spells.js';
 import { abilities } from '../../../data/srd/abilities.js';
 import { dmVoice } from '../../../data/campaign/dm-voice.js';
 import { gameToSave } from '../save/save-format.js';
@@ -72,6 +73,7 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
       const card = el('button', 'choice-card');
       card.type = 'button';
       if (tags.check) card.append(el('span', 'choice-tag', checkLabel(tags.check)));
+      if (tags.spell) card.append(el('span', 'choice-tag', `Spell · ${spellName(tags.spell)}`));
       card.append(el('span', 'choice-text', choice.text));
       card.addEventListener('click', () => choose(choice));
       choices.append(card);
@@ -260,6 +262,11 @@ function checkLabel(check) {
   const named = findSkill(check.testId) || findAbility(check.testId);
   const name = named ? named.name : check.testId;
   return `${name} · ${difficultyName(check.dc)}`;
+}
+
+function spellName(id) {
+  const spell = findSpell(id);
+  return spell ? spell.name : id;
 }
 
 // "Wren Ashdown · Human Fighter 1 · HP 12 · AC 17 · Str +3 Dex +1 … · Proficiency +2"

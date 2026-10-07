@@ -2,11 +2,12 @@
 //
 // Tags on a choice:
 //   #check:persuasion:15          the choice makes this check; the card shows "Persuasion · Medium"
+//   #spell:light                  the choice uses this spell; the card shows "Spell · Light"
 // Tags on a line of text:
 //   #location:Bramblegate, north gate   where the hero is now; shown on the save slot
 
 export function parseTags(tags) {
-  const parsed = { check: null, location: null };
+  const parsed = { check: null, spell: null, location: null };
   for (const tag of tags || []) {
     const colon = tag.indexOf(':');
     const key = (colon < 0 ? tag : tag.slice(0, colon)).trim();
@@ -14,6 +15,8 @@ export function parseTags(tags) {
     if (key === 'check') {
       const [testId, dc] = value.split(':').map((part) => part.trim());
       parsed.check = { testId, dc: Number(dc) };
+    } else if (key === 'spell') {
+      parsed.spell = value;
     } else if (key === 'location') {
       parsed.location = value;
     }

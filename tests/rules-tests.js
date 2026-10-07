@@ -34,6 +34,8 @@ import { pointBuy, standardArray } from '../data/srd/character-creation.js';
 import { quickStartHeroes } from '../data/campaign/quick-start.js';
 import { nameTables } from '../data/campaign/names.js';
 import * as creation from '../js/engine/character/creation.js';
+import { canCastSpell, findSpell, magicInitiateLists, spellGroups, spellNumbers, spellsOnList } from '../js/engine/character/spells.js';
+import { spells } from '../data/srd/spells.js';
 import { difficultyName, rollLine } from '../js/engine/ui/roll-format.js';
 import { parseTags } from '../js/engine/story/tags.js';
 import { skills } from '../data/srd/skills.js';
@@ -71,6 +73,8 @@ function makeHero(overrides = {}) {
     drive: 'glory',
     bond: { type: 'rival', name: 'Test Rival' },
     startingEquipment: { class: 'B', background: 'B' }, // every class and background has an option B
+    spells: null,
+    magicInitiate: [],
     hitPointRolls: [],
     armorId: null,
     shield: false,
@@ -79,6 +83,7 @@ function makeHero(overrides = {}) {
 }
 
 // A legal level 1 High Elf Wizard (Sage): Int 17 and Wis 14 after the background's +2/+1.
+// Knows Prestidigitation from being a High Elf, and has the Sage's Magic Initiate (Wizard).
 function makeWizard(overrides = {}) {
   return makeHero({
     name: 'Test Wizard',
@@ -94,6 +99,12 @@ function makeWizard(overrides = {}) {
     speciesSkills: ['perception'],
     originFeat: null,
     classChoices: {},
+    spells: {
+      cantrips: ['fire-bolt', 'light', 'mage-hand'],
+      spellbook: ['burning-hands', 'comprehend-languages', 'mage-armor', 'magic-missile', 'shield', 'sleep'],
+      prepared: ['mage-armor', 'magic-missile', 'shield', 'sleep'],
+    },
+    magicInitiate: [{ source: 'background', list: 'wizard', ability: 'intelligence', cantrips: ['minor-illusion', 'ray-of-frost'], spell: 'false-life' }],
     ...overrides,
   });
 }
@@ -347,9 +358,10 @@ test('Roll line names a Critical Hit', () => {
 });
 
 test('Ink tags: #check:persuasion:15 is a Persuasion check against DC 15; #location sets the place', () => {
-  assertEqual(parseTags(['check:persuasion:15']), { check: { testId: 'persuasion', dc: 15 }, location: null });
+  assertEqual(parseTags(['check:persuasion:15']), { check: { testId: 'persuasion', dc: 15 }, spell: null, location: null });
+  assertEqual(parseTags(['spell:light']).spell, 'light');
   assertEqual(parseTags(['location: Bramblegate, north gate']).location, 'Bramblegate, north gate');
-  assertEqual(parseTags(null), { check: null, location: null });
+  assertEqual(parseTags(null), { check: null, spell: null, location: null });
 });
 
 // ---- Debug mode: forcing the next d20 ----
@@ -566,10 +578,134 @@ test('Creation: the class kit decides the starting armour', () => {
   assertTrue(kit.items.some(({ item, quantity }) => item.id === 'javelin' && quantity === 8));
 });
 
-test("Creation: Magic Initiate can't be the Human's Versatile feat until spells arrive", () => {
+test('Creation: only Origin feats can be the Human’s Versatile feat', () => {
   const human = creation.chooseSpecies(creation.emptyDraft(), 'human');
-  assertThrows(() => creation.chooseOriginFeat(human, 'magic-initiate'));
   assertThrows(() => creation.chooseOriginFeat(human, 'defense'), 'Defense is a Fighting Style, not an Origin feat');
+  assertEqual(creation.chooseOriginFeat(human, 'magic-initiate').magicInitiate.length, 1);
+});
+
+// ---- Spells ----
+
+test('Data: every spell is SRD, and the lists and species have the spells they need', () => {
+  for (const s of spells) {
+    assertTrue(s.source === 'SRD 5.2.1' && s.level >= 0 && s.level <= 2 && s.lists.length > 0, s.id);
+    assertTrue(Boolean(s.text.length > 20 && s.castingTime && s.range && s.components && s.duration), `${s.id} is missing a field`);
+    assertEqual(s.concentration, s.duration.startsWith('Concentration'), `${s.id} concentration`);
+  }
+  assertEqual(new Set(spells.map((s) => s.id)).size, spells.length, 'spell ids are unique');
+  // Species spells up to character level 3 (level 5 spells arrive with higher levels).
+  for (const sp of species) {
+    const options = sp.choice ? sp.choice.options : [];
+    const ids = [sp.cantrip, ...options.flatMap((o) => [o.cantrip, ...(o.cantrips || []), o.level3Spell, o.alwaysPrepared])].filter(Boolean);
+    for (const id of ids) assertTrue(findSpell(id) !== null, `${sp.id} needs ${id}`);
+  }
+  assertTrue(spellsOnList('wizard', 0).length >= 3 && spellsOnList('wizard', 1).length >= 6 && spellsOnList('wizard', 2).length >= 2);
+  for (const list of ['cleric', 'druid', 'wizard']) {
+    assertTrue(spellsOnList(list, 0).length >= 2 && spellsOnList(list, 1).length >= 1, `Magic Initiate (${list}) has choices`);
+  }
+});
+
+test('Spells: a Wizard knows up to 3 cantrips, keeps a spellbook and prepares spells from it', () => {
+  assertEqual(validateCharacter(makeWizard()), []);
+  const spellsWith = (change) => ({ ...makeWizard().spells, ...change });
+  assertTrue(validateCharacter(makeWizard({ spells: spellsWith({ cantrips: ['fire-bolt', 'light', 'mage-hand', 'ray-of-frost'] }) })).length > 0, 'four cantrips');
+  assertTrue(validateCharacter(makeWizard({ spells: spellsWith({ prepared: ['thunderwave'] }) })).length > 0, 'not in the spellbook');
+  assertTrue(validateCharacter(makeWizard({ spells: spellsWith({ spellbook: ['cure-wounds'] }) })).length > 0, 'a Cleric spell');
+  assertTrue(validateCharacter(makeWizard({ spells: spellsWith({ spellbook: ['misty-step'], prepared: [] }) })).length > 0, 'level 2 is too high at level 1');
+  assertEqual(validateCharacter(makeWizard({ level: 3, classChoices: { scholarSkill: 'investigation' }, spells: spellsWith({ spellbook: ['misty-step'], prepared: ['misty-step'] }) })), []);
+  assertTrue(validateCharacter(makeWizard({ spells: null })).length > 0, 'a Wizard needs spells');
+  assertTrue(validateCharacter({ ...testHero, spells: makeWizard().spells }).length > 0, 'a Fighter has none');
+});
+
+test('Spells: Magic Initiate gives two cantrips and a level 1 spell from one list', () => {
+  const acolyte = (magicInitiate) => makeHero({ backgroundId: 'acolyte', backgroundIncreases: { wisdom: 2, charisma: 1 }, magicInitiate });
+  const cleric = { source: 'background', list: 'cleric', ability: 'wisdom', cantrips: ['guidance', 'sacred-flame'], spell: 'bless' };
+  assertEqual(validateCharacter(acolyte([cleric])), []);
+  assertTrue(validateCharacter(acolyte([])).length > 0, 'the Acolyte’s feat needs its spells');
+  assertTrue(validateCharacter(acolyte([{ ...cleric, list: 'wizard' }])).length > 0, 'the Acolyte’s list is Cleric');
+  assertTrue(validateCharacter(acolyte([{ ...cleric, cantrips: ['guidance', 'fire-bolt'] }])).length > 0, 'Fire Bolt is not a Cleric cantrip');
+  assertTrue(validateCharacter(acolyte([{ ...cleric, spell: 'magic-missile' }])).length > 0, 'not a Cleric spell');
+  assertTrue(validateCharacter(acolyte([{ ...cleric, ability: 'strength' }])).length > 0);
+});
+
+test('Spells: a Human taking Magic Initiate again must use a different list', () => {
+  const human = (list) =>
+    makeWizard({
+      speciesId: 'human',
+      speciesChoice: null,
+      spellcastingAbility: null,
+      speciesSkills: ['perception'],
+      originFeat: 'magic-initiate',
+      magicInitiate: [
+        makeWizard().magicInitiate[0],
+        { source: 'species', list, ability: 'wisdom', cantrips: ['guidance', 'spare-the-dying'], spell: list === 'wizard' ? 'shield' : 'cure-wounds' },
+      ],
+    });
+  assertEqual(validateCharacter(human('cleric')), []);
+  assertTrue(validateCharacter(human('wizard')).length > 0, 'the Sage already took the Wizard list');
+});
+
+test('Spells: species give cantrips at level 1 and a spell at level 3', () => {
+  const ids = (list) => list.map((s) => s.id);
+  const elf = spellGroups(makeWizard()).find((g) => g.label === 'High Elf');
+  assertEqual([ids(elf.cantrips), elf.always.length, elf.ability], [['prestidigitation'], 0, 'intelligence']);
+  const elf3 = spellGroups(makeWizard({ level: 3 })).find((g) => g.label === 'High Elf');
+  assertEqual(elf3.always.map((a) => a.spell.id), ['detect-magic']);
+  const tiefling = makeHero({ speciesId: 'tiefling', speciesChoice: 'infernal', spellcastingAbility: 'charisma', speciesSkills: [], originFeat: null });
+  assertEqual(ids(spellGroups(tiefling)[0].cantrips), ['thaumaturgy', 'fire-bolt']);
+  const juniper = quickStartHeroes.find((h) => h.id === 'juniper').character;
+  assertEqual(spellGroups(juniper).map((g) => g.label), ['Wizard', 'Magic Initiate (Wizard)', 'Rock Gnome']);
+  assertEqual(spellNumbers(juniper, 'intelligence').saveDc.value, 13, '8 + Int 3 + Proficiency 2');
+});
+
+test('Spells: has_spell counts cantrips, prepared spells and spellbook rituals', () => {
+  const juniper = quickStartHeroes.find((h) => h.id === 'juniper').character;
+  const can = (id) => canCastSpell(juniper, id);
+  assertEqual(['light', 'minor-illusion', 'mending', 'thunderwave', 'magic-missile'].map(can), [true, true, true, true, true]);
+  assertTrue(can('comprehend-languages'), 'a ritual in the spellbook');
+  assertEqual([can('burning-hands'), can('cure-wounds'), canCastSpell(testHero, 'light')], [false, false, false]);
+});
+
+test('Creation: a Wizard chooses cantrips, a spellbook and prepared spells', () => {
+  let d = creation.chooseClass(creation.emptyDraft(), 'wizard');
+  assertTrue(creation.creationSteps(d).includes('spells'));
+  for (const id of ['fire-bolt', 'light', 'mage-hand', 'ray-of-frost']) d = creation.toggleClassSpell(d, 'cantrips', id);
+  assertEqual(d.spells.cantrips, ['fire-bolt', 'light', 'mage-hand'], 'three is the limit');
+  assertEqual(creation.toggleClassSpell(d, 'spellbook', 'cure-wounds').spells.spellbook, [], 'not a Wizard spell');
+  assertEqual(creation.toggleClassSpell(d, 'prepared', 'shield').spells.prepared, [], 'not in the spellbook yet');
+  for (const id of ['shield', 'sleep', 'magic-missile', 'mage-armor', 'thunderwave', 'detect-magic']) d = creation.toggleClassSpell(d, 'spellbook', id);
+  for (const id of ['shield', 'sleep', 'magic-missile', 'mage-armor', 'thunderwave']) d = creation.toggleClassSpell(d, 'prepared', id);
+  assertEqual(d.spells.prepared.length, 4, 'four prepared at level 1');
+  assertEqual(creation.stepProblems(d, 'spells'), []);
+  d = creation.toggleClassSpell(d, 'spellbook', 'shield');
+  assertEqual([d.spells.spellbook.includes('shield'), d.spells.prepared.includes('shield')], [false, false], 'out of the book, so unprepared');
+});
+
+test('Creation: Magic Initiate choices, without picking a spell twice', () => {
+  let d = creation.chooseBackground(creation.chooseClass(creation.emptyDraft(), 'wizard'), 'sage');
+  assertEqual(d.magicInitiate.map((e) => [e.source, e.list, e.ability]), [['background', 'wizard', 'intelligence']]);
+  d = creation.toggleClassSpell(d, 'cantrips', 'fire-bolt');
+  assertEqual(creation.toggleInitiateCantrip(d, 'background', 'fire-bolt').magicInitiate[0].cantrips, [], 'already a Wizard cantrip');
+  d = creation.toggleInitiateCantrip(creation.toggleInitiateCantrip(d, 'background', 'light'), 'background', 'ray-of-frost');
+  d = creation.chooseInitiateSpell(creation.chooseInitiateSpell(d, 'background', 'sleep'), 'background', 'shield');
+  assertEqual([d.magicInitiate[0].cantrips, d.magicInitiate[0].spell], [['light', 'ray-of-frost'], 'shield'], 'a second spell swaps the first');
+  // A High Elf already knows Prestidigitation, so picks of it are freed.
+  d = creation.toggleClassSpell(d, 'cantrips', 'prestidigitation');
+  d = creation.chooseSpeciesOption(creation.chooseSpecies(d, 'elf'), 'high-elf');
+  assertEqual(d.spells.cantrips, ['fire-bolt']);
+  // A Human's Versatile Magic Initiate can't reuse the Sage's Wizard list.
+  d = creation.chooseOriginFeat(creation.chooseSpecies(d, 'human'), 'magic-initiate');
+  assertEqual(magicInitiateLists(d, 'species'), ['cleric', 'druid']);
+  assertThrows(() => creation.setInitiateList(d, 'species', 'wizard'));
+  d = creation.setInitiateList(d, 'species', 'druid');
+  assertEqual(d.magicInitiate.find((e) => e.source === 'species').ability, 'wisdom');
+  assertTrue(creation.stepProblems(d, 'spells').some((p) => p.startsWith('Magic Initiate (Druid)')));
+});
+
+test('Creation: heroes with no spells to choose skip the Spells step', () => {
+  const fighter = creation.chooseSpecies(creation.chooseBackground(creation.chooseClass(creation.emptyDraft(), 'fighter'), 'soldier'), 'dwarf');
+  assertTrue(!creation.creationSteps(fighter).includes('spells'));
+  assertTrue(creation.creationSteps(creation.chooseBackground(fighter, 'acolyte')).includes('spells'), 'Magic Initiate (Cleric)');
 });
 
 test('Creation: the Standard Array must use each score once', () => {

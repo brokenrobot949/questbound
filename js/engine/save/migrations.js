@@ -71,4 +71,26 @@ export const migrations = {
       },
     },
   }),
+
+  // Version 6 adds spells. Wizards made before it get a starter set, and Acolyte and Sage
+  // heroes get Magic Initiate spells (Humans couldn't take Magic Initiate before it).
+  5: (save) => {
+    const hero = save.game.character;
+    const spells =
+      hero.classId === 'wizard'
+        ? {
+            cantrips: ['fire-bolt', 'light', 'mage-hand'],
+            spellbook: ['burning-hands', 'detect-magic', 'mage-armor', 'magic-missile', 'shield', 'sleep'],
+            prepared: ['mage-armor', 'magic-missile', 'shield', 'sleep'],
+          }
+        : null;
+    const magicInitiate = [];
+    if (hero.backgroundId === 'acolyte') {
+      magicInitiate.push({ source: 'background', list: 'cleric', ability: 'wisdom', cantrips: ['guidance', 'sacred-flame'], spell: 'cure-wounds' });
+    }
+    if (hero.backgroundId === 'sage') {
+      magicInitiate.push({ source: 'background', list: 'wizard', ability: 'intelligence', cantrips: ['minor-illusion', 'ray-of-frost'], spell: 'false-life' });
+    }
+    return { ...save, version: 6, game: { ...save.game, character: { ...hero, spells, magicInitiate } } };
+  },
 };

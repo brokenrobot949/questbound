@@ -17,13 +17,23 @@ import { nameTables } from '../../../data/campaign/names.js';
 import { rollDice } from '../rules/dice.js';
 import { findBackground, findClass, findFeat, findSpecies } from './sheet.js';
 import { validateCharacter } from './validate.js';
+import {
+  classSpellCounts,
+  highestSpellLevel,
+  magicInitiateLists,
+  magicInitiateSources,
+  speciesSpells,
+  spellsOnList,
+  SPELLCASTING_ABILITIES,
+} from './spells.js';
 
 export const ABILITY_IDS = abilities.map((a) => a.id);
 const SKILL_IDS = skills.map((s) => s.id);
 
 // The steps, in order. Skills come after ability scores, so the player can see every source
-// of skills on one screen, and the bonus each skill would give.
-export const CREATION_STEPS = ['class', 'background', 'species', 'abilities', 'skills', 'details', 'equipment', 'review'];
+// of skills on one screen, and the bonus each skill would give. Spells come next, and only
+// for heroes with spells to choose (see creationSteps).
+export const CREATION_STEPS = ['class', 'background', 'species', 'abilities', 'skills', 'spells', 'details', 'equipment', 'review'];
 
 export const findDrive = (id) => drives.find((d) => d.id === id) || null;
 export const findBond = (id) => bonds.find((b) => b.id === id) || null;
@@ -59,6 +69,8 @@ export function emptyDraft() {
     drive: null,
     bond: { type: null, name: '' },
     startingEquipment: { class: null, background: null },
+    spells: null,
+    magicInitiate: [],
     hitPointRolls: [],
     armorId: null,
     shield: false,
@@ -77,6 +89,7 @@ export function chooseClass(draft, classId) {
   next.classSkills = [];
   next.classChoices = {};
   next.startingEquipment.class = null;
+  next.spells = findClass(classId).spellcasting ? { cantrips: [], spellbook: [], prepared: [] } : null;
   return next;
 }
 
@@ -103,7 +116,7 @@ export function chooseBackground(draft, backgroundId) {
   next.classSkills = next.classSkills.filter(notGiven);
   next.speciesSkills = next.speciesSkills.filter(notGiven);
   next.featSkills = next.featSkills.filter(notGiven);
-  return next;
+  return syncMagicInitiate(next);
 }
 
 // ---- Species ----
@@ -120,13 +133,13 @@ export function chooseSpecies(draft, speciesId) {
   next.speciesSkills = [];
   next.originFeat = null;
   next.featSkills = [];
-  return next;
+  return freeSpeciesSpells(syncMagicInitiate(next));
 }
 
 export function chooseSpeciesOption(draft, optionId) {
   const sp = findSpecies(draft.speciesId);
   if (!sp || !sp.choice || !sp.choice.options.some((o) => o.id === optionId)) throw new Error(`Not an option: ${optionId}`);
-  return { ...copy(draft), speciesChoice: optionId };
+  return freeSpeciesSpells({ ...copy(draft), speciesChoice: optionId });
 }
 
 export function chooseSize(draft, size) {
@@ -136,22 +149,18 @@ export function chooseSize(draft, size) {
 }
 
 export function chooseSpellcastingAbility(draft, abilityId) {
-  if (!['intelligence', 'wisdom', 'charisma'].includes(abilityId)) throw new Error(`Not a spellcasting ability: ${abilityId}`);
+  if (!SPELLCASTING_ABILITIES.includes(abilityId)) throw new Error(`Not a spellcasting ability: ${abilityId}`);
   return { ...copy(draft), spellcastingAbility: abilityId };
 }
 
-// The Human's Versatile trait. Magic Initiate needs spells to choose from, which arrive in a
-// later slice, so it can't be picked here yet.
-export const ORIGIN_FEATS_NOT_YET = ['magic-initiate'];
-
+// The Human's Versatile trait.
 export function chooseOriginFeat(draft, featId) {
   const feat = findFeat(featId);
   if (!feat || feat.category !== 'origin') throw new Error(`Not an Origin feat: ${featId}`);
-  if (ORIGIN_FEATS_NOT_YET.includes(featId)) throw new Error(`${feat.name} arrives with spells.`);
   const next = copy(draft);
   next.originFeat = featId;
   if (featId !== 'skilled') next.featSkills = [];
-  return next;
+  return syncMagicInitiate(next);
 }
 
 // ---- Ability scores ----
@@ -310,6 +319,153 @@ export function toggleSkill(draft, source, skillId) {
   return next;
 }
 
+// ---- Spells ----
+
+// Whether this hero has spells to choose: a class with Spellcasting, or Magic Initiate.
+export function spellStepNeeded(draft) {
+  const cls = findClass(draft.classId);
+  return Boolean(cls && cls.spellcasting) || magicInitiateSources(draft).length > 0;
+}
+
+// The steps this hero goes through (the Spells step only when there are spells to choose).
+export function creationSteps(draft) {
+  return CREATION_STEPS.filter((step) => step !== 'spells' || spellStepNeeded(draft));
+}
+
+// The usual spellcasting ability for each spell list, offered first for Magic Initiate.
+const LIST_ABILITY = { cleric: 'wisdom', druid: 'wisdom', wizard: 'intelligence' };
+
+// Keeps one Magic Initiate entry for each Magic Initiate feat the hero has, keeping any
+// choices already made. Changes the draft it's given (always a fresh copy).
+function syncMagicInitiate(draft) {
+  draft.magicInitiate = magicInitiateSources(draft).map(({ source, list }) => {
+    const kept = (draft.magicInitiate || []).find((entry) => entry.source === source);
+    if (kept && (list === null || kept.list === list)) return kept;
+    return { source, list, ability: list ? LIST_ABILITY[list] : null, cantrips: [], spell: null };
+  });
+  // Taking the feat twice needs two different lists.
+  const background = draft.magicInitiate.find((entry) => entry.source === 'background');
+  const species = draft.magicInitiate.find((entry) => entry.source === 'species');
+  if (background && species && species.list === background.list) Object.assign(species, { list: null, ability: null, cantrips: [], spell: null });
+  return draft;
+}
+
+// Drops class and Magic Initiate picks of spells the species now gives for free.
+// Changes the draft it's given (always a fresh copy).
+function freeSpeciesSpells(draft) {
+  const given = draft.speciesId ? speciesSpells(draft) : null;
+  if (!given) return draft;
+  const ids = [...given.cantrips, ...given.always.map((a) => a.id)];
+  const keep = (id) => !ids.includes(id);
+  if (draft.spells) draft.spells = { ...draft.spells, cantrips: draft.spells.cantrips.filter(keep) };
+  draft.magicInitiate = (draft.magicInitiate || []).map((entry) => ({
+    ...entry,
+    cantrips: entry.cantrips.filter(keep),
+    spell: keep(entry.spell) ? entry.spell : null,
+  }));
+  return draft;
+}
+
+// What already gives the hero this spell, other than `where`, or null. Used to stop the
+// same spell being picked twice. Sources: 'species', 'class-cantrips', 'class-spellbook',
+// 'initiate-background' and 'initiate-species'.
+export function spellTakenBy(draft, spellId, where) {
+  const holders = [];
+  const given = draft.speciesId ? speciesSpells(draft) : null;
+  if (given && (given.cantrips.includes(spellId) || given.always.some((a) => a.id === spellId))) holders.push('species');
+  if (draft.spells) {
+    if (draft.spells.cantrips.includes(spellId)) holders.push('class-cantrips');
+    if (draft.spells.spellbook.includes(spellId)) holders.push('class-spellbook');
+  }
+  for (const entry of draft.magicInitiate) {
+    if (entry.cantrips.includes(spellId) || entry.spell === spellId) holders.push(`initiate-${entry.source}`);
+  }
+  return holders.find((holder) => holder !== where) || null;
+}
+
+// The class's picks: which is 'cantrips', 'spellbook' or 'prepared'.
+// Returns { count, from: [ids], chosen: [ids] }, or null for a class without Spellcasting.
+export function classSpellPicks(draft, which) {
+  const cls = findClass(draft.classId);
+  if (!cls || !cls.spellcasting || !draft.spells) return null;
+  const counts = classSpellCounts(draft);
+  if (which === 'cantrips') return { count: counts.cantrips, from: spellsOnList(cls.id, 0).map((s) => s.id), chosen: draft.spells.cantrips };
+  if (which === 'spellbook') {
+    const from = [];
+    for (let level = 1; level <= highestSpellLevel(draft); level++) from.push(...spellsOnList(cls.id, level).map((s) => s.id));
+    return { count: counts.spellbook, from, chosen: draft.spells.spellbook };
+  }
+  if (which === 'prepared') return { count: counts.prepared, from: draft.spells.spellbook, chosen: draft.spells.prepared };
+  throw new Error(`Unknown class spell pick: ${which}`);
+}
+
+// Picks a class spell, or unpicks it if already picked. Ignored if it can't be picked.
+// Taking a spell out of the spellbook also unprepares it.
+export function toggleClassSpell(draft, which, spellId) {
+  const picks = classSpellPicks(draft, which);
+  if (!picks) return draft;
+  const next = copy(draft);
+  if (picks.chosen.includes(spellId)) {
+    next.spells[which] = picks.chosen.filter((id) => id !== spellId);
+    if (which === 'spellbook') next.spells.prepared = next.spells.prepared.filter((id) => id !== spellId);
+    return next;
+  }
+  const where = which === 'prepared' ? null : `class-${which}`;
+  if (!picks.from.includes(spellId) || picks.chosen.length >= picks.count || (where && spellTakenBy(draft, spellId, where))) return draft;
+  next.spells[which] = [...picks.chosen, spellId];
+  return next;
+}
+
+const initiateEntry = (draft, source) => draft.magicInitiate.find((entry) => entry.source === source) || null;
+
+// Magic Initiate from the Human's Versatile trait: choose its spell list.
+export function setInitiateList(draft, source, list) {
+  if (!initiateEntry(draft, source) || !magicInitiateLists(draft, source).includes(list)) throw new Error(`Magic Initiate can't use the ${list} list here.`);
+  const next = copy(draft);
+  const entry = initiateEntry(next, source);
+  if (entry.list !== list) Object.assign(entry, { list, ability: entry.ability || LIST_ABILITY[list], cantrips: [], spell: null });
+  return next;
+}
+
+export function setInitiateAbility(draft, source, ability) {
+  if (!initiateEntry(draft, source) || !SPELLCASTING_ABILITIES.includes(ability)) throw new Error(`Not a spellcasting ability: ${ability}`);
+  const next = copy(draft);
+  initiateEntry(next, source).ability = ability;
+  return next;
+}
+
+// Magic Initiate's two cantrips: picks or unpicks one.
+export function toggleInitiateCantrip(draft, source, spellId) {
+  const entry = initiateEntry(draft, source);
+  if (!entry || !entry.list) return draft;
+  const next = copy(draft);
+  const mine = initiateEntry(next, source);
+  if (mine.cantrips.includes(spellId)) {
+    mine.cantrips = mine.cantrips.filter((id) => id !== spellId);
+    return next;
+  }
+  const onList = spellsOnList(entry.list, 0).some((s) => s.id === spellId);
+  if (!onList || entry.cantrips.length >= 2 || spellTakenBy(draft, spellId, `initiate-${source}`)) return draft;
+  mine.cantrips.push(spellId);
+  return next;
+}
+
+// Magic Initiate's level 1 spell: picks it, or unpicks it if already picked.
+export function chooseInitiateSpell(draft, source, spellId) {
+  const entry = initiateEntry(draft, source);
+  if (!entry || !entry.list) return draft;
+  const next = copy(draft);
+  const mine = initiateEntry(next, source);
+  if (mine.spell === spellId) {
+    mine.spell = null;
+    return next;
+  }
+  const onList = spellsOnList(entry.list, 1).some((s) => s.id === spellId);
+  if (!onList || spellTakenBy(draft, spellId, `initiate-${source}`)) return draft;
+  mine.spell = spellId;
+  return next;
+}
+
 // ---- Name, Drive and Bond ----
 
 export function setName(draft, name) {
@@ -463,6 +619,20 @@ export function stepProblems(draft, step) {
         const what = { class: `${cls.name} skill`, species: `${sp.name} skill`, feat: 'Skilled feat skill' }[source];
         need(false, `Choose ${picks.count} ${what}${picks.count === 1 ? '' : 's'} (${picks.chosen.length} chosen).`);
       }
+    }
+  } else if (step === 'spells') {
+    const what = { cantrips: `${cls ? cls.name : ''} cantrips`, spellbook: 'spells for your spellbook', prepared: 'spells to prepare' };
+    for (const which of ['cantrips', 'spellbook', 'prepared']) {
+      const picks = classSpellPicks(draft, which);
+      if (picks) need(picks.chosen.length === picks.count, `Choose ${picks.count} ${what[which]} (${picks.chosen.length} chosen).`);
+    }
+    for (const entry of draft.magicInitiate) {
+      const name = entry.list ? `Magic Initiate (${entry.list.charAt(0).toUpperCase()}${entry.list.slice(1)})` : 'Magic Initiate';
+      need(entry.list, `${name}: choose a spell list.`);
+      if (!entry.list) continue;
+      need(entry.ability, `${name}: choose a spellcasting ability.`);
+      need(entry.cantrips.length === 2, `${name}: choose 2 cantrips (${entry.cantrips.length} chosen).`);
+      need(entry.spell, `${name}: choose a level 1 spell.`);
     }
   } else if (step === 'details') {
     need(draft.name.trim() !== '', 'Name your hero.');
