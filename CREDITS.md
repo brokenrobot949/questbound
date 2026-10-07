@@ -9,6 +9,8 @@ This work includes material from the System Reference Document 5.2.1 (“SRD 5.2
 DawnLike 16×16 Universal Rogue-like tileset v1.81 by DragonDePlatino, built on a palette by DawnBringer. Licensed under CC-BY 4.0.
 https://opengameart.org/content/dawnlike-16x16-universal-rogue-like-tileset-v181
 
+The hero sprites are adapted from DawnLike's player template and its Warrior and Mage outfits (commissioned for DawnLike by Romet), recoloured and with original hairstyles and species features added in the same style.
+
 ## Story engine
 
 inkjs 2.4.0, the JavaScript version of inkle's ink scripting language. Copyright (c) 2017 inkle Ltd. and inkjs contributors. MIT License; see `vendor/inkjs-license.md`.

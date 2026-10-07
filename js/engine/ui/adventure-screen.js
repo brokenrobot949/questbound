@@ -16,6 +16,8 @@ import {
   proficiencyBonus,
 } from '../character/sheet.js';
 import { findSpell } from '../character/spells.js';
+import { heroSprite } from '../character/look.js';
+import { spriteCanvas } from './sprite-canvas.js';
 import { abilities } from '../../../data/srd/abilities.js';
 import { dmVoice } from '../../../data/campaign/dm-voice.js';
 import { gameToSave } from '../save/save-format.js';
@@ -34,7 +36,9 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
   const choices = root.getElementById('choices');
   const notices = root.getElementById('notices');
 
-  root.getElementById('hero-strip').textContent = heroSummary(game.character);
+  root
+    .getElementById('hero-strip')
+    .replaceChildren(spriteCanvas(heroSprite(game.character), { scale: 2 }), el('span', 'hero-strip-text', heroSummary(game.character)));
   root.getElementById('slot-note').textContent = `Slot ${game.slot} · Session ${game.sessionCount}`;
   narration.replaceChildren();
   choices.replaceChildren();

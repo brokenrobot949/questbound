@@ -34,10 +34,13 @@ import {
 import { MAX_NAME_LENGTH } from '../character/validate.js';
 import { signedNumber } from './roll-format.js';
 import { el } from './dom.js';
-import { chip, chipRow, expandable, optionCard, optionList, section, textField } from './widgets.js';
+import { chip, chipRow, expandable, optionCard, optionList, section, swatchChip, textField } from './widgets.js';
 import { heroSheet } from './hero-sheet.js';
 import { findSpell, magicInitiateLists, speciesSpells, spellsOnList } from '../character/spells.js';
 import { spellDetails, spellMeta } from './spell-text.js';
+import { skinTones, hairStyles, hairColors, clothColors } from '../../../data/campaign/hero-looks.js';
+import { headgearFor, heroSprite, rollLook, speciesFeatureNames } from '../character/look.js';
+import { portrait } from './sprite-canvas.js';
 
 const abilityName = (id) => findAbility(id).name;
 const skillName = (id) => findSkill(id).name;
@@ -644,6 +647,79 @@ function spellList({ keyPrefix, ids, chosen, full, taken, onToggle, details = tr
   return list;
 }
 
+// ---- Look ----
+
+export function lookStep(ctx) {
+  const { draft } = ctx;
+  const look = draft.look;
+  const set = (changes) => ctx.set(creation.chooseLook(ctx.draft, changes));
+  const nodes = [heading('Your look'), intro('How you appear in town, in dungeons and in battle.')];
+
+  // Shown in the starting armour, which is chosen on the Equipment step.
+  const dressed = creation.previewHero(creation.prepareStep(draft, 'equipment'));
+  const stage = el('div', 'look-stage');
+  stage.append(portrait(heroSprite(dressed), { scale: 6, label: 'Your hero as they look now' }));
+  const features = speciesFeatureNames(draft);
+  const sp = findSpecies(draft.speciesId);
+  if (features.length) stage.append(note(`Every ${sp.name} has ${andList(features)}.`));
+  if (dressed.armorId) stage.append(note(`Shown in ${findArmor(dressed.armorId).name}, from your starting kit. Armour changes your colours.`));
+  const roll = el('button', 'text-button', 'Surprise me');
+  roll.type = 'button';
+  roll.dataset.key = 'roll-look';
+  roll.addEventListener('click', () => ctx.set(creation.chooseLook(ctx.draft, rollLook(ctx.rng, ctx.draft))));
+  stage.append(roll);
+  nodes.push(stage);
+
+  const swatches = (title, list, field, shade = 1) => {
+    const box = section(title);
+    box.append(
+      chipRow(
+        list.map((option) =>
+          swatchChip({
+            key: `look-${field}-${option.id}`,
+            label: option.name,
+            color: option.ramp[shade],
+            selected: look[field] === option.id,
+            onToggle: () => set({ [field]: option.id }),
+          }),
+        ),
+        title,
+      ),
+    );
+    return box;
+  };
+  const choices = (title, list, field) => {
+    const box = section(title);
+    box.append(
+      chipRow(
+        list.map((option) =>
+          chip({ key: `look-${field}-${option.id}`, label: option.name, selected: look[field] === option.id, onToggle: () => set({ [field]: option.id }) }),
+        ),
+        title,
+      ),
+    );
+    return box;
+  };
+
+  nodes.push(swatches('Skin', skinTones, 'skin'));
+  nodes.push(choices('Hairstyle', hairStyles, 'hairStyle'));
+  nodes.push(swatches('Hair colour', hairColors, 'hairColor', 0));
+  nodes.push(
+    choices(
+      'Beard',
+      [
+        { id: false, name: 'None' },
+        { id: true, name: 'Beard' },
+      ],
+      'beard',
+    ),
+  );
+  nodes.push(swatches('Outfit', clothColors, 'outfit'));
+  nodes.push(swatches('Accent (tabard or sash)', clothColors, 'accent'));
+  nodes.push(choices('Headgear', headgearFor(draft.classId), 'headgear'));
+  return nodes;
+}
+
 // ---- Step 6: Name, Drive and Bond ----
 
 export function detailsStep(ctx) {
@@ -784,7 +860,11 @@ export function reviewStep(ctx, quickStart) {
         sheet.querySelector('.sheet-name').textContent = value;
       },
     });
-    nodes.push(wrap);
+    const restyle = el('button', 'text-button', 'Change look');
+    restyle.type = 'button';
+    restyle.dataset.key = 'restyle';
+    restyle.addEventListener('click', () => ctx.goTo('look'));
+    nodes.push(wrap, restyle);
   }
   nodes.push(sheet);
 

@@ -40,3 +40,5 @@ Checks run in the browser, and are linked from the footer in debug mode:
 - Rules: http://localhost:8000/tests/rules.html
 - Story: http://localhost:8000/tests/story.html
 - Saves: http://localhost:8000/tests/saves.html (uses its own test database, so it never touches your saves)
+
+To see every hero look at once (each species and class, and every skin, hair, outfit and headgear option), open http://localhost:8000/tests/looks.html. Add `?scale=10` to look closer.

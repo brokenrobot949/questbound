@@ -26,6 +26,7 @@ import {
   spellsOnList,
   SPELLCASTING_ABILITIES,
 } from './spells.js';
+import { defaultLook, headgearFor, lookProblems } from './look.js';
 
 export const ABILITY_IDS = abilities.map((a) => a.id);
 const SKILL_IDS = skills.map((s) => s.id);
@@ -33,7 +34,7 @@ const SKILL_IDS = skills.map((s) => s.id);
 // The steps, in order. Skills come after ability scores, so the player can see every source
 // of skills on one screen, and the bonus each skill would give. Spells come next, and only
 // for heroes with spells to choose (see creationSteps).
-export const CREATION_STEPS = ['class', 'background', 'species', 'abilities', 'skills', 'spells', 'details', 'equipment', 'review'];
+export const CREATION_STEPS = ['class', 'background', 'species', 'abilities', 'skills', 'spells', 'look', 'details', 'equipment', 'review'];
 
 export const findDrive = (id) => drives.find((d) => d.id === id) || null;
 export const findBond = (id) => bonds.find((b) => b.id === id) || null;
@@ -71,6 +72,7 @@ export function emptyDraft() {
     startingEquipment: { class: null, background: null },
     spells: null,
     magicInitiate: [],
+    look: null, // set on the Look step (see look.js)
     hitPointRolls: [],
     armorId: null,
     shield: false,
@@ -90,6 +92,8 @@ export function chooseClass(draft, classId) {
   next.classChoices = {};
   next.startingEquipment.class = null;
   next.spells = findClass(classId).spellcasting ? { cantrips: [], spellbook: [], prepared: [] } : null;
+  // A helmet is for Fighters and a hood for Wizards.
+  if (next.look && !headgearFor(classId).some((h) => h.id === next.look.headgear)) next.look = { ...next.look, headgear: 'none' };
   return next;
 }
 
@@ -466,6 +470,15 @@ export function chooseInitiateSpell(draft, source, spellId) {
   return next;
 }
 
+// ---- Look ----
+
+// Changes part of the look, e.g. chooseLook(draft, { hairColor: 'black' }).
+export function chooseLook(draft, changes) {
+  const next = copy(draft);
+  next.look = { ...(next.look || defaultLook(next)), ...changes };
+  return next;
+}
+
 // ---- Name, Drive and Bond ----
 
 export function setName(draft, name) {
@@ -573,6 +586,7 @@ export function prepareStep(draft, step) {
     if (!next.abilityScoreMethod) next = setAbilityMethod(next, 'standard-array');
     if (Object.keys(next.backgroundIncreases).length === 0) next = suggestIncreases(next);
   }
+  if (step === 'look' && !next.look) next = { ...copy(next), look: defaultLook(next) };
   if (step === 'equipment') {
     if (!next.startingEquipment.class && kitOptions(next, 'class').length) next = chooseKit(next, 'class', 'A');
     if (!next.startingEquipment.background && kitOptions(next, 'background').length) next = chooseKit(next, 'background', 'A');
@@ -634,6 +648,8 @@ export function stepProblems(draft, step) {
       need(entry.cantrips.length === 2, `${name}: choose 2 cantrips (${entry.cantrips.length} chosen).`);
       need(entry.spell, `${name}: choose a level 1 spell.`);
     }
+  } else if (step === 'look') {
+    problems.push(...lookProblems(draft));
   } else if (step === 'details') {
     need(draft.name.trim() !== '', 'Name your hero.');
     need(findDrive(draft.drive), 'Choose a Drive.');

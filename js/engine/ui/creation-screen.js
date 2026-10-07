@@ -16,12 +16,15 @@ import {
   classStep,
   detailsStep,
   equipmentStep,
+  lookStep,
   reviewStep,
   skillsStep,
   speciesStep,
   spellsStep,
 } from './creation-steps.js';
+import { heroSprite } from '../character/look.js';
 import { el } from './dom.js';
+import { spriteCanvas } from './sprite-canvas.js';
 import { keepFocus, optionCard, optionList, section } from './widgets.js';
 
 const STEP_NAMES = {
@@ -31,6 +34,7 @@ const STEP_NAMES = {
   abilities: 'Ability scores',
   skills: 'Skills',
   spells: 'Spells',
+  look: 'Look',
   details: 'Name, Drive and Bond',
   equipment: 'Equipment',
   review: 'Review',
@@ -43,6 +47,7 @@ const RENDER = {
   abilities: abilitiesStep,
   skills: skillsStep,
   spells: spellsStep,
+  look: lookStep,
   details: detailsStep,
   equipment: equipmentStep,
 };
@@ -78,11 +83,13 @@ export function startCreationScreen({ root, slot, seed, onCancel, onFinish }) {
       else refreshNav();
     },
     redraw: () => render(),
+    goTo: (step) => goTo(step),
     state,
     rng: createRng(seed),
   };
 
-  const steps = () => (state.mode === 'quick' ? ['review'] : creationSteps(ctx.draft));
+  // A Quick Start hero opens on the review, which has a button to restyle them.
+  const steps = () => (state.mode === 'quick' ? ['look', 'review'] : creationSteps(ctx.draft));
 
   function goTo(step) {
     state.step = step;
@@ -135,6 +142,10 @@ export function startCreationScreen({ root, slot, seed, onCancel, onFinish }) {
   }
 
   back.onclick = () => {
+    if (state.mode === 'quick') {
+      goTo(state.step === 'look' ? 'review' : 'start');
+      return;
+    }
     const list = steps();
     const index = list.indexOf(state.step);
     goTo(index <= 0 ? 'start' : list[index - 1]);
@@ -187,6 +198,7 @@ export function startCreationScreen({ root, slot, seed, onCancel, onFinish }) {
           const c = hero.character;
           return optionCard({
             key: `quick-${hero.id}`,
+            media: spriteCanvas(heroSprite(c), { scale: 3 }),
             title: c.name,
             lines: [
               `${describeCharacter(c)} · ${findBackground(c.backgroundId).name}`,
@@ -209,7 +221,7 @@ export function startCreationScreen({ root, slot, seed, onCancel, onFinish }) {
         optionCard({
           key: 'build',
           title: 'Build a hero',
-          lines: ['Class, background, species, ability scores, skills, name, Drive, Bond and equipment. About 10 minutes.'],
+          lines: ['Class, background, species, ability scores, skills, spells, look, name, Drive, Bond and equipment. About 10 minutes.'],
           onSelect: () => {
             state.mode = 'build';
             goTo('class');

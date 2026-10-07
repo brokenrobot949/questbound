@@ -390,6 +390,15 @@ test('Migration: a version 5 Wizard (Sage) gains a spellbook and Magic Initiate 
   assertEqual([upgraded.spells, upgraded.magicInitiate], [null, []]);
 });
 
+test('Migration: a version 6 hero gains the starting look for their species and class, and becomes version 7', () => {
+  const orc = { ...structuredClone(testHero), speciesId: 'orc', speciesSkills: [], originFeat: null };
+  delete orc.look;
+  const v6 = { version: 6, slot: 1, game: { character: orc, flags: [], page: { scene: null, beats: [] } } };
+  const hero = migrateSave(v6, migrations, 7).game.character;
+  assertEqual([hero.look.skin, hero.look.hairStyle, hero.look.outfit, hero.look.headgear], ['green', 'long', 'red', 'none']);
+  assertEqual(validateCharacter(hero), [], 'the upgraded hero must be legal');
+});
+
 test('New game: dice rolled during character creation carry on into the game', async () => {
   const runtime = await freshRuntime();
   const creationDice = createRng('carry-on');

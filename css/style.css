@@ -1556,3 +1556,94 @@ h3.debug-heading {
   color: var(--past);
   border-color: var(--box-edge-dark);
 }
+
+/* Sprites: DawnLike pixel art, enlarged by whole numbers with crisp pixels */
+
+.sprite {
+  display: block;
+  flex: none;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* A portrait: the hero's sprite in a framed box, like the DM window */
+.portrait {
+  display: inline-flex;
+  flex: none;
+  align-self: flex-start;
+  padding: 6px;
+  background: var(--page);
+  border: 3px solid var(--box-edge);
+  border-radius: 6px;
+  box-shadow: 0 0 0 3px var(--box), 0 0 0 5px var(--box-edge-dark);
+  margin: 5px;
+}
+
+.sheet-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slot-body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slot-about {
+  min-width: 0;
+}
+
+.hero-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.option-card.has-media {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* The Look step */
+
+.look-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.look-stage .portrait {
+  align-self: center;
+}
+
+.look-stage .creation-note {
+  padding-left: 0;
+  border-left: none;
+}
+
+.swatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  vertical-align: -3px;
+  border: 2px solid var(--page);
+  box-shadow: 0 0 0 1px var(--box-edge-dark);
+}
+
+.chip[aria-pressed='true'] .swatch {
+  border-color: var(--page);
+  box-shadow: 0 0 0 1px var(--page);
+}

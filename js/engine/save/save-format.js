@@ -18,7 +18,7 @@ import { currentLocation, runPage } from '../story/story-runner.js';
 import { migrations } from './migrations.js';
 import { validateCharacter } from '../character/validate.js';
 
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 // runtime: { story, game } — the compiled story, and whichever game is being played.
 

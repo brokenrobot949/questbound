@@ -4,6 +4,8 @@
 
 import { migrateSave } from '../save/save-format.js';
 import { describeCharacter } from '../character/sheet.js';
+import { heroSprite } from '../character/look.js';
+import { spriteCanvas } from './sprite-canvas.js';
 import { actionButton, backupPanel, restorePanel } from './backup-panels.js';
 import { el } from './dom.js';
 
@@ -62,9 +64,13 @@ function slotCard(slot, record, actions) {
   }
 
   const { character, location } = save.game;
-  card.append(el('p', 'slot-hero', `${character.name} · ${describeCharacter(character)}`));
-  if (location) card.append(el('p', 'slot-detail', location));
-  card.append(el('p', 'slot-detail', `Session ${save.sessionCount} · Last played ${formatWhen(save.savedAt)}`));
+  const about = el('div', 'slot-about');
+  about.append(el('p', 'slot-hero', `${character.name} · ${describeCharacter(character)}`));
+  if (location) about.append(el('p', 'slot-detail', location));
+  about.append(el('p', 'slot-detail', `Session ${save.sessionCount} · Last played ${formatWhen(save.savedAt)}`));
+  const body = el('div', 'slot-body');
+  body.append(spriteCanvas(heroSprite(character), { scale: 3 }), about);
+  card.append(body);
   buttons.append(
     actionButton('Continue', () => actions.onContinue(slot), 'is-primary'),
     newGameButton(`${character.name}'s save`),

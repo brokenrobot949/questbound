@@ -390,6 +390,7 @@ The LPC (Liberated Pixel Cup) art family was considered and set aside: better ch
 
 - **Battle and dungeon maps:** tiles at 3× scale, 8 squares across in portrait.
 - **Town scenes:** backdrops assembled from the same tiles, with tappable buildings and NPCs.
+- **Heroes:** built from DawnLike's commissioned player template (a plain body, plus the Warrior's armour and the Mage's robe), not its ready-made heroes, because those cover only some species and can't be recoloured part by part. Every pixel is tagged as skin, hair, outfit and so on, so each part takes its own colour from the 16-colour palette. Species features (pointed ears, tusks, horns, a dragon's crest, goliath markings) are drawn automatically, Small heroes stand two pixels shorter, worn armour sets the armour's colour (steel or leather), and headgear depends on class (a horned helmet for Fighters, a hood for Wizards). Every hero look can be checked at once on `tests/looks.html`.
 - **Portraits:** the character's sprite enlarged inside a framed box, the classic Dragon Quest approach, so portraits always match.
 - **Dice:** a pixel d20 with a short tumble animation and a flash on natural 20s and 1s.
 - **Gaps:** monsters without a sprite reuse a close match with a palette shift, the same approach as Whimsywild.

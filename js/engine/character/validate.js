@@ -10,6 +10,7 @@ import { drives } from '../../../data/campaign/drives.js';
 import { bonds } from '../../../data/campaign/bonds.js';
 import { findArmor, findBackground, findClass, findFeat, findSpecies } from './sheet.js';
 import { spellProblems } from './spells.js';
+import { lookProblems } from './look.js';
 
 const ABILITY_IDS = abilities.map((a) => a.id);
 const SKILL_IDS = skills.map((s) => s.id);
@@ -139,6 +140,9 @@ export function validateCharacter(character) {
 
   // Spells: the class's cantrips, spellbook and prepared spells, and Magic Initiate's choices.
   problems.push(...spellProblems(character));
+
+  // Look: skin, hair, outfit and headgear from the Look step's options.
+  problems.push(...lookProblems(character));
 
   // Hit Point rolls for levels after 1: a Hit Die result, or null for the fixed value.
   const rolls = character.hitPointRolls || [];

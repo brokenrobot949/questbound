@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Questbound hero looks</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 16px;
+        background: #0d0f1a;
+        color: #f2eee3;
+        font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      h1,
+      h2 {
+        font-size: 1.1rem;
+        color: #f0c85a;
+        margin: 16px 0 8px;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      figure {
+        margin: 0;
+        padding: 8px;
+        background: #161a33;
+        border: 2px solid #4a4f78;
+        border-radius: 6px;
+        text-align: center;
+      }
+      figcaption {
+        font-size: 12px;
+        color: #a9a6c0;
+        max-width: 96px;
+      }
+      canvas {
+        image-rendering: pixelated;
+        display: block;
+        margin: 0 auto 4px;
+      }
+      a {
+        color: #a9a6c0;
+      }
+    </style>
+    <script type="module" src="./looks-gallery.js"></script>
+  </head>
+  <body>
+    <h1>Questbound hero looks</h1>
+    <p>Every species and class in its starting look, then the options. Both animation frames are shown side by side.</p>
+    <div id="gallery"></div>
+    <p><a href="./rules.html">Rules checks</a> &middot; <a href="./story.html">Story checks</a> &middot; <a href="./saves.html">Save checks</a> &middot; <a href="../index.html?debug">Back to the game</a></p>
+  </body>
+</html>

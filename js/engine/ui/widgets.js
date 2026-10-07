@@ -7,19 +7,34 @@
 import { el } from './dom.js';
 
 // A large card the player picks one of. selected shows it chosen; lines are short facts.
-export function optionCard({ key, title, lines = [], tag = '', selected = false, disabled = false, onSelect }) {
+// media: a picture to show beside the text (a hero's sprite), or null.
+export function optionCard({ key, title, lines = [], tag = '', selected = false, disabled = false, media = null, onSelect }) {
   const card = el('button', 'choice-card option-card');
   card.type = 'button';
   card.dataset.key = key;
   card.setAttribute('aria-pressed', String(selected));
   card.disabled = disabled;
+  const text = media ? el('span', 'option-text') : card;
   const top = el('span', 'option-top');
   top.append(el('span', 'option-title', title));
   if (tag) top.append(el('span', 'choice-tag', tag));
-  card.append(top);
-  for (const line of lines) card.append(el('span', 'option-line', line));
+  text.append(top);
+  for (const line of lines) text.append(el('span', 'option-line', line));
+  if (media) {
+    card.classList.add('has-media');
+    card.append(media, text);
+  }
   card.addEventListener('click', onSelect);
   return card;
+}
+
+// A chip with a colour sample in front of its name, for picking colours.
+export function swatchChip({ key, label, color, selected = false, onToggle }) {
+  const button = chip({ key, label: '', selected, onToggle });
+  const sample = el('span', 'swatch');
+  sample.style.background = color;
+  button.append(sample, document.createTextNode(label));
+  return button;
 }
 
 // A small toggle button, in a row of others.

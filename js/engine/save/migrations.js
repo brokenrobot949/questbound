@@ -93,4 +93,25 @@ export const migrations = {
     }
     return { ...save, version: 6, game: { ...save.game, character: { ...hero, spells, magicInitiate } } };
   },
+
+  // Version 7 adds the hero's look (skin, hair, outfit). Heroes made before it get the
+  // starting look for their species and class.
+  6: (save) => {
+    const hero = save.game.character;
+    const bySpecies = {
+      dragonborn: ['copper', 'bald', 'black', false],
+      dwarf: ['tan', 'tousled', 'auburn', true],
+      elf: ['porcelain', 'long', 'blonde', false],
+      gnome: ['peach', 'tousled', 'white', false],
+      goliath: ['grey', 'bald', 'black', false],
+      halfling: ['peach', 'tousled', 'brown', false],
+      human: ['peach', 'tousled', 'brown', false],
+      orc: ['green', 'long', 'black', false],
+      tiefling: ['crimson', 'long', 'black', false],
+    };
+    const [skin, hairStyle, hairColor, beard] = bySpecies[hero.speciesId] || bySpecies.human;
+    const [outfit, accent] = hero.classId === 'wizard' ? ['blue', 'red'] : ['red', 'brown'];
+    const look = { skin, hairStyle, hairColor, beard, outfit, accent, headgear: 'none' };
+    return { ...save, version: 7, game: { ...save.game, character: { ...hero, look } } };
+  },
 };

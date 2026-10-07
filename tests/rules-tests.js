@@ -36,6 +36,9 @@ import { nameTables } from '../data/campaign/names.js';
 import * as creation from '../js/engine/character/creation.js';
 import { canCastSpell, findSpell, magicInitiateLists, spellGroups, spellNumbers, spellsOnList } from '../js/engine/character/spells.js';
 import { spells } from '../data/srd/spells.js';
+import { defaultLook, heroSprite, lookProblems, rollLook } from '../js/engine/character/look.js';
+import * as spriteParts from '../data/campaign/hero-sprite.js';
+import { hairStyles, headgear as headgearOptions, speciesLooks } from '../data/campaign/hero-looks.js';
 import { difficultyName, rollLine } from '../js/engine/ui/roll-format.js';
 import { parseTags } from '../js/engine/story/tags.js';
 import { skills } from '../data/srd/skills.js';
@@ -75,6 +78,7 @@ function makeHero(overrides = {}) {
     startingEquipment: { class: 'B', background: 'B' }, // every class and background has an option B
     spells: null,
     magicInitiate: [],
+    look: { skin: 'peach', hairStyle: 'tousled', hairColor: 'brown', beard: false, outfit: 'red', accent: 'brown', headgear: 'none' },
     hitPointRolls: [],
     armorId: null,
     shield: false,
@@ -477,6 +481,7 @@ test('Creation: building Wren step by step gives the Quick Start hero', () => {
   d = creation.toggleSkill(d, 'species', 'insight');
   d = creation.setBondName(creation.chooseBond(creation.chooseDrive(creation.setName(d, '  Wren   Ashdown '), 'justice'), 'sibling'), 'Kit Ashdown');
   d = creation.prepareStep(d, 'equipment');
+  d = creation.chooseLook(creation.prepareStep(d, 'look'), testHero.look);
   for (const step of creation.CREATION_STEPS) assertEqual(creation.stepProblems(d, step), [], step);
   assertEqual(sortedKeys(creation.finishCharacter(d)), sortedKeys(testHero));
 });
@@ -706,6 +711,86 @@ test('Creation: heroes with no spells to choose skip the Spells step', () => {
   const fighter = creation.chooseSpecies(creation.chooseBackground(creation.chooseClass(creation.emptyDraft(), 'fighter'), 'soldier'), 'dwarf');
   assertTrue(!creation.creationSteps(fighter).includes('spells'));
   assertTrue(creation.creationSteps(creation.chooseBackground(fighter, 'acolyte')).includes('spells'), 'Magic Initiate (Cleric)');
+});
+
+// ---- Looks and sprites ----
+
+test('Data: every sprite part is 16 rows of 16 pixels, using only known colour letters', () => {
+  const letters = new Set(['.', ...Object.keys(heroSprite(testHero).colors)]);
+  const grids = [
+    ['body', spriteParts.body],
+    ['beard', spriteParts.beard],
+    ['armor', spriteParts.armor],
+    ['shield', spriteParts.shield],
+    ['robe', spriteParts.robe],
+    ...Object.entries(spriteParts.hairStyles),
+    ...Object.entries(spriteParts.features),
+    ...Object.entries(spriteParts.headgear),
+  ];
+  for (const [name, rows] of grids) {
+    assertEqual(rows.length, 16, `${name} rows`);
+    for (const row of rows) {
+      assertEqual(row.length, 16, `${name} row "${row}"`);
+      for (const letter of row) assertTrue(letters.has(letter), `${name} uses an unknown letter "${letter}"`);
+    }
+  }
+  for (const look of [hairStyles, headgearOptions]) for (const option of look) assertTrue(option.id in (look === hairStyles ? spriteParts.hairStyles : spriteParts.headgear), option.id);
+  for (const [id, sp] of Object.entries(speciesLooks)) for (const f of sp.features) assertTrue(f in spriteParts.features, `${id}: ${f}`);
+});
+
+test('Look: every species and class starts with a legal look', () => {
+  for (const sp of species) {
+    for (const cls of classes) {
+      const hero = { speciesId: sp.id, speciesChoice: sp.choice ? sp.choice.options[0].id : null, classId: cls.id };
+      assertEqual(lookProblems({ ...hero, look: defaultLook(hero) }), [], `${sp.id} ${cls.id}`);
+    }
+  }
+  assertEqual(defaultLook({ speciesId: 'dragonborn', speciesChoice: 'blue', classId: 'fighter' }).skin, 'azure', 'scales match the ancestry');
+});
+
+test('Look: unknown choices and the wrong class’s headgear are refused', () => {
+  const look = testHero.look;
+  assertTrue(lookProblems({ ...testHero, look: { ...look, skin: 'plaid' } }).length > 0);
+  assertTrue(lookProblems({ ...testHero, look: { ...look, headgear: 'hood' } }).length > 0, 'a hood is for Wizards');
+  assertTrue(lookProblems({ ...testHero, look: null }).length > 0);
+  assertEqual(lookProblems({ ...testHero, look: { ...look, headgear: 'helmet' } }), []);
+});
+
+test('Sprite: two frames; the second bobs the upper body a pixel and keeps the legs', () => {
+  const [first, second] = heroSprite(testHero).frames;
+  assertEqual([first.length, second.length], [16, 16]);
+  assertEqual(second.slice(1, 13), first.slice(0, 12), 'upper body drops one row');
+  assertEqual(second.slice(13), first.slice(13), 'legs stay put');
+});
+
+test('Sprite: species, size, armour and class change the drawing', () => {
+  const pixel = (character, row, col, frame = 0) => heroSprite(character).frames[frame][row][col];
+  const elf = makeWizard();
+  assertEqual(pixel(elf, 4, 3), 'S', 'an Elf’s pointed ear');
+  const orc = makeHero({ speciesId: 'orc', speciesSkills: [], originFeat: null });
+  assertEqual([pixel(orc, 6, 6), pixel(orc, 6, 9)], ['I', 'I'], 'tusks');
+  const small = heroSprite({ ...testHero, size: 'small' }).frames[0];
+  assertEqual([small.length, small[0], small[1]], [16, '.'.repeat(16), '.'.repeat(16)], 'two pixels shorter');
+  const chain = heroSprite(testHero);
+  assertTrue(chain.frames[0].some((row) => row.includes('M')) && chain.colors.m === '#8595a1', 'Chain Mail is steel');
+  assertEqual(heroSprite({ ...testHero, armorId: 'studded-leather-armor' }).colors.m, '#d27d2c', 'leather armour is brown');
+  assertTrue(!heroSprite({ ...testHero, armorId: null }).frames[0].some((row) => row.includes('M')), 'no armour, no metal');
+  assertTrue(heroSprite({ ...testHero, shield: true }).frames[0].some((row) => row.includes('y')), 'a Shield');
+  assertTrue(heroSprite(makeWizard()).frames[0].some((row) => row.includes('T')), 'a Wizard’s robe has a sash');
+  assertEqual(heroSprite({ ...testHero, look: { ...testHero.look, skin: 'green' } }).colors.s, '#6daa2c');
+});
+
+test('Creation: the Look step starts with the species’ look; a new class drops the wrong headgear', () => {
+  let d = creation.chooseSpecies(creation.chooseClass(creation.emptyDraft(), 'wizard'), 'orc');
+  assertEqual(creation.stepProblems(d, 'look'), ['Choose a look.']);
+  d = creation.prepareStep(d, 'look');
+  assertEqual([d.look.skin, d.look.outfit], ['green', 'blue']);
+  d = creation.chooseLook(d, { headgear: 'hood', hairColor: 'white' });
+  assertEqual(creation.stepProblems(d, 'look'), []);
+  assertEqual(creation.chooseClass(d, 'fighter').look.headgear, 'none');
+  const rolled = rollLook(createRng('look'), d);
+  assertEqual(rollLook(createRng('look'), d), rolled, 'same seed, same look');
+  assertEqual(lookProblems({ ...d, look: rolled }), []);
 });
 
 test('Creation: the Standard Array must use each score once', () => {

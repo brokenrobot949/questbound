@@ -34,6 +34,7 @@ export const quickStartHeroes = [
       startingEquipment: { class: 'A', background: 'A' }, // the kits, not the gold
       spells: null, // Fighters have no Spellcasting feature
       magicInitiate: [], // only for Magic Initiate feats
+      look: { skin: 'peach', hairStyle: 'tousled', hairColor: 'auburn', beard: false, outfit: 'red', accent: 'brown', headgear: 'none' },
 
       hitPointRolls: [], // levels after 1; null means "took the fixed value"
       armorId: 'chain-mail',
@@ -78,6 +79,7 @@ export const quickStartHeroes = [
       },
       // The Sage's Magic Initiate (Wizard). Her Rock Gnome cantrips are Mending and Prestidigitation.
       magicInitiate: [{ source: 'background', list: 'wizard', ability: 'intelligence', cantrips: ['minor-illusion', 'ray-of-frost'], spell: 'thunderwave' }],
+      look: { skin: 'peach', hairStyle: 'long', hairColor: 'blonde', beard: false, outfit: 'sky', accent: 'red', headgear: 'none' },
 
       hitPointRolls: [],
       armorId: null,

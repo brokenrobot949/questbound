@@ -27,6 +27,8 @@ import {
   speed,
 } from '../character/sheet.js';
 import { spellGroups, spellNumbers } from '../character/spells.js';
+import { heroSprite } from '../character/look.js';
+import { portrait } from './sprite-canvas.js';
 import { signedNumber } from './roll-format.js';
 import { spellDetails } from './spell-text.js';
 import { el } from './dom.js';
@@ -48,7 +50,9 @@ export function heroSheet(character) {
   const resist = resistances(character);
   if (resist.length) senses.push(`Resists ${resist.map(capitalise).join(', ')}`);
   who.append(el('p', 'sheet-line', senses.join(' · ')));
-  sheet.append(who, el('p', 'sheet-hint', 'Tap any number to see how it was worked out.'));
+  const header = el('div', 'sheet-header');
+  header.append(portrait(heroSprite(character), { scale: 4, label: `${character.name || 'Your hero'}, as they look` }), who);
+  sheet.append(header, el('p', 'sheet-hint', 'Tap any number to see how it was worked out.'));
 
   const pb = proficiencyBonus(character.level);
   sheet.append(
