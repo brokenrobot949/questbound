@@ -37,6 +37,26 @@
         <div id="title-credits-panel"></div>
       </section>
 
+      <section class="screen" id="creation-screen" hidden>
+        <header class="title-bar">
+          <h1 class="game-title">New hero</h1>
+          <nav class="title-bar-links" aria-label="Creation menu">
+            <span class="title-bar-note" id="creation-slot"></span>
+            <button class="text-button" id="creation-cancel" type="button">Save slots</button>
+          </nav>
+        </header>
+        <div id="creation-confirm"></div>
+        <p class="creation-progress" id="creation-progress"></p>
+        <main class="creation-body" id="creation-body"></main>
+        <div class="creation-footer" id="creation-footer">
+          <p class="creation-needs" id="creation-needs" aria-live="polite"></p>
+          <div class="creation-nav">
+            <button class="slot-button" id="creation-back" type="button">Back</button>
+            <button class="slot-button is-primary" id="creation-next" type="button">Next</button>
+          </div>
+        </div>
+      </section>
+
       <section class="screen" id="adventure-screen" hidden>
         <header class="title-bar">
           <h1 class="game-title">Questbound</h1>

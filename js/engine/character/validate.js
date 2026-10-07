@@ -6,11 +6,16 @@
 import { abilities } from '../../../data/srd/abilities.js';
 import { skills } from '../../../data/srd/skills.js';
 import { standardArray, pointBuy, maxAbilityScore } from '../../../data/srd/character-creation.js';
+import { drives } from '../../../data/campaign/drives.js';
+import { bonds } from '../../../data/campaign/bonds.js';
 import { findArmor, findBackground, findClass, findFeat, findSpecies } from './sheet.js';
 
 const ABILITY_IDS = abilities.map((a) => a.id);
 const SKILL_IDS = skills.map((s) => s.id);
 const SPELLCASTING_ABILITIES = ['intelligence', 'wisdom', 'charisma'];
+
+// Names are kept short enough to fit the screen.
+export const MAX_NAME_LENGTH = 40;
 
 export function validateCharacter(character) {
   const problems = [];
@@ -19,6 +24,7 @@ export function validateCharacter(character) {
   };
 
   need(typeof character.name === 'string' && character.name.trim() !== '', 'The hero needs a name.');
+  need(typeof character.name !== 'string' || character.name.length <= MAX_NAME_LENGTH, `Names can be up to ${MAX_NAME_LENGTH} letters.`);
 
   const cls = findClass(character.classId);
   const sp = findSpecies(character.speciesId);
@@ -117,6 +123,18 @@ export function validateCharacter(character) {
     const ok = cls.scholarSkills.includes(choices.scholarSkill) && classSkills.concat(bg.skills, speciesSkills, featSkills).includes(choices.scholarSkill);
     need(ok, 'Choose a Scholar skill you are proficient in.');
   }
+
+  // Drive and Bond (original additions; see docs/DESIGN.md, "Character Creation").
+  need(drives.some((d) => d.id === character.drive), 'Choose a Drive.');
+  const bond = character.bond || {};
+  need(bonds.some((b) => b.id === bond.type), 'Choose a Bond.');
+  need(typeof bond.name === 'string' && bond.name.trim() !== '', 'Name your Bond.');
+  need(typeof bond.name !== 'string' || bond.name.length <= MAX_NAME_LENGTH, `Names can be up to ${MAX_NAME_LENGTH} letters.`);
+
+  // Starting equipment: which kit option was taken from the class and from the background.
+  const kit = character.startingEquipment || {};
+  need(cls.startingEquipment.some((o) => o.option === kit.class), `Choose ${cls.name} starting equipment.`);
+  need(bg.equipment.some((o) => o.option === kit.background), `Choose ${bg.name} starting equipment.`);
 
   // Hit Point rolls for levels after 1: a Hit Die result, or null for the fixed value.
   const rolls = character.hitPointRolls || [];

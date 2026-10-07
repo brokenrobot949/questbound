@@ -9,7 +9,10 @@ import { jumpTo, listScenes, makeChoice, revealRoll } from '../js/engine/story/s
 import { forceNextD20 } from '../js/engine/rules/dice.js';
 import { createRng } from '../js/engine/rules/rng.js';
 import { gameToSave, loadGame, newGame } from '../js/engine/save/save-format.js';
-import { testHero } from '../data/campaign/test-hero.js';
+import { quickStartHeroes } from '../data/campaign/quick-start.js';
+
+// Wren Ashdown, the Quick Start Fighter.
+const testHero = quickStartHeroes.find((h) => h.id === 'wren').character;
 
 const STORY_URL = new URL('../story/', import.meta.url);
 

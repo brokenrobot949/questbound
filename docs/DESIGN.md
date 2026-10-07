@@ -114,6 +114,8 @@ Character creation follows the 2024 rules order, takes about 10 minutes, and has
 6. **Name, Drive and Bond.** Type a name or roll one from species name tables, then choose a Drive and a Bond.
 7. **Equipment.** Take the class and background starting kits, or the starting gold to shop in the first town.
 
+On screen, every skill pick (class, species and the Skilled feat) shares one Skills page after ability scores, so the player sees all the sources at once, sees the bonus each skill would give, and can't pick the same skill twice. Creation ends on a review of the finished sheet, where every number can be tapped to show its maths. The dice for rolled scores and rolled names are the new game's own seeded dice, and rolled scores can't be rerolled.
+
 **Drive and Bond (original additions)**
 
 - **Drive** is what pushes your character: Glory, Faith, Wealth, Knowledge, Justice, Freedom or Kinship. Choices that fit your Drive earn Heroic Inspiration, and the DM's recaps lean on it.

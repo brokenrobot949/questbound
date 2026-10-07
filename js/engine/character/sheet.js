@@ -10,6 +10,8 @@
 //   abilityScoreMethod ('standard-array', 'point-buy', 'random' or 'manual'), baseAbilityScores
 //   classSkills, speciesSkills, featSkills (skills picked from each source)
 //   originFeat (the Human's Versatile feat), classChoices ({ fightingStyle, scholarSkill })
+//   drive (an id from data/campaign/drives.js), bond ({ type, name }: who the hero left behind)
+//   startingEquipment ({ class: 'A', background: 'B' }: the kit options taken at creation)
 //   hitPointRolls (the Hit Die rolled at each level after 1; null = took the fixed value)
 //   armorId (null = no armour), shield (true or false)
 //

@@ -13,11 +13,11 @@ import { PlaytestTracker } from './engine/save/playtest-log.js';
 import { setupOffline } from './engine/save/offline.js';
 import { renderTitleScreen } from './engine/ui/title-screen.js';
 import { startAdventureScreen } from './engine/ui/adventure-screen.js';
+import { startCreationScreen } from './engine/ui/creation-screen.js';
 import { setupDebugPanel } from './engine/ui/debug-panel.js';
 import { applySettings, settingsPanel } from './engine/ui/settings-panel.js';
 import { creditsPanel } from './engine/ui/credits-panel.js';
 import { showFatalError, showScreen } from './engine/ui/dom.js';
-import { testHero } from '../data/campaign/test-hero.js';
 
 const params = new URLSearchParams(window.location.search);
 const DEBUG = params.has('debug');
@@ -131,13 +131,25 @@ async function start() {
         play(game, { backupReminder: newSession && isBackupDue(game.sessionCount, game.lastBackupSession) });
       }),
 
+    // A new game starts with character creation. Any save already in the slot stays until
+    // the new hero begins their adventure.
     onNewGame: (slot) =>
       attempt(() => {
         // In debug mode, &seed=anything starts new games with the same dice.
         const seed = (DEBUG && params.get('seed')) || randomSeed();
-        const game = newGame(runtime, { slot, seed, character: testHero });
-        openedThisVisit.add(slot);
-        play(game);
+        showScreen('creation-screen');
+        startCreationScreen({
+          root: document,
+          slot,
+          seed,
+          onCancel: () => showTitle(),
+          onFinish: ({ character, rngState }) =>
+            attempt(() => {
+              const game = newGame(runtime, { slot, seed, character, rngState });
+              openedThisVisit.add(slot);
+              play(game);
+            }),
+        });
       }),
 
     // The save was downloaded or copied: note it so the reminder counts from now.

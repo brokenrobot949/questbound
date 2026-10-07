@@ -11,7 +11,11 @@ import { migrations } from '../js/engine/save/migrations.js';
 import { validateCharacter } from '../js/engine/character/validate.js';
 import { PlaytestTracker, IDLE_LIMIT_MS, formatDuration, summarizeLog } from '../js/engine/save/playtest-log.js';
 import { openSaveStore, deleteSaveDatabase } from '../js/engine/save/save-store.js';
-import { testHero } from '../data/campaign/test-hero.js';
+import { createRng } from '../js/engine/rules/rng.js';
+import { quickStartHeroes } from '../data/campaign/quick-start.js';
+
+// Wren Ashdown, the Quick Start Fighter.
+const testHero = quickStartHeroes.find((h) => h.id === 'wren').character;
 
 const STORY_URL = new URL('../story/', import.meta.url);
 const TEST_DB = 'questbound-test';
@@ -354,7 +358,30 @@ test("Migration: a version 3 save's stand-in hero becomes a legal Human Fighter,
   const upgraded = migrateSave(v3, migrations, 4);
   const hero = upgraded.game.character;
   assertEqual([upgraded.version, hero.name, hero.level, hero.classId, hero.speciesId, hero.backgroundId], [4, 'Bryn', 3, 'fighter', 'human', 'soldier']);
+  const current = migrateSave(v3, migrations, SAVE_VERSION).game.character;
+  assertEqual(validateCharacter(current), [], 'the hero must be legal once fully upgraded');
+});
+
+test('Migration: a version 4 hero gains a Drive, a Bond and a starting kit, and becomes version 5', () => {
+  const v4hero = { ...testHero };
+  delete v4hero.drive;
+  delete v4hero.bond;
+  delete v4hero.startingEquipment;
+  const v4 = { version: 4, slot: 2, game: { character: v4hero, flags: [], page: { scene: null, beats: [] } } };
+  const upgraded = migrateSave(v4, migrations, 5);
+  const hero = upgraded.game.character;
+  assertEqual([upgraded.version, hero.drive, hero.bond.type, hero.startingEquipment], [5, 'justice', 'sibling', { class: 'A', background: 'A' }]);
   assertEqual(validateCharacter(hero), [], 'the upgraded hero must be legal');
+});
+
+test('New game: dice rolled during character creation carry on into the game', async () => {
+  const runtime = await freshRuntime();
+  const creationDice = createRng('carry-on');
+  creationDice.nextUint32(); // say, rolling a name
+  const carried = newGame(runtime, { slot: 1, seed: 'carry-on', character: testHero, rngState: creationDice.getState() });
+  assertEqual(carried.rng.getState(), creationDice.getState());
+  const fresh = newGame(runtime, { slot: 1, seed: 'carry-on', character: testHero });
+  assertTrue(JSON.stringify(fresh.rng.getState()) !== JSON.stringify(carried.rng.getState()), 'without a state, the dice start from the seed');
 });
 
 // ---- Playtest log ----

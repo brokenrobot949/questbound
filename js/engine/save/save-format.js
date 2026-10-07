@@ -18,19 +18,21 @@ import { currentLocation, runPage } from '../story/story-runner.js';
 import { migrations } from './migrations.js';
 import { validateCharacter } from '../character/validate.js';
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 // runtime: { story, game } — the compiled story, and whichever game is being played.
 
 // A new game in a slot. Starts the story and runs to the first choice.
-export function newGame(runtime, { slot, seed, character, now = new Date() }) {
+// rngState: where the dice generator had got to, if character creation already rolled dice
+// with this seed (ability scores, names); otherwise the dice start fresh from the seed.
+export function newGame(runtime, { slot, seed, character, rngState = null, now = new Date() }) {
   const game = {
     slot,
     createdAt: now.toISOString(),
     sessionCount: 1,
     lastBackupSession: 0,
     seed,
-    rng: createRng(seed),
+    rng: rngState ? new Rng(rngState) : createRng(seed),
     story: runtime.story,
     character: structuredClone(character),
     location: null,

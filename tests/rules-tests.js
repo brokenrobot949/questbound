@@ -31,7 +31,9 @@ import { backgrounds } from '../data/srd/backgrounds.js';
 import { feats } from '../data/srd/feats.js';
 import { armor, shield } from '../data/srd/armor.js';
 import { pointBuy, standardArray } from '../data/srd/character-creation.js';
-import { testHero } from '../data/campaign/test-hero.js';
+import { quickStartHeroes } from '../data/campaign/quick-start.js';
+import { nameTables } from '../data/campaign/names.js';
+import * as creation from '../js/engine/character/creation.js';
 import { difficultyName, rollLine } from '../js/engine/ui/roll-format.js';
 import { parseTags } from '../js/engine/story/tags.js';
 import { skills } from '../data/srd/skills.js';
@@ -41,6 +43,9 @@ import { advancement } from '../data/srd/advancement.js';
 // The first five raw values for the seed 'questbound'. If these ever change, existing
 // saves would roll differently after loading, so the RNG algorithm must stay as it is.
 const KNOWN_QUESTBOUND_VALUES = [1614782848, 800264413, 564517817, 266011180, 1143897396];
+
+// Wren Ashdown, the Quick Start Fighter: a Human Fighter (Soldier) in Chain Mail.
+const testHero = quickStartHeroes.find((h) => h.id === 'wren').character;
 
 // A legal level 1 Human Fighter (Soldier) for checks: Str 8, Dex 14, Con 12, Int 10, Wis 13,
 // Cha 16 after the background's +1s. Pass overrides to change any part.
@@ -63,6 +68,9 @@ function makeHero(overrides = {}) {
     featSkills: [],
     originFeat: 'alert',
     classChoices: { fightingStyle: 'defense' },
+    drive: 'glory',
+    bond: { type: 'rival', name: 'Test Rival' },
+    startingEquipment: { class: 'B', background: 'B' }, // every class and background has an option B
     hitPointRolls: [],
     armorId: null,
     shield: false,
@@ -417,10 +425,151 @@ test('Data: the armour table matches the SRD', () => {
 
 // ---- Character creation rules ----
 
-test('Creation: the test heroes are legal characters', () => {
-  assertEqual(validateCharacter(testHero), []);
+test('Creation: the Quick Start and test heroes are legal characters', () => {
+  for (const hero of quickStartHeroes) assertEqual(validateCharacter(hero.character), [], hero.id);
   assertEqual(validateCharacter(makeHero()), []);
   assertEqual(validateCharacter(makeWizard()), []);
+});
+
+test('Creation: a hero needs a Drive, a named Bond and a starting equipment choice', () => {
+  assertTrue(validateCharacter(makeHero({ drive: 'boredom' })).some((p) => p.includes('Drive')));
+  assertTrue(validateCharacter(makeHero({ bond: { type: 'sibling', name: '  ' } })).some((p) => p.includes('Name your Bond')));
+  assertTrue(validateCharacter(makeHero({ bond: { type: 'cousin', name: 'Ada' } })).some((p) => p.includes('Choose a Bond')));
+  assertTrue(validateCharacter(makeWizard({ startingEquipment: { class: 'C', background: 'A' } })).length > 0, 'the Wizard has no option C');
+  assertTrue(validateCharacter(makeHero({ name: 'x'.repeat(41) })).some((p) => p.includes('up to 40')));
+});
+
+test('Data: every item in the starting kits is in the equipment data', () => {
+  const kits = [...classes.flatMap((c) => c.startingEquipment), ...backgrounds.flatMap((b) => b.equipment)];
+  for (const kit of kits) for (const { id } of kit.items) assertTrue(creation.findItem(id) !== null, `unknown item ${id}`);
+  for (const b of backgrounds) assertTrue(creation.findItem(b.tool) !== null, `${b.id} tool ${b.tool}`);
+  assertEqual(['greatsword', 'javelin', 'dungeoneers-pack'].map((id) => creation.findItem(id).cost), [{ gp: 50 }, { sp: 5 }, { gp: 12 }]);
+});
+
+// Object keys sorted, so two heroes built in a different order compare equal.
+function sortedKeys(value) {
+  if (Array.isArray(value)) return value.map(sortedKeys);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map((k) => [k, sortedKeys(value[k])]));
+  return value;
+}
+
+test('Creation: building Wren step by step gives the Quick Start hero', () => {
+  let d = creation.emptyDraft();
+  d = creation.chooseFightingStyle(creation.chooseClass(d, 'fighter'), 'defense');
+  d = creation.chooseBackground(d, 'soldier');
+  d = creation.chooseOriginFeat(creation.chooseSpecies(d, 'human'), 'alert');
+  d = creation.prepareStep(d, 'abilities');
+  for (const [id, value] of Object.entries(testHero.baseAbilityScores)) d = creation.assignScore(d, id, value);
+  d = creation.setIncrease(creation.setIncrease(creation.setIncrease(d, 'dexterity', 0), 'strength', 2), 'constitution', 1);
+  d = creation.toggleSkill(creation.toggleSkill(d, 'class', 'persuasion'), 'class', 'perception');
+  d = creation.toggleSkill(d, 'species', 'insight');
+  d = creation.setBondName(creation.chooseBond(creation.chooseDrive(creation.setName(d, '  Wren   Ashdown '), 'justice'), 'sibling'), 'Kit Ashdown');
+  d = creation.prepareStep(d, 'equipment');
+  for (const step of creation.CREATION_STEPS) assertEqual(creation.stepProblems(d, step), [], step);
+  assertEqual(sortedKeys(creation.finishCharacter(d)), sortedKeys(testHero));
+});
+
+test('Creation: each step says what it still needs', () => {
+  const d = creation.emptyDraft();
+  assertEqual(creation.stepProblems(d, 'class'), ['Choose a class.']);
+  assertEqual(creation.stepProblems(creation.chooseClass(d, 'fighter'), 'class'), ['Choose a Fighting Style.']);
+  assertEqual(creation.stepProblems(creation.chooseClass(d, 'wizard'), 'class'), []);
+  const elf = creation.chooseSpecies(d, 'elf');
+  assertEqual(creation.stepProblems(elf, 'species').length, 2, 'lineage and spellcasting ability');
+  assertEqual(creation.stepProblems(creation.chooseSpecies(d, 'human'), 'species'), ['Choose an Origin feat.']);
+  assertEqual(creation.stepProblems(d, 'details').length, 4);
+  assertThrows(() => creation.finishCharacter(d));
+});
+
+test('Creation: changing an earlier choice clears the later choices that depended on it', () => {
+  let d = creation.chooseBackground(creation.chooseClass(creation.emptyDraft(), 'fighter'), 'criminal');
+  d = creation.toggleSkill(creation.toggleSkill(d, 'class', 'athletics'), 'class', 'perception');
+  d = creation.chooseKit(d, 'class', 'A');
+  const wizard = creation.chooseClass(d, 'wizard');
+  assertEqual([wizard.classSkills, wizard.startingEquipment.class], [[], null], 'new class, new skills and kit');
+  const soldier = creation.chooseBackground(d, 'soldier');
+  assertEqual(soldier.classSkills, ['perception'], 'the Soldier gives Athletics, so that pick is freed');
+  let human = creation.chooseOriginFeat(creation.chooseSpecies(d, 'human'), 'skilled');
+  human = creation.toggleSkill(human, 'feat', 'arcana');
+  assertEqual(human.featSkills, ['arcana']);
+  assertEqual(creation.chooseSpecies(human, 'dwarf').featSkills, [], 'no Skilled feat without the Human');
+});
+
+test('Creation: skills can only be picked once, and only up to the count', () => {
+  let d = creation.chooseBackground(creation.chooseClass(creation.emptyDraft(), 'fighter'), 'soldier');
+  d = creation.chooseSpecies(d, 'human');
+  assertEqual(creation.toggleSkill(d, 'class', 'athletics').classSkills, [], 'the Soldier already gives Athletics');
+  assertEqual(creation.toggleSkill(d, 'class', 'arcana').classSkills, [], 'not a Fighter skill');
+  d = creation.toggleSkill(creation.toggleSkill(d, 'class', 'history'), 'class', 'survival');
+  assertEqual(creation.toggleSkill(d, 'class', 'insight').classSkills, ['history', 'survival'], 'two is the limit');
+  assertEqual(creation.toggleSkill(d, 'species', 'history').speciesSkills, [], 'already a Fighter skill');
+  assertEqual(creation.toggleSkill(d, 'class', 'history').classSkills, ['survival'], 'tapping again unpicks');
+  assertEqual(creation.skillTakenBy(d, 'intimidation', 'class'), 'background');
+});
+
+test("Creation: the Standard Array goes in the class's order, and assigning a score swaps", () => {
+  const wizard = creation.setAbilityMethod(creation.chooseClass(creation.emptyDraft(), 'wizard'), 'standard-array');
+  assertEqual(wizard.baseAbilityScores, classes.find((c) => c.id === 'wizard').standardArray);
+  const swapped = creation.assignScore(wizard, 'strength', 15);
+  assertEqual([swapped.baseAbilityScores.strength, swapped.baseAbilityScores.intelligence], [15, 8]);
+});
+
+test('Creation: Point Buy starts at 8 and stays within 8 to 15 and 27 points', () => {
+  let d = creation.setAbilityMethod(creation.chooseClass(creation.emptyDraft(), 'fighter'), 'point-buy');
+  assertEqual(creation.pointBuySpent(d.baseAbilityScores), 0);
+  assertEqual(creation.adjustPointBuy(d, 'strength', -1), d, 'no lower than 8');
+  for (let i = 0; i < 7; i++) d = creation.adjustPointBuy(d, 'strength', 1);
+  assertEqual(d.baseAbilityScores.strength, 15, 'no higher than 15');
+  for (let i = 0; i < 7; i++) d = creation.adjustPointBuy(d, 'dexterity', 1);
+  for (let i = 0; i < 7; i++) d = creation.adjustPointBuy(d, 'constitution', 1);
+  assertEqual(creation.pointBuySpent(d.baseAbilityScores), 27);
+  assertEqual(creation.adjustPointBuy(d, 'wisdom', 1), d, 'no points left');
+});
+
+test('Creation: rolled scores are 4d6 drop the lowest, from the seeded dice', () => {
+  const rolls = creation.rollAbilityScores(createRng('roll-scores'));
+  assertEqual(rolls.length, 6);
+  for (const r of rolls) {
+    const kept = r.dice.filter((_, i) => !r.dropped.includes(i));
+    assertEqual([r.dice.length, r.dropped.length], [4, 1]);
+    assertTrue(r.dice[r.dropped[0]] === Math.min(...r.dice), 'the lowest die is dropped');
+    assertEqual(r.total, kept.reduce((s, v) => s + v, 0));
+  }
+  assertEqual(creation.rollAbilityScores(createRng('roll-scores')), rolls, 'same seed, same rolls');
+  const d = creation.setAbilityMethod(creation.chooseClass(creation.emptyDraft(), 'wizard'), 'random', rolls.map((r) => r.total));
+  assertEqual(d.baseAbilityScores.intelligence, Math.max(...rolls.map((r) => r.total)), "the best roll goes to the Wizard's Intelligence");
+});
+
+test('Creation: suggested background increases are +2/+1 to the best scores', () => {
+  let d = creation.chooseBackground(creation.chooseClass(creation.emptyDraft(), 'wizard'), 'sage');
+  d = creation.suggestIncreases(creation.setAbilityMethod(d, 'standard-array'));
+  assertEqual(d.backgroundIncreases, { intelligence: 2, wisdom: 1 });
+});
+
+test('Creation: rolled names come from the species table and the seeded dice', () => {
+  const name = creation.rollName(createRng('names'), 'dwarf');
+  const [given, family] = name.split(' ');
+  assertTrue(nameTables.dwarf.given.includes(given) && nameTables.dwarf.family.includes(family), name);
+  assertEqual(creation.rollName(createRng('names'), 'dwarf'), name);
+  let d = creation.chooseBond(creation.setName(creation.chooseSpecies(creation.emptyDraft(), 'dwarf'), 'Ylva Stonebrow'), 'sibling');
+  assertTrue(creation.rollBondName(createRng('bond'), d).endsWith(' Stonebrow'), 'a sibling shares the family name');
+});
+
+test('Creation: the class kit decides the starting armour', () => {
+  let d = creation.chooseBackground(creation.chooseClass(creation.emptyDraft(), 'fighter'), 'soldier');
+  d = creation.chooseKit(d, 'background', 'A');
+  assertEqual(['A', 'B', 'C'].map((o) => creation.kitArmor(creation.chooseKit(d, 'class', o))), ['chain-mail', 'studded-leather-armor', null]);
+  const wizardKit = creation.chooseKit(creation.chooseClass(d, 'wizard'), 'class', 'A');
+  assertEqual(creation.kitArmor(wizardKit), null);
+  const kit = creation.startingKit(creation.chooseKit(d, 'class', 'A'));
+  assertEqual(kit.gold, 4 + 14);
+  assertTrue(kit.items.some(({ item, quantity }) => item.id === 'javelin' && quantity === 8));
+});
+
+test("Creation: Magic Initiate can't be the Human's Versatile feat until spells arrive", () => {
+  const human = creation.chooseSpecies(creation.emptyDraft(), 'human');
+  assertThrows(() => creation.chooseOriginFeat(human, 'magic-initiate'));
+  assertThrows(() => creation.chooseOriginFeat(human, 'defense'), 'Defense is a Fighting Style, not an Origin feat');
 });
 
 test('Creation: the Standard Array must use each score once', () => {

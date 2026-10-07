@@ -54,4 +54,21 @@ export const migrations = {
       },
     };
   },
+
+  // Version 5 adds the hero's Drive, Bond and starting equipment choice, made at character
+  // creation. Saves before it held the stand-in Human Fighter, who gets the same Drive and
+  // Bond as the Quick Start Fighter and the kit with the Chain Mail they already wear.
+  4: (save) => ({
+    ...save,
+    version: 5,
+    game: {
+      ...save.game,
+      character: {
+        ...save.game.character,
+        drive: 'justice',
+        bond: { type: 'sibling', name: 'Kit Ashdown' },
+        startingEquipment: { class: 'A', background: 'A' },
+      },
+    },
+  }),
 };
