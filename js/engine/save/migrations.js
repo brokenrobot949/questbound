@@ -155,4 +155,7 @@ export const migrations = {
 
   // Version 10 adds a level-up in progress. Saves before it had none.
   9: (save) => ({ ...save, version: 10, game: { ...save.game, levelUp: null } }),
+
+  // Version 11 adds where the hero is in a dungeon. Saves before it had never been in one.
+  10: (save) => ({ ...save, version: 11, game: { ...save.game, dungeon: null } }),
 };

@@ -6,7 +6,10 @@
 // so neither the tap nor quitting and reloading can change the outcome.
 
 import { parseTags } from '../story/tags.js';
-import { continueAfterBattle, currentTime, makeChoice, revealRoll, startFight } from '../story/story-runner.js';
+import { continueAfterBattle, currentDungeon, currentTime, makeChoice, revealRoll, startFight } from '../story/story-runner.js';
+import { findRoom } from '../world/dungeons.js';
+import { findEncounter } from '../combat/battle.js';
+import { showDungeonMap } from './dungeon-map.js';
 import { maxHp } from '../character/resources.js';
 import { levelUpReady } from '../character/level-up.js';
 import { showBattle } from './battle-screen.js';
@@ -47,6 +50,10 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
 
   // Fights and level-ups show here, between the story and the choices.
   const battleArea = root.getElementById('battle-area');
+  // The dungeon map, while the hero is in a dungeon. mapRequest counts maps asked for, so a
+  // map still loading its pictures can tell it has been replaced.
+  const mapArea = root.getElementById('map-area');
+  let mapRequest = 0;
 
   // "Day 2 · Morning · HP 12/12 · 18 GP · ★ Inspiration": as far as the player has seen.
   const updateStatus = () => {
@@ -66,6 +73,7 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
   choices.replaceChildren();
   notices.replaceChildren();
   battleArea.replaceChildren();
+  mapArea.replaceChildren();
 
   // While the backup reminder is up, the view stays at the top so the player sees it.
   // It follows the story again once they answer it or play on.
@@ -81,6 +89,7 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
   // Shows the current page beat by beat, waiting for the player to tap any unrevealed d20.
   async function showPage() {
     updateStatus();
+    showMap();
     for (const beat of game.page.beats) {
       if (beat.type === 'chosen') narration.append(el('p', 'chosen-text', beat.text));
       else if (beat.type === 'text') narration.append(el('p', 'narration-text', beat.text));
@@ -120,9 +129,29 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
     follow(battleArea);
   }
 
+  // The dungeon map, as far as the player has read. doors: [{ room, choice }] for the choices
+  // tagged #go, whose doorways light up to tap. Hidden during a fight: the fight is the room.
+  // Each call replaces the one before, even if that one is still loading its pictures.
+  function showMap(doors = []) {
+    const request = ++mapRequest;
+    const state = currentDungeon(game);
+    if (!state || !state.room || game.battle) {
+      mapArea.replaceChildren();
+      return;
+    }
+    const stillWanted = () => request === mapRequest;
+    showDungeonMap({ container: mapArea, state, hero: heroSprite(game.character), doors, onGo: choose, stillWanted }).catch(showFatalError);
+  }
+
+  function hideMap() {
+    mapRequest += 1;
+    mapArea.replaceChildren();
+  }
+
   // A fight takes the place of the choices until it's over; then the story carries on.
   function showFight() {
     choices.replaceChildren();
+    hideMap();
     showBattle({
       container: battleArea,
       game,
@@ -149,17 +178,25 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
   function showChoices() {
     choices.replaceChildren();
     if (game.story.currentChoices.length === 0) {
+      showMap();
       showEnd();
       return;
     }
+    const doors = [];
+    const dungeon = currentDungeon(game);
     for (const choice of game.story.currentChoices) {
       const tags = parseTags(choice.tags);
       const card = el('button', 'choice-card');
       card.type = 'button';
+      if (tags.go && dungeon) {
+        const room = findRoom(dungeon.id, tags.go);
+        card.append(el('span', 'choice-tag is-go', `Go · ${room ? room.name : tags.go}`));
+        doors.push({ room: tags.go, choice });
+      }
       if (tags.check) card.append(el('span', 'choice-tag', checkLabel(tags.check)));
       if (tags.spell) card.append(el('span', 'choice-tag', `Spell · ${spellName(tags.spell)}`));
       if (tags.buy) card.append(el('span', 'choice-tag', `Buy · ${moneyText(priceOf(tags.buy))}`));
-      if (tags.combat) card.append(el('span', 'choice-tag is-fight', 'Fight'));
+      if (tags.combat) card.append(el('span', 'choice-tag is-fight', fightLabel(tags.combat)));
       // Only the hero's own Drive is pointed out: that's the choice that earns Inspiration.
       if (tags.drive && tags.drive === game.character.drive) {
         card.append(el('span', 'choice-tag is-drive', `★ Your Drive · ${findDrive(tags.drive).name}`));
@@ -168,12 +205,14 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
       card.addEventListener('click', () => choose(choice));
       choices.append(card);
     }
+    showMap(doors);
     follow(choices);
   }
 
   function choose(choice) {
     holdView = false;
     choices.replaceChildren();
+    hideMap();
     for (const node of narration.children) node.classList.add('is-past');
     // A fight: the story waits at this choice until the fight is over.
     if (parseTags(choice.tags).combat) {
@@ -351,6 +390,14 @@ function checkLabel(check) {
   const named = findSkill(check.testId) || findAbility(check.testId);
   const name = named ? named.name : check.testId;
   return `${name} · ${difficultyName(check.dc)}`;
+}
+
+// "Fight · Low", "Fight · Deadly": the first word of the encounter's difficulty
+// (data/campaign/encounters.js), so the player knows what they're walking into.
+function fightLabel(encounterId) {
+  const encounter = findEncounter(encounterId);
+  const rating = encounter ? encounter.difficulty.split(/[\s:(]/)[0] : '';
+  return rating ? `Fight · ${rating}` : 'Fight';
 }
 
 function spellName(id) {

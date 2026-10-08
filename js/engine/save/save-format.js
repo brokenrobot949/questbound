@@ -19,10 +19,12 @@
 //                  character/resources.js), battle (a fight in progress, or null; see
 //                  combat/battle.js), lastBattle ({ encounterId, outcome } of the last fight),
 //                  levelUp (a level-up in progress, or null; see character/level-up.js),
-//                  page, rollLog
+//                  dungeon (the dungeon room the hero is in and the rooms explored, or null;
+//                  see world/dungeons.js), page, rollLog
 
 import { createRng, Rng } from '../rules/rng.js';
-import { currentLocation, currentTime, runPage } from '../story/story-runner.js';
+import { currentDungeon, currentLocation, currentTime, runPage } from '../story/story-runner.js';
+import { dungeonStateOk } from '../world/dungeons.js';
 import { journalOk, newJournal } from '../story/journal.js';
 import { inventoryProblems, startingInventory } from '../character/inventory.js';
 import { freshResources, resourceProblems } from '../character/resources.js';
@@ -31,7 +33,7 @@ import { levelUpOk } from '../character/level-up.js';
 import { migrations } from './migrations.js';
 import { validateCharacter } from '../character/validate.js';
 
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 
 // runtime: { story, game } — the compiled story, and whichever game is being played.
 
@@ -59,10 +61,10 @@ export function newGame(runtime, { slot, seed, character, rngState = null, now =
     battle: null,
     lastBattle: null,
     levelUp: null,
+    dungeon: null,
     page: null,
     rollLog: [],
-    pendingRolls: [],
-    pendingNotes: [],
+    pending: [],
     notice: null,
   };
   runtime.game = game;
@@ -100,6 +102,7 @@ export function gameToSave(game, now = new Date()) {
       battle: game.battle,
       lastBattle: game.lastBattle,
       levelUp: game.levelUp,
+      dungeon: currentDungeon(game),
       page: game.page,
       rollLog: game.rollLog,
     }),
@@ -135,10 +138,10 @@ export function loadGame(runtime, record) {
     battle: save.game.battle,
     lastBattle: save.game.lastBattle,
     levelUp: save.game.levelUp,
+    dungeon: save.game.dungeon,
     page: save.game.page,
     rollLog: save.game.rollLog,
-    pendingRolls: [],
-    pendingNotes: [],
+    pending: [],
     notice: null,
   };
   runtime.game = game;
@@ -195,7 +198,8 @@ export function validateSave(save) {
     if (game.battle !== null && !battleOk(game.battle)) problems.push('fight in progress');
     if (game.lastBattle !== null && !(game.lastBattle && isText(game.lastBattle.outcome))) problems.push('last fight');
     if (game.levelUp !== null && !levelUpOk(game.levelUp)) problems.push('level-up in progress');
-    const beatTypes = ['chosen', 'text', 'roll', 'note', 'location', 'time'];
+    if (!dungeonStateOk(game.dungeon)) problems.push('dungeon');
+    const beatTypes = ['chosen', 'text', 'roll', 'note', 'location', 'time', 'room'];
     const pageOk = game.page && Array.isArray(game.page.beats) && game.page.beats.every((b) => b && beatTypes.includes(b.type));
     if (!pageOk) problems.push('current page');
     if (!Array.isArray(game.rollLog)) problems.push('roll log');

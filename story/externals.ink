@@ -64,6 +64,13 @@ EXTERNAL has_item(item)
 //   * {has_item("rations")} [Toss it your rations] ~ take_item("rations")
 EXTERNAL take_item(item)
 
+// take_damage(dice, type): the hero takes damage outside a fight, from a trap or a fall, e.g.
+//   ~ temp fall = take_damage("1d6", "bludgeoning")
+// At 0 Hit Points they make death saving throws (the player sees each roll) with nobody to
+// help. Returns "up" (still standing), "woke" (blacked out, came round with 1 Hit Point) or
+// "dead" (send the story to Fate's Mercy).
+EXTERNAL take_damage(dice, type)
+
 // Fights: a choice tagged #combat:encounter-id (from data/campaign/encounters.js) starts a
 // fight on the battle grid. The choice's content runs once the fight is over, and
 // combat_won() says how it went:

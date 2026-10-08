@@ -186,16 +186,34 @@ The epilogue then shows each town, faction, companion and your Bond, built from 
      - Survival 10: it was running *away* from the quarry.
      - Detect Magic: necromancy.
    - **Losing the fight is Fate's Mercy:** Odda Brasswick, a priest of the Steadfast Flame hauling firewood, drives the wolf off and carts you home. Goblins took your purse while you lay there (`met_odda`, so she remembers you in Chapter 2).
-   - **It ends at the quarry mouth,** where a goblin lookout sees you (and waves, if you talked the mill goblins down).
-5. **Brackenhollow warren** *(the slice's dungeon, 6 rooms)*:
-   1. **Quarry mouth:** a goblin lookout. Sneak past (Stealth), parley, or fight.
-   2. **Spike-pit passage:** a trap (Perception to spot it, Dexterity save). The goblins' traps all face *inward*: they're afraid of something coming from below.
-   3. **The larder:** empty apart from the miller's flour sacks, and a goblin child hiding: "Not food! Not *food!*" Spare it or scare it, and Nettle hears either way.
-   4. **Nettle's hall:** Mother Nettle with three Goblin Warriors and some Minions, in a standoff.
-      - **Parley (Persuasion or Insight):** the dead broke into the lower warren two nights ago, and the goblins raid because their stores are down there. They saw grey-robed singers drag a man through the tunnels.
-      - **The deal:** "Clear the dead from our lower warren and we stop raiding." This is a Freedom or Kinship Drive moment.
-      - **Or fight:** the whole band is far beyond even a High fight for one hero, so Nettle offers single combat with her instead (High). Or take the captain's way and wipe them out, the hard way.
+   - **It ends at the quarry mouth,** where a goblin lookout squats on a ledge (and waves you in, if you talked the mill goblins down). Finding the warren is a milestone: 50 XP.
+5. **Brackenhollow warren** *(the slice's dungeon, 6 rooms, explored room by room on the dungeon map)*:
+   1. **Quarry mouth:** a goblin lookout (a Goblin Warrior, Low).
+      - Sneak past (Stealth 10: it isn't sharp), talk your way in (Persuasion 15), or fight.
+      - Getting past without a fight is worth its 50 XP.
+      - If you talked the mill goblins down, the lookout guides you in instead.
+   2. **Pit passage:** the SRD's Hidden Pit (1d6 falling damage; found with Investigation 15, or by sending a Mage Hand ahead). A guide shows it to you.
+      - The goblins' warning marks face *inward*: they're afraid of something coming from below (`traps_face_inward`, 25 XP).
+      - *Changed from a spiked pit:* the SRD's Spiked Pit is a Deadly trap for levels 1–4 (about 12 damage), too much for one level 1 hero.
+   3. **The larder:** empty apart from the miller's flour sacks, which is proof the goblins took flour, not the miller (50 XP). A goblin child hides behind them: "Not food! NOT FOOD!"
+      - Spare it (a Justice Drive moment): it tells you the dead came up through the floor with singers behind them.
+      - Or scare it, or leave it. Nettle hears either way.
+   4. **Nettle's hall:** Mother Nettle (Goblin Boss) with three Goblin Warriors and some Minions, in a standoff. Her greeting depends on what you did on the way in.
+      - **Parley:**
+        - Persuasion is DC 10 if you were gentle with her people and killed none, otherwise 15.
+        - Or ask what drove them out of the deep warren (Insight 15, a Knowledge Drive moment).
+        - Talking her round is worth her 200 XP.
+      - **The bargain:**
+        - What she tells you: the dead came up through the old stone two nights ago, and the goblins raid because their stores are down there. She saw grey-robed singers drag a big man with a floury beard down through the tunnels.
+        - Her offer: "Clear the dead from our lower warren and we stop raiding" (new quest: **Brackenhollow's Bargain**).
+        - Shake on it as a Freedom, Kinship or Wealth Drive moment. Wealth wrings a Potion of Healing out of her hoard.
+      - **A failed parley isn't a dead end:** Nettle demands single combat, or you can refuse and offer to help anyway ("Prove it").
+      - **Or fight:**
+        - Single combat with Nettle in a ring of goblin onlookers (High for a level 2 hero, a Glory Drive moment). Win, then offer your hand (the bargain) or finish her (`goblins_slain`; her band scatters).
+        - Or take the captain's way against the whole band, a fight the card marks as Deadly.
+      - **Fate's Mercy in the warren:** losing a fight here, or dying in the pit, means waking tied up in Nettle's hall, robbed. She offers the bargain anyway, as the price of your life.
       - **Flags:** `goblins_spared` or `goblins_slain`.
+      - *It ends at the way down to the lower warren for now.*
    5. **The lower warren:** two Zombies dig mindlessly at the walls (Moderate). Twist: they're digging *away* from you, and attack only if disturbed.
    6. **The breach:** the warren breaks into ancient dressed stone, part of the barrow tunnels. A Choir acolyte (Cultist) sings a Skeleton to its feet. The fight's objective is to stop the hymn before a second Skeleton rises.
       - **If you catch the acolyte:** he talks under Intimidation or Persuasion: "The Precentor will wake the Sleeping King. The miller works the gates."
@@ -209,7 +227,11 @@ The epilogue then shows each town, faction, companion and your Bond, built from 
    - **Long rest at the inn:** reach level 3, and choose a subclass (Champion or Evoker).
 7. **Lights on the hills.** *(End of the slice; a natural stopping point.)* From the inn window, pale lanterns move on the barrow hills. Lark knocks: "They're digging toward the Kings' Barrow."
 
-**Levels:** the first fights, the mill and the goblin deal take you to level 2. The warren, the breach and the report take you to level 3. Quest and discovery XP fill the gap, so the fights stay few and good.
+**Levels:** the first fights, the mill and the warren's first rooms take you to level 2, at the latest in the larder, before you face Nettle. Even a hero who passes no checks has 300 XP by then:
+- the cellar 25, the mill 50, the wolf 50 and the warren mouth 50;
+- the lookout 50, the pit 25 and the larder 50.
+
+The goblin bargain, the lower warren, the breach and the report take you to level 3. Quest and discovery XP fill the gap, so the fights stay few and good.
 
 **Chapter 1 side content** (Phase 2):
 - **Too Many Cats** (side quest): the inn's cats keep vanishing. A Stirge nest in the loft. Funny, short, and a good first loot.

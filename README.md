@@ -42,5 +42,6 @@ Checks run in the browser, and are linked from the footer in debug mode:
 - Saves: http://localhost:8000/tests/saves.html (uses its own test database, so it never touches your saves)
 - Combat: http://localhost:8000/tests/combat.html
 - Levelling up: http://localhost:8000/tests/levels.html
+- Dungeons: http://localhost:8000/tests/dungeon.html
 
 To see every hero look at once (each species and class, and every skin, hair, outfit and headgear option), open http://localhost:8000/tests/looks.html. Add `?scale=10` to look closer.

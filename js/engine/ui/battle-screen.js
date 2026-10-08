@@ -10,41 +10,18 @@ import * as fight from '../combat/battle.js';
 import { key } from '../combat/grid.js';
 import { heroSprite } from '../character/look.js';
 import { featureUsesLeft, featureUsesMax, maxHp } from '../character/resources.js';
-import { sheets, sprites, tiles, wallPieces, wallStyles } from '../../../data/campaign/sprites.js';
+import { sprites } from '../../../data/campaign/sprites.js';
+import { blit, drawCell, drawTile, frameSquare, loadArt, pixelScale, sizeCanvas, spriteImage, TILE } from './tile-art.js';
 import { rollLine } from './roll-format.js';
 import { el } from './dom.js';
 
-const TILE = 16;
 const LINE_MS = 450; // how long each line of an enemy's turn waits before the next
 const FRAME_MS = 500;
-
-const images = new Map();
-// Loads a DawnLike sheet once (path from the repo root, as in data/campaign/sprites.js).
-function sheetImage(path) {
-  if (!images.has(path)) {
-    images.set(
-      path,
-      new Promise((resolve, reject) => {
-        const image = new Image();
-        image.onload = () => resolve(image);
-        image.onerror = () => reject(new Error(`Couldn't load ${path}`));
-        image.src = new URL(`../../../${path}`, import.meta.url).href;
-      }),
-    );
-  }
-  return images.get(path);
-}
-
-async function loadSheets() {
-  const loaded = {};
-  for (const [name, paths] of Object.entries(sheets)) loaded[name] = await Promise.all(paths.map(sheetImage));
-  return loaded;
-}
 
 // container: where to draw. onSave(game) after every action. onDone(): the player has seen
 // the end of the fight and wants to carry on with the story.
 export async function showBattle({ container, game, onSave, onDone }) {
-  const art = await loadSheets();
+  const art = await loadArt();
   const look = heroSprite(game.character);
   const heroFrames = look.frames.map((rows) => spriteImage(look, rows));
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -264,28 +241,14 @@ export async function showBattle({ container, game, onSave, onDone }) {
     const battle = game.battle;
     if (!battle) return;
     const map = fight.battleMap(battle);
-    const scale = pixelScale(map, panel);
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = map.width * TILE * scale;
-    canvas.height = map.height * TILE * scale;
-    canvas.style.width = `${canvas.width / dpr}px`;
-    canvas.style.height = `${canvas.height / dpr}px`;
-    const ctx = canvas.getContext('2d');
-    ctx.imageSmoothingEnabled = false;
+    const scale = pixelScale(map.width, panel);
+    const ctx = sizeCanvas(canvas, map.width, map.height, scale);
     const size = TILE * scale;
     const frame = view.frame % 2;
 
     // Floor, walls and things on the floor.
     for (let y = 0; y < map.height; y++) {
-      for (let x = 0; x < map.width; x++) {
-        const cell = map.cells[y][x];
-        if (cell.terrain === 'wall') {
-          drawWall(ctx, map, x, y, cell.wall, size);
-          continue;
-        }
-        drawTile(ctx, tiles[cell.tile], x, y, size);
-        if (cell.decor) drawTile(ctx, tiles[cell.decor], x, y, size);
-      }
+      for (let x = 0; x < map.width; x++) drawCell(ctx, art, map, x, y, size);
     }
 
     // Where the hero can move, and who they can hit.
@@ -312,7 +275,7 @@ export async function showBattle({ container, game, onSave, onDone }) {
       const sprite = sprites[findMonsterSprite(foe)];
       // The fallen lie faded on their side; the Prone lie on their side.
       const standing = foe.hp > 0;
-      drawTile(ctx, sprite, foe.pos.x, foe.pos.y, size, standing ? frame : 0, {
+      drawTile(ctx, art, sprite, foe.pos.x, foe.pos.y, size, standing ? frame : 0, {
         alpha: standing ? 1 : 0.35,
         lying: !standing || fight.isProne(battle, foe.id),
       });
@@ -328,25 +291,6 @@ export async function showBattle({ container, game, onSave, onDone }) {
 
     const current = fight.currentCombatant(battle);
     if (!battle.outcome) frameSquare(ctx, current.pos, size, scale, '#f0c85a');
-  }
-
-  // A picture from the sheets. The tile's own alpha and lying (data/campaign/sprites.js)
-  // combine with any given here.
-  function drawTile(ctx, tile, x, y, size, frame = 0, { alpha = 1, lying = false } = {}) {
-    const sheet = art[tile.sheet][Math.min(frame, art[tile.sheet].length - 1)];
-    blit(ctx, sheet, tile.col * TILE, tile.row * TILE, x, y, size, { alpha: alpha * (tile.alpha || 1), lying: lying || Boolean(tile.lying) });
-  }
-
-  // Walls pick their tile from which neighbours are walls too.
-  function drawWall(ctx, map, x, y, styleId, size) {
-    const style = wallStyles[styleId];
-    const wallAt = (dx, dy) => {
-      const cell = map.cells[y + dy] && map.cells[y + dy][x + dx];
-      return Boolean(cell && cell.terrain === 'wall');
-    };
-    const mask = (wallAt(0, -1) ? 'N' : '') + (wallAt(1, 0) ? 'E' : '') + (wallAt(0, 1) ? 'S' : '') + (wallAt(-1, 0) ? 'W' : '');
-    const [dx, dy] = wallPieces[mask] || wallPieces.NESW;
-    drawTile(ctx, { sheet: style.sheet, col: style.col + dx, row: style.row + dy }, x, y, size);
   }
 
   function describeGrid() {
@@ -372,58 +316,12 @@ function squares(a, b) {
   return `${n * 5} feet`;
 }
 
-// The largest whole number of device pixels per sprite pixel that fits the space, so the
-// pixel art stays crisp on every screen.
-function pixelScale(map, container) {
-  const dpr = window.devicePixelRatio || 1;
-  const available = Math.max(160, container.clientWidth || 320) * dpr;
-  return Math.max(1, Math.floor(available / (map.width * TILE)));
-}
-
-// Draws one 16 × 16 square of an image onto grid square (x, y), faded by alpha, and turned a
-// quarter on its side when lying (a whole quarter turn keeps the pixels crisp).
-function blit(ctx, image, sx, sy, x, y, size, { alpha = 1, lying = false } = {}) {
-  ctx.save();
-  ctx.globalAlpha *= alpha;
-  if (lying) {
-    ctx.translate(x * size + size / 2, y * size + size / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.drawImage(image, sx, sy, TILE, TILE, -size / 2, -size / 2, size, size);
-  } else {
-    ctx.drawImage(image, sx, sy, TILE, TILE, x * size, y * size, size, size);
-  }
-  ctx.restore();
-}
-
 function drawHealthBar(ctx, pos, fraction, size, scale) {
   const width = size - 4 * scale;
   ctx.fillStyle = '#140c1c';
   ctx.fillRect(pos.x * size + 2 * scale, pos.y * size + size - 3 * scale, width, 2 * scale);
   ctx.fillStyle = fraction > 0.5 ? '#6daa2c' : fraction > 0.25 ? '#dad45e' : '#d04648';
   ctx.fillRect(pos.x * size + 2 * scale, pos.y * size + size - 3 * scale, Math.round(width * Math.max(0, fraction)), 2 * scale);
-}
-
-function frameSquare(ctx, pos, size, scale, color) {
-  ctx.strokeStyle = color;
-  ctx.lineWidth = scale;
-  ctx.strokeRect(pos.x * size + scale / 2, pos.y * size + scale / 2, size - scale, size - scale);
-}
-
-// A hero sprite frame as a 16 × 16 canvas, ready to draw on the grid.
-function spriteImage(sprite, rows) {
-  const image = document.createElement('canvas');
-  image.width = sprite.size;
-  image.height = sprite.size;
-  const data = new ImageData(sprite.size, sprite.size);
-  rows.forEach((row, y) => {
-    [...row].forEach((letter, x) => {
-      const hex = sprite.colors[letter];
-      if (!hex) return;
-      data.data.set([parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16), 255], (y * sprite.size + x) * 4);
-    });
-  });
-  image.getContext('2d').putImageData(data, 0, 0);
-  return image;
 }
 
 function battleButton(label, onClick, extra = '') {

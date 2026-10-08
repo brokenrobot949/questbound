@@ -481,7 +481,7 @@ test('Story: food gets you past the wolf for the same XP, then the body tells it
   pick(game, 'Look at its wounds');
   assertTrue(game.flags.includes('saw_dead_hands') && game.xp - xp === 75);
   pick(game, 'Go on to the quarry');
-  assertEqual([game.story.currentChoices.length, currentLocation(game)], [0, 'Brackenhollow, the quarry mouth']);
+  assertEqual(currentLocation(game), 'Brackenhollow warren, the passage', 'on into the warren');
   assertTrue(game.page.beats.some((b) => b.type === 'text' && b.text.includes('waves both arms')), 'the lookout expects you');
 });
 

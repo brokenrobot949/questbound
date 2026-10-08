@@ -27,7 +27,7 @@ async function freshRuntime() {
 function inlineStory(source) {
   const files = { 'test.ink': source };
   const story = new Compiler(source, new CompilerOptions('test.ink', [], false, null, new JsonFileHandler(files))).Compile();
-  const runtime = { story, game: { story, flags: [], pendingRolls: [], rng: createRng('inline'), character: testHero } };
+  const runtime = { story, game: { story, flags: [], pending: [], rng: createRng('inline'), character: testHero } };
   bindExternals(story, runtime);
   return runtime;
 }

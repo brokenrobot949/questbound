@@ -2006,3 +2006,59 @@ h3.debug-heading {
   border-color: var(--accent);
   color: var(--page);
 }
+
+/* The dungeon map: in the Adventure tab while the hero is in a dungeon */
+
+#map-area:empty {
+  display: none;
+}
+
+#map-area {
+  margin-bottom: 12px;
+}
+
+.dungeon-map {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dungeon-map-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.dungeon-map-title {
+  font-family: var(--font-ui);
+  font-size: var(--size-ui);
+  color: var(--accent);
+}
+
+.dungeon-map-toggle {
+  min-height: 36px;
+  padding: 4px 12px;
+}
+
+.dungeon-map-frame {
+  align-self: center;
+}
+
+.dungeon-map-canvas {
+  display: block;
+  border: 3px solid var(--box-edge-dark);
+  border-radius: 4px;
+  background: var(--page);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.dungeon-map-canvas.has-doors {
+  cursor: pointer;
+}
+
+.choice-tag.is-go {
+  color: var(--good);
+}

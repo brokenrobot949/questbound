@@ -94,7 +94,7 @@ test('A save holds game state, Ink state, dice state, session count and last-pla
   const game = newGame(runtime, { slot: 2, seed: 'contents', character: testHero, now: new Date('2026-10-01T09:00:00Z') });
   const record = gameToSave(game, new Date('2026-10-06T12:00:00Z'));
   assertEqual(Object.keys(record).sort(), ['createdAt', 'game', 'ink', 'lastBackupSession', 'rng', 'savedAt', 'seed', 'sessionCount', 'slot', 'version']);
-  assertEqual(Object.keys(record.game).sort(), ['battle', 'character', 'day', 'featureUses', 'flags', 'hp', 'inspiration', 'inventory', 'journal', 'lastBattle', 'levelUp', 'location', 'money', 'page', 'rollLog', 'slotsUsed', 'time', 'xp']);
+  assertEqual(Object.keys(record.game).sort(), ['battle', 'character', 'day', 'dungeon', 'featureUses', 'flags', 'hp', 'inspiration', 'inventory', 'journal', 'lastBattle', 'levelUp', 'location', 'money', 'page', 'rollLog', 'slotsUsed', 'time', 'xp']);
   assertEqual([record.version, record.slot, record.sessionCount, record.lastBackupSession], [SAVE_VERSION, 2, 1, 0]);
   assertEqual([record.createdAt, record.savedAt], ['2026-10-01T09:00:00.000Z', '2026-10-06T12:00:00.000Z']);
   assertTrue(record.rng.length === 4 && record.rng.every(Number.isInteger), 'dice state should be four whole numbers');
@@ -411,6 +411,21 @@ test('Migration: a version 8 game gains full Hit Points, unspent slots, no XP an
   const v8 = { version: 8, slot: 1, game: { character: structuredClone(testHero), flags: [], page: { scene: null, beats: [] } } };
   const game = migrateSave(v8, migrations, 9).game;
   assertEqual([game.hp, game.slotsUsed, game.featureUses, game.xp, game.battle, game.lastBattle], [12, [], {}, 0, null, null]);
+});
+
+test('Migration: a version 10 game has never been in a dungeon, and becomes version 11', () => {
+  const v10 = { version: 10, slot: 1, game: { character: structuredClone(testHero), levelUp: null } };
+  const save = migrateSave(v10, migrations, 11);
+  assertEqual([save.version, save.game.dungeon], [11, null]);
+});
+
+test('A save with a damaged dungeon state is refused', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'dungeon-check', character: testHero });
+  const record = throughJson(gameToSave(game));
+  record.game.dungeon = { id: 'brackenhollow', room: 'ballroom', explored: [] };
+  assertThrows(() => validateSave(record), 'an unknown room');
+  record.game.dungeon = { id: 'brackenhollow', room: 'larder', explored: ['larder'] };
+  assertEqual(validateSave(record).version, SAVE_VERSION);
 });
 
 test('Migration: a version 9 game gains no level-up in progress, and becomes version 10', () => {

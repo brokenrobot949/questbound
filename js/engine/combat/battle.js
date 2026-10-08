@@ -28,6 +28,7 @@ import { armorClass, findClass, hasFeature, initiative as heroInitiative, speed 
 import { heal, featureUsesLeft, maxHp, spendFeature, spendSlot } from '../character/resources.js';
 import { hasItem, removeItem } from '../character/inventory.js';
 import { feetBetween, isAdjacent, key, parseMap, reachableSquares, squaresBetween, stepCost } from './grid.js';
+import { encounterRows } from '../world/dungeons.js';
 import {
   attackRoll,
   damageAfterResistance,
@@ -44,11 +45,17 @@ export const findEncounter = (id) => encounters.find((e) => e.id === id) || null
 export const findMonster = (id) => monsters.find((m) => m.id === id) || null;
 
 const maps = new Map();
-// The encounter's map, parsed once.
+// The encounter's map, parsed once: its own, or its room of a dungeon. Onlookers (goblins
+// watching a duel, say) stand in the way like any obstacle.
 export function battleMap(battle) {
   if (!maps.has(battle.encounterId)) {
-    const { rows, legend } = findEncounter(battle.encounterId).map;
-    maps.set(battle.encounterId, parseMap(rows, legend));
+    const encounter = findEncounter(battle.encounterId);
+    const { rows, legend } = encounterRows(encounter);
+    const map = parseMap(rows, legend);
+    for (const { decor, pos } of encounter.onlookers || []) {
+      map.cells[pos.y][pos.x] = { ...map.cells[pos.y][pos.x], terrain: 'obstacle', decor };
+    }
+    maps.set(battle.encounterId, map);
   }
   return maps.get(battle.encounterId);
 }
@@ -105,11 +112,11 @@ export function startBattle(game, encounterId, choiceIndex) {
   for (const { monster } of encounter.monsters) counts[monster] = (counts[monster] || 0) + 1;
   const numbered = {};
   const combatants = [{ id: 'hero', side: 'hero', name: game.character.name, pos: { ...encounter.hero } }];
-  for (const { monster: id, pos } of encounter.monsters) {
+  for (const { monster: id, pos, name: given } of encounter.monsters) {
     const monster = findMonster(id);
     if (!monster) throw new Error(`Unknown monster: ${id}`);
     numbered[id] = (numbered[id] || 0) + 1;
-    const name = counts[id] > 1 ? `${monster.name} ${numbered[id]}` : monster.name;
+    const name = given || (counts[id] > 1 ? `${monster.name} ${numbered[id]}` : monster.name);
     combatants.push({ id: `${id}-${numbered[id]}`, side: 'enemy', name, monsterId: id, pos: { ...pos }, hp: monster.hp.average, maxHp: monster.hp.average });
   }
   game.battle = {
@@ -454,6 +461,10 @@ function performAttack(game, attacker, target, option) {
     return { critical: false };
   }
 
+  // A Goblin Boss can pull an ally into the way.
+  const redirected = redirectAttack(game, target);
+  if (redirected !== target) return performAttack(game, attacker, redirected, option);
+
   const { advantage, disadvantage } = attackConditions(game, attacker, target, option);
   const roll = attackRoll(game.rng, option, acOf(game, target), advantage, disadvantage);
   // Hitting an Unconscious creature from within 5 feet is a Critical Hit.
@@ -490,6 +501,24 @@ function onHitCondition(game, target, { condition, maxSize }) {
   knockProne(game, target);
   if (target.side === 'hero' && game.battle.heroState === 'up') log(game, 'You are knocked Prone.');
   else if (target.side === 'enemy') log(game, `${target.name} is knocked Prone.`);
+}
+
+// Redirect Attack (Goblin Boss reaction): when attacked, it swaps places with a Small or
+// Medium ally within 5 feet, and the ally becomes the target instead. Returns who is attacked.
+function redirectAttack(game, target) {
+  const battle = game.battle;
+  if (target.side !== 'enemy' || target.hp <= 0) return target;
+  if (!(findMonster(target.monsterId).reactions || []).includes('redirect-attack')) return target;
+  if (battle.reactionsUsed.includes(target.id) || hasEffect(battle, target.id, 'no-reactions')) return target;
+  const allies = battle.combatants.filter(
+    (c) => c !== target && c.side === 'enemy' && c.hp > 0 && isAdjacent(c.pos, target.pos) && ['small', 'medium'].includes(findMonster(c.monsterId).size),
+  );
+  if (allies.length === 0) return target;
+  const ally = allies.sort((a, b) => b.hp - a.hp)[0];
+  [ally.pos, target.pos] = [target.pos, ally.pos];
+  battle.reactionsUsed.push(target.id);
+  log(game, `${target.name} drags ${ally.name} into the way: Redirect Attack!`);
+  return ally;
 }
 
 // Evoker's Potent Cantrip: a damaging cantrip that misses, or that the target saves against,
@@ -679,11 +708,16 @@ function enemyTurn(game, c) {
   const options = monsterAttackOptions(monster);
   const melee = options.find((o) => o.how === 'melee');
   const ranged = options.find((o) => o.how === 'ranged');
-
-  if (melee && isAdjacent(c.pos, hero.pos)) {
-    performAttack(game, c, hero, melee);
+  // Multiattack: several attacks with the one action, stopping once the hero falls.
+  const attackTimes = (option) => {
+    for (let i = 0; i < (monster.multiattack || 1); i++) {
+      if (battle.outcome || battle.heroState !== 'up' || c.hp <= 0) break;
+      performAttack(game, c, hero, option);
+    }
     return checkEnd(game);
-  }
+  };
+
+  if (melee && isAdjacent(c.pos, hero.pos)) return attackTimes(melee);
   const map = battleMap(battle);
   const crawling = isProne(battle, c.id);
   const reach = reachableSquares(map, c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling });
@@ -692,13 +726,9 @@ function enemyTurn(game, c) {
   if (melee && closest && !prefersRanged) {
     moveAlong(game, c, closest.path);
     if (battle.outcome || c.hp <= 0) return checkEnd(game);
-    performAttack(game, c, hero, melee);
-    return checkEnd(game);
+    return attackTimes(melee);
   }
-  if (ranged && feetBetween(c.pos, hero.pos) <= ranged.range[0]) {
-    performAttack(game, c, hero, ranged);
-    return checkEnd(game);
-  }
+  if (ranged && feetBetween(c.pos, hero.pos) <= ranged.range[0]) return attackTimes(ranged);
   // Too far: Dash towards the hero.
   battle.turnState.movementLeft += speedOf(game, c);
   const farther = reachableSquares(map, c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling });

@@ -126,13 +126,14 @@ The goblin lies on its back in the cart ruts. It carried nothing: no sack, no fl
     -> quarry_mouth
 
 = quarry_mouth
-// The end of what's written so far: beat 5, Brackenhollow warren, comes next.
-The road ends where the hill was cut away. The quarry is a deep grey bite out of the slope, its floor choked with rubble and thorn. At the foot of the cliff, half hidden behind a screen of brambles, a low black opening leads into the rock. Someone has daubed the stone around it with dozens of crude nettle leaves. #location:Brackenhollow, the quarry mouth
+// Finding the goblins' home is a milestone for the reeve's bounty (and worth XP).
+The road ends where the hill was cut away. The quarry is a deep grey bite out of the slope, its floor choked with rubble and thorn. At the foot of the cliff, half hidden behind a screen of brambles, a low black opening leads into the rock. Someone has daubed the stone around it with dozens of crude nettle leaves. #location:Brackenhollow, the quarry mouth #room:brackenhollow/mouth
 
 { has_flag("mill_goblins_talked"):
     On a ledge above the entrance, a goblin lookout stands up and waves both arms at you. Then, after some thought, it waves again, less certainly. You're expected.
 - else:
-    On a ledge above the entrance, something small and sharp-eyed ducks out of sight. You've been seen.
+    On a ledge above the entrance, a goblin lookout squats with a bow across its knees, squinting at the road. It hasn't seen you yet.
 }
 ~ quest_note("missing-miller", "Reached the old quarry: the goblins of Brackenhollow live in a warren under the cliff.")
--> END
+~ give_xp(50)
+-> ch1_warren

@@ -11,16 +11,20 @@
 //   { type: 'note', text }                 a short DM note ("New quest: …"), from an external
 //   { type: 'location', value }            the hero moved (from a #location tag); not shown as text
 //   { type: 'time', value }                the time of day changed (from a #time tag); not shown as text
+//   { type: 'room', value }                the hero entered a dungeon room (from a #room tag, e.g.
+//                                          "brackenhollow/mouth", or "none"); the map shows it
 
 import { parseTags } from './tags.js';
+import { enterRoom, parseRoomTag } from '../world/dungeons.js';
 import { finishBattle, startBattle } from '../combat/battle.js';
 import { dmNotes } from '../../../data/campaign/dm-voice.js';
 
 // How many rolls the roll log keeps in the save. Older ones drop off.
 export const ROLL_LOG_LIMIT = 200;
 
-// Runs Ink until it stops for a choice or ends, and returns the page. A roll made while Ink
-// worked out a line belongs before that line. leadBeats go first (e.g. the choice just made).
+// Runs Ink until it stops for a choice or ends, and returns the page. Rolls and notes made
+// while Ink worked out a line belong before that line, in the order they happened.
+// leadBeats go first (e.g. the choice just made).
 export function runPage(game, leadBeats = []) {
   const { story } = game;
   const beats = [...leadBeats];
@@ -28,13 +32,17 @@ export function runPage(game, leadBeats = []) {
   while (story.canContinue) {
     const text = story.Continue().trim();
     scene = currentKnot(story) || scene;
-    for (const result of game.pendingRolls.splice(0)) {
-      beats.push({ type: 'roll', result, revealed: false });
+    for (const item of game.pending.splice(0)) {
+      if (item.type === 'roll') beats.push({ type: 'roll', result: item.result, revealed: false });
+      else beats.push({ type: 'note', text: item.text });
     }
-    for (const note of (game.pendingNotes || []).splice(0)) beats.push({ type: 'note', text: note });
     const tags = parseTags(story.currentTags);
     if (tags.location) beats.push({ type: 'location', value: tags.location });
     if (tags.time) beats.push({ type: 'time', value: tags.time });
+    if (tags.room) {
+      parseRoomTag(tags.room); // a typo in a room tag is a story bug: fail here, not later
+      beats.push({ type: 'room', value: tags.room });
+    }
     if (text) beats.push({ type: 'text', text });
   }
   return { beats, scene: scene || currentKnot(story) };
@@ -52,10 +60,11 @@ export function listScenes(story) {
 }
 
 // Debug mode: moves the story straight to a knot or stitch and runs on. Returns the new page.
+// A fight in progress is left behind.
 export function jumpTo(game, path) {
-  game.location = currentLocation(game);
-  game.time = currentTime(game);
-  game.pendingRolls.length = 0;
+  settleSeen(game);
+  game.battle = null;
+  game.pending.length = 0;
   game.story.ChoosePathString(path);
   return runPage(game);
 }
@@ -71,6 +80,24 @@ export function currentTime(game) {
   return lastSeen(game, 'time', game.time || null);
 }
 
+// Which dungeon room the hero is in, and the rooms they've explored, as far as the player
+// has seen (see world/dungeons.js), or null.
+export function currentDungeon(game) {
+  let state = game.dungeon || null;
+  for (const beat of game.page ? game.page.beats : []) {
+    if (beat.type === 'roll' && !beat.revealed) break;
+    if (beat.type === 'room') state = enterRoom(state, parseRoomTag(beat.value));
+  }
+  return state;
+}
+
+// Before the story moves on: what the player has seen of this page becomes the starting point.
+function settleSeen(game) {
+  game.location = currentLocation(game);
+  game.time = currentTime(game);
+  game.dungeon = currentDungeon(game);
+}
+
 function lastSeen(game, type, start) {
   let value = start;
   for (const beat of game.page ? game.page.beats : []) {
@@ -83,8 +110,7 @@ function lastSeen(game, type, start) {
 // Takes one of story.currentChoices and runs on. Returns the new page.
 export function makeChoice(game, choice) {
   const expected = parseTags(choice.tags).check;
-  game.location = currentLocation(game);
-  game.time = currentTime(game);
+  settleSeen(game);
   game.story.ChooseChoiceIndex(choice.index);
   const page = runPage(game, [{ type: 'chosen', text: choice.text }]);
   warnIfTagMismatch(expected, page.beats.find((b) => b.type === 'roll'));
@@ -96,8 +122,7 @@ export function makeChoice(game, choice) {
 export function startFight(game, choice) {
   const encounterId = parseTags(choice.tags).combat;
   if (!encounterId) throw new Error('That choice does not start a fight');
-  game.location = currentLocation(game);
-  game.time = currentTime(game);
+  settleSeen(game);
   return startBattle(game, encounterId, choice.index);
 }
 
@@ -106,7 +131,7 @@ export function startFight(game, choice) {
 export function continueAfterBattle(game) {
   const xp = game.battle.outcome === 'victory' ? game.battle.xp : 0;
   const { choiceIndex } = finishBattle(game);
-  if (xp) game.pendingNotes.push(dmNotes.fightWon.replace('{xp}', xp));
+  if (xp) game.pending.push({ type: 'note', text: dmNotes.fightWon.replace('{xp}', xp) });
   const choice = game.story.currentChoices[choiceIndex];
   if (!choice) throw new Error('The story moved on during the fight');
   return makeChoice(game, choice);
@@ -114,8 +139,7 @@ export function continueAfterBattle(game) {
 
 // Starts the story over from the top, keeping the hero and the dice.
 export function restartStory(game) {
-  game.location = currentLocation(game);
-  game.time = currentTime(game);
+  settleSeen(game);
   game.story.ResetState();
   return runPage(game);
 }

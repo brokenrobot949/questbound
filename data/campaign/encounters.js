@@ -7,7 +7,11 @@
 //                  terrain 'floor', 'wall', 'obstacle' (blocks movement) or 'difficult'
 //                  (costs double to cross)
 //                  tile / decor / wall: pictures from data/campaign/sprites.js
-//   hero         where the hero starts; monsters: each one and where it starts ({ x, y })
+//                or map: { dungeon, room }: the fight is in that room of a dungeon map
+//                (data/campaign/dungeons.js), and positions count from the room's top row
+//   hero         where the hero starts; monsters: each one and where it starts ({ x, y }),
+//                with a name if it has its own (Mother Nettle)
+//   onlookers    figures who watch but don't fight: { decor, pos }; they stand in the way
 //   whileHeroDown  what each monster does on its turn while the hero lies at 0 Hit Points
 //                ({name} is the monster's name). These foes don't finish off a fallen hero:
 //                the hero's death saves decide it.
@@ -80,6 +84,51 @@ export const encounters = [
     hero: { x: 3, y: 8 },
     monsters: [{ monster: 'wolf', pos: { x: 4, y: 2 } }],
     whileHeroDown: '{name} goes back to tearing at the dead goblin.',
+    source: 'original',
+  },
+  {
+    id: 'warren-lookout',
+    name: 'The Lookout at Brackenhollow',
+    difficulty: 'Low (50 XP budget for one level 1 hero; one Goblin Warrior is 50 XP)',
+    map: { dungeon: 'brackenhollow', room: 'mouth' },
+    hero: { x: 3, y: 0 },
+    monsters: [{ monster: 'goblin-warrior', name: 'Goblin Lookout', pos: { x: 5, y: 4 } }],
+    whileHeroDown: '{name} shrieks down into the warren for help.',
+    source: 'original',
+  },
+  {
+    id: 'nettle-duel',
+    name: 'Single Combat with Mother Nettle',
+    difficulty: 'High (200 XP budget for one level 2 hero; a Goblin Boss is 200 XP)',
+    map: { dungeon: 'brackenhollow', room: 'hall' },
+    hero: { x: 3, y: 1 },
+    monsters: [{ monster: 'goblin-boss', name: 'Mother Nettle', pos: { x: 3, y: 6 } }],
+    onlookers: [
+      { decor: 'goblin-onlooker', pos: { x: 1, y: 2 } },
+      { decor: 'goblin-archer-onlooker', pos: { x: 6, y: 2 } },
+      { decor: 'goblin-runt-onlooker', pos: { x: 1, y: 5 } },
+      { decor: 'goblin-onlooker', pos: { x: 6, y: 5 } },
+      { decor: 'goblin-runt-onlooker', pos: { x: 2, y: 7 } },
+      { decor: 'goblin-archer-onlooker', pos: { x: 5, y: 7 } },
+    ],
+    whileHeroDown: '{name} lowers her scimitar and waits, as the old law says.',
+    source: 'original',
+  },
+  {
+    id: 'nettle-band',
+    name: 'Nettle’s Whole Band',
+    difficulty: 'Deadly: far beyond High (a Goblin Boss, three Goblin Warriors and two Goblin Minions are 400 XP; High for one level 2 hero is 200)',
+    map: { dungeon: 'brackenhollow', room: 'hall' },
+    hero: { x: 3, y: 1 },
+    monsters: [
+      { monster: 'goblin-boss', name: 'Mother Nettle', pos: { x: 3, y: 6 } },
+      { monster: 'goblin-warrior', pos: { x: 1, y: 5 } },
+      { monster: 'goblin-warrior', pos: { x: 6, y: 5 } },
+      { monster: 'goblin-warrior', pos: { x: 4, y: 6 } },
+      { monster: 'goblin-minion', pos: { x: 1, y: 2 } },
+      { monster: 'goblin-minion', pos: { x: 6, y: 2 } },
+    ],
+    whileHeroDown: '{name} stands over you, jeering.',
     source: 'original',
   },
 ];

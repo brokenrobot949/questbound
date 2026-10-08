@@ -10,4 +10,11 @@ export const quests = [
     chapter: 1,
     source: 'original',
   },
+  {
+    id: 'goblin-bargain',
+    title: 'Brackenhollow’s Bargain',
+    summary: 'Mother Nettle’s goblins will stop raiding if you clear the dead out of their lower warren.',
+    chapter: 1,
+    source: 'original',
+  },
 ];

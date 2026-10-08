@@ -17,7 +17,8 @@ export const dmVoice = {
 };
 
 // The DM's short notes in the story, when something lands in the journal or the pack.
-// {title}, {item}, {drive}, {xp}, {level} and {hp} are filled in by the game.
+// {title}, {item}, {drive}, {xp}, {level}, {hp}, {damage}, {type}, {dice} and {rolls} are filled
+// in by the game.
 export const dmNotes = {
   inspirationFromDrive: 'That’s your Drive ({drive}) talking. You gain Heroic Inspiration.',
   inspirationFromRest: 'You wake ready for anything. Resourceful: you gain Heroic Inspiration.',
@@ -30,6 +31,10 @@ export const dmNotes = {
   xpGained: 'You gain {xp} XP.',
   coinsLost: 'Your purse is gone.',
   fightWon: 'Victory! You gain {xp} XP.',
+  damageTaken: 'You take {damage} {type} damage ({dice}: {rolls}).',
+  blackedOut: 'You drop to 0 Hit Points and black out. Nobody is here to help: you make death saving throws.',
+  cameRound: 'You come round with 1 Hit Point.',
+  fellDead: 'Darkness takes you.',
   levelUpNote: 'You are now level {level}. Your Hit Point maximum rises by {hp}.',
   levelUpDeed: 'Reached level {level}.',
   source: 'original',

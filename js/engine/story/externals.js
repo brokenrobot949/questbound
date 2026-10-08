@@ -4,8 +4,8 @@
 // None are lookahead-safe: Ink must not call them early while it looks ahead for glue.
 //
 // runtime.game is the game being played. The functions use its rng, character, flags, money,
-// pack and journal. They put each d20 result on game.pendingRolls, and each short DM note
-// ("New quest: …") on game.pendingNotes, for the story runner to place on the page.
+// pack and journal. They put each d20 result and each short DM note ("New quest: …") on
+// game.pending, in the order they happen, for the story runner to place on the page.
 
 import { abilityCheck } from '../rules/ability-check.js';
 import { canCastSpell } from '../character/spells.js';
@@ -14,6 +14,7 @@ import { findDrive } from '../character/creation.js';
 import { addDeed, findQuest, questNote, startQuest } from './journal.js';
 import { longRestRecovery } from '../character/resources.js';
 import { tacticalMind } from '../character/features.js';
+import { takeDamage } from '../character/hazards.js';
 import { dmNotes } from '../../../data/campaign/dm-voice.js';
 
 export function bindExternals(story, runtime) {
@@ -25,7 +26,7 @@ export function bindExternals(story, runtime) {
     (skill, dc) => {
       const { game } = runtime;
       const result = tacticalMind(game, abilityCheck({ rng: game.rng, character: game.character, testId: skill, dc }));
-      game.pendingRolls.push(result);
+      game.pending.push({ type: 'roll', result });
       return result.success;
     },
     false,
@@ -118,7 +119,7 @@ export function bindExternals(story, runtime) {
       questNote(game, id, text);
       // One note per quest per page is plenty ("New quest" already says it's in the journal).
       const title = findQuest(id).title;
-      if (!game.pendingNotes.some((n) => n.includes(title))) note(game, dmNotes.questUpdated, { title });
+      if (!game.pending.some((b) => b.type === 'note' && b.text.includes(title))) note(game, dmNotes.questUpdated, { title });
     },
     false,
   );
@@ -176,6 +177,26 @@ export function bindExternals(story, runtime) {
     false,
   );
 
+  // take_damage(dice, type): the hero takes damage outside a fight, from a trap or a fall,
+  // e.g. ~ temp outcome = take_damage("1d6", "bludgeoning"). Resistance halves it. At 0 Hit
+  // Points the hero makes death saving throws (shown as rolls) with nobody to help. Returns
+  // "up" (still standing), "woke" (dropped, then came round with 1 Hit Point) or "dead"
+  // (go to Fate's Mercy).
+  story.BindExternalFunction(
+    'take_damage',
+    (dice, type) => {
+      const { game } = runtime;
+      const { outcome } = takeDamage(game, dice, type, {
+        onDamage: (rolls, taken) => note(game, dmNotes.damageTaken, { damage: taken, type, dice, rolls: rolls.join(', ') }),
+        onDying: () => note(game, dmNotes.blackedOut),
+      });
+      if (outcome === 'woke') note(game, dmNotes.cameRound);
+      if (outcome === 'dead') note(game, dmNotes.fellDead);
+      return outcome;
+    },
+    false,
+  );
+
   // lose_coins(): the hero's purse is taken (Fate's Mercy: robbed while unconscious).
   story.BindExternalFunction(
     'lose_coins',
@@ -190,7 +211,7 @@ export function bindExternals(story, runtime) {
 // A short DM note for the page ("New quest: …"), shown where it happened in the story.
 function note(game, template, values = {}) {
   const text = template.replace(/\{(\w+)\}/g, (_, key) => values[key] ?? '');
-  game.pendingNotes.push(text);
+  game.pending.push({ type: 'note', text });
 }
 
 function flagId(id) {

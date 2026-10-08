@@ -270,7 +270,10 @@ The world is a hand-made region map of towns, wilds and dungeons. You travel bet
 **Dungeons**
 
 - Dungeons use the same tiles as the combat grid. Rooms are revealed as you enter.
-- Tap a door or room to move your party token. Rooms hold traps, puzzles, monsters, treasure or lore.
+- The map sits above the choices and shows the room you're in, with your hero at its entrance; **Whole map** shows every room explored so far, and the rest stays dark. The story moves you room to room, and the map follows only as far as you've read (it waits for any d20 you haven't tapped).
+- Tap a door or room to move your party token: the ways on light up in gold, and tapping one is the same as tapping its "Go" choice card. Rooms hold traps, puzzles, monsters, treasure or lore.
+- Traps work as in the rules. Damage outside a fight that drops you to 0 Hit Points means death saving throws with nobody to help (you see each roll); three failures lead to Fate's Mercy.
+- Every fight card shows how hard the fight is ("Fight · Low", "Fight · Deadly"), from the encounter budget.
 - Searching uses Investigation and Perception checks; traps work as in the rules.
 - Fights start in place on the same map, with no screen change.
 - Most dungeons have 5–15 rooms (20–60 minutes), with cleared rooms safe for a short rest.

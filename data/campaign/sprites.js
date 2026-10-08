@@ -19,6 +19,7 @@ export const sprites = {
   'goblin-minion': { sheet: 'player', col: 5, row: 14 },
   'goblin-warrior': { sheet: 'player', col: 0, row: 14 },
   wolf: { sheet: 'dog', col: 0, row: 1 },
+  'goblin-boss': { sheet: 'player', col: 6, row: 14 },
 };
 
 // Floor tiles and things that stand on them. alpha (0 to 1) draws a picture faded, and
@@ -35,6 +36,15 @@ export const tiles = {
   boulder: { sheet: 'hill', col: 3, row: 0 },
   bones: { sheet: 'decor', col: 1, row: 12 },
   'goblin-body': { sheet: 'player', col: 5, row: 14, alpha: 0.6, lying: true },
+  'cave-floor': { sheet: 'floor', col: 1, row: 22 },
+  rubble: { sheet: 'ground', col: 4, row: 1 },
+  crates: { sheet: 'decor', col: 3, row: 9 },
+  throne: { sheet: 'decor', col: 6, row: 7 },
+  furs: { sheet: 'decor', col: 7, row: 9 },
+  // Goblins who watch a fight without joining it (they stand in the way, though).
+  'goblin-onlooker': { sheet: 'player', col: 0, row: 14 },
+  'goblin-archer-onlooker': { sheet: 'player', col: 4, row: 14 },
+  'goblin-runt-onlooker': { sheet: 'player', col: 5, row: 14 },
 };
 
 // Walls join up with their neighbours. Each wall style is a block of tiles in DawnLike's

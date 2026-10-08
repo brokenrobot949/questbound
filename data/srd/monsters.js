@@ -14,6 +14,9 @@
 //                   for "if the target is Medium or smaller, it has the Prone condition" }
 //   traits          rules the game plays, e.g. 'pack-tactics' (Advantage on attacks against a
 //                   creature with one of its allies, not Incapacitated, within 5 feet of it)
+//   multiattack     how many attacks it makes with its action (1 if not given)
+//   reactions       e.g. 'redirect-attack' (when attacked, swap places with a Small or Medium
+//                   ally within 5 feet, who becomes the target instead)
 //   bonusActions    e.g. 'nimble-escape' (Disengage or Hide as a Bonus Action)
 //   behaviour       how it fights (original): 'brute' charges the nearest foe; 'skirmisher'
 //                   prefers its ranged attack when it can't reach you
@@ -94,6 +97,34 @@ export const monsters = [
     behaviour: 'brute',
     sprite: 'wolf',
     text: 'Pack Tactics. The wolf has Advantage on attack rolls against a creature if at least one of the wolf’s allies is within 5 feet of the creature and the ally doesn’t have the Incapacitated condition.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'goblin-boss',
+    name: 'Goblin Boss',
+    size: 'small',
+    type: 'Fey (Goblinoid)',
+    ac: 17, // Chain Shirt and Shield
+    hp: { average: 21, dice: '6d6' },
+    speed: 30,
+    abilities: { strength: 10, dexterity: 15, constitution: 10, intelligence: 10, wisdom: 8, charisma: 10 },
+    saves: { strength: 0, dexterity: 2, constitution: 0, intelligence: 0, wisdom: -1, charisma: 0 },
+    initiative: 2,
+    skills: { stealth: 6 },
+    darkvision: 60,
+    passivePerception: 9,
+    cr: '1',
+    xp: 200,
+    multiattack: 2,
+    attacks: [
+      { id: 'scimitar', name: 'Scimitar', kind: 'melee', bonus: 4, reach: 5, damage: { dice: '1d6', bonus: 2, type: 'slashing' }, advantageExtra: '1d4' },
+      { id: 'shortbow', name: 'Shortbow', kind: 'ranged', bonus: 4, range: [80, 320], damage: { dice: '1d6', bonus: 2, type: 'piercing' }, advantageExtra: '1d4' },
+    ],
+    bonusActions: ['nimble-escape'],
+    reactions: ['redirect-attack'],
+    behaviour: 'brute',
+    sprite: 'goblin-boss',
+    text: 'Multiattack. The goblin makes two attacks, using Scimitar or Shortbow in any combination. Nimble Escape. The goblin takes the Disengage or Hide action as a Bonus Action. Redirect Attack (Reaction). When a creature the goblin can see makes an attack roll against it, the goblin chooses a Small or Medium ally within 5 feet of itself. The goblin and that ally swap places, and the ally becomes the target of the attack instead.',
     source: 'SRD 5.2.1',
   },
 ];
