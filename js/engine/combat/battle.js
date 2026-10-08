@@ -19,6 +19,10 @@
 //   deathSaves   { successes, failures }
 //   log          [{ round, text, roll, damage }]: everything that happened, in order
 //   outcome      null while fighting, then 'victory' or 'defeat'; xp: earned on victory
+//   surprise     true if the hero caught the foes unawares (they rolled Initiative with
+//                Disadvantage)
+//   hymn         for an encounter with a hymn: { singing, risen } (see encounters.js)
+// A foe that flees the fight is marked escaped, and its hp set to 0 so it no longer counts.
 
 import { encounters } from '../../../data/campaign/encounters.js';
 import { monsters } from '../../../data/srd/monsters.js';
@@ -27,7 +31,7 @@ import { rollDice } from '../rules/dice.js';
 import { armorClass, findClass, hasFeature, initiative as heroInitiative, speed as heroSpeed } from '../character/sheet.js';
 import { heal, featureUsesLeft, maxHp, spendFeature, spendSlot } from '../character/resources.js';
 import { hasItem, removeItem } from '../character/inventory.js';
-import { feetBetween, isAdjacent, key, parseMap, reachableSquares, squaresBetween, stepCost } from './grid.js';
+import { feetBetween, isAdjacent, isStandable, key, parseMap, reachableSquares, squaresBetween, stepCost } from './grid.js';
 import { encounterRows } from '../world/dungeons.js';
 import {
   attackRoll,
@@ -71,6 +75,7 @@ export function hpOf(game, c) {
 
 const upright = (game, c) => (c.side === 'hero' ? game.battle.heroState === 'up' : c.hp > 0);
 const hasEffect = (battle, id, kind) => battle.effects.some((e) => e.target === id && e.kind === kind);
+const STEPS_AROUND = [[0, -1], [1, 0], [0, 1], [-1, 0], [-1, -1], [1, -1], [1, 1], [-1, 1]];
 
 // The Prone condition (SRD 5.2.1): crawling costs extra, standing up costs half your Speed,
 // your attacks have Disadvantage, and attacks against you have Advantage from within 5 feet
@@ -105,7 +110,9 @@ function log(game, text, extra = {}) {
 // ---- Starting ----
 
 // Starts a fight. choiceIndex: the story choice that started it, taken again when it ends.
-export function startBattle(game, encounterId, choiceIndex) {
+// surprise: the hero caught the foes unawares (SRD 5.2.1, "Surprise": they roll Initiative
+// with Disadvantage).
+export function startBattle(game, encounterId, choiceIndex, { surprise = false } = {}) {
   const encounter = findEncounter(encounterId);
   if (!encounter) throw new Error(`Unknown encounter: ${encounterId}`);
   const counts = {};
@@ -134,6 +141,8 @@ export function startBattle(game, encounterId, choiceIndex) {
     log: [],
     outcome: null,
     xp: 0,
+    surprise,
+    hymn: encounter.hymn ? { singing: true, risen: false } : null,
   };
   rollInitiative(game);
   beginTurn(game);
@@ -151,12 +160,14 @@ function rollInitiative(game) {
         ? heroInitiative(game.character).parts.map((p) => ({ ...p, source: 'Initiative' }))
         : [{ label: 'Initiative', value: findMonster(c.monsterId).initiative, source: c.name }];
     const advantage = c.side === 'hero' && hasFeature(game.character, 'remarkable-athlete') ? ['Remarkable Athlete'] : [];
-    const roll = d20Test({ rng: game.rng, kind: 'check', label: 'Initiative', modifiers, advantage });
+    const disadvantage = c.side === 'enemy' && battle.surprise ? ['Surprised'] : [];
+    const roll = d20Test({ rng: game.rng, kind: 'check', label: 'Initiative', modifiers, advantage, disadvantage });
     log(game, `${c.side === 'hero' ? 'You roll' : `${c.name} rolls`} Initiative.`, { roll });
     return { id: c.id, total: roll.total, hero: c.side === 'hero' };
   });
   results.sort((a, b) => b.total - a.total || Number(b.hero) - Number(a.hero));
   battle.order = results.map((r) => r.id);
+  if (battle.surprise) log(game, 'You catch them by surprise.');
   const first = combatantById(battle, battle.order[0]);
   log(game, `${first.side === 'hero' ? 'You go' : `${first.name} goes`} first.`);
 }
@@ -185,9 +196,66 @@ function advanceTurn(game) {
       battle.turn = 0;
       battle.round += 1;
       log(game, `Round ${battle.round}.`);
+      hymnRises(game);
     }
   } while (currentCombatant(battle).side === 'enemy' && currentCombatant(battle).hp <= 0);
   beginTurn(game);
+}
+
+// ---- A hymn (the Ashen Choir) ----
+
+// The monster singing the encounter's hymn, or null.
+function singerOf(battle) {
+  const hymn = findEncounter(battle.encounterId).hymn;
+  return hymn ? enemies(battle).find((c) => c.monsterId === hymn.singer) || null : null;
+}
+
+// At the start of the hymn's round, if the singing hasn't been stopped, the monster rises.
+function hymnRises(game) {
+  const battle = game.battle;
+  const hymn = findEncounter(battle.encounterId).hymn;
+  if (!battle.hymn || !battle.hymn.singing || battle.round < hymn.round) return;
+  const monster = findMonster(hymn.rises.monster);
+  const blocked = blockedFor(game, { side: 'enemy' });
+  const map = battleMap(battle);
+  const spot = [hymn.rises.pos, ...STEPS_AROUND.map(([dx, dy]) => ({ x: hymn.rises.pos.x + dx, y: hymn.rises.pos.y + dy }))].find(
+    (pos) => isStandable(map, pos) && !blocked(pos),
+  );
+  battle.hymn = { singing: false, risen: true };
+  if (!spot) return;
+  const count = battle.combatants.filter((c) => c.monsterId === monster.id).length + 1;
+  const risen = { id: `${monster.id}-${count}`, side: 'enemy', name: `${monster.name} ${count}`, monsterId: monster.id, pos: { ...spot }, hp: monster.hp.average, maxHp: monster.hp.average };
+  battle.combatants.push(risen);
+  battle.order.push(risen.id);
+  log(game, `The hymn swells to its end, and ${risen.name} drags itself up out of the bones!`);
+}
+
+// Damage makes the singer save to keep singing: Constitution, DC 10 or half the damage.
+function hymnHurt(game, singer, taken) {
+  const battle = game.battle;
+  if (!battle.hymn || !battle.hymn.singing || singer !== singerOf(battle)) return;
+  if (singer.hp <= 0) {
+    battle.hymn.singing = false;
+    log(game, 'The hymn dies with the singer.');
+    return;
+  }
+  const dc = Math.max(10, Math.floor(taken / 2));
+  const save = monsterSave(game.rng, findMonster(singer.monsterId), 'constitution', dc);
+  if (save.success) {
+    log(game, `${singer.name} winces, but keeps singing.`, { roll: save });
+  } else {
+    battle.hymn.singing = false;
+    log(game, `${singer.name} chokes on a note: the hymn breaks off!`, { roll: save });
+  }
+}
+
+// What the fight is about beyond winning it, for the battle screen, or ''.
+export function objectiveText(battle) {
+  const hymn = findEncounter(battle.encounterId).hymn;
+  if (!hymn || !battle.hymn) return '';
+  if (battle.hymn.risen) return 'The hymn is finished.';
+  if (!battle.hymn.singing) return 'The hymn is broken. No more of the dead will rise here.';
+  return `The hymn: unless the singer is stopped, a second ${findMonster(hymn.rises.monster).name} rises at the start of round ${hymn.round}. Hurting the singer may break it.`;
 }
 
 // Plays every enemy turn (and a downed hero's death saves) until the hero can act or the
@@ -485,8 +553,10 @@ function performAttack(game, attacker, target, option) {
   const how = option.source === 'spell' ? `${option.name} hits ${whom}` : `${who} hit${you ? '' : 's'} ${whom} with ${option.name}`;
   const savaged = damage.savaged ? ' (Savage Attacker: rolled twice, kept the better)' : '';
   const improved = roll.criticalHit && roll.natural < 20 ? 'Critical hit (Improved Critical)! ' : '';
-  log(game, `${improved || (critical ? 'Critical hit! ' : '')}${how}: ${damageText(damage, option.damage.dice)} damage${savaged}.`, { roll });
-  applyDamage(game, target, damage.total, { type: damage.type, critical });
+  const plus = option.damage.plus || null;
+  const plusText = plus ? ` plus ${plus.amount} ${plus.type}` : '';
+  log(game, `${improved || (critical ? 'Critical hit! ' : '')}${how}: ${damageText(damage, option.damage.dice)} damage${plusText}${savaged}.`, { roll });
+  applyDamage(game, target, damage.total, { type: damage.type, critical, plus });
   if (option.rider && target.hp > 0) addRider(game, attacker, target, option);
   if (option.onHit && !battle.outcome) onHitCondition(game, target, option.onHit);
   return { critical };
@@ -543,15 +613,51 @@ function addRider(game, attacker, target, option) {
   }
 }
 
-function applyDamage(game, target, amount, { type, critical = false }) {
+// A monster's immunities, vulnerabilities and resistances change the damage it takes.
+function monsterDamage(game, target, amount, type) {
+  const monster = findMonster(target.monsterId);
+  if ((monster.immunities || []).includes(type)) {
+    log(game, `${target.name} is immune to ${type} damage.`);
+    return 0;
+  }
+  if ((monster.vulnerabilities || []).includes(type)) {
+    log(game, `${target.name} is vulnerable to ${type} damage: ${amount} becomes ${amount * 2}.`);
+    return amount * 2;
+  }
+  if ((monster.resistances || []).includes(type)) {
+    log(game, `${target.name} resists ${type} damage: ${amount} becomes ${Math.floor(amount / 2)}.`);
+    return Math.floor(amount / 2);
+  }
+  return amount;
+}
+
+// Damage of one type, plus any flat extra of another type (plus: { amount, type }).
+function applyDamage(game, target, amount, { type, critical = false, plus = null }) {
   const battle = game.battle;
   if (target.side === 'enemy') {
-    target.hp = Math.max(0, target.hp - amount);
+    if (target.hp <= 0) return;
+    const monster = findMonster(target.monsterId);
+    const taken = monsterDamage(game, target, amount, type) + (plus ? monsterDamage(game, target, plus.amount, plus.type) : 0);
+    // Undead Fortitude: a Constitution save (DC 5 + the damage) to stay up at 1 Hit Point,
+    // unless the damage is Radiant or from a Critical Hit.
+    if (taken >= target.hp && (monster.traits || []).includes('undead-fortitude') && type !== 'radiant' && !critical) {
+      const save = monsterSave(game.rng, monster, 'constitution', 5 + taken);
+      if (save.success) {
+        target.hp = 1;
+        log(game, `${target.name} should fall, but doesn't: Undead Fortitude leaves it at 1 Hit Point.`, { roll: save });
+        hymnHurt(game, target, taken);
+        return;
+      }
+      log(game, `Undead Fortitude fails ${target.name}.`, { roll: save });
+    }
+    target.hp = Math.max(0, target.hp - taken);
     if (target.hp === 0) log(game, `${target.name} falls.`);
+    if (taken > 0) hymnHurt(game, target, taken);
     return;
   }
-  const taken = damageAfterResistance(amount, type, heroResistances(game.character));
-  if (taken < amount) log(game, `You resist ${type} damage: you take ${taken}.`);
+  const resisted = heroResistances(game.character);
+  const taken = damageAfterResistance(amount, type, resisted) + (plus ? damageAfterResistance(plus.amount, plus.type, resisted) : 0);
+  if (taken < amount + (plus ? plus.amount : 0)) log(game, `You resist some of the damage: you take ${taken}.`);
   if (battle.heroState === 'up') {
     const overflow = taken - game.hp;
     game.hp = Math.max(0, game.hp - taken);
@@ -693,18 +799,27 @@ export function heroDrinkPotion(game) {
 // Each monster fights to its behaviour profile (data/srd/monsters.js):
 //   brute       closes in and attacks; throws or shoots only when it can't reach
 //   skirmisher  shoots when it can't reach you this turn
-// A Prone monster stands up first. The foes so far don't attack a hero who's down: each
-// encounter says what they do instead (its whileHeroDown line).
+//   coward      fights like a brute, but flees once Bloodied (at half its Hit Points or
+//               fewer) if the encounter has a way out (its escape squares)
+// A Prone monster stands up first. A monster singing a hymn does nothing but sing. The foes
+// so far don't attack a hero who's down: each encounter says what they do instead (its
+// whileHeroDown line).
 function enemyTurn(game, c) {
   const battle = game.battle;
   const monster = findMonster(c.monsterId);
   const hero = heroCombatant(battle);
+  const encounter = findEncounter(battle.encounterId);
   if (battle.heroState !== 'up') {
-    const line = findEncounter(battle.encounterId).whileHeroDown || '{name} waits.';
+    const line = encounter.whileHeroDown || '{name} waits.';
     log(game, line.replace('{name}', c.name));
     return;
   }
   if (isProne(battle, c.id) && speedOf(game, c) > 0) standUp(game, c);
+  if (battle.hymn && battle.hymn.singing && c === singerOf(battle)) {
+    log(game, `${c.name} sings on, eyes closed, and the bones on the floor twitch in time.`);
+    return;
+  }
+  if (monster.behaviour === 'coward' && encounter.escape && c.hp <= c.maxHp / 2) return flee(game, c, encounter.escape);
   const options = monsterAttackOptions(monster);
   const melee = options.find((o) => o.how === 'melee');
   const ranged = options.find((o) => o.how === 'ranged');
@@ -737,13 +852,33 @@ function enemyTurn(game, c) {
   return checkEnd(game);
 }
 
+// A Bloodied coward runs for the nearest way out, Dashing. If it gets there, it's gone.
+function flee(game, c, exits) {
+  const battle = game.battle;
+  battle.turnState.movementLeft += speedOf(game, c);
+  const reach = reachableSquares(battleMap(battle), c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling: isProne(battle, c.id) });
+  const steps = [...reach.values()];
+  const out = steps.filter((s) => exits.some((e) => e.x === s.pos.x && e.y === s.pos.y)).sort((a, b) => a.cost - b.cost)[0];
+  const nearest = (s) => Math.min(...exits.map((e) => squaresBetween(s.pos, e)));
+  const toward = out || steps.sort((a, b) => nearest(a) - nearest(b) || a.cost - b.cost)[0];
+  log(game, `${c.name} turns and runs!`);
+  if (toward && toward.path.length) moveAlong(game, c, toward.path);
+  if (c.hp > 0 && exits.some((e) => e.x === c.pos.x && e.y === c.pos.y)) {
+    c.escaped = true;
+    c.hp = 0;
+    log(game, `${c.name} flees into the dark and is gone.`);
+  }
+  return checkEnd(game);
+}
+
 // ---- Ending ----
 
 function checkEnd(game) {
   const battle = game.battle;
   if (battle.outcome) return;
   if (enemies(battle).every((c) => c.hp <= 0)) {
-    battle.xp = enemies(battle).reduce((sum, c) => sum + findMonster(c.monsterId).xp, 0);
+    // Foes that fled are worth nothing.
+    battle.xp = enemies(battle).filter((c) => !c.escaped).reduce((sum, c) => sum + findMonster(c.monsterId).xp, 0);
     log(game, `Victory! The fight is over. (${battle.xp} XP)`);
     endBattle(game, 'victory');
   }
@@ -759,7 +894,8 @@ export function finishBattle(game) {
   const battle = game.battle;
   if (!battle || !battle.outcome) throw new Error('The fight is not over yet.');
   if (battle.outcome === 'victory') game.xp += battle.xp;
-  game.lastBattle = { encounterId: battle.encounterId, outcome: battle.outcome };
+  const escaped = enemies(battle).filter((c) => c.escaped).map((c) => c.monsterId);
+  game.lastBattle = { encounterId: battle.encounterId, outcome: battle.outcome, escaped };
   game.battle = null;
   return { outcome: battle.outcome, choiceIndex: battle.choiceIndex };
 }

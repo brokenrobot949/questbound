@@ -120,10 +120,10 @@ export function makeChoice(game, choice) {
 // A choice tagged #combat:encounter-id starts a fight instead of running on. The story waits
 // at the same choice until the fight ends (see continueAfterBattle).
 export function startFight(game, choice) {
-  const encounterId = parseTags(choice.tags).combat;
+  const { combat: encounterId, surprise } = parseTags(choice.tags);
   if (!encounterId) throw new Error('That choice does not start a fight');
   settleSeen(game);
-  return startBattle(game, encounterId, choice.index);
+  return startBattle(game, encounterId, choice.index, { surprise });
 }
 
 // Once the player has seen how the fight ended: banks its XP, then takes the story choice

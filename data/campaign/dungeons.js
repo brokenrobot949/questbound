@@ -25,6 +25,12 @@ const warrenLegend = {
   c: { terrain: 'obstacle', tile: 'cave-floor', decor: 'crates' },
   T: { terrain: 'obstacle', tile: 'cave-floor', decor: 'throne' },
   f: { terrain: 'floor', tile: 'cave-floor', decor: 'furs' },
+  // The breach: dressed stone, part of the old barrow tunnels.
+  S: { terrain: 'wall', wall: 'stone' },
+  z: { terrain: 'floor', tile: 'crypt-floor' },
+  n: { terrain: 'floor', tile: 'crypt-floor', decor: 'bones' },
+  k: { terrain: 'floor', tile: 'crypt-floor', decor: 'bone-pile' },
+  B: { terrain: 'obstacle', tile: 'crypt-floor', decor: 'bier' },
 };
 
 export const dungeons = [
@@ -61,6 +67,22 @@ export const dungeons = [
       '#f.....#',
       '#..T..c#',
       '#####..#',
+      // The lower warren (rows 24–30): the goblins' deep halls, where the dead dig.
+      '###....#',
+      '#.....=#',
+      '#.=....#',
+      '#....=.#',
+      '#=.....#',
+      '###..###',
+      // The breach (rows 30–37): the warren breaks into a barrow crypt. Its far door leads on
+      // into the barrow tunnels.
+      'SSzzzzSS',
+      'SzzzzzzS',
+      'SnzzzkzS',
+      'SzzzBzzS',
+      'SnzzzzzS',
+      'SzzzzzzS',
+      'SSSzzSSS',
     ],
     legend: warrenLegend,
     rooms: [
@@ -68,6 +90,14 @@ export const dungeons = [
       { id: 'pit', name: 'The pit passage', rows: [5, 11], entry: { x: 3, y: 6 }, exits: { larder: [{ x: 2, y: 11 }, { x: 3, y: 11 }] } },
       { id: 'larder', name: 'The larder', rows: [11, 16], entry: { x: 3, y: 12 }, exits: { hall: [{ x: 3, y: 16 }, { x: 4, y: 16 }] } },
       { id: 'hall', name: 'Nettle’s hall', rows: [16, 24], entry: { x: 3, y: 17 }, exits: { lower: [{ x: 5, y: 24 }, { x: 6, y: 24 }] } },
+      {
+        id: 'lower',
+        name: 'The lower warren',
+        rows: [24, 30],
+        entry: { x: 5, y: 25 },
+        exits: { hall: [{ x: 5, y: 24 }, { x: 6, y: 24 }], breach: [{ x: 3, y: 30 }, { x: 4, y: 30 }] },
+      },
+      { id: 'breach', name: 'The breach', rows: [30, 37], entry: { x: 3, y: 31 }, exits: { lower: [{ x: 3, y: 30 }, { x: 4, y: 30 }] } },
     ],
     source: 'original',
   },

@@ -7,6 +7,8 @@ INCLUDE act-1/ch1-bramblegate.ink
 INCLUDE act-1/ch1-mill.ink
 INCLUDE act-1/ch1-quarry-road.ink
 INCLUDE act-1/ch1-warren.ink
+INCLUDE act-1/ch1-warren-depths.ink
+INCLUDE act-1/ch1-return.ink
 
 // Where play begins: Chapter 1, on the road to Bramblegate.
 -> ch1_arrival

@@ -35,10 +35,11 @@ export async function showBattle({ container, game, onSave, onDone }) {
   const canvas = el('canvas', 'battle-grid');
   canvas.setAttribute('role', 'img');
   const help = el('p', 'battle-help');
+  const objective = el('p', 'battle-objective');
   const controls = el('div', 'battle-controls');
   const logList = el('ol', 'battle-log');
   logList.setAttribute('aria-live', 'polite');
-  panel.append(header, order, canvas, help, controls, logList);
+  panel.append(header, order, objective, canvas, help, controls, logList);
   container.replaceChildren(panel);
 
   const timer = reduceMotion
@@ -106,12 +107,14 @@ export async function showBattle({ container, game, onSave, onDone }) {
       el('span', 'battle-round', `Round ${battle.round}`),
       el('span', 'battle-hp', `HP ${game.hp}/${maxHp(game.character)}`),
     );
+    objective.textContent = fight.objectiveText(battle);
     order.replaceChildren(
       ...battle.order.map((id) => {
         const c = fight.combatantById(battle, id);
         const down = c.side === 'enemy' ? c.hp <= 0 : battle.heroState !== 'up';
         const name = c.side === 'hero' ? 'You' : c.name;
-        const label = !down && fight.isProne(battle, c.id) ? `${name} (Prone)` : name;
+        let label = !down && fight.isProne(battle, c.id) ? `${name} (Prone)` : name;
+        if (c.escaped) label = `${name} (fled)`;
         const item = el('li', `battle-order-entry${c === current ? ' is-current' : ''}${down ? ' is-down' : ''}`, label);
         return item;
       }),
@@ -270,7 +273,7 @@ export async function showBattle({ container, game, onSave, onDone }) {
 
     // Creatures: the fallen first, so the standing are drawn on top.
     const hero = fight.heroCombatant(battle);
-    const foes = fight.enemies(battle).sort((a, b) => (a.hp > 0) - (b.hp > 0));
+    const foes = fight.enemies(battle).filter((c) => !c.escaped).sort((a, b) => (a.hp > 0) - (b.hp > 0));
     for (const foe of foes) {
       const sprite = sprites[findMonsterSprite(foe)];
       // The fallen lie faded on their side; the Prone lie on their side.

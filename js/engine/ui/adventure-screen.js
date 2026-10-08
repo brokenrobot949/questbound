@@ -196,7 +196,7 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
       if (tags.check) card.append(el('span', 'choice-tag', checkLabel(tags.check)));
       if (tags.spell) card.append(el('span', 'choice-tag', `Spell · ${spellName(tags.spell)}`));
       if (tags.buy) card.append(el('span', 'choice-tag', `Buy · ${moneyText(priceOf(tags.buy))}`));
-      if (tags.combat) card.append(el('span', 'choice-tag is-fight', fightLabel(tags.combat)));
+      if (tags.combat) card.append(el('span', 'choice-tag is-fight', `${fightLabel(tags.combat)}${tags.surprise ? ' · Surprise attack' : ''}`));
       // Only the hero's own Drive is pointed out: that's the choice that earns Inspiration.
       if (tags.drive && tags.drive === game.character.drive) {
         card.append(el('span', 'choice-tag is-drive', `★ Your Drive · ${findDrive(tags.drive).name}`));
@@ -396,7 +396,7 @@ function checkLabel(check) {
 // (data/campaign/encounters.js), so the player knows what they're walking into.
 function fightLabel(encounterId) {
   const encounter = findEncounter(encounterId);
-  const rating = encounter ? encounter.difficulty.split(/[\s:(]/)[0] : '';
+  const rating = encounter ? encounter.difficulty.split(/[\s:(,]/)[0] : '';
   return rating ? `Fight · ${rating}` : 'Fight';
 }
 

@@ -6,6 +6,8 @@
 //   #drive:wealth                 the choice fits that Drive; the card says so if it's the hero's
 //   #buy:torch                    the choice buys that item; the card shows the price
 //   #combat:mill-scavengers       the choice starts that fight; its content runs after it
+//   #surprise                     with #combat: the hero strikes first, unseen; the foes roll
+//                                 Initiative with Disadvantage
 //   #go:larder                    the choice walks to that room of the dungeon you're in; the
 //                                 card says so, and its doorway lights up on the map to tap
 // Tags on a line of text:
@@ -15,7 +17,7 @@
 //                                 dungeons.js); the map shows it. #room:none leaves the dungeon.
 
 export function parseTags(tags) {
-  const parsed = { check: null, spell: null, location: null, time: null, drive: null, buy: null, combat: null, go: null, room: null };
+  const parsed = { check: null, spell: null, location: null, time: null, drive: null, buy: null, combat: null, surprise: false, go: null, room: null };
   for (const tag of tags || []) {
     const colon = tag.indexOf(':');
     const key = (colon < 0 ? tag : tag.slice(0, colon)).trim();
@@ -35,6 +37,8 @@ export function parseTags(tags) {
       parsed.buy = value;
     } else if (key === 'combat') {
       parsed.combat = value;
+    } else if (key === 'surprise') {
+      parsed.surprise = true;
     } else if (key === 'go') {
       parsed.go = value;
     } else if (key === 'room') {

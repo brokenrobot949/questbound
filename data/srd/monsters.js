@@ -17,9 +17,17 @@
 //   multiattack     how many attacks it makes with its action (1 if not given)
 //   reactions       e.g. 'redirect-attack' (when attacked, swap places with a Small or Medium
 //                   ally within 5 feet, who becomes the target instead)
+//   immunities      damage types it takes no damage from; vulnerabilities: double damage;
+//   resistances     half damage
+//   An attack's damage can carry plus: { amount, type }: a flat extra of another type, as in
+//                   "3 (1d4 + 1) Slashing damage plus 1 Necrotic damage"
+//   'undead-fortitude' (trait): when damage drops it to 0 Hit Points, a Constitution save
+//                   (DC 5 + the damage) leaves it at 1 instead, unless the damage is Radiant or
+//                   from a Critical Hit
 //   bonusActions    e.g. 'nimble-escape' (Disengage or Hide as a Bonus Action)
 //   behaviour       how it fights (original): 'brute' charges the nearest foe; 'skirmisher'
-//                   prefers its ranged attack when it can't reach you
+//                   prefers its ranged attack when it can't reach you; 'coward' fights like a
+//                   brute but flees once Bloodied, if the fight has a way out
 //   sprite          which DawnLike sprite draws it (see data/campaign/sprites.js)
 
 export const monsters = [
@@ -125,6 +133,76 @@ export const monsters = [
     behaviour: 'brute',
     sprite: 'goblin-boss',
     text: 'Multiattack. The goblin makes two attacks, using Scimitar or Shortbow in any combination. Nimble Escape. The goblin takes the Disengage or Hide action as a Bonus Action. Redirect Attack (Reaction). When a creature the goblin can see makes an attack roll against it, the goblin chooses a Small or Medium ally within 5 feet of itself. The goblin and that ally swap places, and the ally becomes the target of the attack instead.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'zombie',
+    name: 'Zombie',
+    size: 'medium',
+    type: 'Undead',
+    ac: 8,
+    hp: { average: 15, dice: '2d8 + 6' },
+    speed: 20,
+    abilities: { strength: 13, dexterity: 6, constitution: 16, intelligence: 3, wisdom: 6, charisma: 5 },
+    saves: { strength: 1, dexterity: -2, constitution: 3, intelligence: -4, wisdom: 0, charisma: -3 },
+    initiative: -2,
+    immunities: ['poison'],
+    darkvision: 60,
+    passivePerception: 8,
+    cr: '1/4',
+    xp: 50,
+    traits: ['undead-fortitude'],
+    attacks: [{ id: 'slam', name: 'Slam', kind: 'melee', bonus: 3, reach: 5, damage: { dice: '1d8', bonus: 1, type: 'bludgeoning' } }],
+    behaviour: 'brute',
+    sprite: 'zombie',
+    text: 'Undead Fortitude. If damage reduces the zombie to 0 Hit Points, it makes a Constitution saving throw (DC 5 plus the damage taken) unless the damage is Radiant or from a Critical Hit. On a successful save, the zombie drops to 1 Hit Point instead.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'skeleton',
+    name: 'Skeleton',
+    size: 'medium',
+    type: 'Undead',
+    ac: 14,
+    hp: { average: 13, dice: '2d8 + 4' },
+    speed: 30,
+    abilities: { strength: 10, dexterity: 16, constitution: 15, intelligence: 6, wisdom: 8, charisma: 5 },
+    saves: { strength: 0, dexterity: 3, constitution: 2, intelligence: -2, wisdom: -1, charisma: -3 },
+    initiative: 3,
+    vulnerabilities: ['bludgeoning'],
+    immunities: ['poison'],
+    darkvision: 60,
+    passivePerception: 9,
+    cr: '1/4',
+    xp: 50,
+    attacks: [
+      { id: 'shortsword', name: 'Shortsword', kind: 'melee', bonus: 5, reach: 5, damage: { dice: '1d6', bonus: 3, type: 'piercing' } },
+      { id: 'shortbow', name: 'Shortbow', kind: 'ranged', bonus: 5, range: [80, 320], damage: { dice: '1d6', bonus: 3, type: 'piercing' } },
+    ],
+    behaviour: 'brute',
+    sprite: 'skeleton',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'cultist',
+    name: 'Cultist',
+    size: 'medium',
+    type: 'Humanoid',
+    ac: 12, // Leather Armor
+    hp: { average: 9, dice: '2d8' },
+    speed: 30,
+    abilities: { strength: 11, dexterity: 12, constitution: 10, intelligence: 10, wisdom: 11, charisma: 10 },
+    saves: { strength: 0, dexterity: 1, constitution: 0, intelligence: 0, wisdom: 2, charisma: 0 },
+    initiative: 1,
+    skills: { deception: 2, religion: 2 },
+    passivePerception: 10,
+    cr: '1/8',
+    xp: 25,
+    attacks: [
+      { id: 'ritual-sickle', name: 'Ritual Sickle', kind: 'melee', bonus: 3, reach: 5, damage: { dice: '1d4', bonus: 1, type: 'slashing', plus: { amount: 1, type: 'necrotic' } } },
+    ],
+    behaviour: 'coward',
+    sprite: 'cultist',
     source: 'SRD 5.2.1',
   },
 ];

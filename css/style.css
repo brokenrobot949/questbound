@@ -2062,3 +2062,16 @@ h3.debug-heading {
 .choice-tag.is-go {
   color: var(--good);
 }
+
+.battle-objective {
+  margin: 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--accent);
+  font-family: var(--font-ui);
+  font-size: var(--size-ui);
+  color: var(--accent);
+}
+
+.battle-objective:empty {
+  display: none;
+}

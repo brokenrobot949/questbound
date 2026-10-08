@@ -1,4 +1,5 @@
-// Chapter 1 · Bramblegate, beat 5: Brackenhollow warren, rooms 1–4 (docs/STORY.md).
+// Chapter 1 · Bramblegate, beat 5: Brackenhollow warren, rooms 1–4 (docs/STORY.md). Rooms 5–6
+// are in ch1-warren-depths.ink.
 //
 // The slice's dungeon, explored room by room on the map (#room tags; #go choices light up
 // a doorway to tap). The lookout at the quarry mouth (sneak, talk or fight); the hidden pit
@@ -301,8 +302,8 @@ On a throne built from quarry stone and three different stolen chairs sits an ol
 // ---- The way down ----
 
 = lower_door
-// The end of what's written so far: the lower warren and the breach come next.
 At the back of the hall, a barricade of crates and broken furniture blocks a passage that slopes steeply down into the dark. { has_flag("goblins_spared"): Two of Nettle's warriors drag it aside for you, and step well back. | You drag it aside yourself. }
 
 From somewhere below comes a sound like spades in wet earth: slow, steady, and tireless.
--> END
+* [Go down into the dark #go:lower]
+    -> ch1_warren_depths

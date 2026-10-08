@@ -12,6 +12,12 @@
 //   hero         where the hero starts; monsters: each one and where it starts ({ x, y }),
 //                with a name if it has its own (Mother Nettle)
 //   onlookers    figures who watch but don't fight: { decor, pos }; they stand in the way
+//   hymn         a monster sings while it fights (the Ashen Choir): { singer: monster id,
+//                rises: { monster, pos }, round }. Unless the singing stops first, the
+//                monster rises at pos at the start of that round. Damage makes the singer
+//                save (Constitution, DC 10 or half the damage) or the hymn breaks off.
+//   escape       squares a fleeing monster can leave the fight by (it flees once Bloodied,
+//                at half its Hit Points or fewer)
 //   whileHeroDown  what each monster does on its turn while the hero lies at 0 Hit Points
 //                ({name} is the monster's name). These foes don't finish off a fallen hero:
 //                the hero's death saves decide it.
@@ -129,6 +135,38 @@ export const encounters = [
       { monster: 'goblin-minion', pos: { x: 6, y: 2 } },
     ],
     whileHeroDown: '{name} stands over you, jeering.',
+    source: 'original',
+  },
+  {
+    id: 'lower-dead',
+    name: 'The Dead in the Lower Warren',
+    difficulty: 'Moderate (150 XP budget for one level 2 hero; three Zombies are 150 XP)',
+    map: { dungeon: 'brackenhollow', room: 'lower' },
+    hero: { x: 5, y: 1 },
+    monsters: [
+      { monster: 'zombie', pos: { x: 1, y: 2 } },
+      { monster: 'zombie', pos: { x: 1, y: 4 } },
+      { monster: 'zombie', pos: { x: 2, y: 5 } },
+    ],
+    whileHeroDown: '{name} turns back to the wall and goes on digging.',
+    source: 'original',
+  },
+  {
+    id: 'breach-hymn',
+    name: 'The Hymn at the Breach',
+    difficulty: 'Low, rising to Moderate if the hymn raises a second Skeleton (a Cultist and a Skeleton are 75 XP, then 125; for one level 2 hero Low is 100 and Moderate 150)',
+    map: { dungeon: 'brackenhollow', room: 'breach' },
+    hero: { x: 3, y: 1 },
+    monsters: [
+      { monster: 'cultist', name: 'Choir Acolyte', pos: { x: 4, y: 5 } },
+      { monster: 'skeleton', pos: { x: 3, y: 3 } },
+    ],
+    hymn: { singer: 'cultist', rises: { monster: 'skeleton', pos: { x: 5, y: 3 } }, round: 3 },
+    escape: [
+      { x: 3, y: 7 },
+      { x: 4, y: 7 },
+    ],
+    whileHeroDown: '{name} stands over you, waiting for the hymn to finish.',
     source: 'original',
   },
 ];

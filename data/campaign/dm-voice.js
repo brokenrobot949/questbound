@@ -25,6 +25,8 @@ export const dmNotes = {
   alreadyInspired: 'That’s your Drive ({drive}) talking, though you already have Heroic Inspiration.',
   questStarted: 'New quest: {title}. It’s in your journal.',
   questUpdated: 'Journal: {title} updated.',
+  questFinished: 'Quest complete: {title}.',
+  coinsGained: 'You receive {coins}.',
   itemGained: 'You now have: {item}.',
   itemBought: 'Bought: {item}, for {cost}.',
   itemGone: 'Gone from your pack: {item}.',

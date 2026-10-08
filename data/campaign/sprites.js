@@ -6,6 +6,8 @@
 export const sheets = {
   player: ['assets/dawnlike/Characters/Player0.png', 'assets/dawnlike/Characters/Player1.png'],
   dog: ['assets/dawnlike/Characters/Dog0.png', 'assets/dawnlike/Characters/Dog1.png'],
+  undead: ['assets/dawnlike/Characters/Undead0.png', 'assets/dawnlike/Characters/Undead1.png'],
+  humanoid: ['assets/dawnlike/Characters/Humanoid0.png', 'assets/dawnlike/Characters/Humanoid1.png'],
   floor: ['assets/dawnlike/Objects/Floor.png'],
   wall: ['assets/dawnlike/Objects/Wall.png'],
   decor: ['assets/dawnlike/Objects/Decor0.png'],
@@ -20,6 +22,9 @@ export const sprites = {
   'goblin-warrior': { sheet: 'player', col: 0, row: 14 },
   wolf: { sheet: 'dog', col: 0, row: 1 },
   'goblin-boss': { sheet: 'player', col: 6, row: 14 },
+  zombie: { sheet: 'undead', col: 1, row: 0 },
+  skeleton: { sheet: 'undead', col: 0, row: 2 },
+  cultist: { sheet: 'humanoid', col: 4, row: 7 },
 };
 
 // Floor tiles and things that stand on them. alpha (0 to 1) draws a picture faded, and
@@ -45,6 +50,9 @@ export const tiles = {
   'goblin-onlooker': { sheet: 'player', col: 0, row: 14 },
   'goblin-archer-onlooker': { sheet: 'player', col: 4, row: 14 },
   'goblin-runt-onlooker': { sheet: 'player', col: 5, row: 14 },
+  'crypt-floor': { sheet: 'floor', col: 8, row: 22 },
+  bier: { sheet: 'decor', col: 6, row: 10 },
+  'bone-pile': { sheet: 'decor', col: 0, row: 13 },
 };
 
 // Walls join up with their neighbours. Each wall style is a block of tiles in DawnLike's

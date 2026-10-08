@@ -213,25 +213,39 @@ The epilogue then shows each town, faction, companion and your Bond, built from 
         - Or take the captain's way against the whole band, a fight the card marks as Deadly.
       - **Fate's Mercy in the warren:** losing a fight here, or dying in the pit, means waking tied up in Nettle's hall, robbed. She offers the bargain anyway, as the price of your life.
       - **Flags:** `goblins_spared` or `goblins_slain`.
-      - *It ends at the way down to the lower warren for now.*
-   5. **The lower warren:** two Zombies dig mindlessly at the walls (Moderate). Twist: they're digging *away* from you, and attack only if disturbed.
-   6. **The breach:** the warren breaks into ancient dressed stone, part of the barrow tunnels. A Choir acolyte (Cultist) sings a Skeleton to its feet. The fight's objective is to stop the hymn before a second Skeleton rises.
-      - **If you catch the acolyte:** he talks under Intimidation or Persuasion: "The Precentor will wake the Sleeping King. The miller works the gates."
-      - **If he escapes:** he drops his hymnal. Either way you get the hymnal: coronation hymns, a rough map of the barrow road and the Choir's sigil (`found_hymnal`).
-   - **Treasure:** the goblin hoard is shiny junk plus a Potion of Healing and a goblin-tooth charm (original trinket).
-6. **Back to Bramblegate.** Reeve Corbin pays.
-   - **Captain Varrow** approves or disapproves of how you handled the goblins, which sets the town's attitude.
-   - If you spared them, Nettle's band camps by the mill and trades (a later ally).
+   5. **The lower warren:** three Zombies dig at the far wall, keeping time with a hymn from somewhere below (Moderate: 150 XP for one level 2 hero; *was two Zombies*, which is only Low at level 2). Twist: they're digging *away* from you, and attack only if disturbed.
+      - **Your choices:** creep past (Stealth 10, worth their XP), or fall on them while their backs are turned (a surprise attack: they roll Initiative with Disadvantage).
+      - **Losing** is Fate's Mercy: you come to robbed. If you spared the goblins, one shows you a crawl-way past the dead.
+   6. **The breach:** the warren breaks into a barrow crypt of dressed stone, with crowns carved on the lintel. A Choir acolyte (Cultist) sings a Skeleton to its feet.
+      - **The objective:** stop the hymn before a second Skeleton rises at the start of round 3. He does nothing but sing, and every time he's hurt he makes a Constitution save (DC 10, or half the damage) or the hymn breaks off.
+      - **Creep close first** (Stealth 15) for a surprise attack.
+      - **He flees once Bloodied,** out through the crypt's far door.
+      - **If you catch the acolyte:** he talks under Intimidation or Persuasion: "The Precentor will wake the Sleeping King. The miller works the gates." Then, while your back is turned, something drags him off into the barrow tunnels.
+      - **If he escapes:** he leaves his hymnal behind.
+      - **Either way:**
+        - You get the hymnal: coronation hymns, a rough map of the barrow road and the Choir's sigil (`found_hymnal`, 25 XP).
+        - The diggers upstairs fall still once the hymn stops (`lower_dead_stilled`).
+        - The tunnel beyond is collapsed: the way to the barrow is the road on the map (Chapter 2).
+      - **Losing** is Fate's Mercy: he robs you and runs, but leaves the hymnal.
+   - **Back up to Nettle:** if you made the bargain, she pays: a Potion of Healing and a goblin-tooth charm (an original trinket that says her people know you). The bargain's done (100 XP). If you broke her band, the same things are in the hoard behind her empty throne.
+6. **Back to Bramblegate,** after dark.
+   - **Reeve Corbin pays half the bounty (25 gold) for ending the raids;** the other half when Garrick Dunn is home, so *The Missing Miller* stays open.
+   - **Captain Varrow** approves of a broken band (`varrow_approves`), or is wary of a goblin bargain but grudgingly impressed (`varrow_wary`). This sets the town's attitude later.
+   - If you spared them, Nettle's band is already camped by the mill (`goblins_at_mill`, a later ally).
    - **Morwen** reads the hymnal: "The Ashen Choir. They sing at funerals that aren't theirs."
-   - **Prior Crane** goes pale when he sees it (foreshadowing).
-   - **Long rest at the inn:** reach level 3, and choose a subclass (Champion or Evoker).
+   - **Prior Crane** goes pale at the map. With Insight 15 you see that he recognises it (`crane_knows_the_map`, foreshadowing).
+   - **Long rest at the inn:** the raids are over (a 150 XP milestone), which takes the main path to level 3 and a subclass (Champion or Evoker).
 7. **Lights on the hills.** *(End of the slice; a natural stopping point.)* From the inn window, pale lanterns move on the barrow hills. Lark knocks: "They're digging toward the Kings' Barrow."
 
 **Levels:** the first fights, the mill and the warren's first rooms take you to level 2, at the latest in the larder, before you face Nettle. Even a hero who passes no checks has 300 XP by then:
 - the cellar 25, the mill 50, the wolf 50 and the warren mouth 50;
 - the lookout 50, the pit 25 and the larder 50.
 
-The goblin bargain, the lower warren, the breach and the report take you to level 3. Quest and discovery XP fill the gap, so the fights stay few and good.
+The goblin bargain, the lower warren, the breach and the report take you to level 3. On the main path that's about 1,000 XP by the inn:
+- the bargain 200, the dead 150, the breach 75 to 125 and the hymnal 25;
+- Nettle's payment 100 and the inn 150.
+
+Fate's Mercy costs XP along the way, so a hero who lost fights may still be level 2 at the inn. Quest and discovery XP fill the gap, so the fights stay few and good.
 
 **Chapter 1 side content** (Phase 2):
 - **Too Many Cats** (side quest): the inn's cats keep vanishing. A Stirge nest in the loft. Funny, short, and a good first loot.

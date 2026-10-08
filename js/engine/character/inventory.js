@@ -1,20 +1,22 @@
 // Money and the hero's pack: what changes in play, so it lives on the game, not the character.
 //
 //   game.money       coins, counted in copper pieces (1 GP = 10 SP = 100 CP)
-//   game.inventory   [{ id, quantity }]: item ids from data/srd/equipment.js and armor.js
+//   game.inventory   [{ id, quantity }]: item ids from data/srd/equipment.js and armor.js,
+//                    and the story's own items in data/campaign/items.js
 //
 // Prices in the data are in coins ({ gp: 50 }); money is shown as gold, silver and copper.
 
 import { equipment } from '../../../data/srd/equipment.js';
 import { armor, shield } from '../../../data/srd/armor.js';
+import { items as storyItems } from '../../../data/campaign/items.js';
 import { findBackground, findClass } from './sheet.js';
 
-// Any item: armour, a Shield, or other equipment.
+// Any item: armour, a Shield, other equipment, or one of the story's own items.
 export function findItem(id) {
   if (id === shield.id) return { ...shield, category: 'shield' };
   const worn = armor.find((a) => a.id === id);
   if (worn) return { ...worn, category: 'armor', armorCategory: worn.category };
-  return equipment.find((e) => e.id === id) || null;
+  return equipment.find((e) => e.id === id) || storyItems.find((e) => e.id === id) || null;
 }
 
 export const COPPER_PER = { cp: 1, sp: 10, ep: 50, gp: 100, pp: 1000 };

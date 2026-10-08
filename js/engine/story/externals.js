@@ -9,9 +9,9 @@
 
 import { abilityCheck } from '../rules/ability-check.js';
 import { canCastSpell } from '../character/spells.js';
-import { addItem, buyItem, canAfford, findItem, hasItem, moneyText, removeItem } from '../character/inventory.js';
+import { addItem, buyItem, canAfford, COPPER_PER, findItem, hasItem, moneyText, removeItem } from '../character/inventory.js';
 import { findDrive } from '../character/creation.js';
-import { addDeed, findQuest, questNote, startQuest } from './journal.js';
+import { addDeed, findQuest, finishQuest, questNote, startQuest } from './journal.js';
 import { longRestRecovery } from '../character/resources.js';
 import { tacticalMind } from '../character/features.js';
 import { takeDamage } from '../character/hazards.js';
@@ -166,6 +166,10 @@ export function bindExternals(story, runtime) {
   //       { combat_won(): You stand over the goblins… - else: … }
   story.BindExternalFunction('combat_won', () => Boolean(runtime.game.lastBattle && runtime.game.lastBattle.outcome === 'victory'), false);
 
+  // foe_escaped(monster): true if a foe of that kind fled the last fight instead of falling,
+  // e.g. { foe_escaped("cultist"): He got away. }. monster is an id from data/srd/monsters.js.
+  story.BindExternalFunction('foe_escaped', (id) => Boolean(runtime.game.lastBattle && (runtime.game.lastBattle.escaped || []).includes(id)), false);
+
   // give_xp(n): the hero earns XP for a quest or discovery (fights give their own).
   story.BindExternalFunction(
     'give_xp',
@@ -193,6 +197,27 @@ export function bindExternals(story, runtime) {
       if (outcome === 'woke') note(game, dmNotes.cameRound);
       if (outcome === 'dead') note(game, dmNotes.fellDead);
       return outcome;
+    },
+    false,
+  );
+
+  // give_coins(gp): the hero is paid, in gold pieces, e.g. ~ give_coins(25)
+  story.BindExternalFunction(
+    'give_coins',
+    (gp) => {
+      if (!Number.isInteger(gp) || gp < 1) throw new Error(`give_coins needs a whole number of gold pieces, got ${gp}`);
+      runtime.game.money += gp * COPPER_PER.gp;
+      note(runtime.game, dmNotes.coinsGained, { coins: moneyText(gp * COPPER_PER.gp) });
+    },
+    false,
+  );
+
+  // finish_quest(id): marks a quest done in the journal, and tells the player.
+  story.BindExternalFunction(
+    'finish_quest',
+    (id) => {
+      finishQuest(runtime.game, id);
+      note(runtime.game, dmNotes.questFinished, { title: findQuest(id).title });
     },
     false,
   );

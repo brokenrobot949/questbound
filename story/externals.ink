@@ -47,6 +47,9 @@ EXTERNAL add_deed(text)
 EXTERNAL start_quest(id)
 EXTERNAL quest_note(id, text)
 
+// finish_quest(id): marks the quest done in the journal; the player is told.
+EXTERNAL finish_quest(id)
+
 // can_afford(item): true if the hero has the money for one of that item.
 // buy(item): pays for one and puts it in the pack. Tag the choice so the card shows the price:
 //   + {can_afford("torch")} [Buy a torch #buy:torch]
@@ -82,8 +85,16 @@ EXTERNAL take_damage(dice, type)
 //       }
 EXTERNAL combat_won()
 
+// foe_escaped(monster): true if a foe of that kind fled the last fight instead of falling,
+// e.g. { foe_escaped("cultist"): He got away. }. Add #surprise to a #combat choice when the
+// hero strikes first, unseen: the foes roll Initiative with Disadvantage.
+EXTERNAL foe_escaped(monster)
+
 // give_xp(n): the hero earns XP for a quest or discovery. Fights give their own XP.
 EXTERNAL give_xp(n)
 
 // lose_coins(): the hero's purse is gone (for Fate's Mercy: robbed while unconscious).
 EXTERNAL lose_coins()
+
+// give_coins(gp): the hero is paid, in gold pieces, e.g. ~ give_coins(25)
+EXTERNAL give_coins(gp)
