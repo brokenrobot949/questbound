@@ -288,6 +288,13 @@ test('Attack roll: a natural 20 hits whatever the AC, as a Critical Hit', () => 
   assertEqual([r.success, r.outcome, r.criticalHit], [true, 'hit', true]);
 });
 
+test('Attack roll: with Improved Critical a natural 19 is a Critical Hit too, but only then', () => {
+  const champion = d20Test({ rng: scriptedRng([19]), kind: 'attack', target: { type: 'AC', value: 30 }, criticalOn: 19 });
+  assertEqual([champion.success, champion.criticalHit, champion.automatic], [true, true, 'natural 19']);
+  const anyone = d20Test({ rng: scriptedRng([19]), kind: 'attack', target: { type: 'AC', value: 30 } });
+  assertEqual([anyone.success, anyone.criticalHit], [false, false]);
+});
+
 test('Attack roll: a natural 1 misses whatever the bonus', () => {
   const mods = [{ label: 'Bonus', value: 20, source: 'test' }];
   const r = d20Test({ rng: scriptedRng([1]), kind: 'attack', modifiers: mods, target: { type: 'AC', value: 5 } });

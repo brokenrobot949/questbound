@@ -17,7 +17,7 @@ export const dmVoice = {
 };
 
 // The DM's short notes in the story, when something lands in the journal or the pack.
-// {title}, {item} and {drive} are filled in by the game.
+// {title}, {item}, {drive}, {xp}, {level} and {hp} are filled in by the game.
 export const dmNotes = {
   inspirationFromDrive: 'That’s your Drive ({drive}) talking. You gain Heroic Inspiration.',
   inspirationFromRest: 'You wake ready for anything. Resourceful: you gain Heroic Inspiration.',
@@ -29,5 +29,16 @@ export const dmNotes = {
   xpGained: 'You gain {xp} XP.',
   coinsLost: 'Your purse is gone.',
   fightWon: 'Victory! You gain {xp} XP.',
+  levelUpNote: 'You are now level {level}. Your Hit Point maximum rises by {hp}.',
+  levelUpDeed: 'Reached level {level}.',
+  source: 'original',
+};
+
+// The DM marks a new level with a line of narration, by class ({level} is filled in).
+// "default" is for any class without its own line.
+export const levelUpVoice = {
+  fighter: 'Somewhere between the last fight and this quiet moment, your body learned something your mind is only now catching up with. Your stance is surer and your swing is quicker. You reach level {level}.',
+  wizard: 'Your notes, scrawled by candlelight and spattered with mud, suddenly make a new kind of sense. The shape of the magic feels less like a riddle and more like a tool. You reach level {level}.',
+  default: 'Everything you have survived has taught you something. You reach level {level}.',
   source: 'original',
 };

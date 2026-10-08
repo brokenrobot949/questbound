@@ -8,7 +8,9 @@
 //   round, order, turn         the round, combatant ids in initiative order, whose turn it is
 //   combatants   [{ id, side: 'hero' | 'enemy', name, pos: { x, y }, monsterId, hp, maxHp }]
 //                (the hero's Hit Points are game.hp)
-//   turnState    { movementLeft, action, bonus, disengaged, savageUsed } for the current turn
+//   turnState    { movementLeft, action, bonus, disengaged, savageUsed, surged, athleteMove }
+//                for the current turn: surged after Action Surge; athleteMove is the free
+//                move Remarkable Athlete gives straight after a Critical Hit (feet, or 0)
 //   effects      [{ kind, target, endsOn }]: 'dodging', 'slowed', 'no-reactions' or
 //                'no-healing', lasting until the start of endsOn's next turn
 //   reactionsUsed  ids that have used their reaction since their last turn
@@ -21,7 +23,7 @@ import { encounters } from '../../../data/campaign/encounters.js';
 import { monsters } from '../../../data/srd/monsters.js';
 import { d20Test } from '../rules/d20-test.js';
 import { rollDice } from '../rules/dice.js';
-import { armorClass, findClass, initiative as heroInitiative, speed as heroSpeed } from '../character/sheet.js';
+import { armorClass, findClass, hasFeature, initiative as heroInitiative, speed as heroSpeed } from '../character/sheet.js';
 import { heal, featureUsesLeft, maxHp, spendFeature, spendSlot } from '../character/resources.js';
 import { hasItem } from '../character/inventory.js';
 import { feetBetween, isAdjacent, key, parseMap, reachableSquares, squaresBetween } from './grid.js';
@@ -105,7 +107,8 @@ export function startBattle(game, encounterId, choiceIndex) {
   return game.battle;
 }
 
-// Everyone rolls Initiative; the highest goes first (the hero wins ties).
+// Everyone rolls Initiative; the highest goes first (the hero wins ties). A Champion's
+// Remarkable Athlete gives Advantage.
 function rollInitiative(game) {
   const battle = game.battle;
   const results = battle.combatants.map((c) => {
@@ -113,7 +116,8 @@ function rollInitiative(game) {
       c.side === 'hero'
         ? heroInitiative(game.character).parts.map((p) => ({ ...p, source: 'Initiative' }))
         : [{ label: 'Initiative', value: findMonster(c.monsterId).initiative, source: c.name }];
-    const roll = d20Test({ rng: game.rng, kind: 'check', label: 'Initiative', modifiers });
+    const advantage = c.side === 'hero' && hasFeature(game.character, 'remarkable-athlete') ? ['Remarkable Athlete'] : [];
+    const roll = d20Test({ rng: game.rng, kind: 'check', label: 'Initiative', modifiers, advantage });
     log(game, `${c.side === 'hero' ? 'You roll' : `${c.name} rolls`} Initiative.`, { roll });
     return { id: c.id, total: roll.total, hero: c.side === 'hero' };
   });
@@ -135,7 +139,7 @@ function beginTurn(game) {
   const c = currentCombatant(battle);
   battle.effects = battle.effects.filter((e) => e.endsOn !== c.id);
   battle.reactionsUsed = battle.reactionsUsed.filter((id) => id !== c.id);
-  battle.turnState = { movementLeft: speedOf(game, c), action: false, bonus: false, disengaged: false, savageUsed: false };
+  battle.turnState = { movementLeft: speedOf(game, c), action: false, bonus: false, disengaged: false, savageUsed: false, surged: false, athleteMove: 0 };
   if (c.side === 'hero' && battle.heroState === 'down') deathSave(game);
 }
 
@@ -177,6 +181,7 @@ function requireHeroTurn(game) {
 
 export function endHeroTurn(game) {
   requireHeroTurn(game);
+  game.battle.turnState.athleteMove = 0;
   log(game, 'You end your turn.');
   advanceTurn(game);
   runEnemyTurns(game);
@@ -194,26 +199,37 @@ function blockedFor(game, mover) {
   };
 }
 
+// Where the hero can move now. Squares within a Remarkable Athlete free move are marked
+// free: going there costs no movement and provokes no Opportunity Attacks.
 export function heroReachable(game) {
   if (!isHeroTurn(game)) return new Map();
-  const hero = heroCombatant(game.battle);
-  return reachableSquares(battleMap(game.battle), hero.pos, game.battle.turnState.movementLeft, blockedFor(game, hero));
+  const battle = game.battle;
+  const hero = heroCombatant(battle);
+  const map = battleMap(battle);
+  const squares = reachableSquares(map, hero.pos, battle.turnState.movementLeft, blockedFor(game, hero));
+  const free = battle.turnState.athleteMove || 0;
+  if (free > 0) {
+    for (const [at, step] of reachableSquares(map, hero.pos, free, blockedFor(game, hero))) squares.set(at, { ...step, free: true });
+  }
+  return squares;
 }
 
 export function heroMove(game, pos) {
   requireHeroTurn(game);
   const step = heroReachable(game).get(key(pos));
   if (!step || step.cost === 0) throw new Error("You can't reach that square this turn.");
-  moveAlong(game, heroCombatant(game.battle), step.path);
+  game.battle.turnState.athleteMove = 0;
+  moveAlong(game, heroCombatant(game.battle), step.path, { free: Boolean(step.free) });
 }
 
 // Moves one square at a time, provoking an Opportunity Attack from any foe whose reach the
-// mover leaves, unless the mover took the Disengage action.
-function moveAlong(game, mover, path) {
+// mover leaves, unless the mover took the Disengage action. A free move (Remarkable Athlete)
+// costs no movement and provokes nothing.
+function moveAlong(game, mover, path, { free = false } = {}) {
   const battle = game.battle;
   const map = battleMap(battle);
   for (const next of path) {
-    if (!battle.turnState.disengaged) {
+    if (!battle.turnState.disengaged && !free) {
       for (const foe of battle.combatants) {
         if (foe.side === mover.side || !upright(game, foe)) continue;
         if (battle.reactionsUsed.includes(foe.id) || hasEffect(battle, foe.id, 'no-reactions')) continue;
@@ -224,10 +240,11 @@ function moveAlong(game, mover, path) {
       }
     }
     const cost = map.cells[next.y][next.x].terrain === 'difficult' ? 10 : 5;
-    battle.turnState.movementLeft -= cost;
+    if (!free) battle.turnState.movementLeft -= cost;
     mover.pos = { ...next };
   }
-  log(game, mover.side === 'hero' ? 'You move.' : `${mover.name} moves.`);
+  if (free) log(game, 'You move, light on your feet (Remarkable Athlete).');
+  else log(game, mover.side === 'hero' ? 'You move.' : `${mover.name} moves.`);
 }
 
 function opportunityAttack(game, attacker, target) {
@@ -246,7 +263,7 @@ function attackConditions(game, attacker, target, option) {
   const advantage = [];
   const disadvantage = [];
   if (hasEffect(battle, target.id, 'dodging')) disadvantage.push(`${target.side === 'hero' ? 'You are' : `${target.name} is`} Dodging`);
-  if (option.how === 'ranged') {
+  if (option.how === 'ranged' || option.how === 'rays') {
     if (feetBetween(attacker.pos, target.pos) > option.range[0]) disadvantage.push('Long range');
     const foeNearby = battle.combatants.some((c) => c.side !== attacker.side && upright(game, c) && isAdjacent(c.pos, attacker.pos));
     if (foeNearby) disadvantage.push('An enemy is within 5 feet');
@@ -283,11 +300,14 @@ export function attackPreview(game, optionId, targetId) {
     preview.describe = `${target.name} makes a ${option.saveAbility} save against DC ${option.saveDc}`;
   } else if (option.how === 'darts') {
     preview.chance = 1;
-    preview.describe = 'Never misses';
+    preview.describe = `Never misses: ${option.darts} darts`;
   } else {
-    preview.chance = hitChance(bonus, acOf(game, target), mode);
-    preview.describe = `+${bonus} to hit against AC ${acOf(game, target)}`;
+    const criticalOn = option.criticalOn || 20;
+    preview.chance = hitChance(bonus, acOf(game, target), mode, criticalOn);
+    preview.describe = `${option.how === 'rays' ? `${option.rays} rays, each ` : ''}+${bonus} to hit against AC ${acOf(game, target)}`;
+    if (criticalOn < 20) preview.describe += ` · Critical Hit on ${criticalOn}–20`;
   }
+  if (option.potent) preview.describe += ` · half damage even on a ${option.how === 'save' ? 'save' : 'miss'} (Potent Cantrip)`;
   return preview;
 }
 
@@ -296,18 +316,32 @@ export function heroAttack(game, optionId, targetId) {
   const battle = game.battle;
   if (battle.turnState.action) throw new Error('You have already used your action this turn.');
   const option = heroAttackOptions(game).find((o) => o.id === optionId);
+  if (option && option.source === 'spell' && battle.turnState.surged) throw new Error("Action Surge's extra action can't be used to cast a spell.");
   const target = combatantById(battle, targetId);
   if (!option) throw new Error(`You can't attack with ${optionId} right now.`);
   if (!target || target.side !== 'enemy' || target.hp <= 0) throw new Error('Choose a foe to attack.');
   const hero = heroCombatant(battle);
   if (!inRange(hero, target, option)) throw new Error(`${target.name} is out of range.`);
   battle.turnState.action = true;
+  battle.turnState.athleteMove = 0;
   if (option.slotLevel) spendSlot(game, option.slotLevel);
-  performAttack(game, hero, target, option);
+  const { critical } = performAttack(game, hero, target, option);
   checkEnd(game);
+  // Champion: straight after a Critical Hit, move up to half your Speed without provoking.
+  if (critical && !battle.outcome && battle.heroState === 'up' && hasFeature(game.character, 'remarkable-athlete')) {
+    battle.turnState.athleteMove = Math.floor(heroSpeed(game.character).value / 2 / 5) * 5;
+    log(game, `Remarkable Athlete: you can move up to ${battle.turnState.athleteMove} feet straight away without provoking Opportunity Attacks.`);
+  }
+}
+
+// The nearest foe still standing that an attack can reach, or null.
+function nextFoe(game, attacker, option) {
+  const foes = enemies(game.battle).filter((c) => c.hp > 0 && inRange(attacker, c, option));
+  return foes.sort((a, b) => feetBetween(attacker.pos, a.pos) - feetBetween(attacker.pos, b.pos))[0] || null;
 }
 
 // Resolves an attack or attack spell from one combatant on another, and logs it.
+// Returns { critical }: whether it scored a Critical Hit.
 function performAttack(game, attacker, target, option) {
   const battle = game.battle;
   const you = attacker.side === 'hero';
@@ -325,38 +359,73 @@ function performAttack(game, attacker, target, option) {
     }
     log(game, `${who} cast ${option.name}: ${darts} glowing darts strike ${whom} for ${rolls.join(' + ')} = ${total} force damage.`);
     applyDamage(game, target, total, { type: option.damage.type });
-    return;
+    return { critical: false };
+  }
+
+  // Scorching Ray: an attack roll for each ray. When the target falls, the rest go to the
+  // nearest foe still standing in range.
+  if (option.how === 'rays') {
+    log(game, `${who} cast ${option.name}: ${option.rays} rays of fire streak out.`);
+    let aim = target;
+    let critical = false;
+    for (let ray = 1; ray <= option.rays; ray++) {
+      if (aim.hp <= 0) aim = nextFoe(game, attacker, option);
+      if (!aim) break;
+      const result = performAttack(game, attacker, aim, { ...option, how: 'ranged', name: `Ray ${ray}`, ray });
+      critical = critical || result.critical;
+    }
+    return { critical };
   }
 
   if (option.how === 'save') {
     const save = monsterSave(game.rng, findMonster(target.monsterId), option.saveAbility, option.saveDc, hasEffect(battle, target.id, 'dodging') ? ['Dodging'] : []);
+    if (save.success && option.potent) {
+      halfDamage(game, target, option, `${who} cast ${option.name} at ${whom}, who saves`, save);
+      return { critical: false };
+    }
     if (save.success) {
       log(game, `${who} cast ${option.name} at ${whom}, who shrugs it off.`, { roll: save });
-      return;
+      return { critical: false };
     }
     const damage = rollDamage(game.rng, option.damage);
     log(game, `${who} cast ${option.name}: ${whom} fails the save and takes ${damageText(damage, option.damage.dice)} damage.`, { roll: save });
     applyDamage(game, target, damage.total, { type: damage.type });
-    return;
+    return { critical: false };
   }
 
   const { advantage, disadvantage } = attackConditions(game, attacker, target, option);
   const roll = attackRoll(game.rng, option, acOf(game, target), advantage, disadvantage);
   // Hitting an Unconscious creature from within 5 feet is a Critical Hit.
   const critical = roll.criticalHit || (roll.success && target.side === 'hero' && battle.heroState !== 'up' && isAdjacent(attacker.pos, target.pos));
+  if (!roll.success && option.potent) {
+    halfDamage(game, target, option, `${who} cast ${option.name} at ${whom}, and miss`, roll);
+    return { critical: false };
+  }
   if (!roll.success) {
     const tries = option.source === 'spell' ? `cast${you ? '' : 's'} ${option.name} at ${whom}` : `attack${you ? '' : 's'} ${whom} with ${option.name}`;
-    log(game, `${who} ${tries}, and miss${you ? '' : 'es'}.`, { roll });
-    return;
+    if (option.ray) log(game, `${option.name} misses ${whom}.`, { roll });
+    else log(game, `${who} ${tries}, and miss${you ? '' : 'es'}.`, { roll });
+    return { critical: false };
   }
   const savage = option.savage && !battle.turnState.savageUsed && you;
   if (savage) battle.turnState.savageUsed = true;
   const damage = rollDamage(game.rng, option.damage, { critical, advantage: roll.mode === 'advantage', greatWeapon: option.greatWeapon, savage });
   const how = option.source === 'spell' ? `${option.name} hits ${whom}` : `${who} hit${you ? '' : 's'} ${whom} with ${option.name}`;
   const savaged = damage.savaged ? ' (Savage Attacker: rolled twice, kept the better)' : '';
-  log(game, `${critical ? 'Critical hit! ' : ''}${how}: ${damageText(damage, option.damage.dice)} damage${savaged}.`, { roll });
+  const improved = roll.criticalHit && roll.natural < 20 ? 'Critical hit (Improved Critical)! ' : '';
+  log(game, `${improved || (critical ? 'Critical hit! ' : '')}${how}: ${damageText(damage, option.damage.dice)} damage${savaged}.`, { roll });
   applyDamage(game, target, damage.total, { type: damage.type, critical });
   if (option.rider && target.hp > 0) addRider(game, attacker, target, option);
+  return { critical };
+}
+
+// Evoker's Potent Cantrip: a damaging cantrip that misses, or that the target saves against,
+// still deals half its damage, with none of its other effects.
+function halfDamage(game, target, option, what, roll) {
+  const damage = rollDamage(game.rng, option.damage);
+  const half = Math.floor(damage.total / 2);
+  log(game, `${what}, but Potent Cantrip deals half damage: ${damageText(damage, option.damage.dice)}, halved to ${half}.`, { roll });
+  applyDamage(game, target, half, { type: damage.type });
 }
 
 function addRider(game, attacker, target, option) {
@@ -456,12 +525,35 @@ function heroUseAction(game, name) {
   requireHeroTurn(game);
   if (game.battle.turnState.action) throw new Error(`You have already used your action, so you can't ${name}.`);
   game.battle.turnState.action = true;
+  game.battle.turnState.athleteMove = 0;
 }
 
 function heroUseBonus(game, name) {
   requireHeroTurn(game);
   if (game.battle.turnState.bonus) throw new Error(`You have already used your Bonus Action, so you can't ${name}.`);
   game.battle.turnState.bonus = true;
+  game.battle.turnState.athleteMove = 0;
+}
+
+// Fighter level 2, Action Surge: one more action this turn, though not to cast a spell.
+// Offered once the turn's action is used. One use per Short or Long Rest.
+export function heroCanSurge(game) {
+  const turn = game.battle && game.battle.turnState;
+  return Boolean(isHeroTurn(game) && hasFeature(game.character, 'action-surge') && featureUsesLeft(game, 'action-surge') > 0 && turn.action && !turn.surged);
+}
+
+export function heroActionSurge(game) {
+  requireHeroTurn(game);
+  const turn = game.battle.turnState;
+  if (!hasFeature(game.character, 'action-surge')) throw new Error('Action Surge comes at Fighter level 2.');
+  if (featureUsesLeft(game, 'action-surge') < 1) throw new Error('Action Surge is spent until you rest.');
+  if (!turn.action) throw new Error('Use your action first: Action Surge gives you one more.');
+  if (turn.surged) throw new Error('You have already used Action Surge this turn.');
+  spendFeature(game, 'action-surge');
+  turn.action = false;
+  turn.surged = true;
+  turn.athleteMove = 0;
+  log(game, 'Action Surge! You push past your limits: one more action this turn.');
 }
 
 // Which bonus actions the hero has right now.

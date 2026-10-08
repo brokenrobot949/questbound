@@ -152,4 +152,7 @@ export const migrations = {
       lastBattle: null,
     },
   }),
+
+  // Version 10 adds a level-up in progress. Saves before it had none.
+  9: (save) => ({ ...save, version: 10, game: { ...save.game, levelUp: null } }),
 };

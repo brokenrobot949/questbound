@@ -3,7 +3,7 @@
 //
 //   game.hp           current Hit Points (the maximum comes from the sheet)
 //   game.slotsUsed    spell slots spent, by spell level: [level 1, level 2, …]
-//   game.featureUses  uses spent of limited features, e.g. { 'second-wind': 1 }
+//   game.featureUses  uses spent of limited features, e.g. { 'second-wind': 1, 'action-surge': 1 }
 //   game.xp           experience points
 //
 // A Long Rest brings all of them back (except XP).
@@ -53,6 +53,7 @@ export function featureUsesMax(character, featureId) {
   const cls = findClass(character.classId);
   const row = cls.levels[Math.min(character.level, cls.levels.length) - 1];
   if (featureId === 'second-wind') return row.secondWindUses || 0;
+  if (featureId === 'action-surge') return row.actionSurgeUses || 0;
   return 0;
 }
 

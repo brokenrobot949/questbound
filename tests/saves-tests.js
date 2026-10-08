@@ -12,6 +12,7 @@ import { validateCharacter } from '../js/engine/character/validate.js';
 import { PlaytestTracker, IDLE_LIMIT_MS, formatDuration, summarizeLog } from '../js/engine/save/playtest-log.js';
 import { openSaveStore, deleteSaveDatabase } from '../js/engine/save/save-store.js';
 import { createRng } from '../js/engine/rules/rng.js';
+import { beginLevelUp, chooseHitPoints } from '../js/engine/character/level-up.js';
 import { quickStartHeroes } from '../data/campaign/quick-start.js';
 
 // Wren Ashdown, the Quick Start Fighter.
@@ -93,7 +94,7 @@ test('A save holds game state, Ink state, dice state, session count and last-pla
   const game = newGame(runtime, { slot: 2, seed: 'contents', character: testHero, now: new Date('2026-10-01T09:00:00Z') });
   const record = gameToSave(game, new Date('2026-10-06T12:00:00Z'));
   assertEqual(Object.keys(record).sort(), ['createdAt', 'game', 'ink', 'lastBackupSession', 'rng', 'savedAt', 'seed', 'sessionCount', 'slot', 'version']);
-  assertEqual(Object.keys(record.game).sort(), ['battle', 'character', 'day', 'featureUses', 'flags', 'hp', 'inspiration', 'inventory', 'journal', 'lastBattle', 'location', 'money', 'page', 'rollLog', 'slotsUsed', 'time', 'xp']);
+  assertEqual(Object.keys(record.game).sort(), ['battle', 'character', 'day', 'featureUses', 'flags', 'hp', 'inspiration', 'inventory', 'journal', 'lastBattle', 'levelUp', 'location', 'money', 'page', 'rollLog', 'slotsUsed', 'time', 'xp']);
   assertEqual([record.version, record.slot, record.sessionCount, record.lastBackupSession], [SAVE_VERSION, 2, 1, 0]);
   assertEqual([record.createdAt, record.savedAt], ['2026-10-01T09:00:00.000Z', '2026-10-06T12:00:00.000Z']);
   assertTrue(record.rng.length === 4 && record.rng.every(Number.isInteger), 'dice state should be four whole numbers');
@@ -410,6 +411,27 @@ test('Migration: a version 8 game gains full Hit Points, unspent slots, no XP an
   const v8 = { version: 8, slot: 1, game: { character: structuredClone(testHero), flags: [], page: { scene: null, beats: [] } } };
   const game = migrateSave(v8, migrations, 9).game;
   assertEqual([game.hp, game.slotsUsed, game.featureUses, game.xp, game.battle, game.lastBattle], [12, [], {}, 0, null, null]);
+});
+
+test('Migration: a version 9 game gains no level-up in progress, and becomes version 10', () => {
+  const v9 = { version: 9, slot: 1, game: { character: structuredClone(testHero), xp: 40 } };
+  const save = migrateSave(v9, migrations, 10);
+  assertEqual([save.version, save.game.levelUp, save.game.xp], [10, null, 40]);
+});
+
+test('A level-up half done is saved, and a rolled Hit Die stays rolled after a reload', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'level-save', character: testHero });
+  game.xp = 300;
+  beginLevelUp(game);
+  chooseHitPoints(game, 'roll');
+  const rolled = game.levelUp.hitPoints;
+  const reloaded = loadGame(await freshRuntime(), throughJson(gameToSave(game)));
+  assertEqual(reloaded.levelUp, { level: 2, hitPoints: rolled, subclassId: null, scholarSkill: null, spellbook: [], savant: [], prepared: [] });
+  assertThrows(() => chooseHitPoints(reloaded, 'fixed'), 'no swapping a bad roll for the fixed value');
+  assertEqual(validateSave(throughJson(gameToSave(reloaded))).version, SAVE_VERSION);
+  const broken = throughJson(gameToSave(reloaded));
+  broken.game.levelUp.spellbook = 'lots';
+  assertThrows(() => validateSave(broken), 'a damaged level-up is refused');
 });
 
 test('Migration: a version 7 game gains a day, a journal, and coins and a pack from its kits, and becomes version 8', () => {

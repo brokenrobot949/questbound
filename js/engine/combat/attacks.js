@@ -3,17 +3,22 @@
 // "Damage and Healing", "Weapons", and the spell descriptions.
 //
 // An attack option (what the attacker can use):
-//   { id, name, source: 'weapon' | 'spell' | 'monster', how: 'melee' | 'ranged' | 'save' | 'darts',
+//   { id, name, source: 'weapon' | 'spell' | 'monster',
+//     how: 'melee' | 'ranged' | 'save' | 'darts' | 'rays',
 //     reach (feet, melee), range ([normal, long] feet, ranged), modifiers (to hit, for d20Test),
-//     damage: { dice, bonus, type, extraOnAdvantage }, saveDc, saveAbility, darts, slotLevel,
-//     rider, greatWeapon, savage, heavyDisadvantage }
+//     damage: { dice, bonus, type, extraOnAdvantage }, saveDc, saveAbility, darts, rays,
+//     slotLevel (the spell slot it uses), rider, greatWeapon, savage, heavyDisadvantage,
+//     criticalOn (19 with Improved Critical), potent (a cantrip with Potent Cantrip) }
 
 import { d20Test } from '../rules/d20-test.js';
 import { rollDice } from '../rules/dice.js';
-import { abilityModifierOf, characterFeats, findAbility, findClass, proficiencyBonus, abilityScore, resistances } from '../character/sheet.js';
+import { abilityModifierOf, characterFeats, findAbility, findClass, hasFeature, proficiencyBonus, abilityScore, resistances } from '../character/sheet.js';
 import { findItem } from '../character/inventory.js';
 import { spellGroups, spellNumbers } from '../character/spells.js';
 import { slotsLeft } from '../character/resources.js';
+
+// The highest spell slot level there is.
+const TOP_SLOT = 9;
 
 export function parseDice(text) {
   const match = /^(\d+)d(\d+)$/.exec(text);
@@ -42,6 +47,8 @@ export function heroAttackOptions(game) {
   const savage = styles.includes('savage-attacker');
   const str = abilityModifierOf(character, 'strength');
   const dex = abilityModifierOf(character, 'dexterity');
+  const criticalOn = hasFeature(character, 'improved-critical') ? 19 : 20;
+  const potent = hasFeature(character, 'potent-cantrip');
 
   for (const entry of game.inventory) {
     const item = findItem(entry.id);
@@ -73,6 +80,7 @@ export function heroAttackOptions(game) {
         greatWeapon: styles.includes('great-weapon-fighting') && how === 'melee' && twoHands,
         savage,
         heavyDisadvantage,
+        criticalOn,
       };
     };
 
@@ -86,33 +94,41 @@ export function heroAttackOptions(game) {
     }
   }
 
-  // Attack spells: cantrips and prepared spells that work in a fight.
+  // Attack spells: cantrips and prepared spells that work in a fight. A levelled spell is
+  // offered once for each slot level it can use that has slots left; Magic Missile and
+  // Scorching Ray gain a dart or a ray for each slot level above the spell's own.
   for (const group of spellGroups(character)) {
     if (!group.ability) continue;
     const numbers = spellNumbers(character, group.ability);
     const castable = [...group.cantrips, ...group.prepared, ...group.always.map((a) => a.spell)];
     for (const spell of castable) {
-      if (!spell || !spell.combat || options.some((o) => o.id === `spell-${spell.id}`)) continue;
-      if (spell.level > 0 && slotsLeft(game, spell.level) < 1) continue;
+      if (!spell || !spell.combat || options.some((o) => o.spellId === spell.id)) continue;
       const c = spell.combat;
+      const slots = [];
+      if (spell.level === 0) slots.push(null);
+      else for (let slot = spell.level; slot <= TOP_SLOT; slot++) if (slotsLeft(game, slot) > 0) slots.push(slot);
       const dice = spell.level === 0 && c.scales ? cantripDice(c.damage.dice, character.level) : c.damage.dice;
-      const option = {
-        id: `spell-${spell.id}`,
-        name: spell.name,
-        source: 'spell',
-        spellId: spell.id,
-        slotLevel: spell.level || null,
-        how: c.kind === 'attack' ? c.attack : c.kind,
-        reach: c.kind === 'attack' && c.attack === 'melee' ? c.range : null,
-        range: c.kind === 'attack' && c.attack === 'melee' ? null : [c.range, c.range],
-        modifiers: numbers.attackBonus.parts.map((p) => ({ ...p, source: `${group.label} spellcasting` })),
-        damage: { dice, bonus: c.damage.bonus || 0, type: c.damage.type },
-        saveDc: numbers.saveDc.value,
-        saveAbility: c.save || null,
-        darts: c.darts || null,
-        rider: c.rider || null,
-      };
-      options.push(option);
+      for (const slot of slots) {
+        const above = slot ? slot - spell.level : 0;
+        options.push({
+          id: above ? `spell-${spell.id}-${slot}` : `spell-${spell.id}`,
+          name: above ? `${spell.name} (level ${slot} slot)` : spell.name,
+          source: 'spell',
+          spellId: spell.id,
+          slotLevel: slot,
+          how: c.kind === 'attack' ? c.attack : c.kind,
+          reach: c.kind === 'attack' && c.attack === 'melee' ? c.range : null,
+          range: c.kind === 'attack' && c.attack === 'melee' ? null : [c.range, c.range],
+          modifiers: numbers.attackBonus.parts.map((p) => ({ ...p, source: `${group.label} spellcasting` })),
+          damage: { dice, bonus: c.damage.bonus || 0, type: c.damage.type },
+          saveDc: numbers.saveDc.value,
+          saveAbility: c.save || null,
+          darts: c.darts ? c.darts + above : null,
+          rays: c.rays ? c.rays + above : null,
+          rider: c.rider || null,
+          potent: potent && spell.level === 0,
+        });
+      }
     }
   }
   return options;
@@ -182,11 +198,12 @@ export function heroResistances(character) {
   return resistances(character);
 }
 
-// The chance an attack hits, from 0 to 1: a natural 1 always misses and a 20 always hits.
-export function hitChance(modifierTotal, ac, mode = 'normal') {
-  let faces = 0;
-  for (let face = 2; face <= 19; face++) if (face + modifierTotal >= ac) faces += 1;
-  const p = (faces + 1) / 20;
+// The chance an attack hits, from 0 to 1: a natural 1 always misses and a Critical Hit (a 20,
+// or criticalOn and up) always hits.
+export function hitChance(modifierTotal, ac, mode = 'normal', criticalOn = 20) {
+  let faces = 21 - criticalOn;
+  for (let face = 2; face < criticalOn; face++) if (face + modifierTotal >= ac) faces += 1;
+  const p = faces / 20;
   if (mode === 'advantage') return 1 - (1 - p) ** 2;
   if (mode === 'disadvantage') return p ** 2;
   return p;
@@ -202,6 +219,7 @@ export function attackRoll(rng, option, ac, advantage, disadvantage) {
     advantage,
     disadvantage,
     target: { type: 'AC', value: ac },
+    criticalOn: option.criticalOn || 20,
   });
 }
 

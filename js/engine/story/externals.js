@@ -13,17 +13,18 @@ import { addItem, buyItem, canAfford, findItem, hasItem, moneyText } from '../ch
 import { findDrive } from '../character/creation.js';
 import { addDeed, findQuest, questNote, startQuest } from './journal.js';
 import { longRestRecovery } from '../character/resources.js';
+import { tacticalMind } from '../character/features.js';
 import { dmNotes } from '../../../data/campaign/dm-voice.js';
 
 export function bindExternals(story, runtime) {
   // check(skill, dc): the hero makes an ability check against a DC, e.g. check("persuasion", 15).
   // skill is a skill id from data/srd/skills.js, or an ability id for a plain ability check.
-  // Returns true on a success.
+  // Returns true on a success. A Fighter's Tactical Mind can turn a failure into a success.
   story.BindExternalFunction(
     'check',
     (skill, dc) => {
       const { game } = runtime;
-      const result = abilityCheck({ rng: game.rng, character: game.character, testId: skill, dc });
+      const result = tacticalMind(game, abilityCheck({ rng: game.rng, character: game.character, testId: skill, dc }));
       game.pendingRolls.push(result);
       return result.success;
     },

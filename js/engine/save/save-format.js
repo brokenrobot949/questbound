@@ -18,6 +18,7 @@
 //                  character/inventory.js), hp, slotsUsed, featureUses and xp (see
 //                  character/resources.js), battle (a fight in progress, or null; see
 //                  combat/battle.js), lastBattle ({ encounterId, outcome } of the last fight),
+//                  levelUp (a level-up in progress, or null; see character/level-up.js),
 //                  page, rollLog
 
 import { createRng, Rng } from '../rules/rng.js';
@@ -26,10 +27,11 @@ import { journalOk, newJournal } from '../story/journal.js';
 import { inventoryProblems, startingInventory } from '../character/inventory.js';
 import { freshResources, resourceProblems } from '../character/resources.js';
 import { battleOk } from '../combat/battle.js';
+import { levelUpOk } from '../character/level-up.js';
 import { migrations } from './migrations.js';
 import { validateCharacter } from '../character/validate.js';
 
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 
 // runtime: { story, game } — the compiled story, and whichever game is being played.
 
@@ -56,6 +58,7 @@ export function newGame(runtime, { slot, seed, character, rngState = null, now =
     ...freshResources(character),
     battle: null,
     lastBattle: null,
+    levelUp: null,
     page: null,
     rollLog: [],
     pendingRolls: [],
@@ -96,6 +99,7 @@ export function gameToSave(game, now = new Date()) {
       xp: game.xp,
       battle: game.battle,
       lastBattle: game.lastBattle,
+      levelUp: game.levelUp,
       page: game.page,
       rollLog: game.rollLog,
     }),
@@ -130,6 +134,7 @@ export function loadGame(runtime, record) {
     xp: save.game.xp,
     battle: save.game.battle,
     lastBattle: save.game.lastBattle,
+    levelUp: save.game.levelUp,
     page: save.game.page,
     rollLog: save.game.rollLog,
     pendingRolls: [],
@@ -189,6 +194,7 @@ export function validateSave(save) {
     problems.push(...resourceProblems(game));
     if (game.battle !== null && !battleOk(game.battle)) problems.push('fight in progress');
     if (game.lastBattle !== null && !(game.lastBattle && isText(game.lastBattle.outcome))) problems.push('last fight');
+    if (game.levelUp !== null && !levelUpOk(game.levelUp)) problems.push('level-up in progress');
     const beatTypes = ['chosen', 'text', 'roll', 'note', 'location', 'time'];
     const pageOk = game.page && Array.isArray(game.page.beats) && game.page.beats.every((b) => b && beatTypes.includes(b.type));
     if (!pageOk) problems.push('current page');

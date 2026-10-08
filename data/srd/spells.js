@@ -11,10 +11,12 @@
 //   upgrade       "Cantrip Upgrade" or "Using a Higher-Level Spell Slot" text, if any
 //
 // combat: how the spell works on the battle grid, for spells that do so far:
-//   kind     'attack' (a spell attack roll), 'save' (the target makes a saving throw), or
-//            'darts' (Magic Missile: automatic hits)
+//   kind     'attack' (a spell attack roll), 'save' (the target makes a saving throw),
+//            'darts' (Magic Missile: automatic hits), or 'rays' (Scorching Ray: a ranged
+//            spell attack for each ray)
 //   attack   'melee' or 'ranged';  save: the ability the target saves with
-//   range    in feet;  damage: { dice, bonus, type };  darts: how many at the lowest level
+//   range    in feet;  damage: { dice, bonus, type }
+//   darts, rays  how many at the spell's own level; one more for each slot level above it
 //   scales   a cantrip whose dice grow at character levels 5, 11 and 17
 //   rider    a lasting effect on a hit: 'slowed' (Speed −10 ft), 'no-reactions',
 //            'no-healing' (until the start of your next turn)
@@ -687,6 +689,7 @@ export const spells = [
   },
   {
     id: 'scorching-ray',
+    combat: { kind: 'rays', range: 120, rays: 3, damage: { dice: '2d6', type: 'fire' } },
     name: 'Scorching Ray',
     level: 2,
     school: 'Evocation',

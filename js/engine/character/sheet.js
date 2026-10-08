@@ -166,6 +166,13 @@ export function checkModifiers(character, testId) {
   return { ability, skill, modifiers, total: modifiers.reduce((sum, m) => sum + m.value, 0) };
 }
 
+// Features that give Advantage on a check, as reasons for d20Test, e.g. ['Remarkable Athlete'].
+export function checkAdvantage(character, testId) {
+  const reasons = [];
+  if (testId === 'athletics' && hasFeature(character, 'remarkable-athlete')) reasons.push('Remarkable Athlete');
+  return reasons;
+}
+
 export function skillBonus(character, skillId) {
   return derived(checkModifiers(character, skillId).modifiers.map(({ label, value }) => ({ label, value })));
 }
@@ -301,6 +308,13 @@ export function spellcasting(character) {
 }
 
 // ---- Features ----
+
+// True if the character has this class or subclass feature at their level, e.g. 'action-surge'.
+export function hasFeature(character, featureId) {
+  const has = (rows) => rows.some((row) => row.level <= character.level && row.features.includes(featureId));
+  const sub = subclassOf(character);
+  return has(classOf(character).levels) || Boolean(sub && has(sub.levels));
+}
 
 // Class, subclass and species features the character has at their level, plus feats.
 export function characterFeatures(character) {

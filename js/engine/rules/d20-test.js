@@ -14,6 +14,8 @@ const KINDS = ['check', 'save', 'attack'];
 //   advantage     reasons the roll has Advantage, e.g. ['Help action'] (empty for none)
 //   disadvantage  reasons the roll has Disadvantage
 //   target        { type: 'DC' or 'AC', value: 15 }, or null when there is no target number
+//   criticalOn    attack rolls only: the lowest natural roll that is a Critical Hit (20, or 19
+//                 with the Champion's Improved Critical). A Critical Hit always hits.
 export function d20Test({
   rng,
   kind,
@@ -22,6 +24,7 @@ export function d20Test({
   advantage = [],
   disadvantage = [],
   target = null,
+  criticalOn = 20,
 }) {
   if (!KINDS.includes(kind)) throw new Error(`Unknown d20 test kind: ${kind}`);
 
@@ -49,13 +52,14 @@ export function d20Test({
   const total = natural + modifierTotal;
 
   // Meeting or beating the target succeeds. A natural 20 or 1 only matters for attack rolls:
-  // a 20 always hits (a Critical Hit) and a 1 always misses.
+  // a 20 always hits (a Critical Hit) and a 1 always misses. Improved Critical makes a 19 a
+  // Critical Hit too.
   let success = null;
   let automatic = null;
   if (target) success = total >= target.value;
-  if (kind === 'attack' && natural === 20) {
+  if (kind === 'attack' && natural >= criticalOn) {
     success = true;
-    automatic = 'natural 20';
+    automatic = `natural ${natural}`;
   } else if (kind === 'attack' && natural === 1) {
     success = false;
     automatic = 'natural 1';
@@ -84,6 +88,6 @@ export function d20Test({
     success,
     outcome,
     automatic,
-    criticalHit: kind === 'attack' && natural === 20,
+    criticalHit: kind === 'attack' && natural >= criticalOn,
   };
 }

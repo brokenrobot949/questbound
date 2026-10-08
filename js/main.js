@@ -6,6 +6,8 @@ import { loadStory } from './engine/story/ink-loader.js';
 import { bindExternals } from './engine/story/externals.js';
 import { jumpTo, restartStory } from './engine/story/story-runner.js';
 import { findClass } from './engine/character/sheet.js';
+import { lowerLevel, xpForLevel } from './engine/character/level-up.js';
+import { addItem, COPPER_PER } from './engine/character/inventory.js';
 import { openSaveStore } from './engine/save/save-store.js';
 import { gameToSave, loadGame, newGame } from './engine/save/save-format.js';
 import { isBackupDue } from './engine/save/backup.js';
@@ -212,9 +214,24 @@ async function start() {
             if (!Number.isInteger(level) || level < 1 || level > max) {
               throw new Error(`Level must be 1 to ${max}: the rules data covers levels 1–${max} so far.`);
             }
-            game.character.level = level;
-            if (level < 3) game.character.subclassId = null; // subclasses come at level 3
-            game.character.hitPointRolls = (game.character.hitPointRolls || []).slice(0, level - 1);
+            // Going up gives the XP, and the level-up screen walks through each new level.
+            if (level < game.character.level) lowerLevel(game, level);
+            else if (level > game.character.level) game.xp = Math.max(game.xp, xpForLevel(level));
+          }),
+        giveXp: (xp) =>
+          change((game) => {
+            if (!Number.isInteger(xp) || xp < 1) throw new Error('Give a whole number of XP, 1 or more.');
+            game.xp += xp;
+          }),
+        giveGold: (gp) =>
+          change((game) => {
+            if (!Number.isInteger(gp) || gp < 1) throw new Error('Give a whole number of gold pieces, 1 or more.');
+            game.money += gp * COPPER_PER.gp;
+          }),
+        giveItem: (id, quantity) =>
+          change((game) => {
+            if (!Number.isInteger(quantity) || quantity < 1) throw new Error('Give 1 or more.');
+            addItem(game.inventory, id, quantity);
           }),
         setSubclass: (id) =>
           change((game) => {

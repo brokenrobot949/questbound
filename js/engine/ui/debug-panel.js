@@ -1,6 +1,7 @@
 // Debug mode (add ?debug to the address): a "Debug" button that opens a panel of testing tools.
-// Jump to any scene, view and edit story flags and Ink variables, set the hero's level,
-// force the next d20, toggle auto-roll, reset the current save, and read the playtest log.
+// Jump to any scene, view and edit story flags and Ink variables, set the hero's level, give
+// XP, gold and items, force the next d20, toggle auto-roll, reset the current save, and read
+// the playtest log.
 
 import { listScenes } from '../story/story-runner.js';
 import { describeCharacter, findClass } from '../character/sheet.js';
@@ -8,13 +9,16 @@ import { forceNextD20, peekForcedD20 } from '../rules/dice.js';
 import { getSetting, setSetting } from '../save/settings.js';
 import { formatDuration, summarizeLog } from '../save/playtest-log.js';
 import { offlineReport } from '../save/offline.js';
+import { nextLevelXp } from '../character/level-up.js';
+import { equipment } from '../../../data/srd/equipment.js';
 import { actionButton } from './backup-panels.js';
 import { el } from './dom.js';
 
 // getGame(): the game being played, or null on the title screen.
 // offline: a promise of how offline play started ("on", "off-local", "off-debug", "unsupported").
-// actions: { jumpTo(path), restartStory(), setLevel(n), setSubclass(id), setFlags(list),
-//            setInkVariable(name, value), resetSave() }
+// actions: { jumpTo(path), restartStory(), setLevel(n), setSubclass(id), giveXp(n),
+//            giveGold(gp), giveItem(id, quantity), setFlags(list), setInkVariable(name, value),
+//            resetSave() }
 // Each action applies the change, saves and redraws; the panel then redraws itself.
 export function setupDebugPanel({ root, getGame, tracker, offline, actions }) {
   const toggle = root.getElementById('debug-toggle');
@@ -139,9 +143,27 @@ export function setupDebugPanel({ root, getGame, tracker, offline, actions }) {
     level.value = String(game.character.level);
     level.setAttribute('aria-label', 'Level');
     section.append(
-      el('p', 'debug-label', `Level (the rules data covers 1–${maxLevel} so far)`),
+      el('p', 'debug-label', `Level (1–${maxLevel} so far). Going up gives the XP, then the level-up screen walks through each level.`),
       row(level, actionButton('Set level', () => run(() => actions.setLevel(Number(level.value))))),
     );
+
+    const next = nextLevelXp(game.character);
+    const xp = numberInput('XP to give', next !== null ? Math.max(0, next - game.xp) : 100);
+    section.append(
+      el('p', 'debug-label', `XP: ${game.xp}${next !== null ? ` (next level at ${next})` : ''}`),
+      row(xp, actionButton('Give XP', () => run(() => actions.giveXp(Number(xp.value))))),
+    );
+    const gold = numberInput('Gold to give', 50);
+    section.append(el('p', 'debug-label', 'Gold pieces'), row(gold, actionButton('Give gold', () => run(() => actions.giveGold(Number(gold.value))))));
+    const item = el('select', 'debug-input');
+    item.setAttribute('aria-label', 'Item');
+    for (const entry of equipment) {
+      const o = el('option', null, entry.name);
+      o.value = entry.id;
+      item.append(o);
+    }
+    const count = numberInput('How many', 1);
+    section.append(el('p', 'debug-label', 'Item'), row(item, count, actionButton('Give item', () => run(() => actions.giveItem(item.value, Number(count.value))))));
 
     // Subclasses are chosen at level 3.
     if (game.character.level >= 3) {
@@ -158,8 +180,16 @@ export function setupDebugPanel({ root, getGame, tracker, offline, actions }) {
         row(pick, actionButton('Set subclass', () => run(() => actions.setSubclass(pick.value || null)))),
       );
     }
-    section.append(el('p', 'debug-note', 'Granting items and gold arrives with the inventory in Phase 1.'));
     return section;
+  }
+
+  function numberInput(label, value) {
+    const input = el('input', 'debug-input is-short');
+    input.type = 'number';
+    input.min = '0';
+    input.value = String(value);
+    input.setAttribute('aria-label', label);
+    return input;
   }
 
   function diceSection(game) {

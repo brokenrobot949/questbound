@@ -9,7 +9,7 @@
 import * as fight from '../combat/battle.js';
 import { key } from '../combat/grid.js';
 import { heroSprite } from '../character/look.js';
-import { maxHp } from '../character/resources.js';
+import { featureUsesLeft, featureUsesMax, maxHp } from '../character/resources.js';
 import { sheets, sprites, tiles, wallPieces, wallStyles } from '../../../data/campaign/sprites.js';
 import { rollLine } from './roll-format.js';
 import { el } from './dom.js';
@@ -157,7 +157,9 @@ export async function showBattle({ container, game, onSave, onDone }) {
     const turn = battle.turnState;
     help.textContent = view.option
       ? 'Choose a foe to attack: tap it on the grid or below.'
-      : `Your turn. Tap a lit square to move (${turn.movementLeft} feet left), or choose an action.`;
+      : turn.athleteMove
+        ? `Remarkable Athlete: tap a gold square to move up to ${turn.athleteMove} feet without provoking Opportunity Attacks, or carry on.`
+        : `Your turn. Tap a lit square to move (${turn.movementLeft} feet left), or choose an action.`;
 
     const options = fight.heroAttackOptions(game);
     const attacks = el('div', 'battle-row');
@@ -168,7 +170,8 @@ export async function showBattle({ container, game, onSave, onDone }) {
         render();
       });
       button.setAttribute('aria-pressed', String(view.option === option.id));
-      button.disabled = turn.action;
+      // Action Surge's extra action can't cast a spell.
+      button.disabled = turn.action || (turn.surged && option.source === 'spell');
       attacks.append(button);
     }
     controls.append(attacks);
@@ -199,6 +202,14 @@ export async function showBattle({ container, game, onSave, onDone }) {
       const button = battleButton(label, () => act(() => run(game)));
       button.disabled = turn.action;
       other.append(button);
+    }
+    // Fighters from level 2: Action Surge, once the turn's action is used.
+    if (featureUsesMax(game.character, 'action-surge')) {
+      const left = featureUsesLeft(game, 'action-surge');
+      const surge = battleButton(left ? 'Action Surge' : 'Action Surge (spent)', () => act(() => fight.heroActionSurge(game)));
+      surge.disabled = !fight.heroCanSurge(game);
+      surge.title = 'One more action this turn (not a spell). Comes back after a rest.';
+      other.append(surge);
     }
     controls.append(other);
 
@@ -265,13 +276,14 @@ export async function showBattle({ container, game, onSave, onDone }) {
 
     // Where the hero can move, and who they can hit.
     if (fight.isHeroTurn(game) && !view.revealing) {
-      // A pale wash with a bright edge, so it shows on wood and stone alike.
-      ctx.fillStyle = 'rgba(222, 238, 214, 0.32)';
-      ctx.strokeStyle = 'rgba(222, 238, 214, 0.85)';
+      // A pale wash with a bright edge, so it shows on wood and stone alike. Gold squares are
+      // a free move (Remarkable Athlete).
       ctx.lineWidth = scale;
       if (!view.option) {
         for (const step of fight.heroReachable(game).values()) {
           if (step.cost === 0) continue;
+          ctx.fillStyle = step.free ? 'rgba(240, 200, 90, 0.35)' : 'rgba(222, 238, 214, 0.32)';
+          ctx.strokeStyle = step.free ? 'rgba(240, 200, 90, 0.9)' : 'rgba(222, 238, 214, 0.85)';
           const inset = 2 * scale;
           ctx.fillRect(step.pos.x * size + inset, step.pos.y * size + inset, size - 2 * inset, size - 2 * inset);
           ctx.strokeRect(step.pos.x * size + inset + scale / 2, step.pos.y * size + inset + scale / 2, size - 2 * inset - scale, size - 2 * inset - scale);

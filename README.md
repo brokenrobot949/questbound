@@ -31,7 +31,7 @@ The game uses three free fonts, stored in `assets/fonts/` with their licences: P
 
 ## Debug mode
 
-Open http://localhost:8000/?debug to get a red **Debug** button in the corner. It opens tools to jump to any scene, view and edit story flags and Ink variables, set the hero's level, force the next d20, turn on auto-roll, reset the current save, and read the playtest log (session and scene times, levels reached, deaths). In debug mode, adding `&seed=anything` to the address makes new games roll the same dice every time, including rolled ability scores and names during character creation.
+Open http://localhost:8000/?debug to get a red **Debug** button in the corner. It opens tools to jump to any scene, view and edit story flags and Ink variables, set the hero's level, give XP, gold and items, force the next d20, turn on auto-roll, reset the current save, and read the playtest log (session and scene times, levels reached, deaths). In debug mode, adding `&seed=anything` to the address makes new games roll the same dice every time, including rolled ability scores and names during character creation.
 
 ## Checks
 
@@ -41,5 +41,6 @@ Checks run in the browser, and are linked from the footer in debug mode:
 - Story: http://localhost:8000/tests/story.html
 - Saves: http://localhost:8000/tests/saves.html (uses its own test database, so it never touches your saves)
 - Combat: http://localhost:8000/tests/combat.html
+- Levelling up: http://localhost:8000/tests/levels.html
 
 To see every hero look at once (each species and class, and every skin, hair, outfit and headgear option), open http://localhost:8000/tests/looks.html. Add `?scale=10` to look closer.

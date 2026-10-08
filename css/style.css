@@ -1956,3 +1956,53 @@ h3.debug-heading {
 .choice-tag.is-fight {
   color: var(--bad);
 }
+
+/* The level-up screen: in the Adventure tab, in place of the choices */
+
+.level-up {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.level-up-title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: var(--size-heading);
+  font-weight: normal;
+  line-height: 1.5;
+  color: var(--accent);
+}
+
+.level-up .narration-text {
+  margin: 0;
+}
+
+.level-up-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--box);
+  border: 3px solid var(--accent);
+  border-radius: 6px;
+}
+
+.level-up-needs,
+.level-up-problem {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--size-ui);
+  color: var(--muted);
+}
+
+.level-up-problem {
+  color: var(--bad);
+}
+
+.level-up .slot-button[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--page);
+}

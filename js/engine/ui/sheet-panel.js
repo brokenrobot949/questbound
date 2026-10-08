@@ -4,7 +4,7 @@
 import { findBond, findDrive } from '../character/creation.js';
 import { findItem, itemText, moneyText } from '../character/inventory.js';
 import { featureUsesLeft, featureUsesMax, maxHp, slotsAt, slotsLeft } from '../character/resources.js';
-import { advancement } from '../../../data/srd/advancement.js';
+import { levelUpReady, nextLevelXp } from '../character/level-up.js';
 import { heroSheet } from './hero-sheet.js';
 import { el } from './dom.js';
 import { expandable } from './widgets.js';
@@ -17,16 +17,22 @@ export function sheetPanel(game) {
   const now = el('section', 'sheet-block');
   now.append(el('h3', 'section-heading', 'Right now'));
   now.append(el('p', 'sheet-line', `Hit Points: ${game.hp} of ${maxHp(character)}`));
-  const next = advancement.find((row) => row.level === character.level + 1);
-  now.append(el('p', 'sheet-line', `XP: ${game.xp}${next ? ` (level ${next.level} at ${next.xp})` : ''}`));
+  const next = nextLevelXp(character);
+  let xpNote = ` (level ${character.level} is as high as the game goes for now)`;
+  if (levelUpReady(game)) xpNote = ' (level up ready: see the Adventure tab)';
+  else if (next !== null) xpNote = ` (level ${character.level + 1} at ${next})`;
+  now.append(el('p', 'sheet-line', `XP: ${game.xp}${xpNote}`));
   const slotLevels = [1, 2, 3].filter((level) => slotsAt(character, level) > 0);
   if (slotLevels.length) {
     now.append(el('p', 'sheet-line', `Spell slots left: ${slotLevels.map((level) => `${slotsLeft(game, level)} of ${slotsAt(character, level)} level ${level}`).join(', ')}`));
   }
-  if (featureUsesMax(character, 'second-wind')) {
-    now.append(el('p', 'sheet-line', `Second Wind: ${featureUsesLeft(game, 'second-wind')} of ${featureUsesMax(character, 'second-wind')} left`));
+  for (const [id, name] of [
+    ['second-wind', 'Second Wind'],
+    ['action-surge', 'Action Surge'],
+  ]) {
+    if (featureUsesMax(character, id)) now.append(el('p', 'sheet-line', `${name}: ${featureUsesLeft(game, id)} of ${featureUsesMax(character, id)} left`));
   }
-  now.append(el('p', 'section-hint', 'A long rest brings back Hit Points, spell slots and Second Wind.'));
+  now.append(el('p', 'section-hint', 'A long rest brings back Hit Points, spell slots and every use of your features.'));
   panel.append(now);
 
   panel.append(heroSheet(character));

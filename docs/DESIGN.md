@@ -140,6 +140,19 @@ The game uses the 2024 fifth-edition rules as published in SRD 5.2.1 (https://ww
 
 The DM marks the moment with a line of narration, then walks you through: hit points (roll your Hit Die or take the average, your choice each time), new features, subclass at level 3, Ability Score Improvement or feat at levels 4, 8, 12 and 16, an Epic Boon at 19, and new spells.
 
+- The level-up opens as soon as your XP reaches the next level, in place of the story's choices, but never in the middle of a fight. It goes one level at a time, so XP for two levels means two level-ups in a row.
+- Every choice is saved as you make it. A rolled Hit Die stands: reloading can't swap a bad roll for the fixed value.
+- Your current Hit Points rise by as much as your maximum does.
+- The journal records each new level as a deed.
+
+**Class features that act on their own**
+
+A few features would need a pop-up at an awkward moment, so the game uses them for you when it's clearly worth it:
+- **Tactical Mind** (Fighter 2) spends a Second Wind use on a failed ability check only when the extra d10 could turn it into a success, and the use is spent only if it does.
+- **Opportunity attacks** are taken automatically.
+
+A setting to be asked instead can come later, alongside the Shield spell's reaction.
+
 **Class rollout**
 
 | Phase | Classes | Why then |

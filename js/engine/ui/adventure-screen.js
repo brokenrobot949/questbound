@@ -8,7 +8,9 @@
 import { parseTags } from '../story/tags.js';
 import { continueAfterBattle, currentTime, makeChoice, revealRoll, startFight } from '../story/story-runner.js';
 import { maxHp } from '../character/resources.js';
+import { levelUpReady } from '../character/level-up.js';
 import { showBattle } from './battle-screen.js';
+import { showLevelUp } from './level-up-screen.js';
 import { moneyText, priceOf } from '../character/inventory.js';
 import { findDrive } from '../character/creation.js';
 import {
@@ -24,7 +26,7 @@ import { findSpell } from '../character/spells.js';
 import { heroSprite } from '../character/look.js';
 import { spriteCanvas } from './sprite-canvas.js';
 import { abilities } from '../../../data/srd/abilities.js';
-import { dmVoice } from '../../../data/campaign/dm-voice.js';
+import { dmNotes, dmVoice } from '../../../data/campaign/dm-voice.js';
 import { gameToSave } from '../save/save-format.js';
 import { getSetting } from '../save/settings.js';
 import { difficultyName, outcomeText, rollLine, signedNumber } from './roll-format.js';
@@ -43,6 +45,7 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
   const notices = root.getElementById('notices');
   const status = root.getElementById('play-status');
 
+  // Fights and level-ups show here, between the story and the choices.
   const battleArea = root.getElementById('battle-area');
 
   // "Day 2 · Morning · HP 12/12 · 18 GP · ★ Inspiration": as far as the player has seen.
@@ -53,9 +56,11 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
     status.textContent = parts.filter(Boolean).join(' · ');
   };
 
-  root
-    .getElementById('hero-strip')
-    .replaceChildren(spriteCanvas(heroSprite(game.character), { scale: 2 }), el('span', 'hero-strip-text', heroSummary(game.character)));
+  const renderHeroStrip = () =>
+    root
+      .getElementById('hero-strip')
+      .replaceChildren(spriteCanvas(heroSprite(game.character), { scale: 2 }), el('span', 'hero-strip-text', heroSummary(game.character)));
+  renderHeroStrip();
   root.getElementById('slot-note').textContent = `Slot ${game.slot} · Session ${game.sessionCount}`;
   narration.replaceChildren();
   choices.replaceChildren();
@@ -87,8 +92,32 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
       }
     }
     if (game.battle) showFight();
+    else if (levelUpReady(game)) showLevel();
     else showChoices();
     onPageShown();
+  }
+
+  // A new level takes the place of the choices until the player has made its choices.
+  function showLevel() {
+    choices.replaceChildren();
+    showLevelUp({
+      container: battleArea,
+      game,
+      onSave,
+      onDone: ({ level, hpGained }) => {
+        battleArea.replaceChildren();
+        const text = dmNotes.levelUpNote.replace('{level}', level).replace('{hp}', hpGained);
+        game.page.beats.push({ type: 'note', text });
+        narration.append(el('p', 'dm-note', text));
+        renderHeroStrip();
+        updateStatus();
+        onSave(game);
+        onPageShown();
+        if (levelUpReady(game)) showLevel();
+        else showChoices();
+      },
+    });
+    follow(battleArea);
   }
 
   // A fight takes the place of the choices until it's over; then the story carries on.
@@ -330,7 +359,7 @@ function spellName(id) {
 }
 
 // "Wren Ashdown · Human Fighter 1 · HP 12 · AC 17 · Str +3 Dex +1 … · Proficiency +2"
-// (HP is the maximum until combat tracks damage.)
+// (HP here is the maximum; the status line shows what's left.)
 function heroSummary(character) {
   const mods = abilities.map((a) => `${a.abbreviation} ${signedNumber(abilityModifierOf(character, a.id))}`);
   return [

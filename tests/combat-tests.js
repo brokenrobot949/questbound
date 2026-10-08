@@ -15,6 +15,7 @@ import { loadStory } from '../js/engine/story/ink-loader.js';
 import { bindExternals } from '../js/engine/story/externals.js';
 import { continueAfterBattle, makeChoice, startFight } from '../js/engine/story/story-runner.js';
 import { gameToSave, loadGame, newGame } from '../js/engine/save/save-format.js';
+import { validateCharacter } from '../js/engine/character/validate.js';
 
 const wren = quickStartHeroes.find((h) => h.id === 'wren').character;
 const juniper = quickStartHeroes.find((h) => h.id === 'juniper').character;
@@ -216,6 +217,108 @@ test('Fight: winning gives the monsters’ XP once the player carries on', () =>
   assertEqual([game.battle.outcome, game.battle.xp], ['victory', 50]);
   const { outcome, choiceIndex } = fight.finishBattle(game);
   assertEqual([outcome, choiceIndex, game.xp, game.battle, game.lastBattle.outcome], ['victory', 0, 50, null, 'victory']);
+});
+
+// ---- Level 2 and 3 features ----
+
+const wren2 = { ...wren, level: 2, hitPointRolls: [null] };
+const champion = { ...wren, level: 3, subclassId: 'champion', hitPointRolls: [null, null] };
+// Juniper at level 3, as an Evoker with Scorching Ray prepared.
+const evoker = {
+  ...juniper,
+  level: 3,
+  subclassId: 'evoker',
+  classChoices: { scholarSkill: 'arcana' },
+  hitPointRolls: [null, null],
+  spells: {
+    cantrips: juniper.spells.cantrips,
+    spellbook: [...juniper.spells.spellbook, 'burning-hands', 'false-life', 'scorching-ray', 'shatter', 'misty-step', 'knock'],
+    prepared: [...juniper.spells.prepared, 'burning-hands', 'scorching-ray'],
+  },
+};
+
+test('Level 3 heroes for these checks are legal', () => {
+  assertEqual([validateCharacter(champion), validateCharacter(evoker)], [[], []]);
+});
+
+test('Action Surge: one more action, once until a rest', () => {
+  const game = millFight(wren2);
+  const [first, second] = fight.enemies(game.battle);
+  first.pos = { x: 2, y: 2 };
+  second.pos = { x: 4, y: 2 };
+  first.hp = 1;
+  second.hp = 1;
+  assertTrue(!fight.heroCanSurge(game), 'only once the action is used');
+  forceNextD20(15);
+  fight.heroAttack(game, 'greatsword-melee', first.id);
+  assertTrue(fight.heroCanSurge(game));
+  fight.heroActionSurge(game);
+  assertEqual([game.battle.turnState.action, game.featureUses['action-surge']], [false, 1]);
+  forceNextD20(15);
+  fight.heroAttack(game, 'greatsword-melee', second.id);
+  assertEqual([first.hp, second.hp, game.battle.outcome], [0, 0, 'victory']);
+  assertThrows(() => fight.heroActionSurge(game), 'spent');
+  assertTrue(!fight.heroCanSurge(millFight(wren)), 'level 1 Fighters don’t have it');
+});
+
+test('Improved Critical: a Champion’s natural 19 is a Critical Hit, then a free move', () => {
+  assertEqual(hitChance(0, 30, 'normal', 19), 0.1, 'a 19 or a 20');
+  const game = millFight(champion);
+  const battle = game.battle;
+  assertEqual(battle.log[0].roll.advantage, ['Remarkable Athlete'], 'Advantage on Initiative');
+  const [first, second] = fight.enemies(battle);
+  first.pos = { x: 3, y: 2 };
+  second.pos = { x: 2, y: 2 };
+  forceNextD20(19);
+  fight.heroAttack(game, 'greatsword-melee', first.id);
+  assertTrue(battle.log.some((e) => e.text.startsWith('Critical hit (Improved Critical)!')), 'logged as a Critical Hit');
+  assertEqual(battle.turnState.athleteMove, 15, 'half of a 30-foot Speed');
+  const free = [...fight.heroReachable(game).values()].filter((s) => s.free && s.cost > 0);
+  assertTrue(free.length > 0 && free.every((s) => s.cost <= 15));
+  // Step away from the goblin beside you: no Opportunity Attack, and no movement spent.
+  fight.heroMove(game, { x: 5, y: 1 });
+  assertTrue(!battle.log.some((e) => e.text.includes('an Opportunity Attack!')));
+  assertEqual([battle.turnState.movementLeft, battle.turnState.athleteMove], [30, 0]);
+});
+
+test('Potent Cantrip: an Evoker’s missed Fire Bolt still deals half damage', () => {
+  const game = millFight(evoker);
+  const goblin = fight.enemies(game.battle)[0];
+  goblin.hp = 20;
+  forceNextD20(1);
+  fight.heroAttack(game, 'spell-fire-bolt', goblin.id);
+  const line = game.battle.log.find((e) => e.text.includes('Potent Cantrip'));
+  assertTrue(Boolean(line), 'a miss, but half damage');
+  const half = Number(/halved to (\d+)/.exec(line.text)[1]);
+  assertEqual(goblin.hp, 20 - half);
+  assertTrue(fight.attackPreview(game, 'spell-fire-bolt', goblin.id).describe.includes('Potent Cantrip'), 'and the preview says so');
+});
+
+test('Spell slots: Magic Missile from a level 2 slot fires four darts', () => {
+  const game = millFight(evoker);
+  const ids = heroAttackOptions(game).map((o) => o.id);
+  assertTrue(ids.includes('spell-magic-missile') && ids.includes('spell-magic-missile-2'), ids.join(', '));
+  game.slotsUsed = [4];
+  const options = heroAttackOptions(game);
+  assertTrue(!options.some((o) => o.id === 'spell-magic-missile'), 'no level 1 slots left');
+  assertEqual(options.find((o) => o.id === 'spell-magic-missile-2').darts, 4);
+  const goblin = fight.enemies(game.battle)[0];
+  goblin.hp = 30;
+  fight.heroAttack(game, 'spell-magic-missile-2', goblin.id);
+  assertEqual(game.slotsUsed, [4, 1]);
+  assertTrue(game.battle.log.some((e) => e.text.includes('4 glowing darts')));
+});
+
+test('Scorching Ray: an attack for each ray, moving on when the target falls', () => {
+  const game = millFight(evoker);
+  const [first, second] = fight.enemies(game.battle);
+  first.hp = 1;
+  // Each ray: a d20 of 15 (hits AC 12), then 2d6 of 3 and 3.
+  game.rng = scriptedRng([15, 3, 3, 15, 3, 3, 15, 3, 3]);
+  fight.heroAttack(game, 'spell-scorching-ray', first.id);
+  const rays = game.battle.log.filter((e) => /^Ray \d hits/.test(e.text)).map((e) => e.text.split(':')[0]);
+  assertEqual(rays, ['Ray 1 hits Goblin Minion 1', 'Ray 2 hits Goblin Minion 2', 'Ray 3 hits Goblin Minion 2']);
+  assertEqual([first.hp, second.hp, game.slotsUsed[1], game.battle.outcome], [0, 0, 1, 'victory'], 'one level 2 slot spent');
 });
 
 // ---- The story ----

@@ -37,7 +37,7 @@ import { el } from './dom.js';
 import { chip, chipRow, expandable, optionCard, optionList, section, swatchChip, textField } from './widgets.js';
 import { heroSheet } from './hero-sheet.js';
 import { findSpell, magicInitiateLists, speciesSpells, spellsOnList } from '../character/spells.js';
-import { spellDetails, spellMeta } from './spell-text.js';
+import { spellList } from './spell-picker.js';
 import { skinTones, hairStyles, hairColors, clothColors } from '../../../data/campaign/hero-looks.js';
 import { headgearFor, heroSprite, rollLook, speciesFeatureNames } from '../character/look.js';
 import { portrait } from './sprite-canvas.js';
@@ -505,6 +505,12 @@ const TAKEN_TEXT = {
   'initiate-species': 'already from Magic Initiate',
 };
 
+// Why a spell can't be picked here, in words, or null (see creation.spellTakenBy).
+function takenText(draft, spellId, where) {
+  const holder = creation.spellTakenBy(draft, spellId, where);
+  return holder ? TAKEN_TEXT[holder] : null;
+}
+
 export function spellsStep(ctx) {
   const { draft } = ctx;
   const cls = findClass(draft.classId);
@@ -537,7 +543,7 @@ export function spellsStep(ctx) {
             ids: picks.from,
             chosen: picks.chosen,
             full: picks.chosen.length >= picks.count,
-            taken: (id) => (which === 'prepared' ? null : creation.spellTakenBy(draft, id, `class-${which}`)),
+            taken: (id) => (which === 'prepared' ? null : takenText(draft, id, `class-${which}`)),
             onToggle: (id) => ctx.set(creation.toggleClassSpell(ctx.draft, which, id)),
             details: which !== 'prepared',
           }),
@@ -603,7 +609,7 @@ function initiateSection(ctx, entry) {
       ids: cantripIds,
       chosen: entry.cantrips,
       full: entry.cantrips.length >= 2,
-      taken: (id) => creation.spellTakenBy(draft, id, where),
+      taken: (id) => takenText(draft, id, where),
       onToggle: (id) => ctx.set(creation.toggleInitiateCantrip(ctx.draft, entry.source, id)),
     }),
   );
@@ -614,7 +620,7 @@ function initiateSection(ctx, entry) {
       ids: spellIdsOn(entry.list, 1),
       chosen: entry.spell ? [entry.spell] : [],
       full: false, // choosing another swaps it
-      taken: (id) => creation.spellTakenBy(draft, id, where),
+      taken: (id) => takenText(draft, id, where),
       onToggle: (id) => ctx.set(creation.chooseInitiateSpell(ctx.draft, entry.source, id)),
     }),
   );
@@ -623,28 +629,6 @@ function initiateSection(ctx, entry) {
 
 function spellIdsOn(list, level) {
   return spellsOnList(list, level).map((s) => s.id);
-}
-
-// A list of spells to pick from. Each row toggles the spell; "What it does" opens its text.
-function spellList({ keyPrefix, ids, chosen, full, taken, onToggle, details = true }) {
-  const list = el('div', 'spell-list');
-  for (const id of ids) {
-    const spell = findSpell(id);
-    const picked = chosen.includes(id);
-    const takenBy = taken(id);
-    const row = el('div', 'spell-option');
-    const button = el('button', 'spell-toggle');
-    button.type = 'button';
-    button.dataset.key = `${keyPrefix}-${id}`;
-    button.setAttribute('aria-pressed', String(picked));
-    button.disabled = !picked && (full || Boolean(takenBy));
-    button.append(el('span', 'spell-name', spell.name), el('span', 'spell-meta', takenBy ? TAKEN_TEXT[takenBy] : spellMeta(spell)));
-    button.addEventListener('click', () => onToggle(id));
-    row.append(button);
-    if (details) row.append(expandable('What it does', spellDetails(spell)));
-    list.append(row);
-  }
-  return list;
 }
 
 // ---- Look ----
