@@ -2,7 +2,7 @@
 // Rules: SRD 5.2.1, "Combat on a Grid". Every square costs 5 feet to enter, diagonals included;
 // difficult terrain costs 10. You can move through an ally's square but not an enemy's, and
 // you can't end your move in anyone's square. Walls and obstacles can't be entered, and a
-// diagonal step can't cut across the corner of a wall.
+// diagonal step can't cut across the corner of a wall. Crawling costs 5 feet more a square.
 
 export const SQUARE_FEET = 5;
 
@@ -51,8 +51,9 @@ const STEPS = [
 
 // Every square a creature can reach this turn, with what it costs and the way there.
 // blockedBy(pos): 'enemy' (can't pass), 'ally' (can pass, can't stop) or null.
+// crawling: a Prone creature crawls, and every square costs 5 feet more.
 // Returns a Map from key(pos) to { pos, cost (feet), path: [pos, …] (not including the start) }.
-export function reachableSquares(map, start, feet, blockedBy = () => null) {
+export function reachableSquares(map, start, feet, blockedBy = () => null, { crawling = false } = {}) {
   const best = new Map([[key(start), { pos: start, cost: 0, path: [] }]]);
   const queue = [{ pos: start, cost: 0, path: [] }];
   while (queue.length) {
@@ -65,7 +66,7 @@ export function reachableSquares(map, start, feet, blockedBy = () => null) {
         continue; // no cutting corners
       }
       if (blockedBy(next) === 'enemy') continue;
-      const cost = here.cost + (cellAt(map, next).terrain === 'difficult' ? 2 : 1) * SQUARE_FEET;
+      const cost = here.cost + stepCost(map, next, crawling);
       if (cost > feet) continue;
       const known = best.get(key(next));
       if (known && known.cost <= cost) continue;
@@ -77,4 +78,10 @@ export function reachableSquares(map, start, feet, blockedBy = () => null) {
   // Nobody can end their move in a square someone else is standing in.
   for (const [k, step] of best) if (k !== key(start) && blockedBy(step.pos)) best.delete(k);
   return best;
+}
+
+// What it costs to move into a square: 5 feet, 10 in difficult terrain, and 5 more when
+// crawling (SRD 5.2.1, "Crawling": each foot costs 1 extra foot, 2 extra in difficult terrain).
+export function stepCost(map, pos, crawling = false) {
+  return ((cellAt(map, pos).terrain === 'difficult' ? 2 : 1) + (crawling ? 1 : 0)) * SQUARE_FEET;
 }

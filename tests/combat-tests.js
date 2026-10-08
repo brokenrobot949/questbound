@@ -13,7 +13,7 @@ import { monsters } from '../data/srd/monsters.js';
 import { quickStartHeroes } from '../data/campaign/quick-start.js';
 import { loadStory } from '../js/engine/story/ink-loader.js';
 import { bindExternals } from '../js/engine/story/externals.js';
-import { continueAfterBattle, makeChoice, startFight } from '../js/engine/story/story-runner.js';
+import { continueAfterBattle, currentLocation, makeChoice, startFight } from '../js/engine/story/story-runner.js';
 import { gameToSave, loadGame, newGame } from '../js/engine/save/save-format.js';
 import { validateCharacter } from '../js/engine/character/validate.js';
 
@@ -42,6 +42,13 @@ test('Grid: walls block, corners can’t be cut, difficult terrain costs double'
   const mud = reachableSquares(map, { x: 2, y: 3 }, 5);
   assertTrue(!mud.has(key({ x: 2, y: 2 })), 'difficult terrain needs 10 feet');
   assertEqual(reachableSquares(map, { x: 2, y: 3 }, 10).get(key({ x: 2, y: 2 })).cost, 10);
+});
+
+test('Grid: crawling costs 5 feet more a square, 15 in difficult terrain', () => {
+  const map = parseMap(['.~..'], legend);
+  const crawl = reachableSquares(map, { x: 0, y: 0 }, 25, () => null, { crawling: true });
+  assertEqual([crawl.get(key({ x: 1, y: 0 })).cost, crawl.get(key({ x: 2, y: 0 })).cost], [15, 25]);
+  assertTrue(!crawl.has(key({ x: 3, y: 0 })), 'three squares of crawling is more than 25 feet');
 });
 
 test('Grid: pass through an ally but not an enemy, and stop in nobody’s square', () => {
@@ -321,6 +328,75 @@ test('Scorching Ray: an attack for each ray, moving on when the target falls', (
   assertEqual([first.hp, second.hp, game.slotsUsed[1], game.battle.outcome], [0, 0, 1, 'victory'], 'one level 2 slot spent');
 });
 
+// ---- The Wolf, Prone and Pack Tactics ----
+
+// The quarry-road fight with the hero going first, the wolf moved next to them.
+function wolfFight(character = wren, seed = 'wolf') {
+  const game = gameFor(character, seed);
+  forceNextD20(20);
+  fight.startBattle(game, 'quarry-wolf', 0);
+  const wolf = fight.enemies(game.battle)[0];
+  wolf.pos = { x: 3, y: 7 }; // the hero starts at (3, 8)
+  return { game, wolf };
+}
+
+test('Wolf: its Bite knocks a Medium hero Prone', () => {
+  const { game, wolf } = wolfFight();
+  assertEqual([wolf.name, wolf.hp, fight.findMonster('wolf').speed], ['Wolf', 11, 40]);
+  forceNextD20(15); // the wolf's Bite: 15 + 4 = 19 hits AC 17
+  fight.endHeroTurn(game);
+  assertTrue(game.battle.log.some((e) => e.text === 'You are knocked Prone.'), 'knocked down');
+  assertTrue(fight.isProne(game.battle, 'hero') && fight.isHeroTurn(game));
+});
+
+test('Prone: your attacks have Disadvantage; crawling costs double; standing costs half your Speed', () => {
+  const { game, wolf } = wolfFight();
+  game.battle.effects.push({ kind: 'prone', target: 'hero', endsOn: null });
+  assertTrue(fight.attackPreview(game, 'greatsword-melee', wolf.id).disadvantage.includes('You are Prone'));
+  assertEqual(fight.heroReachable(game).get(key({ x: 2, y: 8 })).cost, 10, 'one square of crawling');
+  assertTrue(fight.heroCanStand(game));
+  fight.heroStandUp(game);
+  assertEqual([fight.isProne(game.battle, 'hero'), game.battle.turnState.movementLeft], [false, 15]);
+  assertThrows(() => fight.heroStandUp(game), 'already standing');
+  assertEqual(fight.attackPreview(game, 'greatsword-melee', wolf.id).disadvantage, []);
+});
+
+test('Prone: attacks from within 5 feet have Advantage, and from farther away Disadvantage', () => {
+  const { game, wolf } = wolfFight();
+  game.battle.effects.push({ kind: 'prone', target: wolf.id, endsOn: null });
+  assertTrue(fight.attackPreview(game, 'greatsword-melee', wolf.id).advantage.includes('Wolf is Prone, within 5 feet'));
+  wolf.pos = { x: 3, y: 4 };
+  assertTrue(fight.attackPreview(game, 'shortbow-ranged', wolf.id).disadvantage.includes('Wolf is Prone, and more than 5 feet away'));
+  // A Prone monster gets up at the start of its turn.
+  fight.endHeroTurn(game);
+  assertTrue(game.battle.log.some((e) => e.text === 'Wolf gets back on its feet.') && !fight.isProne(game.battle, wolf.id));
+});
+
+test('Pack Tactics: a wolf with an ally beside you attacks with Advantage', () => {
+  const { game } = wolfFight();
+  game.battle.combatants.push({ id: 'wolf-2', side: 'enemy', name: 'Wolf 2', monsterId: 'wolf', pos: { x: 4, y: 7 }, hp: 11, maxHp: 11 });
+  fight.endHeroTurn(game);
+  const bite = game.battle.log.find((e) => e.roll && e.roll.kind === 'attack');
+  assertTrue(bite.roll.advantage.includes('Pack Tactics'), JSON.stringify(bite.roll.advantage));
+});
+
+test('Wolf: while the hero is down, it goes back to the dead goblin, and the fall leaves you Prone', () => {
+  const game = gameFor(wren);
+  game.hp = 0;
+  // Initiative: the hero 2, the wolf 15. Then a natural 20 death save.
+  game.rng = scriptedRng([2, 15, 20]);
+  fight.startBattle(game, 'quarry-wolf', 0);
+  assertTrue(game.battle.log.some((e) => e.text === 'Wolf goes back to tearing at the dead goblin.'));
+  assertEqual([game.battle.heroState, game.hp], ['up', 1]);
+
+  const hurt = wolfFight();
+  hurt.game.hp = 1;
+  forceNextD20(15);
+  fight.endHeroTurn(hurt.game);
+  assertTrue(hurt.game.battle.log.some((e) => e.text.startsWith('You drop to 0 Hit Points')));
+  assertTrue(fight.isProne(hurt.game.battle, 'hero'), 'Unconscious includes Prone');
+});
+
 // ---- The story ----
 
 async function storyGame(character, seed) {
@@ -338,9 +414,9 @@ function pick(game, start) {
 }
 
 // Plays from the gate to the goblins in the mill cellar.
-async function toTheCellar(seed) {
-  const game = await storyGame(wren, seed);
-  pick(game, "Show her your old regiment's token");
+async function toTheCellar(seed, character = wren) {
+  const game = await storyGame(character, seed);
+  pick(game, character.backgroundId === 'soldier' ? "Show her your old regiment's token" : 'Wait out the night');
   pick(game, "Go to the reeve's hall");
   pick(game, 'Take the job, and ask');
   pick(game, 'Tell her to go home');
@@ -377,6 +453,63 @@ test('Story: losing the mill fight is Fate’s Mercy: robbed, rested, and the st
   continueAfterBattle(game);
   assertEqual([game.money, game.day, game.hp > 0], [0, day + 1, true], 'no purse, a new day, Hit Points back');
   assertTrue(game.journal.deeds.some((d) => d.text.includes('carried home by Lark')));
+});
+
+// Plays from the cellar, talking the goblins down, to the wolf on the quarry road.
+async function toTheWolf(seed, character = wren) {
+  const game = await toTheCellar(seed, character);
+  forceNextD20(20);
+  pick(game, "Tell them you're not here for them");
+  return game;
+}
+
+test('Story: the quarry road meets a wolf; the goblins you talked down have gone ahead', async () => {
+  const game = await toTheWolf('quarry-meet');
+  assertTrue(game.page.beats.some((b) => b.type === 'text' && b.text.includes('to tell Mother Nettle')));
+  const tags = game.story.currentChoices.map((c) => c.tags || []);
+  assertTrue(tags.some((t) => t.includes('combat:quarry-wolf')), 'a Fight choice');
+  assertTrue(tags.some((t) => t.includes('check:animal-handling:15')), 'an Animal Handling choice');
+  assertTrue(!tags.some((t) => t.includes('spell:fire-bolt')), 'Wren can’t cast Fire Bolt');
+});
+
+test('Story: food gets you past the wolf for the same XP, then the body tells its tale', async () => {
+  const game = await toTheWolf('quarry-food');
+  const xp = game.xp;
+  pick(game, 'Throw it some of your food'); // Wren's Dungeoneer's Pack has rations
+  assertEqual([game.xp - xp, game.flags.includes('quarry_wolf_spared')], [50, true]);
+  forceNextD20(20);
+  pick(game, 'Look at its wounds');
+  assertTrue(game.flags.includes('saw_dead_hands') && game.xp - xp === 75);
+  pick(game, 'Go on to the quarry');
+  assertEqual([game.story.currentChoices.length, currentLocation(game)], [0, 'Brackenhollow, the quarry mouth']);
+  assertTrue(game.page.beats.some((b) => b.type === 'text' && b.text.includes('waves both arms')), 'the lookout expects you');
+});
+
+test('Story: bought rations are handed over and leave the pack', async () => {
+  const game = await toTheCellar('quarry-rations', juniper);
+  game.inventory.push({ id: 'rations', quantity: 1 }); // as if bought at the market
+  forceNextD20(20);
+  pick(game, "Tell them you're not here for them");
+  // Juniper can also scare it with Fire Bolt or Minor Illusion.
+  const tags = game.story.currentChoices.map((c) => (c.tags || []).join(' '));
+  assertTrue(tags.includes('spell:fire-bolt') && tags.includes('spell:minor-illusion'));
+  pick(game, 'Throw it some of your food');
+  assertTrue(!game.inventory.some((e) => e.id === 'rations'), 'the rations are gone');
+  assertTrue(game.page.beats.some((b) => b.type === 'note' && b.text === 'Gone from your pack: Rations.'));
+});
+
+test('Story: losing to the wolf is Fate’s Mercy: Odda Brasswick carts you home', async () => {
+  const game = await toTheWolf('quarry-lose');
+  const choice = game.story.currentChoices.find((c) => (c.tags || []).includes('combat:quarry-wolf'));
+  startFight(game, choice);
+  game.hp = 0;
+  game.battle.heroState = 'dead';
+  game.battle.outcome = 'defeat';
+  const day = game.day;
+  continueAfterBattle(game);
+  assertEqual([game.money, game.day, game.hp > 0], [0, day + 1, true]);
+  assertTrue(game.flags.includes('met_odda') && game.journal.deeds.some((d) => d.text.includes('Odda Brasswick')));
+  assertTrue(game.story.currentChoices.some((c) => c.text.startsWith('Look at its wounds')), 'the story goes on, at the body');
 });
 
 test('Story: a fight in progress is saved and reloaded exactly', async () => {

@@ -173,7 +173,20 @@ The epilogue then shows each town, faction, companion and your Bond, built from 
    - **Fighter:** "The door was barred from inside and broken *outward*." **Wizard:** "The ash marks a burned sigil: a staff of music notes." **Dwarf:** "This cellar floor is hollow, with old dressed stone underneath."
    - **Discovery:** the cellar floor has been broken through from below into an old tunnel, now choked with rubble.
    - **First fight (the combat tutorial, Low):** two goblin scavengers (two Goblin Minions: 50 XP, a Low fight for one level 1 hero by the 2024 budget; the Goblin Warrior waits in the warren) come back for more flour. Fight them, talk them down (Persuasion), or roar them off (Intimidation). They're starving, and Mother Nettle sent them. Talking takes you straight to Nettle and skips the warren's outer fights; scaring them off leaves a flour trail to follow. Losing the fight is Fate's Mercy: you wake in the temple, robbed, where Lark carried you.
-4. **The quarry road.** A short trip to the old quarry. A Wolf worries at a goblin corpse covered in claw marks that no wolf made (a Low fight, or drive it off with Animal Handling or a loud noise).
+4. **The quarry road.** A short trip to the old quarry. A starving Wolf worries at a goblin corpse covered in claw marks that no wolf made.
+   - **Choices:**
+     - Fight it: a Low fight, and its Bite knocks you Prone.
+     - Calm it (Animal Handling 15).
+     - Roar it off (Intimidation 15).
+     - Scare it with a cantrip (Fire Bolt or Minor Illusion).
+     - Throw it some food (rations, or a Dungeoneer's Pack).
+     - Every way past it gives the same 50 XP.
+   - **The body:**
+     - Medicine 10: the gouges are human fingers with grave dirt in them (`saw_dead_hands`, 25 XP).
+     - Survival 10: it was running *away* from the quarry.
+     - Detect Magic: necromancy.
+   - **Losing the fight is Fate's Mercy:** Odda Brasswick, a priest of the Steadfast Flame hauling firewood, drives the wolf off and carts you home. Goblins took your purse while you lay there (`met_odda`, so she remembers you in Chapter 2).
+   - **It ends at the quarry mouth,** where a goblin lookout sees you (and waves, if you talked the mill goblins down).
 5. **Brackenhollow warren** *(the slice's dungeon, 6 rooms)*:
    1. **Quarry mouth:** a goblin lookout. Sneak past (Stealth), parley, or fight.
    2. **Spike-pit passage:** a trap (Perception to spot it, Dexterity save). The goblins' traps all face *inward*: they're afraid of something coming from below.

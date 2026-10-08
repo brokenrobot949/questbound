@@ -133,7 +133,8 @@ export async function showBattle({ container, game, onSave, onDone }) {
       ...battle.order.map((id) => {
         const c = fight.combatantById(battle, id);
         const down = c.side === 'enemy' ? c.hp <= 0 : battle.heroState !== 'up';
-        const label = c.side === 'hero' ? 'You' : c.name;
+        const name = c.side === 'hero' ? 'You' : c.name;
+        const label = !down && fight.isProne(battle, c.id) ? `${name} (Prone)` : name;
         const item = el('li', `battle-order-entry${c === current ? ' is-current' : ''}${down ? ' is-down' : ''}`, label);
         return item;
       }),
@@ -155,11 +156,14 @@ export async function showBattle({ container, game, onSave, onDone }) {
   function renderHeroControls() {
     const battle = game.battle;
     const turn = battle.turnState;
+    const prone = fight.isProne(battle, 'hero');
     help.textContent = view.option
       ? 'Choose a foe to attack: tap it on the grid or below.'
       : turn.athleteMove
         ? `Remarkable Athlete: tap a gold square to move up to ${turn.athleteMove} feet without provoking Opportunity Attacks, or carry on.`
-        : `Your turn. Tap a lit square to move (${turn.movementLeft} feet left), or choose an action.`;
+        : prone
+          ? `You're Prone: your attacks have Disadvantage, and foes beside you have Advantage. Stand up for ${fight.heroStandCost(game)} feet of movement, or crawl (${turn.movementLeft} feet left, each square costs double).`
+          : `Your turn. Tap a lit square to move (${turn.movementLeft} feet left), or choose an action.`;
 
     const options = fight.heroAttackOptions(game);
     const attacks = el('div', 'battle-row');
@@ -190,6 +194,16 @@ export async function showBattle({ container, game, onSave, onDone }) {
         targets.append(button);
       }
       controls.append(targets);
+    }
+
+    // Standing up from Prone uses movement, not an action.
+    if (prone) {
+      const stand = el('div', 'battle-row');
+      stand.append(el('span', 'battle-row-label', 'Movement'));
+      const button = battleButton(`Stand up (${fight.heroStandCost(game)} feet)`, () => act(() => fight.heroStandUp(game)));
+      button.disabled = !fight.heroCanStand(game);
+      stand.append(button);
+      controls.append(stand);
     }
 
     const other = el('div', 'battle-row');
@@ -296,27 +310,31 @@ export async function showBattle({ container, game, onSave, onDone }) {
     const foes = fight.enemies(battle).sort((a, b) => (a.hp > 0) - (b.hp > 0));
     for (const foe of foes) {
       const sprite = sprites[findMonsterSprite(foe)];
-      ctx.globalAlpha = foe.hp > 0 ? 1 : 0.35;
-      drawTile(ctx, sprite, foe.pos.x, foe.pos.y, size, foe.hp > 0 ? frame : 0);
-      ctx.globalAlpha = 1;
+      // The fallen lie faded on their side; the Prone lie on their side.
+      const standing = foe.hp > 0;
+      drawTile(ctx, sprite, foe.pos.x, foe.pos.y, size, standing ? frame : 0, {
+        alpha: standing ? 1 : 0.35,
+        lying: !standing || fight.isProne(battle, foe.id),
+      });
       if (foe.hp > 0) drawHealthBar(ctx, foe.pos, foe.hp / foe.maxHp, size, scale);
       if (view.option && foe.hp > 0) {
         const preview = fight.attackPreview(game, view.option, foe.id);
         if (preview && preview.inRange) frameSquare(ctx, foe.pos, size, scale, '#ff8a7a');
       }
     }
-    ctx.globalAlpha = battle.heroState === 'up' ? 1 : 0.5;
-    ctx.drawImage(heroFrames[battle.heroState === 'up' ? frame : 0], hero.pos.x * size, hero.pos.y * size, size, size);
-    ctx.globalAlpha = 1;
+    const up = battle.heroState === 'up';
+    blit(ctx, heroFrames[up ? frame : 0], 0, 0, hero.pos.x, hero.pos.y, size, { alpha: up ? 1 : 0.5, lying: !up || fight.isProne(battle, 'hero') });
     drawHealthBar(ctx, hero.pos, game.hp / maxHp(game.character), size, scale);
 
     const current = fight.currentCombatant(battle);
     if (!battle.outcome) frameSquare(ctx, current.pos, size, scale, '#f0c85a');
   }
 
-  function drawTile(ctx, tile, x, y, size, frame = 0) {
+  // A picture from the sheets. The tile's own alpha and lying (data/campaign/sprites.js)
+  // combine with any given here.
+  function drawTile(ctx, tile, x, y, size, frame = 0, { alpha = 1, lying = false } = {}) {
     const sheet = art[tile.sheet][Math.min(frame, art[tile.sheet].length - 1)];
-    ctx.drawImage(sheet, tile.col * TILE, tile.row * TILE, TILE, TILE, x * size, y * size, size, size);
+    blit(ctx, sheet, tile.col * TILE, tile.row * TILE, x, y, size, { alpha: alpha * (tile.alpha || 1), lying: lying || Boolean(tile.lying) });
   }
 
   // Walls pick their tile from which neighbours are walls too.
@@ -360,6 +378,21 @@ function pixelScale(map, container) {
   const dpr = window.devicePixelRatio || 1;
   const available = Math.max(160, container.clientWidth || 320) * dpr;
   return Math.max(1, Math.floor(available / (map.width * TILE)));
+}
+
+// Draws one 16 × 16 square of an image onto grid square (x, y), faded by alpha, and turned a
+// quarter on its side when lying (a whole quarter turn keeps the pixels crisp).
+function blit(ctx, image, sx, sy, x, y, size, { alpha = 1, lying = false } = {}) {
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  if (lying) {
+    ctx.translate(x * size + size / 2, y * size + size / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.drawImage(image, sx, sy, TILE, TILE, -size / 2, -size / 2, size, size);
+  } else {
+    ctx.drawImage(image, sx, sy, TILE, TILE, x * size, y * size, size, size);
+  }
+  ctx.restore();
 }
 
 function drawHealthBar(ctx, pos, fraction, size, scale) {

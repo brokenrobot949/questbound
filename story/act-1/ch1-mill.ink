@@ -117,6 +117,7 @@ You wake on a narrow cot that smells of candle wax. The Temple of the Steadfast 
 "She found you in the mill cellar," the Prior says softly. "Dragged you halfway to the gate before the watch saw her. The goblins took your purse, I'm afraid, and a good deal of flour."
 ~ lose_coins()
 ~ long_rest()
+~ set_flag("mill_fates_mercy")
 ~ add_deed("Was beaten by goblin scavengers at Dunn's Mill, and carried home by Lark Dunn.")
 ~ quest_note("missing-miller", "The goblins who beat you at the mill fled south with the flour, towards the old quarry.")
 
@@ -124,6 +125,14 @@ You wake on a narrow cot that smells of candle wax. The Temple of the Steadfast 
 -> to_the_quarry
 
 = to_the_quarry
-// The end of what's written so far: beat 4, the quarry road, comes next.
-The flour trail leads south, out of the brook valley and up towards the old quarry, where the goblins of Brackenhollow make their home.
--> END
+{
+- has_flag("mill_fates_mercy"):
+    Lark walks you back out past the mill and points down the south road. "Bring him home," she says, and doesn't wait for an answer.
+- has_flag("mill_goblins_talked"):
+    The goblins scurry off ahead of you to tell Mother Nettle you're coming. You follow at your own pace.
+- has_flag("mill_goblins_fled"):
+    You follow the trail of spilled flour out of the yard and onto the south road.
+- else:
+    The goblins' bare footprints came up the south road, and that's the way they lead back.
+}
+-> ch1_quarry_road

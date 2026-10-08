@@ -9,7 +9,7 @@
 
 import { abilityCheck } from '../rules/ability-check.js';
 import { canCastSpell } from '../character/spells.js';
-import { addItem, buyItem, canAfford, findItem, hasItem, moneyText } from '../character/inventory.js';
+import { addItem, buyItem, canAfford, findItem, hasItem, moneyText, removeItem } from '../character/inventory.js';
 import { findDrive } from '../character/creation.js';
 import { addDeed, findQuest, questNote, startQuest } from './journal.js';
 import { longRestRecovery } from '../character/resources.js';
@@ -147,6 +147,17 @@ export function bindExternals(story, runtime) {
     false,
   );
   story.BindExternalFunction('has_item', (id) => hasItem(runtime.game, id), false);
+
+  // take_item(item): one of an item leaves the pack: used up, eaten or handed over.
+  // Check has_item first; taking something the hero doesn't have is a story bug.
+  story.BindExternalFunction(
+    'take_item',
+    (id) => {
+      removeItem(runtime.game.inventory, id, 1);
+      note(runtime.game, dmNotes.itemGone, { item: findItem(id).name });
+    },
+    false,
+  );
 
   // combat_won(): true if the hero won the last fight. A choice tagged #combat:encounter-id
   // starts a fight on the battle grid; its content runs once the fight is over, e.g.

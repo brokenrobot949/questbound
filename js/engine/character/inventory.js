@@ -66,6 +66,14 @@ export function addItem(inventory, id, quantity = 1) {
   else inventory.push({ id, quantity });
 }
 
+// Takes from a pack in place; an item used up leaves the pack.
+export function removeItem(inventory, id, quantity = 1) {
+  const held = inventory.find((entry) => entry.id === id);
+  if (!held || held.quantity < quantity) throw new Error(`The pack doesn't hold ${quantity} ${id}`);
+  held.quantity -= quantity;
+  if (held.quantity === 0) inventory.splice(inventory.indexOf(held), 1);
+}
+
 export function hasItem(game, id) {
   return game.inventory.some((entry) => entry.id === id && entry.quantity > 0);
 }

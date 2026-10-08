@@ -26,6 +26,7 @@ export const dmNotes = {
   questUpdated: 'Journal: {title} updated.',
   itemGained: 'You now have: {item}.',
   itemBought: 'Bought: {item}, for {cost}.',
+  itemGone: 'Gone from your pack: {item}.',
   xpGained: 'You gain {xp} XP.',
   coinsLost: 'Your purse is gone.',
   fightWon: 'Victory! You gain {xp} XP.',

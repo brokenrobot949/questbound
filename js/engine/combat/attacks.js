@@ -8,7 +8,8 @@
 //     reach (feet, melee), range ([normal, long] feet, ranged), modifiers (to hit, for d20Test),
 //     damage: { dice, bonus, type, extraOnAdvantage }, saveDc, saveAbility, darts, rays,
 //     slotLevel (the spell slot it uses), rider, greatWeapon, savage, heavyDisadvantage,
-//     criticalOn (19 with Improved Critical), potent (a cantrip with Potent Cantrip) }
+//     criticalOn (19 with Improved Critical), potent (a cantrip with Potent Cantrip),
+//     onHit (a monster attack's condition on a hit, e.g. the Wolf's Bite knocking you Prone) }
 
 import { d20Test } from '../rules/d20-test.js';
 import { rollDice } from '../rules/dice.js';
@@ -142,6 +143,7 @@ export function monsterAttackOptions(monster) {
       source: 'monster',
       modifiers: [{ label: 'Attack', value: attack.bonus, source: `${monster.name}'s ${attack.name}` }],
       damage: { ...attack.damage, extraOnAdvantage: attack.advantageExtra || null },
+      onHit: attack.onHit || null,
     };
     if (attack.kind === 'melee' || attack.kind === 'melee-or-ranged') {
       options.push({ ...base, id: `${attack.id}-melee`, name: attack.name, how: 'melee', reach: attack.reach });

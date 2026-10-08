@@ -59,6 +59,11 @@ EXTERNAL buy(item)
 EXTERNAL give_item(item)
 EXTERNAL has_item(item)
 
+// take_item(item): one of an item leaves the pack (used up, eaten or handed over), and the
+// player is told. Only call it after has_item says the hero has one, e.g.
+//   * {has_item("rations")} [Toss it your rations] ~ take_item("rations")
+EXTERNAL take_item(item)
+
 // Fights: a choice tagged #combat:encounter-id (from data/campaign/encounters.js) starts a
 // fight on the battle grid. The choice's content runs once the fight is over, and
 // combat_won() says how it went:

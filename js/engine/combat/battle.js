@@ -12,7 +12,8 @@
 //                for the current turn: surged after Action Surge; athleteMove is the free
 //                move Remarkable Athlete gives straight after a Critical Hit (feet, or 0)
 //   effects      [{ kind, target, endsOn }]: 'dodging', 'slowed', 'no-reactions' or
-//                'no-healing', lasting until the start of endsOn's next turn
+//                'no-healing', lasting until the start of endsOn's next turn; and 'prone'
+//                (endsOn null), which lasts until the creature stands up
 //   reactionsUsed  ids that have used their reaction since their last turn
 //   heroState    'up', 'down' (0 Hit Points, making death saves), 'stable' or 'dead'
 //   deathSaves   { successes, failures }
@@ -25,8 +26,8 @@ import { d20Test } from '../rules/d20-test.js';
 import { rollDice } from '../rules/dice.js';
 import { armorClass, findClass, hasFeature, initiative as heroInitiative, speed as heroSpeed } from '../character/sheet.js';
 import { heal, featureUsesLeft, maxHp, spendFeature, spendSlot } from '../character/resources.js';
-import { hasItem } from '../character/inventory.js';
-import { feetBetween, isAdjacent, key, parseMap, reachableSquares, squaresBetween } from './grid.js';
+import { hasItem, removeItem } from '../character/inventory.js';
+import { feetBetween, isAdjacent, key, parseMap, reachableSquares, squaresBetween, stepCost } from './grid.js';
 import {
   attackRoll,
   damageAfterResistance,
@@ -63,6 +64,32 @@ export function hpOf(game, c) {
 
 const upright = (game, c) => (c.side === 'hero' ? game.battle.heroState === 'up' : c.hp > 0);
 const hasEffect = (battle, id, kind) => battle.effects.some((e) => e.target === id && e.kind === kind);
+
+// The Prone condition (SRD 5.2.1): crawling costs extra, standing up costs half your Speed,
+// your attacks have Disadvantage, and attacks against you have Advantage from within 5 feet
+// and Disadvantage from farther away.
+export const isProne = (battle, id) => hasEffect(battle, id, 'prone');
+
+function knockProne(game, c) {
+  if (!isProne(game.battle, c.id)) game.battle.effects.push({ kind: 'prone', target: c.id, endsOn: null });
+}
+
+// Sizes, smallest first, for "Medium or smaller" rules.
+const SIZES = ['tiny', 'small', 'medium', 'large', 'huge', 'gargantuan'];
+const sizeOf = (game, c) => (c.side === 'hero' ? game.character.size : findMonster(c.monsterId).size);
+
+// Standing up costs half the creature's Speed, rounded down. With a Speed of 0 it can't.
+function standCost(game, c) {
+  return Math.floor(speedOf(game, c) / 2);
+}
+
+function standUp(game, c) {
+  const battle = game.battle;
+  const cost = standCost(game, c);
+  battle.turnState.movementLeft -= cost;
+  battle.effects = battle.effects.filter((e) => !(e.target === c.id && e.kind === 'prone'));
+  log(game, c.side === 'hero' ? `You get back on your feet (${cost} feet of movement).` : `${c.name} gets back on its feet.`);
+}
 
 function log(game, text, extra = {}) {
   game.battle.log.push({ round: game.battle.round, text, ...extra });
@@ -206,12 +233,34 @@ export function heroReachable(game) {
   const battle = game.battle;
   const hero = heroCombatant(battle);
   const map = battleMap(battle);
-  const squares = reachableSquares(map, hero.pos, battle.turnState.movementLeft, blockedFor(game, hero));
+  const crawling = isProne(battle, hero.id);
+  const squares = reachableSquares(map, hero.pos, battle.turnState.movementLeft, blockedFor(game, hero), { crawling });
   const free = battle.turnState.athleteMove || 0;
   if (free > 0) {
-    for (const [at, step] of reachableSquares(map, hero.pos, free, blockedFor(game, hero))) squares.set(at, { ...step, free: true });
+    for (const [at, step] of reachableSquares(map, hero.pos, free, blockedFor(game, hero), { crawling })) squares.set(at, { ...step, free: true });
   }
   return squares;
+}
+
+// A Prone hero can stand up if they have half their Speed left to spend. It's not an action.
+export function heroStandCost(game) {
+  return standCost(game, heroCombatant(game.battle));
+}
+
+export function heroCanStand(game) {
+  const cost = heroStandCost(game);
+  return isHeroTurn(game) && isProne(game.battle, 'hero') && speedOf(game, heroCombatant(game.battle)) > 0 && game.battle.turnState.movementLeft >= cost;
+}
+
+export function heroStandUp(game) {
+  requireHeroTurn(game);
+  const battle = game.battle;
+  if (!isProne(battle, 'hero')) throw new Error('You are already on your feet.');
+  const cost = heroStandCost(game);
+  if (speedOf(game, heroCombatant(battle)) === 0) throw new Error("With a Speed of 0 you can't stand up.");
+  if (battle.turnState.movementLeft < cost) throw new Error(`Standing up takes ${cost} feet of movement, and you have ${battle.turnState.movementLeft} left.`);
+  battle.turnState.athleteMove = 0;
+  standUp(game, heroCombatant(battle));
 }
 
 export function heroMove(game, pos) {
@@ -228,6 +277,7 @@ export function heroMove(game, pos) {
 function moveAlong(game, mover, path, { free = false } = {}) {
   const battle = game.battle;
   const map = battleMap(battle);
+  const crawling = isProne(battle, mover.id);
   for (const next of path) {
     if (!battle.turnState.disengaged && !free) {
       for (const foe of battle.combatants) {
@@ -239,11 +289,11 @@ function moveAlong(game, mover, path, { free = false } = {}) {
         }
       }
     }
-    const cost = map.cells[next.y][next.x].terrain === 'difficult' ? 10 : 5;
-    if (!free) battle.turnState.movementLeft -= cost;
+    if (!free) battle.turnState.movementLeft -= stepCost(map, next, crawling);
     mover.pos = { ...next };
   }
   if (free) log(game, 'You move, light on your feet (Remarkable Athlete).');
+  else if (crawling) log(game, mover.side === 'hero' ? 'You crawl.' : `${mover.name} crawls.`);
   else log(game, mover.side === 'hero' ? 'You move.' : `${mover.name} moves.`);
 }
 
@@ -270,6 +320,17 @@ function attackConditions(game, attacker, target, option) {
   }
   if (option.heavyDisadvantage) disadvantage.push('Heavy weapon without the Strength or Dexterity 13 it needs');
   if (target.side === 'hero' && battle.heroState !== 'up') advantage.push('You are Unconscious');
+  const is = (c) => (c.side === 'hero' ? 'You are' : `${c.name} is`);
+  if (isProne(battle, attacker.id)) disadvantage.push(`${is(attacker)} Prone`);
+  if (isProne(battle, target.id)) {
+    if (isAdjacent(attacker.pos, target.pos)) advantage.push(`${is(target)} Prone, within 5 feet`);
+    else disadvantage.push(`${is(target)} Prone, and more than 5 feet away`);
+  }
+  // Pack Tactics: an ally of the attacker, not Incapacitated, within 5 feet of the target.
+  if (attacker.side === 'enemy' && (findMonster(attacker.monsterId).traits || []).includes('pack-tactics')) {
+    const ally = battle.combatants.some((c) => c !== attacker && c.side === attacker.side && upright(game, c) && isAdjacent(c.pos, target.pos));
+    if (ally) advantage.push('Pack Tactics');
+  }
   return { advantage, disadvantage };
 }
 
@@ -416,7 +477,19 @@ function performAttack(game, attacker, target, option) {
   log(game, `${improved || (critical ? 'Critical hit! ' : '')}${how}: ${damageText(damage, option.damage.dice)} damage${savaged}.`, { roll });
   applyDamage(game, target, damage.total, { type: damage.type, critical });
   if (option.rider && target.hp > 0) addRider(game, attacker, target, option);
+  if (option.onHit && !battle.outcome) onHitCondition(game, target, option.onHit);
   return { critical };
+}
+
+// A condition a monster's hit gives, such as the Wolf's Bite knocking a Medium or smaller
+// creature Prone.
+function onHitCondition(game, target, { condition, maxSize }) {
+  if (condition !== 'prone') throw new Error(`Unknown condition from a hit: ${condition}`);
+  if (maxSize && SIZES.indexOf(sizeOf(game, target)) > SIZES.indexOf(maxSize)) return;
+  if (isProne(game.battle, target.id) || (target.side === 'enemy' && target.hp <= 0)) return;
+  knockProne(game, target);
+  if (target.side === 'hero' && game.battle.heroState === 'up') log(game, 'You are knocked Prone.');
+  else if (target.side === 'enemy') log(game, `${target.name} is knocked Prone.`);
 }
 
 // Evoker's Potent Cantrip: a damaging cantrip that misses, or that the target saves against,
@@ -458,6 +531,7 @@ function applyDamage(game, target, amount, { type, critical = false }) {
       if (overflow >= maxHp(game.character)) return heroDies(game, 'The blow is too much.');
       battle.heroState = 'down';
       battle.deathSaves = { successes: 0, failures: 0 };
+      knockProne(game, target); // the Unconscious condition includes Prone
       log(game, 'You drop to 0 Hit Points and fall Unconscious.');
     }
     return;
@@ -479,7 +553,7 @@ function deathSave(game) {
     game.hp = 1;
     battle.heroState = 'up';
     battle.deathSaves = { successes: 0, failures: 0 };
-    log(game, 'A natural 20! You gasp, roll over, and get back up with 1 Hit Point.', { roll });
+    log(game, `A natural 20! You gasp and come to with 1 Hit Point${isProne(battle, 'hero') ? ', still on the ground' : ''}.`, { roll });
     return;
   }
   if (roll.natural === 1) battle.deathSaves.failures += 2;
@@ -579,9 +653,7 @@ export function heroSecondWind(game) {
 export function heroDrinkPotion(game) {
   if (!hasItem(game, 'potion-of-healing')) throw new Error('You have no Potion of Healing.');
   heroUseBonus(game, 'drink a potion');
-  const held = game.inventory.find((e) => e.id === 'potion-of-healing');
-  held.quantity -= 1;
-  if (held.quantity === 0) game.inventory.splice(game.inventory.indexOf(held), 1);
+  removeItem(game.inventory, 'potion-of-healing', 1);
   const roll = rollDice(game.rng, 2, 4);
   const gained = heal(game, roll.total + 2);
   log(game, `You drink a Potion of Healing: 2d4 (${roll.rolls.join(', ')}) + 2 = ${roll.total + 2}. You regain ${gained} Hit Points.`);
@@ -592,15 +664,18 @@ export function heroDrinkPotion(game) {
 // Each monster fights to its behaviour profile (data/srd/monsters.js):
 //   brute       closes in and attacks; throws or shoots only when it can't reach
 //   skirmisher  shoots when it can't reach you this turn
-// Goblins are scavengers: they don't attack a hero who's down, and rummage for loot instead.
+// A Prone monster stands up first. The foes so far don't attack a hero who's down: each
+// encounter says what they do instead (its whileHeroDown line).
 function enemyTurn(game, c) {
   const battle = game.battle;
   const monster = findMonster(c.monsterId);
   const hero = heroCombatant(battle);
   if (battle.heroState !== 'up') {
-    log(game, `${c.name} rummages through the flour sacks.`);
+    const line = findEncounter(battle.encounterId).whileHeroDown || '{name} waits.';
+    log(game, line.replace('{name}', c.name));
     return;
   }
+  if (isProne(battle, c.id) && speedOf(game, c) > 0) standUp(game, c);
   const options = monsterAttackOptions(monster);
   const melee = options.find((o) => o.how === 'melee');
   const ranged = options.find((o) => o.how === 'ranged');
@@ -610,7 +685,8 @@ function enemyTurn(game, c) {
     return checkEnd(game);
   }
   const map = battleMap(battle);
-  const reach = reachableSquares(map, c.pos, battle.turnState.movementLeft, blockedFor(game, c));
+  const crawling = isProne(battle, c.id);
+  const reach = reachableSquares(map, c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling });
   const closest = [...reach.values()].filter((s) => isAdjacent(s.pos, hero.pos)).sort((a, b) => a.cost - b.cost)[0];
   const prefersRanged = monster.behaviour === 'skirmisher' && ranged && inRange(c, hero, ranged);
   if (melee && closest && !prefersRanged) {
@@ -625,7 +701,7 @@ function enemyTurn(game, c) {
   }
   // Too far: Dash towards the hero.
   battle.turnState.movementLeft += speedOf(game, c);
-  const farther = reachableSquares(map, c.pos, battle.turnState.movementLeft, blockedFor(game, c));
+  const farther = reachableSquares(map, c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling });
   const nearest = [...farther.values()].sort((a, b) => squaresBetween(a.pos, hero.pos) - squaresBetween(b.pos, hero.pos) || a.cost - b.cost)[0];
   if (nearest && nearest.path.length) moveAlong(game, c, nearest.path);
   return checkEnd(game);
