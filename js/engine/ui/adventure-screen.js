@@ -14,6 +14,7 @@ import { maxHp } from '../character/resources.js';
 import { levelUpReady } from '../character/level-up.js';
 import { showBattle } from './battle-screen.js';
 import { showLevelUp } from './level-up-screen.js';
+import { sessionCard, whatNowBox } from './session-panels.js';
 import { moneyText, priceOf } from '../character/inventory.js';
 import { findDrive } from '../character/creation.js';
 import {
@@ -41,8 +42,10 @@ const TUMBLE_STEP_MS = 60;
 
 // game: the active game (see save/save-format.js). onSave(game) is called after every change.
 // backupReminder: true to open with the "time to back up" notice.
+// sessionStart: { recap } when a new session begins, to open with its title card (recap is
+// from story/sessions.js, or null); null otherwise.
 // onPageShown(): called whenever new story has been shown (the Journal tab may have news).
-export function startAdventureScreen({ game, root, onSave, backupReminder = false, onPageShown = () => {} }) {
+export function startAdventureScreen({ game, root, onSave, backupReminder = false, sessionStart = null, onPageShown = () => {} }) {
   const narration = root.getElementById('narration');
   const choices = root.getElementById('choices');
   const notices = root.getElementById('notices');
@@ -75,13 +78,41 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
   battleArea.replaceChildren();
   mapArea.replaceChildren();
 
-  // While the backup reminder is up, the view stays at the top so the player sees it.
-  // It follows the story again once they answer it or play on.
-  let holdView = backupReminder;
+  // While the session card or the backup reminder is up, the view stays at the top so the
+  // player sees it. It follows the story again once they answer it or play on.
+  let holdView = backupReminder || Boolean(sessionStart);
   const follow = (node) => {
     if (!holdView) scrollIntoView(node);
   };
+  if (sessionStart) {
+    const card = sessionCard({
+      game,
+      recap: sessionStart.recap,
+      onClose: () => {
+        card.remove();
+        if (!notices.querySelector('.reminder')) holdView = false;
+        scrollIntoView(choices);
+      },
+    });
+    notices.append(card);
+  }
   if (backupReminder) notices.append(backupReminderBox(game, onSave, () => (holdView = false)));
+
+  // "What now?": the hero's aim and the latest clue, on one tap; tap again to close.
+  const whatNowButton = root.getElementById('what-now');
+  whatNowButton.setAttribute('aria-expanded', 'false');
+  whatNowButton.onclick = () => {
+    const open = notices.querySelector('.what-now');
+    const close = (box) => {
+      box.remove();
+      whatNowButton.setAttribute('aria-expanded', 'false');
+    };
+    if (open) return close(open);
+    const box = whatNowBox(game, () => close(box));
+    notices.prepend(box);
+    whatNowButton.setAttribute('aria-expanded', 'true');
+    scrollIntoView(box);
+  };
   renderRollLog(root, game);
   if (game.notice) narration.append(el('p', 'dm-note', game.notice));
   showPage();

@@ -22,6 +22,7 @@ Rain needles down as you reach the north gate. The bar is already across. A lant
 "Gate shuts at sundown," she calls. "Pike, gate warden, and I don't care who you are. There's barrow-dead on the roads. Nobody comes in till dawn."
 
 Past her shoulder you can see warm windows and smoke curling from an inn chimney. Out here, the wind is picking up.
+~ set_objective("Get through Bramblegate's north gate, or find somewhere dry to wait for morning.")
 
 * [Talk her into opening the gate #check:persuasion:15]
     You step into the lantern light, show her your empty hands, and tell her plainly who you are and why you've come.

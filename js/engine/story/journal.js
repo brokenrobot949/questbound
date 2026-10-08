@@ -2,9 +2,11 @@
 // ("Day 2: took the reeve's bounty"). Scenes add to it through the externals in externals.js.
 //
 // game.journal: {
-//   quests: [{ id, status: 'active' | 'done', day, notes: [{ day, text }] }],
-//   deeds:  [{ day, text }],
-//   unread: true when something new has been written since the player last looked
+//   quests:   [{ id, status: 'active' | 'done', day, notes: [{ day, text }] }],
+//   deeds:    [{ day, text }],
+//   sessions: one summary per session played (see sessions.js): { session, fromDay, toDay,
+//             deeds: [text], xp, fromLevel, toLevel, questsStarted: [id], questsFinished: [id] }
+//   unread:   true when something new has been written since the player last looked
 // }
 
 import { quests } from '../../../data/campaign/quests.js';
@@ -12,7 +14,7 @@ import { quests } from '../../../data/campaign/quests.js';
 export const findQuest = (id) => quests.find((q) => q.id === id) || null;
 
 export function newJournal() {
-  return { quests: [], deeds: [], unread: false };
+  return { quests: [], deeds: [], sessions: [], unread: false };
 }
 
 // A notable act, in the DM's words. The recaps and the epilogue read from these.
@@ -52,10 +54,15 @@ export function dayStamped({ day, text }) {
 // Checks a saved journal's shape, for loading saves.
 export function journalOk(journal) {
   const entry = (e) => e && Number.isInteger(e.day) && typeof e.text === 'string';
+  const ids = (list) => Array.isArray(list) && list.every((id) => findQuest(id));
+  const summary = (s) =>
+    s && [s.session, s.fromDay, s.toDay, s.xp, s.fromLevel, s.toLevel].every(Number.isInteger) && Array.isArray(s.deeds) && ids(s.questsStarted) && ids(s.questsFinished);
   return Boolean(
     journal &&
       Array.isArray(journal.deeds) &&
       journal.deeds.every(entry) &&
+      Array.isArray(journal.sessions) &&
+      journal.sessions.every(summary) &&
       Array.isArray(journal.quests) &&
       journal.quests.every((q) => findQuest(q.id) && ['active', 'done'].includes(q.status) && Array.isArray(q.notes) && q.notes.every(entry)) &&
       typeof journal.unread === 'boolean',

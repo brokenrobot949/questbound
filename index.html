@@ -67,6 +67,9 @@
         <!-- One tab shows at a time; the bottom bar switches between them. -->
         <div class="play-tab" id="tab-adventure">
           <p class="hero-strip" id="hero-strip"></p>
+          <div class="adventure-tools">
+            <button class="slot-button what-now-button" id="what-now" type="button" aria-expanded="false">What now?</button>
+          </div>
 
           <div class="notices" id="notices"></div>
 
@@ -89,6 +92,7 @@
         <div class="play-tab" id="tab-menu" hidden>
           <p class="menu-slot" id="slot-note"></p>
           <div class="menu-actions">
+            <button class="slot-button is-primary" id="end-session" type="button">End session</button>
             <button class="slot-button" id="to-title" type="button">Save slots</button>
             <button class="slot-button" id="play-credits" type="button" aria-expanded="false">Credits</button>
           </div>

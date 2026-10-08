@@ -154,6 +154,7 @@ Behind the sacks, something sniffles. A goblin child, no bigger than a cat, is w
 // ---- Room 4: Nettle's hall ----
 
 = hall
+~ set_objective("Deal with Mother Nettle, with words or with steel.")
 The passage opens into the biggest chamber yet. Furs and stolen blankets cover the floor. At the far end, on a throne built from quarry stone and three different stolen chairs, sits Mother Nettle. #room:brackenhollow/hall #location:Brackenhollow warren, Nettle's hall
 
 She's old, and broad for a goblin, in a chain shirt too big for her and a headdress of crow feathers, with a scimitar across her knees. Three goblin warriors stand around her with arrows on the string. More goblins crowd the shadows behind them, small and thin and staring.
@@ -233,6 +234,7 @@ You tell her straight: you came for Garrick Dunn, and for the raids to stop. Gob
 { combat_won():
     The last of Nettle's warriors goes down, and the rest of her band scatters, shrieking, into the tunnels. The hall is yours, and it's very quiet.
     ~ set_flag("goblins_slain")
+    ~ set_objective("Find out what drove the goblins out of their own deep warren.")
     ~ add_deed("Fought Mother Nettle's whole band in Brackenhollow warren, and won.")
     ~ quest_note("missing-miller", "Mother Nettle's band is broken. The raids are over, one way or another.")
     -> lower_door
@@ -244,6 +246,7 @@ You tell her straight: you came for Garrick Dunn, and for the raids to stop. Gob
 You do what the captain would want. The hall goes silent, then erupts: goblins scatter in every direction, into side tunnels and cracks in the walls, wailing for Mother.
 In a moment there's nobody left but you.
 ~ set_flag("goblins_slain")
+~ set_objective("Find out what drove the goblins out of their own deep warren.")
 ~ add_deed("Beat Mother Nettle in single combat in Brackenhollow warren, and finished her.")
 ~ quest_note("missing-miller", "Mother Nettle is dead and her band has scattered. The raids are over.")
 -> lower_door
@@ -275,6 +278,7 @@ Garrick Dunn.
 You shake. Her hand is small and dry, and her grip could crack walnuts.
 ~ set_flag("goblins_spared")
 ~ start_quest("goblin-bargain")
+~ set_objective("Clear the dead out of Brackenhollow's lower warren, as you promised Nettle.")
 ~ add_deed("Struck a bargain with Mother Nettle of Brackenhollow: clear the dead from her deep warren, and the raids stop.")
 ~ quest_note("missing-miller", "Mother Nettle saw grey-robed singers drag a man with a floury beard down through her warren. Garrick Dunn is below.")
 -> lower_door
@@ -297,6 +301,7 @@ You wake with your wrists tied, in a hall full of goblins. Your purse is gone. A
 
 On a throne built from quarry stone and three different stolen chairs sits an old goblin woman in a chain shirt and a headdress of crow feathers, with a scimitar across her knees: Mother Nettle. "Lookout says you came to stab," she says. "Pit says you're clumsy. What do you say?"
 ~ set_flag("warren_captured")
+~ set_objective("Deal with Mother Nettle, with words or with steel.")
 -> hall_talk
 
 // ---- The way down ----

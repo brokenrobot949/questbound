@@ -50,6 +50,11 @@ EXTERNAL quest_note(id, text)
 // finish_quest(id): marks the quest done in the journal; the player is told.
 EXTERNAL finish_quest(id)
 
+// set_objective(text): the hero's aim now, in the DM's words. "What now?" and the recap at
+// the start of a session show it. Set a new one whenever the aim changes, e.g.
+//   ~ set_objective("Follow the goblins' trail south to the old quarry.")
+EXTERNAL set_objective(text)
+
 // can_afford(item): true if the hero has the money for one of that item.
 // buy(item): pays for one and puts it in the pack. Tag the choice so the card shows the price:
 //   + {can_afford("torch")} [Buy a torch #buy:torch]

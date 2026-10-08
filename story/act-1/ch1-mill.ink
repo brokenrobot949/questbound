@@ -135,4 +135,5 @@ You wake on a narrow cot that smells of candle wax. The Temple of the Steadfast 
 - else:
     The goblins' bare footprints came up the south road, and that's the way they lead back.
 }
+~ set_objective("Follow the goblins south to the old quarry, where they make their home.")
 -> ch1_quarry_road

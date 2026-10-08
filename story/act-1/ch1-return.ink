@@ -46,6 +46,7 @@ Captain Varrow has been leaning in the doorway the whole time.
     ~ set_flag("varrow_wary")
 }
 ~ set_flag("reported_to_reeve")
+~ set_objective("Get some sleep at the Tallow and Thistle. Morwen and Prior Crane might make something of the hymnal first.")
 -> town
 
 = morwen
@@ -90,4 +91,5 @@ Someone knocks at your door, very softly.
 It's Lark Dunn, in a cloak too big for her and boots full of mud. "They're digging toward the Kings' Barrow," she whispers. "I followed the lanterns as far as the standing stones. That's where they've taken him. I know it."
 ~ quest_note("missing-miller", "Lanterns on the barrow hills at night, heading north. Lark followed them to the standing stones: she's sure the Choir is digging toward the Kings' Barrow.")
 ~ add_deed("Came back from Brackenhollow with the Choir's hymnal, and saw their lanterns moving on the barrow hills.")
+~ set_objective("Follow the lanterns north to the Kings' Barrow, and bring Garrick Dunn home. (Chapter 2 is still being written.)")
 -> END

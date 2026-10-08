@@ -13,6 +13,13 @@ export const dmVoice = {
     'One. Somewhere a bard starts writing a song about this, and it is not flattering.',
     'The die shows a 1, then tries to roll off the table and escape the scene.',
   ],
+  // How the DM opens the "Previously…" recap when you come back after a while. The game
+  // takes turns through them, session by session.
+  recapOpeners: [
+    'Previously…',
+    'When last we left our hero…',
+    'Settle in. Here’s where we were…',
+  ],
   source: 'original',
 };
 
@@ -26,6 +33,7 @@ export const dmNotes = {
   questStarted: 'New quest: {title}. It’s in your journal.',
   questUpdated: 'Journal: {title} updated.',
   questFinished: 'Quest complete: {title}.',
+  stoppingPoint: 'A good place to stop, if you need to: your game is saved, and the story will be right here.',
   coinsGained: 'You receive {coins}.',
   itemGained: 'You now have: {item}.',
   itemBought: 'Bought: {item}, for {cost}.',

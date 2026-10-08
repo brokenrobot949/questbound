@@ -24,16 +24,19 @@ export const ROLL_LOG_LIMIT = 200;
 
 // Runs Ink until it stops for a choice or ends, and returns the page. Rolls and notes made
 // while Ink worked out a line belong before that line, in the order they happened.
-// leadBeats go first (e.g. the choice just made).
+// leadBeats go first (e.g. the choice just made). A natural stopping point (a long rest, a
+// finished quest) ends the page with a note saying so, once.
 export function runPage(game, leadBeats = []) {
   const { story } = game;
   const beats = [...leadBeats];
   let scene = null;
+  let stoppingPoint = false;
   while (story.canContinue) {
     const text = story.Continue().trim();
     scene = currentKnot(story) || scene;
     for (const item of game.pending.splice(0)) {
       if (item.type === 'roll') beats.push({ type: 'roll', result: item.result, revealed: false });
+      else if (item.type === 'stop') stoppingPoint = true;
       else beats.push({ type: 'note', text: item.text });
     }
     const tags = parseTags(story.currentTags);
@@ -45,6 +48,7 @@ export function runPage(game, leadBeats = []) {
     }
     if (text) beats.push({ type: 'text', text });
   }
+  if (stoppingPoint) beats.push({ type: 'note', text: dmNotes.stoppingPoint });
   return { beats, scene: scene || currentKnot(story) };
 }
 

@@ -7,6 +7,7 @@ import { bindExternals } from './engine/story/externals.js';
 import { jumpTo, restartStory } from './engine/story/story-runner.js';
 import { findClass } from './engine/character/sheet.js';
 import { lowerLevel, xpForLevel } from './engine/character/level-up.js';
+import { beginSession, endSession, recap } from './engine/story/sessions.js';
 import { addItem, COPPER_PER } from './engine/character/inventory.js';
 import { openSaveStore } from './engine/save/save-store.js';
 import { gameToSave, loadGame, newGame } from './engine/save/save-format.js';
@@ -113,17 +114,18 @@ async function start() {
     }
   }
 
-  function showAdventure(game, backupReminder = false) {
+  // sessionStart: { recap } when a new session begins (its title card shows), else null.
+  function showAdventure(game, backupReminder = false, sessionStart = null) {
     tabs.show('adventure');
-    startAdventureScreen({ game, root: document, onSave: autosave, backupReminder, onPageShown: () => tabs.refresh() });
+    startAdventureScreen({ game, root: document, onSave: autosave, backupReminder, sessionStart, onPageShown: () => tabs.refresh() });
     if (debugPanel) debugPanel.refresh();
   }
 
-  function play(game, { backupReminder = false } = {}) {
+  function play(game, { backupReminder = false, sessionStart = null } = {}) {
     showScreen('adventure-screen');
     tracker.startSession(game);
     autosave(game);
-    showAdventure(game, backupReminder);
+    showAdventure(game, backupReminder, sessionStart);
   }
 
   // Runs a title-screen action; if it fails, shows the title again with the reason.
@@ -140,10 +142,17 @@ async function start() {
     onContinue: (slot) =>
       attempt(async () => {
         const game = loadGame(runtime, await store.read(slot));
-        const newSession = !openedThisVisit.has(slot);
-        if (newSession) game.sessionCount += 1;
+        // A new session: the first time the slot is opened this visit, or after End session.
+        const newSession = !openedThisVisit.has(slot) || game.session.ended;
+        if (newSession) {
+          game.sessionCount += 1;
+          beginSession(game);
+        }
         openedThisVisit.add(slot);
-        play(game, { backupReminder: newSession && isBackupDue(game.sessionCount, game.lastBackupSession) });
+        play(game, {
+          backupReminder: newSession && isBackupDue(game.sessionCount, game.lastBackupSession),
+          sessionStart: newSession ? { recap: recap(game, game.lastPlayed) } : null,
+        });
       }),
 
     // A new game starts with character creation. Any save already in the slot stays until
@@ -162,7 +171,7 @@ async function start() {
             attempt(() => {
               const game = newGame(runtime, { slot, seed, character, rngState });
               openedThisVisit.add(slot);
-              play(game);
+              play(game, { sessionStart: { recap: null } });
             }),
         });
       }),
@@ -277,6 +286,18 @@ async function start() {
   playCredits.addEventListener('click', () => togglePanel(playCredits, document.getElementById('menu-credits'), creditsPanel));
 
   document.getElementById('to-title').addEventListener('click', () => showTitle());
+
+  // End session: the DM writes this session's summary into the journal, then the save slots.
+  document.getElementById('end-session').addEventListener('click', () =>
+    attempt(async () => {
+      const game = runtime.game;
+      if (!game) return;
+      const summary = endSession(game);
+      await autosave(game);
+      const text = summary ? `Session ${summary.session} is written into ${game.character.name}'s journal. See you next time.` : 'Session ended. See you next time.';
+      await showTitle({ text, tone: 'info' });
+    }),
+  );
   if (resumeSlot !== null) await titleActions.onContinue(resumeSlot);
   else await showTitle();
 }

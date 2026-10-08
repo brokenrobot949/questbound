@@ -136,4 +136,5 @@ The road ends where the hill was cut away. The quarry is a deep grey bite out of
 }
 ~ quest_note("missing-miller", "Reached the old quarry: the goblins of Brackenhollow live in a warren under the cliff.")
 ~ give_xp(50)
+~ set_objective("Get into the goblins' warren, and find whoever leads them.")
 -> ch1_warren

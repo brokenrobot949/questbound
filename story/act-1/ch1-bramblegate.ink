@@ -13,6 +13,7 @@ Morning comes grey and dripping. Morwen sets down a breakfast big enough for two
 
 "Reeve Corbin's offering good coin to whoever brings Garrick home. His hall's across the square." She pushes a little corked bottle across the table, red as a cherry. "And take this. On the house. Garrick's the only miller for twenty miles, and I'm not baking with gravel."
 ~ give_item("potion-of-healing")
+~ set_objective("Look around Bramblegate, and see Reeve Corbin at his hall about the missing miller.")
 -> bramblegate
 
 // The square: the hub of the town. Places stay open to visit as often as the player likes.
@@ -58,6 +59,7 @@ Reeve Ansel Corbin's hall is a long room full of ledgers and worried people. The
 - "Dunn's Mill is down the brook road, south of town," Corbin says. "Start there. And please, hurry."
 ~ set_flag("took_bounty")
 ~ start_quest("missing-miller")
+~ set_objective("Go down the brook road to Dunn's Mill, and find out what happened to Garrick Dunn.")
 ~ add_deed("Took Reeve Corbin's bounty: find Garrick Dunn and end the goblin raids.")
 {has_flag("saw_barrow_light"):
     ~ quest_note("missing-miller", "Pale lights moved on the barrow hills the night you reached Bramblegate.")

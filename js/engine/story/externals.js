@@ -82,7 +82,7 @@ export function bindExternals(story, runtime) {
   );
 
   // long_rest(): the hero sleeps the night through: all Hit Points, spell slots and feature
-  // uses come back, and the next day begins.
+  // uses come back, and the next day begins. It's a natural stopping point, and the DM says so.
   story.BindExternalFunction(
     'long_rest',
     () => {
@@ -94,6 +94,19 @@ export function bindExternals(story, runtime) {
         game.inspiration = true;
         note(game, dmNotes.inspirationFromRest);
       }
+      game.pending.push({ type: 'stop' }); // the page ends with "a good place to stop"
+    },
+    false,
+  );
+
+  // set_objective(text): the hero's aim now, in the DM's words, e.g.
+  // ~ set_objective("Follow the goblins' trail south to the old quarry.")
+  // "What now?" and the recap at the start of a session show it.
+  story.BindExternalFunction(
+    'set_objective',
+    (text) => {
+      if (typeof text !== 'string' || text.trim() === '') throw new Error('set_objective needs some text');
+      runtime.game.objective = text.trim();
     },
     false,
   );
@@ -218,6 +231,7 @@ export function bindExternals(story, runtime) {
     (id) => {
       finishQuest(runtime.game, id);
       note(runtime.game, dmNotes.questFinished, { title: findQuest(id).title });
+      runtime.game.pending.push({ type: 'stop' });
     },
     false,
   );

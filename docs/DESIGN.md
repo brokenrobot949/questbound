@@ -93,6 +93,15 @@ Every time you open the game is a numbered session, the same ritual as a real ta
 
 The game points out natural stopping points: after a long rest, a finished quest or a return to town.
 
+**How it works in the game**
+
+- **What counts as a session:** opening a save slot once per visit to the page. Coming back to the title screen and continuing in the same visit carries on the same session, unless you chose End Session.
+- **The title card:** shows every session, Session 1 included. The "Previously…" recap shows only after more than an hour away. It gives the last three deeds, where you are, and your aim.
+- **Your aim:** the story sets it at each turning point, in the DM's words (`set_objective` in Ink).
+- **What now?** sits under the hero strip. It shows your aim and the newest clue from your newest active quest.
+- **Session summaries:** **End session** (in the Menu) writes the summary into the journal's Sessions section and returns to the save slots. If you just close the game instead, the summary is written when you next come back. A session where nothing happened isn't written down.
+- **Stopping points:** a long rest or a finished quest ends that page with "A good place to stop, if you need to", once, just above the choices.
+
 **Built for bursts**
 
 - **What now?** One tap and the DM restates your current objective and suggests a next step.

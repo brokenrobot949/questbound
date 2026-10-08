@@ -13,6 +13,7 @@ import { PlaytestTracker, IDLE_LIMIT_MS, formatDuration, summarizeLog } from '..
 import { openSaveStore, deleteSaveDatabase } from '../js/engine/save/save-store.js';
 import { createRng } from '../js/engine/rules/rng.js';
 import { beginLevelUp, chooseHitPoints } from '../js/engine/character/level-up.js';
+import { beginSession, endSession, recap, whatNow } from '../js/engine/story/sessions.js';
 import { quickStartHeroes } from '../data/campaign/quick-start.js';
 
 // Wren Ashdown, the Quick Start Fighter.
@@ -86,7 +87,7 @@ test('New game: the hero starts with the coins and pack from their kits, no Insp
   const game = newGame(await freshRuntime(), { slot: 1, seed: 'kit', character: testHero });
   assertEqual(game.money, 1800, 'Fighter kit A 4 GP and Soldier kit A 14 GP, in copper');
   assertTrue(game.inventory.some((e) => e.id === 'chain-mail') && game.inventory.some((e) => e.id === 'arrow' && e.quantity === 20));
-  assertEqual([game.inspiration, game.journal], [false, { quests: [], deeds: [], unread: false }]);
+  assertEqual([game.inspiration, game.journal], [false, { quests: [], deeds: [], sessions: [], unread: false }]);
 });
 
 test('A save holds game state, Ink state, dice state, session count and last-played time', async () => {
@@ -94,7 +95,7 @@ test('A save holds game state, Ink state, dice state, session count and last-pla
   const game = newGame(runtime, { slot: 2, seed: 'contents', character: testHero, now: new Date('2026-10-01T09:00:00Z') });
   const record = gameToSave(game, new Date('2026-10-06T12:00:00Z'));
   assertEqual(Object.keys(record).sort(), ['createdAt', 'game', 'ink', 'lastBackupSession', 'rng', 'savedAt', 'seed', 'sessionCount', 'slot', 'version']);
-  assertEqual(Object.keys(record.game).sort(), ['battle', 'character', 'day', 'dungeon', 'featureUses', 'flags', 'hp', 'inspiration', 'inventory', 'journal', 'lastBattle', 'levelUp', 'location', 'money', 'page', 'rollLog', 'slotsUsed', 'time', 'xp']);
+  assertEqual(Object.keys(record.game).sort(), ['battle', 'character', 'day', 'dungeon', 'featureUses', 'flags', 'hp', 'inspiration', 'inventory', 'journal', 'lastBattle', 'levelUp', 'location', 'money', 'objective', 'page', 'rollLog', 'session', 'slotsUsed', 'time', 'xp']);
   assertEqual([record.version, record.slot, record.sessionCount, record.lastBackupSession], [SAVE_VERSION, 2, 1, 0]);
   assertEqual([record.createdAt, record.savedAt], ['2026-10-01T09:00:00.000Z', '2026-10-06T12:00:00.000Z']);
   assertTrue(record.rng.length === 4 && record.rng.every(Number.isInteger), 'dice state should be four whole numbers');
@@ -581,6 +582,76 @@ test('Playtest log: reloading for an update carries on the same session entry', 
 
 test('Playtest log: durations read naturally', () => {
   assertEqual([formatDuration(38 * SECOND), formatDuration(245 * SECOND), formatDuration(3720 * SECOND)], ['38s', '4m 05s', '1h 02m']);
+});
+
+// ---- The session ritual ----
+
+test('Migration: a version 11 game gains session summaries, an aim and a session start, and becomes version 12', () => {
+  const v11 = {
+    version: 11,
+    slot: 1,
+    sessionCount: 4,
+    savedAt: '2026-10-01T10:00:00.000Z',
+    game: { character: structuredClone(testHero), day: 2, xp: 75, journal: { quests: [{ id: 'missing-miller', status: 'active', day: 1, notes: [] }], deeds: [{ day: 1, text: 'Did a thing.' }], unread: false } },
+  };
+  const game = migrateSave(v11, migrations, 12).game;
+  assertEqual([game.objective, game.journal.sessions], [null, []]);
+  assertEqual(game.session, { number: 4, startedAt: '2026-10-01T10:00:00.000Z', day: 2, xp: 75, level: 1, deeds: 1, quests: { 'missing-miller': 'active' }, ended: false });
+});
+
+test('Sessions: a new session sums up the last one in the journal if the player just closed the game', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'session', character: testHero });
+  game.journal.deeds.push({ day: 1, text: 'Did a brave thing.' });
+  game.xp += 50;
+  game.sessionCount += 1;
+  beginSession(game);
+  assertEqual(game.journal.sessions, [{ session: 1, fromDay: 1, toDay: 1, deeds: ['Did a brave thing.'], xp: 50, fromLevel: 1, toLevel: 1, questsStarted: [], questsFinished: [] }]);
+  assertEqual([game.session.number, game.session.deeds, game.session.xp, game.session.ended], [2, 1, 50, false]);
+  game.sessionCount += 1;
+  beginSession(game);
+  assertEqual(game.journal.sessions.length, 1, 'nothing happened in session 2, so nothing is written');
+});
+
+test('Sessions: End session writes the summary once', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'end', character: testHero });
+  game.journal.deeds.push({ day: 1, text: 'Did a brave thing.' });
+  assertEqual(endSession(game).session, 1);
+  assertEqual(endSession(game), null, 'already ended');
+  game.sessionCount += 1;
+  beginSession(game);
+  assertEqual(game.journal.sessions.length, 1, 'not written twice');
+  assertEqual(validateSave(throughJson(gameToSave(game))).version, SAVE_VERSION);
+});
+
+test('Recap: only after more than an hour away, with the last three deeds and the aim', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'recap', character: testHero });
+  for (const text of ['One.', 'Two.', 'Three.', 'Four.']) game.journal.deeds.push({ day: 1, text });
+  game.objective = 'Find the miller.';
+  const now = new Date('2026-10-07T12:00:00Z');
+  assertEqual(recap(game, '2026-10-07T11:30:00Z', now), null, 'half an hour is no time at all');
+  const r = recap(game, '2026-10-07T10:00:00Z', now);
+  assertEqual([r.deeds, r.aim], [['Two.', 'Three.', 'Four.'], 'Find the miller.']);
+  assertTrue(typeof r.opener === 'string' && r.opener.length > 0);
+});
+
+test('What now? and the aim: the story sets the aim, and the newest quest gives the latest word', async () => {
+  const runtime = await freshRuntime();
+  const game = newGame(runtime, { slot: 1, seed: 'aim', character: testHero });
+  assertTrue(/north gate/.test(whatNow(game).aim), 'the gate scene sets an aim');
+  game.page = makeChoice(game, game.story.currentChoices.find((c) => c.text.startsWith('Wait out the night')));
+  game.journal.quests.push({ id: 'missing-miller', status: 'active', day: 1, notes: [{ day: 1, text: 'Boot prints at the mill.' }] });
+  assertEqual(whatNow(game).quest, { title: 'The Missing Miller', note: 'Boot prints at the mill.' });
+  const reloaded = loadGame(await freshRuntime(), throughJson(gameToSave(game)));
+  assertEqual(reloaded.objective, game.objective, 'the aim is saved');
+});
+
+test('Stopping points: a page with a long rest ends by saying it’s a good place to stop', async () => {
+  const runtime = await freshRuntime();
+  const game = newGame(runtime, { slot: 1, seed: 'rest', character: testHero });
+  game.page = makeChoice(game, game.story.currentChoices.find((c) => c.text.startsWith('Wait out the night')));
+  const last = game.page.beats.at(-1);
+  assertTrue(last.type === 'note' && last.text.startsWith('A good place to stop'), JSON.stringify(last));
+  assertEqual(game.page.beats.filter((b) => b.text === last.text).length, 1, 'said once');
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

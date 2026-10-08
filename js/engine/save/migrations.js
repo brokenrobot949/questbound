@@ -158,4 +158,21 @@ export const migrations = {
 
   // Version 11 adds where the hero is in a dungeon. Saves before it had never been in one.
   10: (save) => ({ ...save, version: 11, game: { ...save.game, dungeon: null } }),
+
+  // Version 12 adds the session ritual: session summaries in the journal, the hero's aim,
+  // and where this session began (taken as the moment the save was last played).
+  11: (save) => {
+    const { game } = save;
+    const session = {
+      number: save.sessionCount,
+      startedAt: save.savedAt,
+      day: game.day,
+      xp: game.xp,
+      level: game.character.level,
+      deeds: game.journal.deeds.length,
+      quests: Object.fromEntries(game.journal.quests.map((q) => [q.id, q.status])),
+      ended: false,
+    };
+    return { ...save, version: 12, game: { ...game, objective: null, session, journal: { ...game.journal, sessions: [] } } };
+  },
 };

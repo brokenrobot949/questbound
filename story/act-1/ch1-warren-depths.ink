@@ -15,6 +15,7 @@ They were people once, a long time ago. Grave-cloth hangs off them in rags, and 
 
 Under the scraping you can hear singing, somewhere ahead and below. The diggers are keeping time with it.
 ~ set_flag("heard_the_hymn")
+~ set_objective("Find whoever is singing below the warren, and stop the song.")
 
 * [Slip past them while they dig #check:stealth:10]
     You keep to the far wall and move only when their spades bite.
@@ -147,6 +148,7 @@ You come to on the cold crypt floor. The hymn is over, the acolyte is gone, and 
 ~ give_item("choir-hymnal")
 The book is a hymnal, bound in grey. Inside are old coronation hymns, written out again and again in a careful hand, and a rough map of a road running north into the barrow hills. Burned into the cover is a staff wound with music notes{ has_flag("saw_choir_sigil"): , the same sigil you saw scorched into the floor of Dunn's Mill}.
 ~ set_flag("found_hymnal")
+~ set_objective("Climb out of the warren, and take what you've learned back to Reeve Corbin in Bramblegate.")
 ~ quest_note("missing-miller", "Took a hymnal from the Choir at the breach: coronation hymns, a map of the barrow road, and their sigil, a staff wound with music notes.")
 ~ give_xp(25)
 
