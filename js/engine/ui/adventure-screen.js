@@ -171,7 +171,7 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
       return;
     }
     const stillWanted = () => request === mapRequest;
-    showDungeonMap({ container: mapArea, state, hero: heroSprite(game.character), doors, onGo: choose, stillWanted }).catch(showFatalError);
+    showDungeonMap({ container: mapArea, state, flags: game.flags, hero: heroSprite(game.character), doors, onGo: choose, stillWanted }).catch(showFatalError);
   }
 
   function hideMap() {
@@ -186,10 +186,9 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
     showBattle({
       container: battleArea,
       game,
-      onSave: (g) => {
-        onSave(g);
-        updateStatus();
-      },
+      onSave,
+      // The status line's Hit Points follow the fight as it plays out, not ahead of it.
+      onShown: updateStatus,
       onDone: () => {
         battleArea.replaceChildren();
         for (const node of narration.children) node.classList.add('is-past');

@@ -17,12 +17,19 @@
 //   reactionsUsed  ids that have used their reaction since their last turn
 //   heroState    'up', 'down' (0 Hit Points, making death saves), 'stable' or 'dead'
 //   deathSaves   { successes, failures }
-//   log          [{ round, text, roll, damage }]: everything that happened, in order
+//   log          [{ round, text, roll, turnOf, newRound }]: everything that happened, in
+//                order; turnOf marks the line that starts a combatant's turn, and newRound
+//                the line that starts a round
 //   outcome      null while fighting, then 'victory' or 'defeat'; xp: earned on victory
 //   surprise     true if the hero caught the foes unawares (they rolled Initiative with
 //                Disadvantage)
 //   hymn         for an encounter with a hymn: { singing, risen } (see encounters.js)
 // A foe that flees the fight is marked escaped, and its hp set to 0 so it no longer counts.
+//
+// Replays (not saved): each log line written in this visit also remembers the scene just
+// after it (who stood where, with how many Hit Points) and any moves it covers, so the battle
+// screen can play a turn back a line at a time, walking each creature square by square.
+// Lines from a loaded save have none, and the screen shows them at once.
 
 import { encounters } from '../../../data/campaign/encounters.js';
 import { monsters } from '../../../data/srd/monsters.js';
@@ -103,8 +110,47 @@ function standUp(game, c) {
   log(game, c.side === 'hero' ? `You get back on your feet (${cost} feet of movement).` : `${c.name} gets back on its feet.`);
 }
 
-function log(game, text, extra = {}) {
-  game.battle.log.push({ round: game.battle.round, text, ...extra });
+const replays = new WeakMap(); // log line → { scene, moves }
+const walking = new WeakMap(); // battle → the walk in progress: { id, from, path }
+
+// Writes a line in the fight log. moves: creatures shifted outside a walk (Redirect Attack's
+// swap), as { id, from, path }.
+function log(game, text, extra = {}, moves = []) {
+  const battle = game.battle;
+  const entry = { round: battle.round, text, ...extra };
+  battle.log.push(entry);
+  // The steps walked since the last line belong to this one (an Opportunity Attack can break
+  // a walk in two).
+  const walk = walking.get(battle);
+  const walked = [];
+  if (walk && walk.path.length) {
+    walked.push({ id: walk.id, from: walk.from, path: walk.path });
+    walk.from = { ...walk.path[walk.path.length - 1] };
+    walk.path = [];
+  }
+  replays.set(entry, { scene: battleScene(game), moves: [...walked, ...moves] });
+}
+
+// What a log line remembers for the replay ({ scene, moves }), or null for a line from a save.
+export const replayOf = (entry) => replays.get(entry) || null;
+
+// Where everyone is and how they're doing right now: the round, whose turn it is, the hero's
+// state, and each creature's square, Hit Points, and whether it's Prone or has fled.
+export function battleScene(game) {
+  const battle = game.battle;
+  return {
+    round: battle.round,
+    actor: battle.order.length ? battle.order[battle.turn] : null,
+    heroState: battle.heroState,
+    units: battle.combatants.map((c) => ({ id: c.id, pos: { ...c.pos }, hp: hpOf(game, c), prone: isProne(battle, c.id), escaped: Boolean(c.escaped) })),
+  };
+}
+
+// After damage lands, the line that announced it shows the new Hit Points.
+function rescene(game) {
+  const entry = game.battle.log[game.battle.log.length - 1];
+  const replay = entry && replays.get(entry);
+  if (replay) replay.scene = battleScene(game);
 }
 
 // ---- Starting ----
@@ -185,6 +231,7 @@ function beginTurn(game) {
   battle.effects = battle.effects.filter((e) => e.endsOn !== c.id);
   battle.reactionsUsed = battle.reactionsUsed.filter((id) => id !== c.id);
   battle.turnState = { movementLeft: speedOf(game, c), action: false, bonus: false, disengaged: false, savageUsed: false, surged: false, athleteMove: 0 };
+  log(game, c.side === 'hero' ? 'Your turn.' : `${c.name}'s turn.`, { turnOf: c.id });
   if (c.side === 'hero' && battle.heroState === 'down') deathSave(game);
 }
 
@@ -195,7 +242,7 @@ function advanceTurn(game) {
     if (battle.turn >= battle.order.length) {
       battle.turn = 0;
       battle.round += 1;
-      log(game, `Round ${battle.round}.`);
+      log(game, `Round ${battle.round}.`, { newRound: true });
       hymnRises(game);
     }
   } while (currentCombatant(battle).side === 'enemy' && currentCombatant(battle).hp <= 0);
@@ -353,23 +400,29 @@ function moveAlong(game, mover, path, { free = false } = {}) {
   const battle = game.battle;
   const map = battleMap(battle);
   const crawling = isProne(battle, mover.id);
-  for (const next of path) {
-    if (!battle.turnState.disengaged && !free) {
-      for (const foe of battle.combatants) {
-        if (foe.side === mover.side || !upright(game, foe)) continue;
-        if (battle.reactionsUsed.includes(foe.id) || hasEffect(battle, foe.id, 'no-reactions')) continue;
-        if (isAdjacent(foe.pos, mover.pos) && !isAdjacent(foe.pos, next)) {
-          opportunityAttack(game, foe, mover);
-          if (battle.outcome || !upright(game, mover)) return;
+  walking.set(battle, { id: mover.id, from: { ...mover.pos }, path: [] });
+  try {
+    for (const next of path) {
+      if (!battle.turnState.disengaged && !free) {
+        for (const foe of battle.combatants) {
+          if (foe.side === mover.side || !upright(game, foe)) continue;
+          if (battle.reactionsUsed.includes(foe.id) || hasEffect(battle, foe.id, 'no-reactions')) continue;
+          if (isAdjacent(foe.pos, mover.pos) && !isAdjacent(foe.pos, next)) {
+            opportunityAttack(game, foe, mover);
+            if (battle.outcome || !upright(game, mover)) return;
+          }
         }
       }
+      if (!free) battle.turnState.movementLeft -= stepCost(map, next, crawling);
+      mover.pos = { ...next };
+      walking.get(battle).path.push({ ...next });
     }
-    if (!free) battle.turnState.movementLeft -= stepCost(map, next, crawling);
-    mover.pos = { ...next };
+    if (free) log(game, 'You move, light on your feet (Remarkable Athlete).');
+    else if (crawling) log(game, mover.side === 'hero' ? 'You crawl.' : `${mover.name} crawls.`);
+    else log(game, mover.side === 'hero' ? 'You move.' : `${mover.name} moves.`);
+  } finally {
+    walking.delete(battle);
   }
-  if (free) log(game, 'You move, light on your feet (Remarkable Athlete).');
-  else if (crawling) log(game, mover.side === 'hero' ? 'You crawl.' : `${mover.name} crawls.`);
-  else log(game, mover.side === 'hero' ? 'You move.' : `${mover.name} moves.`);
 }
 
 function opportunityAttack(game, attacker, target) {
@@ -585,9 +638,13 @@ function redirectAttack(game, target) {
   );
   if (allies.length === 0) return target;
   const ally = allies.sort((a, b) => b.hp - a.hp)[0];
+  const swap = [
+    { id: ally.id, from: { ...ally.pos }, path: [{ ...target.pos }] },
+    { id: target.id, from: { ...target.pos }, path: [{ ...ally.pos }] },
+  ];
   [ally.pos, target.pos] = [target.pos, ally.pos];
   battle.reactionsUsed.push(target.id);
-  log(game, `${target.name} drags ${ally.name} into the way: Redirect Attack!`);
+  log(game, `${target.name} drags ${ally.name} into the way: Redirect Attack!`, {}, swap);
   return ally;
 }
 
@@ -632,7 +689,12 @@ function monsterDamage(game, target, amount, type) {
 }
 
 // Damage of one type, plus any flat extra of another type (plus: { amount, type }).
-function applyDamage(game, target, amount, { type, critical = false, plus = null }) {
+function applyDamage(game, target, amount, damage) {
+  takeHit(game, target, amount, damage);
+  rescene(game);
+}
+
+function takeHit(game, target, amount, { type, critical = false, plus = null }) {
   const battle = game.battle;
   if (target.side === 'enemy') {
     if (target.hp <= 0) return;

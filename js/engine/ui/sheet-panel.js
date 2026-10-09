@@ -1,8 +1,13 @@
 // The Sheet tab during play: the hero's sheet (every number taps open to show its maths),
-// plus what changes in play: Heroic Inspiration, coins and the pack.
+// plus what changes in play: Heroic Inspiration, coins and the pack, and the armour worn and
+// every attack the hero has, with the numbers the fight uses.
 
 import { findBond, findDrive } from '../character/creation.js';
 import { findItem, itemText, moneyText } from '../character/inventory.js';
+import { armorClass, findArmor } from '../character/sheet.js';
+import { heroAttackOptions } from '../combat/attacks.js';
+import { shield } from '../../../data/srd/armor.js';
+import { attackSummary } from './attack-text.js';
 import { featureUsesLeft, featureUsesMax, maxHp, slotsAt, slotsLeft } from '../character/resources.js';
 import { levelUpReady, nextLevelXp } from '../character/level-up.js';
 import { heroSheet } from './hero-sheet.js';
@@ -34,6 +39,7 @@ export function sheetPanel(game) {
   }
   now.append(el('p', 'section-hint', 'A long rest brings back Hit Points, spell slots and every use of your features.'));
   panel.append(now);
+  panel.append(gearBlock(game));
 
   panel.append(heroSheet(character));
 
@@ -59,8 +65,51 @@ export function sheetPanel(game) {
   if (held.length === 0) pack.append(el('p', 'section-hint', 'Your pack is empty.'));
   for (const entry of held) {
     const item = findItem(entry.id);
-    pack.append(item.text ? expandable(itemText(entry), item.text) : el('p', 'pack-item', itemText(entry)));
+    let label = itemText(entry);
+    if (entry.id === character.armorId) label += ' (wearing)';
+    else if (entry.id === shield.id && character.shield) label += ' (on your arm)';
+    pack.append(item.text ? expandable(label, item.text) : el('p', 'pack-item', label));
   }
   panel.append(pack);
   return panel;
+}
+
+// What the hero wears, and what they can attack with: each weapon (and attack spell) with its
+// chance to hit, damage and reach, the same numbers the battle screen shows.
+function gearBlock(game) {
+  const { character } = game;
+  const block = el('section', 'sheet-block');
+  block.append(el('h3', 'section-heading', 'Armour and weapons'));
+  const ac = armorClass(character).value;
+  const worn = character.armorId ? findArmor(character.armorId) : null;
+  block.append(el('p', 'sheet-line', `Wearing: ${worn ? worn.name : 'no armour'} (Armor Class ${ac})`));
+  if (character.shield) block.append(el('p', 'sheet-line', `Shield: on your arm (+${shield.acBonus} Armor Class)`));
+
+  const options = heroAttackOptions(game);
+  const weapons = game.inventory.filter((entry) => entry.quantity > 0 && findItem(entry.id).category === 'weapon');
+  block.append(el('p', 'sheet-line', 'Weapons'));
+  if (weapons.length === 0) block.append(el('p', 'section-hint', 'You carry no weapons.'));
+  else block.append(el('p', 'section-hint', 'Every weapon in your pack is at hand in a fight: you draw the one you need as you attack.'));
+  for (const entry of weapons) {
+    const item = findItem(entry.id);
+    const ways = options.filter((option) => option.itemId === item.id);
+    for (const option of ways) block.append(el('p', 'pack-item', `${option.name}: ${attackSummary(option).join(' · ')}`));
+    if (ways.length === 0) block.append(el('p', 'pack-item', `${item.name}: ${whyNot(game, item)}`));
+  }
+
+  // Attack spells, once each (at the lowest slot level with a slot left).
+  const spells = options.filter((option, i) => option.source === 'spell' && options.findIndex((o) => o.spellId === option.spellId) === i);
+  if (spells.length) {
+    block.append(el('p', 'sheet-line', 'Attack spells'));
+    for (const option of spells) block.append(el('p', 'pack-item', `${option.name}: ${attackSummary(option).join(' · ')}`));
+  }
+  return block;
+}
+
+// Why a weapon in the pack can't be used just now.
+function whyNot(game, item) {
+  const props = item.properties || [];
+  if (props.includes('two-handed') && game.character.shield) return 'needs both hands, so not while you carry a Shield';
+  if (item.ammunition) return `no ${findItem(item.ammunition).name.toLowerCase()}s left`;
+  return 'can’t be used just now';
 }

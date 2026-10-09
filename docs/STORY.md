@@ -6,6 +6,8 @@ Draft 1, Oct 6, 2026. Written by Claude Code; Rob approved its key decisions the
 
 **Rules every scene follows** (from CLAUDE.md): second person, present tense, two to four short paragraphs per beat; failure moves the story forward and never dead-ends a quest; options the character doesn't qualify for stay hidden. Most fights are Moderate, bosses are High, and every authored fight gets a twist where it can: a hazard, an objective, reinforcements or a chance to parley.
 
+**Conversations don't repeat themselves.** A place or person greets you once per visit, and a different short line each time you come back. Questions you ask loop back to the questions, not to the greeting, so nobody says the same paragraph twice in one conversation. (In Ink: the greeting is the knot, and the questions are a stitch that loops to itself.)
+
 ---
 
 ## The campaign at a glance

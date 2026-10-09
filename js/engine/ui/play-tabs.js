@@ -12,9 +12,14 @@ export function setupPlayTabs({ root, getGame, onOpenMenu, onJournalRead }) {
   const nav = root.getElementById('bottom-nav');
   const buttons = [...nav.querySelectorAll('[data-tab]')];
   let current = 'adventure';
+  // How far down each tab was scrolled when the player left it.
+  const scrolls = {};
 
-  function show(tab) {
+  // fresh: a game is starting, so every tab starts from the top.
+  function show(tab, { fresh = false } = {}) {
     if (!TABS.includes(tab)) throw new Error(`Unknown tab: ${tab}`);
+    if (fresh) for (const name of TABS) delete scrolls[name];
+    else scrolls[current] = window.scrollY;
     current = tab;
     const game = getGame();
     for (const name of TABS) root.getElementById(`tab-${name}`).hidden = name !== tab;
@@ -32,7 +37,9 @@ export function setupPlayTabs({ root, getGame, onOpenMenu, onJournalRead }) {
     }
     if (tab === 'menu') onOpenMenu();
     refresh();
-    window.scrollTo(0, 0);
+    // The Adventure tab comes back to where the player left it, at the latest events. The
+    // other tabs are built afresh each time, so they open at the top.
+    window.scrollTo(0, tab === 'adventure' ? scrolls.adventure || 0 : 0);
   }
 
   // Marks the Journal tab when something new has been written in it.

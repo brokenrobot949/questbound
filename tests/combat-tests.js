@@ -16,6 +16,7 @@ import { bindExternals } from '../js/engine/story/externals.js';
 import { continueAfterBattle, currentLocation, makeChoice, startFight } from '../js/engine/story/story-runner.js';
 import { gameToSave, loadGame, newGame } from '../js/engine/save/save-format.js';
 import { validateCharacter } from '../js/engine/character/validate.js';
+import { attackSummary, averageDamage } from '../js/engine/ui/attack-text.js';
 
 const wren = quickStartHeroes.find((h) => h.id === 'wren').character;
 const juniper = quickStartHeroes.find((h) => h.id === 'juniper').character;
@@ -523,6 +524,57 @@ test('Story: a fight in progress is saved and reloaded exactly', async () => {
   const reloaded = loadGame(runtime, record);
   assertEqual(reloaded.battle, JSON.parse(JSON.stringify(game.battle)));
   assertTrue(reloaded.story.currentChoices.some((c) => c.index === reloaded.battle.choiceIndex), 'the story waits at the same choice');
+});
+
+// ---- Playing turns back on screen ----
+
+test('Replay: each turn is announced, and every line remembers the scene just after it', () => {
+  const game = millFight();
+  fight.endHeroTurn(game);
+  const log = game.battle.log;
+  assertTrue(log.every((entry) => fight.replayOf(entry)), 'every line written this visit can be played back');
+  const turns = log.filter((entry) => entry.turnOf).map((entry) => entry.text);
+  assertTrue(turns.includes("Goblin Minion 1's turn.") && turns[turns.length - 1] === 'Your turn.', turns.join(' / '));
+  assertEqual(fight.replayOf(log[log.length - 1]).scene, fight.battleScene(game), 'the last line shows the fight as it stands');
+  assertTrue(!JSON.stringify(game.battle).includes('"scene"'), 'the replay isn’t part of the saved fight');
+});
+
+test('Replay: a walk goes square by square, and an Opportunity Attack breaks it in two', () => {
+  const game = millFight();
+  const battle = game.battle;
+  const hero = fight.heroCombatant(battle);
+  const start = { ...hero.pos };
+  fight.enemies(battle)[0].pos = { x: 3, y: 2 }; // next to the hero at (3, 1)
+  fight.heroMove(game, { x: 1, y: 2 });
+  const attack = battle.log.find((entry) => entry.text.includes('an Opportunity Attack!'));
+  const before = fight.replayOf(attack).moves;
+  assertEqual([before.length, before[0].id, before[0].from, before[0].path.length], [1, 'hero', start, 1], 'one step, then the goblin lashes out');
+  const after = fight.replayOf(battle.log.find((entry) => entry.text === 'You move.')).moves;
+  assertEqual([after[0].from, after[0].path], [before[0].path[0], [{ x: 1, y: 2 }]], 'then the rest of the walk');
+});
+
+test('Replay: damage shows on the line that deals it', () => {
+  const game = millFight();
+  const goblin = fight.enemies(game.battle)[0];
+  goblin.pos = { x: 3, y: 2 };
+  goblin.hp = 30; // so it doesn't fall, and no later line shows the damage instead
+  forceNextD20(15);
+  fight.heroAttack(game, 'greatsword-melee', goblin.id);
+  const hit = game.battle.log.find((entry) => entry.text.includes('hit Goblin Minion 1 with Greatsword'));
+  assertEqual(fight.replayOf(hit).scene.units.find((u) => u.id === goblin.id).hp, goblin.hp);
+  assertTrue(goblin.hp < 30);
+});
+
+test('Action buttons say what an attack does: to hit, damage, the average, and reach', () => {
+  const wrenOptions = heroAttackOptions(millFight());
+  assertEqual(attackSummary(wrenOptions.find((o) => o.id === 'greatsword-melee')), ['+5 to hit', '2d6 + 3 slashing', '10 on average', 'melee']);
+  assertEqual(attackSummary(wrenOptions.find((o) => o.id === 'javelin-ranged')), ['+5 to hit', '1d6 + 3 piercing', '6.5 on average', 'thrown 30/120 ft']);
+  const evokerGame = millFight(evoker);
+  const options = heroAttackOptions(evokerGame);
+  const missile = attackSummary(options.find((o) => o.id === 'spell-magic-missile'), { slotsLeft: () => 4 });
+  assertEqual(missile, ['3 darts that never miss', '1d4 + 1 force each', '10.5 on average', 'range 120 ft', 'uses a level 1 slot (4 left)']);
+  assertTrue(attackSummary(options.find((o) => o.id === 'spell-fire-bolt')).includes('half damage even on a miss'), 'Potent Cantrip');
+  assertEqual(averageDamage({ dice: '2d6', bonus: 3 }, { greatWeapon: true }), 11, 'Great Weapon Fighting counts 1s and 2s as 3s');
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

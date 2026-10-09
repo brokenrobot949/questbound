@@ -6,7 +6,8 @@ import { createRng } from '../js/engine/rules/rng.js';
 import { forceNextD20 } from '../js/engine/rules/dice.js';
 import { isStandable, parseMap } from '../js/engine/combat/grid.js';
 import * as fight from '../js/engine/combat/battle.js';
-import { enterRoom, findDungeon, parseRoomTag } from '../js/engine/world/dungeons.js';
+import { enterRoom, findDungeon, parseRoomTag, roomFigures } from '../js/engine/world/dungeons.js';
+import { sprites, tiles } from '../data/campaign/sprites.js';
 import { takeDamage } from '../js/engine/character/hazards.js';
 import { startingInventory } from '../js/engine/character/inventory.js';
 import { freshResources } from '../js/engine/character/resources.js';
@@ -47,6 +48,33 @@ test('Rooms: the map remembers where you’ve been, even after you leave', () =>
   assertEqual(state, { id: 'brackenhollow', room: 'mouth', explored: ['mouth', 'pit'] });
   assertEqual(enterRoom(state, parseRoomTag('none')), { id: 'brackenhollow', room: null, explored: ['mouth', 'pit'] });
   assertThrows(() => parseRoomTag('brackenhollow/ballroom'), 'a room that isn’t on the map');
+});
+
+test('Rooms: whoever is in a room stands on open floor inside it, with a picture to draw', () => {
+  for (const dungeon of dungeons) {
+    const map = parseMap(dungeon.rows, dungeon.legend);
+    for (const room of dungeon.rooms) {
+      for (const figure of room.figures || []) {
+        const where = `${room.id}: ${figure.name} at ${figure.pos.x},${figure.pos.y}`;
+        assertTrue(figure.pos.y >= room.rows[0] && figure.pos.y <= room.rows[1] && isStandable(map, figure.pos), where);
+        assertTrue(Boolean(sprites[figure.sprite] || tiles[figure.sprite]), `${where}: picture`);
+        assertTrue(figure.pos.x !== room.entry.x || figure.pos.y !== room.entry.y, `${where}: on the hero's square`);
+      }
+    }
+  }
+});
+
+test('Rooms: Nettle and her band wait in the hall where the fights start them, and leave once it’s broken', () => {
+  const hall = findDungeon('brackenhollow').rooms.find((r) => r.id === 'hall');
+  const band = encounters.find((e) => e.id === 'nettle-band');
+  const onMap = (pos) => ({ x: pos.x, y: pos.y + hall.rows[0] });
+  const here = roomFigures(hall, []);
+  for (const { pos } of band.monsters) assertTrue(here.some((f) => f.pos.x === onMap(pos).x && f.pos.y === onMap(pos).y), `someone stands at ${pos.x},${pos.y}`);
+  assertEqual(here.find((f) => f.name === 'Mother Nettle').fallen, false);
+  assertEqual(roomFigures(hall, ['goblins_spared']).length, here.length, 'a bargain keeps them home');
+  assertEqual(roomFigures(hall, ['goblins_slain']), [], 'a broken band scatters');
+  const lower = findDungeon('brackenhollow').rooms.find((r) => r.id === 'lower');
+  assertTrue(roomFigures(lower, ['lower_dead_stilled']).every((f) => f.fallen), 'the stilled dead lie where they dug');
 });
 
 test('Encounters: every fight’s difficulty starts with Low, Moderate, High or Deadly (the choice card shows it)', () => {

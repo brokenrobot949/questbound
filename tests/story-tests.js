@@ -181,4 +181,30 @@ test('Chapter 1: the market takes coins, fills the pack, and only offers what th
   assertTrue(notesOn(page).includes('Bought: Torch, for 1 CP.'));
 });
 
+test('Chapter 1: townsfolk don’t repeat their greeting after each answer, and no page says anything twice', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'talk', character: testHero });
+  const texts = (page) => page.beats.filter((b) => b.type === 'text').map((b) => b.text);
+  const go = (start) => {
+    const page = pick(game, start);
+    const said = texts(page);
+    assertEqual(said.filter((t, i) => said.indexOf(t) !== i), [], `"${start}" repeats itself`);
+    return said;
+  };
+  go("Show her your old regiment's token");
+  go("Call in at Hob's forge");
+  assertEqual(go('Ask Hob').length, 2, 'Hob’s answer, and no greeting after it');
+  assertEqual(cards(game), ['Back to the square'], 'asked once, that’s it');
+  go('Back to the square');
+  assertEqual(go("Call in at Hob's forge").length, 1, 'coming back gets one short greeting');
+  go('Back to the square');
+  go('Look in at the temple');
+  assertEqual(go('Pray for the missing miller').length, 1, 'the Prior doesn’t greet you again');
+  assertTrue(cards(game).some((t) => t.startsWith('Ask the Prior')), 'the other question is still there');
+  go('Back to the square');
+  go('Read the notice board');
+  assertTrue(!go('Tear down').some((t) => t.startsWith('CAPABLE FOLK')), 'the notices aren’t read out again');
+  go('Back to the square');
+  assertEqual(go('Read the notice board').length, 1, 'a second look is one line');
+});
+
 run(document.getElementById('summary'), document.getElementById('results'));

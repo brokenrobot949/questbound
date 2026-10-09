@@ -35,6 +35,16 @@ export function enterRoom(state, where) {
   };
 }
 
+// Who the hero finds in a room, given the story flags: [{ sprite, pos, name, fallen }].
+// Anyone who has left (a goneOn flag is set) isn't there; anyone who fell (a fallenOn flag
+// is set) lies where they fell.
+export function roomFigures(room, flags) {
+  const anySet = (list) => (list || []).some((flag) => flags.includes(flag));
+  return (room.figures || [])
+    .filter((figure) => !anySet(figure.goneOn))
+    .map((figure) => ({ sprite: figure.sprite, pos: figure.pos, name: figure.name || null, fallen: anySet(figure.fallenOn) }));
+}
+
 // The rows and legend of a fight's map: its own map, or a room's band of a dungeon map
 // (encounter.map = { dungeon, room }), so the fight happens where the hero is standing.
 export function encounterRows(encounter) {

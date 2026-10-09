@@ -8,6 +8,7 @@ const PREFIX = 'questbound:';
 const DEFAULTS = {
   autoRoll: false, // roll the d20 straight away instead of waiting for a tap
   plainNarration: false, // show the story in a plain font instead of the pixel font
+  battleSpeed: 'normal', // how fast turns play out in a fight: 'slow', 'normal' or 'fast'
 };
 
 // Settings changed on this visit. If storage is full or blocked, they still last until the page closes.

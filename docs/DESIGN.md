@@ -212,6 +212,7 @@ The character sheet is a live, tabbed version of the paper sheet: every number o
 
 - Weapons, armour, adventuring gear and magic items come from the free rules, including 2024 weapon mastery properties.
 - Equipped gear shows on your sprite as a colour change, since DawnLike sprites are recoloured rather than layered.
+- For now: the armour you wear and your Shield come from your starting kit. The Sheet's **Armour and weapons** section shows what you're wearing and your Armor Class, then every weapon with its bonus to hit, damage, average damage and reach, the same numbers the battle screen uses. Every weapon in your pack is at hand in a fight (you draw the one you need as you attack); a two-handed weapon can't be used while you carry a Shield, and a bow needs arrows, and the Sheet says so. In the Pack, your armour is marked "(wearing)" and your Shield "(on your arm)". Changing armour arrives with the first armour you can find or buy.
 - Coins use the standard five types (copper, silver, electrum, gold, platinum).
 - Magic items scale with tier: mostly common and uncommon in Act I, rare in Act II, very rare in Act III, legendary in Act IV. Loot tables are original, built from rules-listed items.
 - Unknown magic items are identified with a short rest of study or the Identify spell, as in the rules.
@@ -238,6 +239,19 @@ Combat plays on a tactical grid, like miniatures on a battle map: 5-foot squares
 3. Bonus actions sit in their own bar. Reactions, such as an opportunity attack or the Shield spell, pop up as prompts or can be set to automatic.
 4. Before any attack, the game shows your chance to hit ("65%") and the damage dice.
 
+How it works in the game so far: every action button says what it does under its name. An attack shows its bonus to hit, damage dice, average damage and reach ("+5 to hit · 2d6 + 3 slashing · 10 on average · melee"); Dash, Dodge, Second Wind and the rest say what they do and how many uses are left. Choosing an attack lists each foe with your chance to hit it, and any Advantage or Disadvantage and why.
+
+**Watching turns play out**
+
+Every turn, the enemies' and your own, plays out a line at a time instead of all at once:
+
+- Each creature's turn is announced ("Goblin Warrior 2's turn"), and a gold frame marks whoever is acting on the grid and in the turn order.
+- Creatures walk square by square. A walk that provokes an Opportunity Attack stops for it, then carries on.
+- Damage and healing pop up as numbers over whoever took them, and Hit Points (the bars and the header) change as each hit lands, not before.
+- The line playing now shows in a box right under the grid, with its roll; between turns that box keeps the last thing that happened. The full fight log sits below the actions.
+- When a turn starts playing, the screen scrolls so the grid and that box are in view.
+- **Battle speed** in Settings sets the pace (Slow, Normal or Fast), and **Skip** shows the rest at once. The fight is decided and saved before it plays out, so skipping or reloading never changes what happened.
+
 **Rules on the grid**
 
 Initiative, attack rolls against AC, critical hits, damage types and resistances, saving throws, area spells drawn as cones, spheres and lines, opportunity attacks, cover, concentration checks, the 2024 conditions, weapon mastery and death saves all work as written. Sneaking up first gives enemies disadvantage on initiative, per the 2024 surprise rule.
@@ -257,7 +271,7 @@ Initiative, attack rolls against AC, critical hits, damage types and resistances
 **Quick resolve and speed**
 
 - A fight well under your party's strength offers **Resolve**: the engine plays it out instantly with real rolls and reports HP lost and resources spent. Story and boss fights are always played by hand.
-- Settings cover animation speed, auto-roll, automatic reactions and auto end-turn.
+- Settings cover animation speed (Battle speed: Slow, Normal or Fast), auto-roll, automatic reactions and auto end-turn.
 
 ## World and Exploration
 
@@ -281,6 +295,7 @@ The world is a hand-made region map of towns, wilds and dungeons. You travel bet
 - Dungeons use the same tiles as the combat grid. Rooms are revealed as you enter.
 - The map sits above the choices and shows the room you're in, with your hero at its entrance; **Whole map** shows every room explored so far, and the rest stays dark. The story moves you room to room, and the map follows only as far as you've read (it waits for any d20 you haven't tapped).
 - Tap a door or room to move your party token: the ways on light up in gold, and tapping one is the same as tapping its "Go" choice card. Rooms hold traps, puzzles, monsters, treasure or lore.
+- Whoever is in a room stands on the map when you walk in: Mother Nettle before her throne with her band around her, the dead at their digging. Where a room has a fight, they stand on the squares the fight starts them on. The story moves them on: those who leave or scatter are gone from the map, and those who fall lie where they fell.
 - Traps work as in the rules. Damage outside a fight that drops you to 0 Hit Points means death saving throws with nobody to help (you see each roll); three failures lead to Fate's Mercy.
 - Every fight card shows how hard the fight is ("Fight · Low", "Fight · Deadly"), from the encounter budget.
 - Searching uses Investigation and Perception checks; traps work as in the rules.

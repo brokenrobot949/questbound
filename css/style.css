@@ -873,6 +873,13 @@ h3.debug-heading {
 .title-extras {
   display: flex;
   justify-content: center;
+  gap: 32px;
+}
+
+/* A comfortable thumb-sized target for each link. */
+.title-extras .text-button {
+  min-height: 44px;
+  padding: 6px 8px;
 }
 
 .title-bar-links {
@@ -923,6 +930,25 @@ h3.debug-heading {
 
 .setting-hint {
   color: var(--muted);
+}
+
+/* A setting with a few values: its text, then a row of buttons */
+.setting.is-choice {
+  flex-direction: column;
+  gap: 6px;
+  cursor: default;
+}
+
+.setting-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.setting-choice[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--page);
 }
 
 /* Credits: the contents of CREDITS.md */
@@ -1896,6 +1922,78 @@ h3.debug-heading {
 .battle-button {
   min-height: 40px;
   padding: 6px 12px;
+}
+
+/* The line playing out, right under the grid: whose turn, what happened, and the roll */
+.battle-caption {
+  min-height: 4.5em;
+  padding: 8px 12px;
+  background: var(--box);
+  border: 2px solid var(--box-edge-dark);
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  font-size: var(--size-ui);
+}
+
+.battle-caption:empty {
+  display: none;
+}
+
+.battle-caption p {
+  margin: 0;
+}
+
+.battle-caption-title {
+  margin-bottom: 4px !important;
+  font-family: var(--font-heading);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--accent);
+}
+
+/* Action buttons: the name, and underneath it what the action does */
+.battle-actions {
+  flex-basis: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+}
+
+.battle-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 2px;
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.battle-action-what {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.battle-action[aria-pressed='true'] .battle-action-what {
+  color: var(--page);
+}
+
+.battle-action:disabled .battle-action-what {
+  color: var(--past);
+}
+
+.battle-log-line.is-turn {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--box-edge-dark);
+  color: var(--accent);
+}
+
+.battle-log-line.is-turn:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 
 .battle-button[aria-pressed='true'] {

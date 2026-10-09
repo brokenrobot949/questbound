@@ -112,14 +112,18 @@ Reeve Ansel Corbin's hall is a long room full of ledgers and worried people. The
         ~ note_goblins_fled()
     }
 - else:
-    Hob looks up from his anvil and waves his hammer at you. "Back again! Nobody ever comes back. It's the noise." #location:Bramblegate, Hob's forge
+    {&Hob looks up from his anvil and waves his hammer at you. "Back again! Nobody ever comes back. It's the noise."|Hob's hammer doesn't miss a beat. "Still in one piece? Good for business," he shouts over the clanging.|Hob is elbow-deep in a quench barrel, and waves a dripping hand at you. "Look around! Touch nothing orange."} #location:Bramblegate, Hob's forge
 }
+-> talk
+
+// The conversation itself: the greeting above isn't said again after each answer.
+= talk
 * [Ask Hob everything he knows about the barrows #drive:knowledge]
     ~ drive_moment("knowledge")
     Hob is delighted to be asked. Kings were buried up there in the old days, he says, with their swords and their crowns and their grudges. "Nobody's dug in those hills for a hundred years. Bad luck. Worse drainage."
 
     "The big one's the Kings' Barrow," he adds, quieter. "Folk say it's never been opened. Folk say a lot of things."
-    -> forge
+    -> talk
 + [Back to the square]
     -> bramblegate
 
@@ -129,12 +133,16 @@ Reeve Ansel Corbin's hall is a long room full of ledgers and worried people. The
 
     "All are welcome at the Flame," he says. "Even at this hour. Especially at this hour."
 - else:
-    Prior Crane looks up from the great candle and nods. #location:Bramblegate, the temple
+    {&Prior Crane looks up from the great candle and nods.|The great candle burns on. Prior Crane is bent over a ledger, and gives you a small, tired smile.|Prior Crane is sweeping wax from the altar steps. He straightens up when he sees you.} #location:Bramblegate, the temple
 }
+-> talk
+
+// The conversation itself: the greeting above isn't said again after each answer.
+= talk
 * [Pray for the missing miller #drive:faith]
     ~ drive_moment("faith")
     You kneel before the Flame and pray for Garrick Dunn, wherever he is. After a moment the Prior kneels beside you. Neither of you says anything. It helps more than you expected.
-    -> temple
+    -> talk
 * [Ask the Prior about the barrows #check:insight:15]
     "The barrows?" He talks easily enough about old kings and sacred rest and the Flame's duty to the dead.
     { check("insight", 15):
@@ -143,26 +151,33 @@ Reeve Ansel Corbin's hall is a long room full of ledgers and worried people. The
     - else:
         He seems like a kind man having a bad week. Who isn't, in Bramblegate?
     }
-    -> temple
+    -> talk
 + [Back to the square]
     -> bramblegate
 
 === notice_board ===
-The notice board is a slab of oak by the well, pocked with old nail holes. #location:Bramblegate, the square
+{ notice_board == 1:
+    The notice board is a slab of oak by the well, pocked with old nail holes. #location:Bramblegate, the square
 
-CAPABLE FOLK WANTED. The dead walk and goblins raid. Apply to Reeve Corbin. Payment on results.
+    CAPABLE FOLK WANTED. The dead walk and goblins raid. Apply to Reeve Corbin. Payment on results.
 
-TEN SILVER PER GOBLIN EAR, paid at the watch-house. By order of Captain H. Varrow.
+    TEN SILVER PER GOBLIN EAR, paid at the watch-house. By order of Captain H. Varrow.
 
-LOST: one grey cat, answers to Biscuit, does not answer to anything else. Ask at the Tallow and Thistle.
+    LOST: one grey cat, answers to Biscuit, does not answer to anything else. Ask at the Tallow and Thistle.
 
-{not has_flag("tore_down_notice"): WANTED: runaway bond-servant Tobin Reed, aged fourteen. Reward for his return from Master Fulke, tanner.}
+    {not has_flag("tore_down_notice"): WANTED: runaway bond-servant Tobin Reed, aged fourteen. Reward for his return from Master Fulke, tanner.}
+- else:
+    The same damp notices: the reeve's call for capable folk, Captain Varrow's ear bounty, and Biscuit the cat, still missing.{not has_flag("tore_down_notice"): The one about the runaway, Tobin Reed, is still there too.} #location:Bramblegate, the square
+}
+-> read
 
+// Reading on: the notices aren't read out again after tearing one down.
+= read
 * [Tear down the notice about the runaway #drive:freedom]
     ~ drive_moment("freedom")
     ~ set_flag("tore_down_notice")
     You tear it down, fold it small and drop it down the well. Nobody stops you. An old woman drawing water gives you a nod that says she'd have done it herself, if her knees were younger.
-    -> notice_board
+    -> read
 + [Back to the square]
     -> bramblegate
 
