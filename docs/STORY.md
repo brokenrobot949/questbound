@@ -8,6 +8,8 @@ Draft 1, Oct 6, 2026. Written by Claude Code; Rob approved its key decisions the
 
 **Conversations don't repeat themselves.** A place or person greets you once per visit, and a different short line each time you come back. Questions you ask loop back to the questions, not to the greeting, so nobody says the same paragraph twice in one conversation. (In Ink: the greeting is the knot, and the questions are a stitch that loops to itself.)
 
+**Who's speaking.** A line where someone speaks ends with `#speaker:id`, and the game shows their portrait and name beside it. Everyone who speaks has an entry in `data/campaign/people.js`, with their look. A new character needs one before their first line (a check fails otherwise). Lines the hero speaks get no tag.
+
 ---
 
 ## The campaign at a glance

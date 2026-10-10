@@ -20,7 +20,7 @@ The reeve of Bramblegate sent word down every road: the dead are walking out of 
 
 Rain needles down as you reach the north gate. The bar is already across. A lantern swings above it, and under the lantern a gate warden in a dripping cloak watches you come. #location:Bramblegate, north gate
 
-"Gate shuts at sundown," she calls. "Pike, gate warden, and I don't care who you are. There's barrow-dead on the roads. Nobody comes in till dawn."
+"Gate shuts at sundown," she calls. "Pike, gate warden, and I don't care who you are. There's barrow-dead on the roads. Nobody comes in till dawn." #speaker:pike
 
 Past her shoulder you can see warm windows and smoke curling from an inn chimney. Out here, the wind is picking up.
 ~ set_objective("Get through Bramblegate's north gate, or find somewhere dry to wait for morning.")
@@ -79,29 +79,29 @@ Past her shoulder you can see warm windows and smoke curling from an inn chimney
 ~ add_deed("Talked Warden Pike into opening the north gate after sundown.")
 The warden studies you for a long moment. Then she sighs, sets her shoulder to the bar and heaves it aside.
 
-"Straight to the Tallow and Thistle, and stay off the walls," she says. "If anything follows you in, I'm telling the captain it was your idea."
+"Straight to the Tallow and Thistle, and stay off the walls," she says. "If anything follows you in, I'm telling the captain it was your idea." #speaker:pike
 -> into_town
 
 = gate_opens_grudging
 ~ set_flag("warden_opened_gate")
 ~ add_deed("Shouted the north gate open. Warden Pike hasn't forgiven it.")
-"Fine," the warden snaps. "Fine! Come in and drip on somebody else." She hauls the bar aside hard enough to rattle the hinges.
+"Fine," the warden snaps. "Fine! Come in and drip on somebody else." She hauls the bar aside hard enough to rattle the hinges. #speaker:pike
 
-"You'll be at the Tallow and Thistle," she adds as you pass. It isn't a question. "I'll know where to find you."
+"You'll be at the Tallow and Thistle," she adds as you pass. It isn't a question. "I'll know where to find you." #speaker:pike
 -> into_town
 
 = gate_sees_through
-She laughs, which is worse than shouting. "The reeve's expecting nobody. The reeve's asleep." She leans on the parapet. "Nice try, though. There's a dry corner under the eaves."
+She laughs, which is worse than shouting. "The reeve's expecting nobody. The reeve's asleep." She leans on the parapet. "Nice try, though. There's a dry corner under the eaves." #speaker:pike
 -> night_at_the_gate
 
 = gate_stays_shut
-She hears you out, then shakes her head. "Nice speech. Still no." She jerks her chin at the gatehouse. "There's a dry corner under the eaves. Better than the road."
+She hears you out, then shakes her head. "Nice speech. Still no." She jerks her chin at the gatehouse. "There's a dry corner under the eaves. Better than the road." #speaker:pike
 -> night_at_the_gate
 
 = soldier_token
 You dig the brass token out from under your collar: your old regiment's badge, worn smooth by your thumb on long nights.
 
-The warden squints at it, then at you. "My brother wore one of those." The bar is off before you've tucked the token away. "Welcome to Bramblegate, soldier. The Tallow and Thistle's the warm one."
+The warden squints at it, then at you. "My brother wore one of those." The bar is off before you've tucked the token away. "Welcome to Bramblegate, soldier. The Tallow and Thistle's the warm one." #speaker:pike
 ~ set_flag("warden_opened_gate")
 ~ add_deed("Showed an old regiment's token at the north gate. Warden Pike let a fellow soldier in.")
 -> into_town
@@ -109,7 +109,7 @@ The warden squints at it, then at you. "My brother wore one of those." The bar i
 = sanctuary
 "I ask for sanctuary," you call up, "as temple law allows any pilgrim, in any town, after dark."
 
-There's a long pause. Somewhere above, the warden swears quietly. "Prior Crane would have my hide if I turned away a holy traveller," she grumbles, and the bar scrapes aside. "Temple's past the square. Inn's closer. Pick one and stay in it."
+There's a long pause. Somewhere above, the warden swears quietly. "Prior Crane would have my hide if I turned away a holy traveller," she grumbles, and the bar scrapes aside. "Temple's past the square. Inn's closer. Pick one and stay in it." #speaker:pike
 ~ set_flag("warden_opened_gate")
 ~ add_deed("Claimed a pilgrim's right of sanctuary at the north gate after dark.")
 -> into_town
@@ -131,7 +131,7 @@ You go up and over like it's an old habit, which it is, and drop into a dark all
 = climb_fall
 Halfway up, a stone shifts under your boot and you land in the ditch with a splash that echoes off the wall. A lantern bobs towards you along the parapet.
 
-"Thought so," says the warden, peering down. "Dry corner under the eaves. Don't make me tell the captain."
+"Thought so," says the warden, peering down. "Dry corner under the eaves. Don't make me tell the captain." #speaker:pike
 -> night_at_the_gate
 
 = gate_charmed
@@ -139,19 +139,19 @@ Halfway up, a stone shifts under your boot and you land in the ditch with a spla
 ~ set_flag("warden_opened_gate")
 ~ set_flag("charmed_pike")
 ~ add_deed("Charmed Warden Pike into opening the north gate after sundown. She'll know, when it wears off.")
-The warden's frown melts into a smile, as if you were an old friend come home. "Well, why didn't you say it was you?" She hauls the bar aside herself. "Get in out of the wet. Mind the step."
+The warden's frown melts into a smile, as if you were an old friend come home. "Well, why didn't you say it was you?" She hauls the bar aside herself. "Get in out of the wet. Mind the step." #speaker:pike
 
 In an hour the charm will fade, and she'll know exactly what you did. But that's an hour away, and the inn is right there.
 -> into_town
 
 = gate_feels_the_spell
-Something flickers behind the warden's eyes, and her hand goes to her cudgel. "Was that a spell? At my gate?" She leans out over the parapet and glares at you. "There's a dry corner under the eaves. Keep your fingers still in it."
+Something flickers behind the warden's eyes, and her hand goes to her cudgel. "Was that a spell? At my gate?" She leans out over the parapet and glares at you. "There's a dry corner under the eaves. Keep your fingers still in it." #speaker:pike
 -> night_at_the_gate
 
 = cantrip_trick
 ~ set_flag("warden_opened_gate")
 ~ add_deed("Charmed the north gate open with a little magic.")
-The warden stares, then laughs despite herself. "Well, the dead don't do tricks." She sets her shoulder to the bar and heaves it aside. "In you come, before you set the gatehouse alight."
+The warden stares, then laughs despite herself. "Well, the dead don't do tricks." She sets her shoulder to the bar and heaves it aside. "In you come, before you set the gatehouse alight." #speaker:pike
 -> into_town
 
 = night_at_the_gate
@@ -162,12 +162,12 @@ Near midnight, a pale light moves on the hills to the east, where the barrows ar
 ~ add_deed("Spent a cold night under the north gate's eaves, and saw pale lights on the barrow hills.")
 ~ long_rest()
 
-At dawn the bar comes off. "Patient sort, aren't you?" says the warden, though her eyes keep drifting back to those hills. "The Tallow and Thistle's across the square. Tell Morwen I sent you and she'll feed you twice." #location:Bramblegate #time:Dawn
+At dawn the bar comes off. "Patient sort, aren't you?" says the warden, though her eyes keep drifting back to those hills. "The Tallow and Thistle's across the square. Tell Morwen I sent you and she'll feed you twice." #location:Bramblegate #time:Dawn #speaker:pike
 -> ch1_morning
 
 = into_town
 The Tallow and Thistle is still lit. Inside it smells of woodsmoke and stew, and a broad woman with flour to the elbows takes one look at you dripping on her floor and puts a bowl in your hands before you've said a word. #location:Bramblegate, the Tallow and Thistle #time:Night
 
-"Morwen Tallow," she says. "Room's at the top of the stairs, breakfast's at dawn. Nobody's out there tonight but the dead, and they don't pay."
+"Morwen Tallow," she says. "Room's at the top of the stairs, breakfast's at dawn. Nobody's out there tonight but the dead, and they don't pay." #speaker:morwen
 ~ long_rest()
 -> ch1_morning

@@ -23,7 +23,9 @@
 //                  levelUp (a level-up in progress, or null; see character/level-up.js),
 //                  dungeon (the dungeon room the hero is in and the rooms explored, or null;
 //                  see world/dungeons.js), objective (the hero's aim, or null) and session
-//                  (this session's starting point; see story/sessions.js), page, rollLog
+//                  (this session's starting point; see story/sessions.js), page, rollLog,
+//                  and undo (the moment before the last choice or attack, kept while the hero
+//                  holds Heroic Inspiration so a failed roll can be rerolled; see save/undo.js)
 
 import { createRng, Rng } from '../rules/rng.js';
 import { currentDungeon, currentLocation, currentTime, runPage } from '../story/story-runner.js';
@@ -36,8 +38,9 @@ import { battleOk } from '../combat/battle.js';
 import { levelUpOk } from '../character/level-up.js';
 import { migrations } from './migrations.js';
 import { validateCharacter } from '../character/validate.js';
+import { undoOk } from './undo.js';
 
-export const SAVE_VERSION = 13;
+export const SAVE_VERSION = 14;
 
 // runtime: { story, game } — the compiled story, and whichever game is being played.
 
@@ -70,6 +73,7 @@ export function newGame(runtime, { slot, seed, character, rngState = null, now =
     session: null,
     page: null,
     rollLog: [],
+    undo: null,
     pending: [],
     notice: null,
   };
@@ -116,6 +120,7 @@ export function gameToSave(game, now = new Date()) {
       session: game.session,
       page: game.page,
       rollLog: game.rollLog,
+      undo: game.undo || null,
     }),
   };
 }
@@ -156,6 +161,7 @@ export function loadGame(runtime, record) {
     session: save.game.session,
     page: save.game.page,
     rollLog: save.game.rollLog,
+    undo: save.game.undo || null,
     lastPlayed: save.savedAt, // when this save was last played, for the recap (not saved again)
     pending: [],
     notice: null,
@@ -166,6 +172,7 @@ export function loadGame(runtime, record) {
   } catch (error) {
     console.warn("Couldn't restore the story position:", error);
     runtime.story.ResetState();
+    game.undo = null;
     game.page = runPage(game);
     game.notice = 'The story has changed since this save, so the scene starts again.';
   }
@@ -221,6 +228,7 @@ export function validateSave(save) {
     const pageOk = game.page && Array.isArray(game.page.beats) && game.page.beats.every((b) => b && beatTypes.includes(b.type));
     if (!pageOk) problems.push('current page');
     if (!Array.isArray(game.rollLog)) problems.push('roll log');
+    if (!undoOk(game.undo)) problems.push('undo point');
   }
 
   if (problems.length > 0) {

@@ -32,11 +32,11 @@
 * [Call up to the lookout that you've come to talk #check:persuasion:15]
     You show your empty hands and call up that you're here to see Mother Nettle, not to fight.
     { check("persuasion", 15):
-        The lookout chews on that for a long moment. Then it hops down from the ledge with its bow still half drawn. "Mother decides," it says. "Follow. Touch nothing."
+        The lookout chews on that for a long moment. Then it hops down from the ledge with its bow still half drawn. "Mother decides," it says. "Follow. Touch nothing." #speaker:lookout
         ~ set_flag("warren_lookout_talked")
         -> past_lookout
     - else:
-        "Talk," the lookout sneers, "with arrows." It draws.
+        "Talk," the lookout sneers, "with arrows." It draws. #speaker:lookout
         -> lookout_fight
     }
 * {can_cast("fog-cloud")} [Fill the quarry with fog, and walk in under it #spell:fog-cloud]
@@ -49,7 +49,7 @@
 
 = guided_in
 // The goblins you talked down at the mill ran ahead to say you were coming.
-The lookout scrambles down from its ledge and bobs its head at you, nervous and very polite. "Mother says come," it says. "Mother says no stabbing. Follow."
+The lookout scrambles down from its ledge and bobs its head at you, nervous and very polite. "Mother says come," it says. "Mother says no stabbing. Follow." #speaker:lookout
 ~ set_flag("warren_lookout_talked")
 -> past_lookout
 
@@ -126,14 +126,14 @@ The walls are notched with handholds, small but enough, and you haul yourself ou
 -> trap_marks
 
 = pit_shown
-Your goblin guide stops dead and points at a square of floor that looks like all the rest. "Lid," it says. "Pit under. Step where I step." You do.
+Your goblin guide stops dead and points at a square of floor that looks like all the rest. "Lid," it says. "Pit under. Step where I step." You do. #speaker:lookout
 -> trap_marks
 
 = trap_marks
 Scratched into the wall beside the pit are goblin warning marks, and they're on the wrong side. They face down the passage, to be read by someone coming up from the deep warren, not by anyone coming in.
 These traps weren't dug to keep you out. They were dug to keep something in.
 { has_flag("warren_lookout_talked"):
-    Your guide sees you looking. "Not for you," it mutters. "For them." It won't say who "them" is. Then it points on down the passage, and scuttles back towards the daylight before you can ask.
+    Your guide sees you looking. "Not for you," it mutters. "For them." It won't say who "them" is. Then it points on down the passage, and scuttles back towards the daylight before you can ask. #speaker:lookout
 }
 ~ set_flag("traps_face_inward")
 ~ quest_note("missing-miller", "The goblins' traps face inward. Whatever they fear is coming up from below their warren.")
@@ -160,12 +160,12 @@ The goblins took the miller's flour, then. Nothing in here suggests they took th
 ~ quest_note("missing-miller", "Dunn's flour is in the goblins' larder, but there's no sign they ever had the miller himself.")
 ~ give_xp(50)
 
-Behind the sacks, something sniffles. A goblin child, no bigger than a cat, is wedged in the gap with its arms over its head. "Not food!" it squeaks. "Not food! NOT FOOD!"
+Behind the sacks, something sniffles. A goblin child, no bigger than a cat, is wedged in the gap with its arms over its head. "Not food!" it squeaks. "Not food! NOT FOOD!" #speaker:goblin-child
 
 * [Crouch down and promise it you're not hungry #drive:justice]
     ~ drive_moment("justice")
     You sit down on the floor, slowly, and wait. After a long while the child lowers its arms.
-    "Dead things came up," it whispers. "Through the floor, in the deep. Big people singing behind them. Mother says the singers make them walk." Then it squirms past you and is gone up the passage, shouting for Mother at the top of its lungs.
+    "Dead things came up," it whispers. "Through the floor, in the deep. Big people singing behind them. Mother says the singers make them walk." Then it squirms past you and is gone up the passage, shouting for Mother at the top of its lungs. #speaker:goblin-child
     ~ set_flag("larder_child_spared")
     ~ quest_note("missing-miller", "A goblin child says dead things came up through the floor of the deep warren, with singers behind them.")
     -> larder_on
@@ -176,7 +176,7 @@ Behind the sacks, something sniffles. A goblin child, no bigger than a cat, is w
 * {can_cast("dancing-lights")} [Send little lights dancing for it #spell:dancing-lights]
     ~ cast("dancing-lights")
     Four soft lights wink into being and bob through the gloom like fireflies. The child's arms come down. It reaches for one, misses, and lets out a squeak of a giggle.
-    "Dead things came up," it whispers, watching the lights. "Through the floor, in the deep. Big people singing behind them. Mother says the singers make them walk." Then it squirms past you and is gone up the passage, a light still bobbing after it.
+    "Dead things came up," it whispers, watching the lights. "Through the floor, in the deep. Big people singing behind them. Mother says the singers make them walk." Then it squirms past you and is gone up the passage, a light still bobbing after it. #speaker:goblin-child
     ~ set_flag("larder_child_spared")
     ~ quest_note("missing-miller", "A goblin child says dead things came up through the floor of the deep warren, with singers behind them.")
     -> larder_on
@@ -199,15 +199,15 @@ She's old, and broad for a goblin, in a chain shirt too big for her and a headdr
 Nobody moves. Nobody breathes.
 {
 - has_flag("mill_goblins_fought") || has_flag("warren_lookout_killed"):
-    "You killed my people," Nettle says. Her voice is very quiet. "You'd better have something to say."
+    "You killed my people," Nettle says. Her voice is very quiet. "You'd better have something to say." #speaker:nettle
 - has_flag("larder_child_scared"):
-    "You frightened my grandbabby," Nettle says. "That was stupid. Say something less stupid."
+    "You frightened my grandbabby," Nettle says. "That was stupid. Say something less stupid." #speaker:nettle
 - has_flag("warren_lookout_spared"):
-    "You beat my lookout, then sat with him so he didn't die," Nettle says. "Strange thing to do. Say why."
+    "You beat my lookout, then sat with him so he didn't die," Nettle says. "Strange thing to do. Say why." #speaker:nettle
 - has_flag("larder_child_spared") || has_flag("mill_goblins_talked"):
-    "They say you're soft," Nettle says, and leans forward. "Are you soft?"
+    "They say you're soft," Nettle says, and leans forward. "Are you soft?" #speaker:nettle
 - else:
-    "Well," Nettle says. "Look what walked into my hall."
+    "Well," Nettle says. "Look what walked into my hall." #speaker:nettle
 }
 -> hall_talk
 
@@ -222,7 +222,7 @@ Nobody moves. Nobody breathes.
     You watch her eyes, not her blade. Every time a sound comes up from below, they flick to the back of the hall.
     { check("insight", 15):
         "You're not angry at me," you say. "You're frightened, of something under your own floor."
-        Nettle stares at you. Then she laughs, a short dry bark, and the arrows dip. "Clever. Sit down, clever."
+        Nettle stares at you. Then she laughs, a short dry bark, and the arrows dip. "Clever. Sit down, clever." #speaker:nettle
         -> parley_won
     - else:
         You can't read her. She sees you trying, and doesn't like it.
@@ -238,18 +238,18 @@ Nobody moves. Nobody breathes.
 = plead(dc)
 You tell her straight: you came for Garrick Dunn, and for the raids to stop. Goblin blood isn't the point.
 { check("persuasion", dc):
-    Nettle weighs you for a long moment. Then she lowers the scimitar. "Huh," she says. "Sit."
+    Nettle weighs you for a long moment. Then she lowers the scimitar. "Huh," she says. "Sit." #speaker:nettle
     -> parley_won
 - else:
     -> challenged
 }
 
 = challenged
-"Words," Nettle says, and spits. "Anyone can make words. You want my ear? Earn it. You and me, in the ring, by the old law."
+"Words," Nettle says, and spits. "Anyone can make words. You want my ear? Earn it. You and me, in the ring, by the old law." #speaker:nettle
 * [Accept her challenge #combat:nettle-duel]
     -> duel_fought
 * [Refuse, and tell her you'll help her anyway]
-    Nettle squints at you as if you've said something in a language she almost knows. "Help," she repeats. Then, grudgingly: "Prove it."
+    Nettle squints at you as if you've said something in a language she almost knows. "Help," she repeats. Then, grudgingly: "Prove it." #speaker:nettle
     -> the_bargain
 
 = parley_won
@@ -261,7 +261,7 @@ You tell her straight: you came for Garrick Dunn, and for the raids to stop. Gob
 { combat_won():
     Mother Nettle goes down on one knee, her scimitar in the dirt, and her people make a sound like the whole hall flinching. She looks up at you and waits. Under the old law, it's your choice now.
     * [Offer her your hand]
-        Nettle looks at your hand for a long time. Then she takes it and hauls herself up. "Hah," she says. "Strong and soft. Rare."
+        Nettle looks at your hand for a long time. Then she takes it and hauls herself up. "Hah," she says. "Strong and soft. Rare." #speaker:nettle
         -> the_bargain
     * [Finish her, as Captain Varrow would want]
         -> nettle_slain
@@ -291,13 +291,13 @@ In a moment there's nobody left but you.
 -> lower_door
 
 = the_bargain
-Nettle settles back on her throne. "Two nights ago," she says, "the dead came up through the floor of our deep warren. Dug up from the old stone underneath, where nobody's dug for a thousand years. We ran. Lost our stores, lost our deep halls." She spits. "So we took flour. We're not sorry."
+Nettle settles back on her throne. "Two nights ago," she says, "the dead came up through the floor of our deep warren. Dug up from the old stone underneath, where nobody's dug for a thousand years. We ran. Lost our stores, lost our deep halls." She spits. "So we took flour. We're not sorry." #speaker:nettle
 
-"Then the singers came. Grey robes, singing, walking behind the dead like shepherds. Dragged a man along with them, through our tunnels and down. Big man. Floury beard."
+"Then the singers came. Grey robes, singing, walking behind the dead like shepherds. Dragged a man along with them, through our tunnels and down. Big man. Floury beard." #speaker:nettle
 
 Garrick Dunn.
 
-"Clear the dead out of our lower warren," Nettle says, "and we stop raiding. Your farms keep their flour. Deal?"
+"Clear the dead out of our lower warren," Nettle says, "and we stop raiding. Your farms keep their flour. Deal?" #speaker:nettle
 
 * [Shake on it: nobody should be driven from their home #drive:freedom]
     ~ drive_moment("freedom")
@@ -307,7 +307,7 @@ Garrick Dunn.
     -> deal_made
 * [Shake on it, if she throws in something from her hoard #drive:wealth]
     ~ drive_moment("wealth")
-    Nettle stares at you, then cackles. "Greedy! Good." She fishes in a bag behind her throne and slaps a stoppered red bottle into your palm.
+    Nettle stares at you, then cackles. "Greedy! Good." She fishes in a bag behind her throne and slaps a stoppered red bottle into your palm. #speaker:nettle
     ~ give_item("potion-of-healing")
     -> deal_made
 * [Shake on it]
@@ -329,7 +329,7 @@ You wake with your wrists tied, sitting against the wall of Nettle's hall. Your 
 ~ lose_coins()
 ~ long_rest()
 
-Nettle crouches in front of you. "You lasted," she says, grudging. "Most don't. So. You'll pay for your life the useful way."
+Nettle crouches in front of you. "You lasted," she says, grudging. "Most don't. So. You'll pay for your life the useful way." #speaker:nettle
 ~ set_flag("nettle_spared_you")
 -> the_bargain
 
@@ -338,7 +338,7 @@ You wake with your wrists tied, in a hall full of goblins. Your purse is gone. A
 ~ lose_coins()
 ~ long_rest()
 
-On a throne built from quarry stone and three different stolen chairs sits an old goblin woman in a chain shirt and a headdress of crow feathers, with a scimitar across her knees: Mother Nettle. "Lookout says you came to stab," she says. "Pit says you're clumsy. What do you say?"
+On a throne built from quarry stone and three different stolen chairs sits an old goblin woman in a chain shirt and a headdress of crow feathers, with a scimitar across her knees: Mother Nettle. "Lookout says you came to stab," she says. "Pit says you're clumsy. What do you say?" #speaker:nettle
 ~ set_flag("warren_captured")
 ~ set_objective("Deal with Mother Nettle, with words or with steel.")
 -> hall_talk

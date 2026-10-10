@@ -418,6 +418,50 @@ body {
   color: var(--past);
 }
 
+/* A line someone speaks: their portrait and name beside it (js/engine/ui/speakers.js). A run
+   of lines by the same person shows the portrait once, and the rest line up under it. */
+.speech {
+  --portrait-room: 72px; /* 48px picture + frame + gap */
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.speech.is-continued {
+  padding-left: var(--portrait-room);
+}
+
+.speaker-portrait {
+  flex: none;
+  width: 60px; /* the 48px picture, its padding and border */
+  height: 60px;
+  padding: 4px;
+  line-height: 0;
+  background: var(--page);
+  border: 2px solid var(--box-edge-dark);
+  border-radius: 4px;
+}
+
+.speech-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.speaker-name {
+  margin: 0 0 0.25em;
+  font-family: var(--font-ui);
+  font-size: var(--size-ui);
+  color: var(--accent);
+}
+
+.speech.is-past .speaker-name {
+  color: var(--past);
+}
+
+.speech.is-past .speaker-portrait {
+  opacity: 0.6;
+}
+
 /* Choice cards */
 
 .choices {
@@ -620,6 +664,21 @@ body {
 .dm-aside {
   margin: 8px 0 0;
   font-style: italic;
+  color: var(--accent);
+}
+
+/* Heroic Inspiration: the offer to reroll a failed roll */
+.reroll-offer {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 2px solid var(--accent);
+  border-radius: 6px;
+}
+
+.reroll-text {
+  margin: 0 0 8px;
+  font-family: var(--font-ui);
+  font-size: var(--size-ui);
   color: var(--accent);
 }
 

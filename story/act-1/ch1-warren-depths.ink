@@ -53,7 +53,7 @@ You come to with your face in the dirt. The dead have gone back to their wall an
 ~ lose_coins()
 ~ long_rest()
 { has_flag("goblins_spared"):
-    A goblin warrior crouches beside you, keeping well clear of the diggers. "Mother says don't die yet," it whispers. "Deal's not done." It shows you a crawl-way along the wall, behind the dead, and scurries back up the passage.
+    A goblin warrior crouches beside you, keeping well clear of the diggers. "Mother says don't die yet," it whispers. "Deal's not done." It shows you a crawl-way along the wall, behind the dead, and scurries back up the passage. #speaker:goblin-warrior
 - else:
     You lie still for a long time. When you can move, you crawl along the wall behind the diggers, and they never turn.
 }
@@ -130,12 +130,12 @@ The acolyte lies at the foot of the bier, alive, bleeding, and still humming und
         His eyes go soft and grateful, as if yours were the first kind face he's seen in years.
         -> acolyte_talks
     - else:
-        He flinches away from you. "Witch-tongue," he spits, and starts to sing again, louder.
+        He flinches away from you. "Witch-tongue," he spits, and starts to sing again, louder. #speaker:acolyte
         -> acolyte_silent
     }
 
 = acolyte_talks
-"The Precentor will wake the Sleeping King," he whispers, smiling with bloody teeth. "And the miller works the gates. You're late. You're all of you so late."
+"The Precentor will wake the Sleeping King," he whispers, smiling with bloody teeth. "And the miller works the gates. You're late. You're all of you so late." #speaker:acolyte
 ~ set_flag("acolyte_talked")
 ~ quest_note("missing-miller", "The Choir's acolyte says the miller 'works the gates' for someone called the Precentor, who will 'wake the Sleeping King'.")
 -> acolyte_taken
@@ -201,7 +201,7 @@ The crypt's far door leads on into the barrow tunnels, but a few yards in, the r
 = nettle_pays
 Word has gone ahead of you. When you climb into Nettle's hall, the whole band is waiting, and nobody's holding a bow. #room:brackenhollow/hall #location:Brackenhollow warren, Nettle's hall
 
-"The digging stopped," Nettle says. "Deep halls are ours again." She digs in the bag behind her throne and presses two things into your hand: a stoppered red bottle, and a string of small sharp teeth knotted with a nettle leaf. "Potion. And that's so my people know you. Don't lose it."
+"The digging stopped," Nettle says. "Deep halls are ours again." She digs in the bag behind her throne and presses two things into your hand: a stoppered red bottle, and a string of small sharp teeth knotted with a nettle leaf. "Potion. And that's so my people know you. Don't lose it." #speaker:nettle
 ~ give_item("potion-of-healing")
 ~ give_item("goblin-tooth-charm")
 ~ finish_quest("goblin-bargain")

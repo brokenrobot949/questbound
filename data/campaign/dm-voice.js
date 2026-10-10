@@ -30,6 +30,7 @@ export const dmNotes = {
   inspirationFromDrive: 'That’s your Drive ({drive}) talking. You gain Heroic Inspiration.',
   inspirationFromRest: 'You wake ready for anything. Resourceful: you gain Heroic Inspiration.',
   alreadyInspired: 'That’s your Drive ({drive}) talking, though you already have Heroic Inspiration.',
+  inspirationReroll: 'You spend your Heroic Inspiration and roll again. The new roll stands.',
   questStarted: 'New quest: {title}. It’s in your journal.',
   questUpdated: 'Journal: {title} updated.',
   questFinished: 'Quest complete: {title}.',

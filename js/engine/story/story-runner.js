@@ -6,7 +6,9 @@
 //
 // Page beats:
 //   { type: 'chosen', text }               the choice the player just made
-//   { type: 'text', text }                 a paragraph of narration
+//   { type: 'text', text, speaker }        a paragraph of narration; speaker: who speaks in it
+//                                          (from a #speaker tag: an id in data/campaign/
+//                                          people.js), if anyone does
 //   { type: 'roll', result, revealed }     a d20 test; revealed once the player has tapped the die
 //   { type: 'note', text }                 a short DM note ("New quest: …"), from an external
 //   { type: 'location', value }            the hero moved (from a #location tag); not shown as text
@@ -19,6 +21,8 @@ import { enterRoom, parseRoomTag } from '../world/dungeons.js';
 import { finishBattle, startBattle } from '../combat/battle.js';
 import { dmNotes } from '../../../data/campaign/dm-voice.js';
 import { timePasses } from '../character/spell-effects.js';
+import { takeUndoPoint } from '../save/undo.js';
+import { startD20Count, stopD20Count } from '../rules/d20-test.js';
 
 // How many rolls the roll log keeps in the save. Older ones drop off.
 export const ROLL_LOG_LIMIT = 200;
@@ -47,7 +51,7 @@ export function runPage(game, leadBeats = []) {
       parseRoomTag(tags.room); // a typo in a room tag is a story bug: fail here, not later
       beats.push({ type: 'room', value: tags.room });
     }
-    if (text) beats.push({ type: 'text', text });
+    if (text) beats.push(tags.speaker ? { type: 'text', text, speaker: tags.speaker } : { type: 'text', text });
   }
   if (stoppingPoint) beats.push({ type: 'note', text: dmNotes.stoppingPoint });
   return { beats, scene: scene || currentKnot(story) };
@@ -68,6 +72,7 @@ export function listScenes(story) {
 // A fight in progress is left behind.
 export function jumpTo(game, path) {
   settleSeen(game);
+  game.undo = null;
   game.battle = null;
   game.pending.length = 0;
   game.story.ChoosePathString(path);
@@ -117,12 +122,21 @@ function lastSeen(game, type, start) {
   return value;
 }
 
-// Takes one of story.currentChoices and runs on. Returns the new page.
-export function makeChoice(game, choice) {
+// Takes one of story.currentChoices and runs on. Returns the new page. With Heroic
+// Inspiration in hand, the game first keeps an undo point, so a failed roll can be rerolled.
+// reroll: a reroll plan for one of the choice's d20s (see rules/inspiration.js), or null.
+export function makeChoice(game, choice, { reroll = null } = {}) {
   const expected = parseTags(choice.tags).check;
-  settleSeen(game);
-  game.story.ChooseChoiceIndex(choice.index);
-  const page = runPage(game, [{ type: 'chosen', text: choice.text }]);
+  takeUndoPoint(game, 'choice', { choice: { index: choice.index, text: choice.text } });
+  startD20Count(reroll);
+  let page;
+  try {
+    settleSeen(game);
+    game.story.ChooseChoiceIndex(choice.index);
+    page = runPage(game, [{ type: 'chosen', text: choice.text }]);
+  } finally {
+    stopD20Count();
+  }
   warnIfTagMismatch(expected, page.beats.find((b) => b.type === 'roll'));
   return page;
 }
@@ -133,6 +147,7 @@ export function startFight(game, choice) {
   const { combat: encounterId, surprise } = parseTags(choice.tags);
   if (!encounterId) throw new Error('That choice does not start a fight');
   settleSeen(game);
+  game.undo = null;
   return startBattle(game, encounterId, choice.index, { surprise });
 }
 
@@ -150,6 +165,7 @@ export function continueAfterBattle(game) {
 // Starts the story over from the top, keeping the hero and the dice.
 export function restartStory(game) {
   settleSeen(game);
+  game.undo = null;
   game.story.ResetState();
   return runPage(game);
 }

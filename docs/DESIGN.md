@@ -51,13 +51,22 @@ Options your character doesn't qualify for stay hidden, so scenes read naturally
 **Dice and honesty**
 
 - Every d20 test follows the 2024 rules: ability checks, saving throws and attack rolls, with advantage and disadvantage shown as two dice.
-- Difficulty uses the standard ladder (Easy 10, Medium 15, Hard 20, Very Hard 25). A setting shows the word, the exact DC, or nothing.
+- Difficulty uses the standard ladder (Easy 10, Medium 15, Hard 20, Very Hard 25). **Check difficulty** in Settings shows the word ("Persuasion · Medium", the default), the exact DC ("Persuasion · DC 15"), or nothing, on choice cards and over the die before it's rolled. The roll itself always shows the DC once it's made.
 - **Heroic Inspiration** is the DM's reward for playing to your character's Drive (see Character creation). Spend it to reroll any die.
 - The random number generator is seeded and saved. Reloading reproduces the same roll, so the dice can't be re-rolled by quitting.
+
+How Heroic Inspiration works in the game so far (★ in the status line means you have it):
+
+- **In a scene:** when one of your own checks or saves fails, the story waits. "Reroll ★" spends your Inspiration and plays that choice again with only that die changed: you tap the d20 again, and the story follows the new roll, even if it's worse. "Keep the roll" saves it for later. The roll shows both faces: "d20 (4 → 15, Heroic Inspiration)".
+- **In a fight:** when an attack of yours misses on your turn, a "Reroll ★" button sits above your actions until you do anything else.
+- **Not yet:** saves you make during your foes' turns (a Concentration save, say), since those turns are decided before they play out on screen; damage dice; and other people's rolls.
+- **Honest dice:** the game keeps the moment before your last choice or attack while you hold Inspiration, and the reroll's new die comes from dice of its own. Quitting and reloading rerolls the same way, so it can't be used to fish for a better roll.
 
 **The DM's voice**
 
 Narration is short, vivid and second person: "You push the door. The smell reaches you first." The DM has a light personality and reacts to big moments: a natural 20 gets a flourish, a natural 1 gets a wry line. NPCs speak in their own voices with a pixel portrait.
+
+How portraits work so far: a line where someone speaks shows their portrait and name beside it, once for a run of lines by the same person. People are drawn with the same sprite builder as heroes (Warden Pike in her helmet and chain mail, Hob the gnome smith in his apron); goblins, the Choir and the wolf use their DawnLike sprites. The cast and their looks are in `data/campaign/people.js`. Lines the hero speaks have no portrait.
 
 **Memory and reactivity**
 
@@ -298,6 +307,9 @@ Initiative, attack rolls against AC, critical hits, damage types and resistances
 **Quick resolve and speed**
 
 - A fight well under your party's strength offers **Resolve**: the engine plays it out instantly with real rolls and reports HP lost and resources spent. Story and boss fights are always played by hand.
+  - **Well under** means the monsters' XP is no more than half the Low budget for one character of your level (SRD 5.2.1, XP Budget per Character): 25 XP at level 1, 50 at level 2, 75 at level 3. In Chapter 1, a level 2 hero can resolve the wolf, the warren's lookout or the mill's two goblins. Encounters marked `byHand` (Mother Nettle, the Choir at the breach) never offer it.
+  - **How you fight:** stand up if Prone, close in if nothing's in reach, and attack the foe you'd hurt most with a weapon or cantrip. Resolve never spends spell slots, free casts, Second Wind, Action Surge or potions.
+  - **It hands the fight back** if you're below half your Hit Points at the start of one of your turns, and it isn't offered once you are. Otherwise it reports the rounds and Hit Points lost: "Resolved in 3 rounds: you lost 6 Hit Points."
 - Settings cover animation speed (Battle speed: Slow, Normal or Fast), auto-roll, automatic reactions (so far: Cast Shield by itself and Cast Hellish Rebuke by itself) and auto end-turn.
 
 ## World and Exploration
@@ -588,7 +600,7 @@ Rules content is typed into `data/srd/` from the SRD 5.2.1 document, one phase a
 **Saves**
 
 - Three save slots in the browser's IndexedDB storage, which holds far more than localStorage. Settings stay in localStorage. Every key is prefixed with `questbound:`.
-- Autosave after every choice and every combat turn. The dice generator's state is saved too, so reloading can't reroll.
+- Autosave after every choice and every combat turn. The dice generator's state is saved too, so reloading can't reroll. While you hold Heroic Inspiration, the save also keeps the moment before your last choice or attack, so a reroll still works after the game is closed (save version 14).
 - Every save has a version number and a migration path.
 - Export and import as a downloadable file or a copyable text code, with a backup reminder every 10 sessions.
 

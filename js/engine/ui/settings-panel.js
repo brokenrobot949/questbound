@@ -18,6 +18,16 @@ const OPTIONS = [
     hint: "Skips tapping the die. You still see every roll in full.",
   },
   {
+    name: 'checkDifficulty',
+    label: 'Check difficulty',
+    hint: 'How hard a check looks on its card before you roll: a word ("Medium"), the exact number ("DC 15"), or nothing. Once rolled, the full roll always shows the DC.',
+    choices: [
+      ['word', 'Word'],
+      ['number', 'DC'],
+      ['hidden', 'Hide'],
+    ],
+  },
+  {
     name: 'autoShield',
     label: 'Cast Shield by itself',
     hint: 'If you have the Shield spell ready, the game casts it with your lowest spell slot whenever an attack would hit you and Shield would make it miss. Turn this off to save your slots.',

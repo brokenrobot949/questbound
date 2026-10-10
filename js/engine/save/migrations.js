@@ -183,4 +183,8 @@ export const migrations = {
     const battle = game.battle ? { ...game.battle, concentration: null } : null;
     return { ...save, version: 13, game: { ...game, tempHp: 0, activeSpells: [], battle } };
   },
+
+  // Version 14 keeps the moment before the last choice or attack, so Heroic Inspiration can
+  // reroll a failed roll. Older saves have none: the next choice makes one.
+  13: (save) => ({ ...save, version: 14, game: { ...save.game, undo: null } }),
 };

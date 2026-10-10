@@ -3,7 +3,9 @@
 //
 // The engine rolls a check the moment Ink calls check(); the seeded RNG has already decided
 // the result, and the game is saved with it straight away. Tapping the d20 only reveals it,
-// so neither the tap nor quitting and reloading can change the outcome.
+// so neither the tap nor quitting and reloading can change the outcome. The one way to change
+// it is the rules' own: a hero with Heroic Inspiration can spend it to reroll a failed roll
+// of theirs (Reroll or Keep the roll, under the result; see rules/inspiration.js).
 
 import { parseTags } from '../story/tags.js';
 import { continueAfterBattle, currentDungeon, currentTime, makeChoice, revealRoll, startFight } from '../story/story-runner.js';
@@ -29,13 +31,15 @@ import {
 import { findSpell } from '../character/spells.js';
 import { activeSpellIds } from '../character/spell-effects.js';
 import { castCostText, sceneCastCost } from '../character/casting.js';
+import { canRerollRoll, keepRoll, rerollRoll } from '../rules/inspiration.js';
+import { speechBlock } from './speakers.js';
 import { heroSprite } from '../character/look.js';
 import { spriteCanvas } from './sprite-canvas.js';
 import { abilities } from '../../../data/srd/abilities.js';
 import { dmNotes, dmVoice } from '../../../data/campaign/dm-voice.js';
 import { gameToSave } from '../save/save-format.js';
 import { getSetting } from '../save/settings.js';
-import { difficultyName, outcomeText, rollLine, signedNumber } from './roll-format.js';
+import { difficultyLabel, outcomeText, rollLine, signedNumber } from './roll-format.js';
 import { actionButton, backupPanel } from './backup-panels.js';
 import { el, showFatalError } from './dom.js';
 
@@ -129,19 +133,34 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
     },
   };
 
-  // Shows the current page beat by beat, waiting for the player to tap any unrevealed d20.
+  // Shows the current page beat by beat, waiting for the player to tap any unrevealed d20,
+  // and to answer the offer of a reroll. A reroll replaces the page, which starts again.
   async function showPage() {
     updateStatus();
     showMap();
+    const start = narration.children.length;
+    // Who spoke the paragraph just shown: a run of lines by the same person shows their
+    // portrait once.
+    let lastSpeaker = null;
     for (const beat of game.page.beats) {
+      const speaker = beat.type === 'text' ? beat.speaker || null : null;
       if (beat.type === 'chosen') narration.append(el('p', 'chosen-text', beat.text));
+      else if (beat.type === 'text' && speaker) narration.append(speechBlock(beat.text, speaker, { continued: speaker === lastSpeaker }));
       else if (beat.type === 'text') narration.append(el('p', 'narration-text', beat.text));
       else if (beat.type === 'note') narration.append(el('p', 'dm-note', beat.text));
-      else if (beat.type === 'roll' && beat.revealed) narration.append(revealedRollPanel(beat));
       else if (beat.type === 'roll') {
-        await rollPanelAwaitingTap(beat);
+        let panel;
+        if (beat.revealed) narration.append((panel = revealedRollPanel(beat)));
+        else panel = await rollPanelAwaitingTap(beat);
         updateStatus();
+        if (await offerReroll(beat, panel)) {
+          while (narration.children.length > start) narration.lastChild.remove();
+          renderRollLog(root, game);
+          return showPage();
+        }
       }
+      // (Location, time and room beats aren't shown, so they don't break a run.)
+      if (['chosen', 'text', 'note', 'roll'].includes(beat.type)) lastSpeaker = speaker;
     }
     if (game.battle) showFight();
     else if (levelUpReady(game)) showLevel();
@@ -288,13 +307,47 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
     follow(choices);
   }
 
+  // Heroic Inspiration: under a failed roll of the hero's own, Reroll or Keep the roll. Waits
+  // for the answer, and saves it. Resolves true if the roll was rerolled (the page is new).
+  function offerReroll(beat, panel) {
+    if (!canRerollRoll(game, beat)) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      const box = el('div', 'reroll-offer');
+      box.append(el('p', 'reroll-text', '★ You have Heroic Inspiration. Spend it to roll again? The new roll stands, even if it’s worse.'));
+      const buttons = el('div', 'slot-actions');
+      buttons.append(
+        actionButton('Reroll ★', () => {
+          holdView = false;
+          try {
+            game.page = rerollRoll(game, beat);
+          } catch (error) {
+            showFatalError(error);
+            return;
+          }
+          onSave(game);
+          resolve(true);
+        }),
+        actionButton('Keep the roll', () => {
+          holdView = false;
+          keepRoll(beat);
+          box.remove();
+          onSave(game);
+          resolve(false);
+        }),
+      );
+      box.append(buttons);
+      panel.append(box);
+      follow(box);
+    });
+  }
+
   // Shows the d20 and waits for the player's tap (or rolls straight away with auto-roll on),
-  // then reveals the roll in full and saves.
+  // then reveals the roll in full and saves. Resolves with the roll's panel.
   function rollPanelAwaitingTap(beat) {
     return new Promise((resolve) => {
       const { panel, die } = rollPanel(beat.result);
       const autoRoll = getSetting('autoRoll');
-      const hint = el('p', 'roll-hint', 'Tap the d20 to roll');
+      const hint = el('p', 'roll-hint', beat.result.rerolled ? 'Tap the d20 to roll again' : 'Tap the d20 to roll');
       if (!autoRoll) panel.append(hint);
       narration.append(panel);
       follow(panel);
@@ -310,7 +363,7 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
         renderRollLog(root, game);
         onSave(game);
         follow(panel);
-        resolve();
+        resolve(panel);
       };
 
       if (autoRoll) {
@@ -376,9 +429,8 @@ function revealedRollPanel(beat) {
 function rollPanel(result) {
   const panel = el('div', 'roll-panel');
   const heading = el('p', 'roll-heading', result.label);
-  if (result.target && result.target.type === 'DC') {
-    heading.textContent += ` · ${difficultyName(result.target.value)}`;
-  }
+  const difficulty = result.target && result.target.type === 'DC' ? difficultyLabel(result.target.value, getSetting('checkDifficulty')) : '';
+  if (difficulty) heading.textContent += ` · ${difficulty}`;
   const die = d20Button();
   panel.append(heading, die.button);
   return { panel, die };
@@ -428,11 +480,13 @@ function renderRollLog(root, game) {
   root.getElementById('roll-count').textContent = String(game.rollLog.length);
 }
 
-// "Persuasion · Medium"
+// "Persuasion · Medium", "Persuasion · DC 15" or "Persuasion", as the Check difficulty
+// setting says.
 function checkLabel(check) {
   const named = findSkill(check.testId) || findAbility(check.testId);
   const name = named ? named.name : check.testId;
-  return `${name} · ${difficultyName(check.dc)}`;
+  const difficulty = difficultyLabel(check.dc, getSetting('checkDifficulty'));
+  return difficulty ? `${name} · ${difficulty}` : name;
 }
 
 // "Fight · Low", "Fight · Deadly": the first word of the encounter's difficulty

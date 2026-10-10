@@ -94,7 +94,7 @@ The second goblin goes down in a puff of flour, and the mill is quiet again. In 
 = talked_down
 The goblins stare at you. Then the smaller one bursts into tears, which neither of you expected.
 
-"Mother Nettle sent us," the other one says, wiping its nose on its arm. "No food. Dead things in the deep warren, digging and digging. Took our stores. We only take flour. We never took no miller. Sorry. Sorry." It points a shaking finger south. "Old quarry. Mother will talk. Maybe."
+"Mother Nettle sent us," the other one says, wiping its nose on its arm. "No food. Dead things in the deep warren, digging and digging. Took our stores. We only take flour. We never took no miller. Sorry. Sorry." It points a shaking finger south. "Old quarry. Mother will talk. Maybe." #speaker:goblin
 ~ set_flag("mill_goblins_talked")
 ~ add_deed("Talked two starving goblins down in the cellar of Dunn's Mill.")
 ~ quest_note("missing-miller", "The mill goblins say Mother Nettle sent them for flour. Something dead is digging in their deep warren, and they swear they never took the miller.")
@@ -114,20 +114,20 @@ They leave a trail, though. Flour, spilling from a split sack, all the way down 
 // Fate's Mercy: losing the fight isn't the end. The story goes on, at a cost.
 You wake on a narrow cot that smells of candle wax. The Temple of the Steadfast Flame. Prior Crane is sitting beside you, and Lark Dunn is asleep in a chair by the door, her father's hatchet across her knees. #location:Bramblegate, the temple #time:Morning
 
-"She found you in the mill cellar," the Prior says softly. "Dragged you halfway to the gate before the watch saw her. The goblins took your purse, I'm afraid, and a good deal of flour."
+"She found you in the mill cellar," the Prior says softly. "Dragged you halfway to the gate before the watch saw her. The goblins took your purse, I'm afraid, and a good deal of flour." #speaker:crane
 ~ lose_coins()
 ~ long_rest()
 ~ set_flag("mill_fates_mercy")
 ~ add_deed("Was beaten by goblin scavengers at Dunn's Mill, and carried home by Lark Dunn.")
 ~ quest_note("missing-miller", "The goblins who beat you at the mill fled south with the flour, towards the old quarry.")
 
-"They went south," Lark says, without opening her eyes. "Towards the old quarry. I followed the flour." #location:Bramblegate
+"They went south," Lark says, without opening her eyes. "Towards the old quarry. I followed the flour." #location:Bramblegate #speaker:lark
 -> to_the_quarry
 
 = to_the_quarry
 {
 - has_flag("mill_fates_mercy"):
-    Lark walks you back out past the mill and points down the south road. "Bring him home," she says, and doesn't wait for an answer.
+    Lark walks you back out past the mill and points down the south road. "Bring him home," she says, and doesn't wait for an answer. #speaker:lark
 - has_flag("mill_goblins_talked"):
     The goblins scurry off ahead of you to tell Mother Nettle you're coming. You follow at your own pace.
 - has_flag("mill_goblins_fled"):

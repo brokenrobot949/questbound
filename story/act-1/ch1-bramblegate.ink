@@ -7,11 +7,11 @@
 === ch1_morning ===
 Morning comes grey and dripping. Morwen sets down a breakfast big enough for two: eggs, black bread, a slab of ham, and tea strong enough to stand a spoon in. #location:Bramblegate, the Tallow and Thistle #time:Morning
 
-"Goblins hit the mill last night," she says, sliding onto the bench across from you as if you'd asked. "Took half the flour and smashed the wheelhouse. And Garrick Dunn, the miller, is gone. Door broken in, and no Garrick."
+"Goblins hit the mill last night," she says, sliding onto the bench across from you as if you'd asked. "Took half the flour and smashed the wheelhouse. And Garrick Dunn, the miller, is gone. Door broken in, and no Garrick." #speaker:morwen
 
-{has_flag("saw_barrow_light"): You tell her about the lights on the hills. Her cheerfulness goes out like a pinched candle. "Then it's not only goblins," she says quietly. "And you'd best not say that too loud."}
+{has_flag("saw_barrow_light"): You tell her about the lights on the hills. Her cheerfulness goes out like a pinched candle. "Then it's not only goblins," she says quietly. "And you'd best not say that too loud." #speaker:morwen}
 
-"Reeve Corbin's offering good coin to whoever brings Garrick home. His hall's across the square." She pushes a little corked bottle across the table, red as a cherry. "And take this. On the house. Garrick's the only miller for twenty miles, and I'm not baking with gravel."
+"Reeve Corbin's offering good coin to whoever brings Garrick home. His hall's across the square." She pushes a little corked bottle across the table, red as a cherry. "And take this. On the house. Garrick's the only miller for twenty miles, and I'm not baking with gravel." #speaker:morwen
 ~ give_item("potion-of-healing")
 ~ set_objective("Look around Bramblegate, and see Reeve Corbin at his hall about the missing miller.")
 -> bramblegate
@@ -40,9 +40,9 @@ Morning comes grey and dripping. Morwen sets down a breakfast big enough for two
 === reeve_hall ===
 Reeve Ansel Corbin's hall is a long room full of ledgers and worried people. The reeve himself is a thin man with ink on his cuffs and the look of someone who hasn't slept since the goblins came. Behind him, Captain Holt Varrow of the watch leans against the wall with his arms folded, scarred and unimpressed. #location:Bramblegate, the reeve's hall
 
-"You answered the call," Corbin says, faintly surprised that anybody did. "Then here's the job. Find Garrick Dunn and bring him home. Put a stop to the goblin raids. Fifty gold when it's done."
+"You answered the call," Corbin says, faintly surprised that anybody did. "Then here's the job. Find Garrick Dunn and bring him home. Put a stop to the goblin raids. Fifty gold when it's done." #speaker:corbin
 
-"And ten silver a goblin ear," Varrow adds. "Bring me ears."
+"And ten silver a goblin ear," Varrow adds. "Bring me ears." #speaker:varrow
 
 * [Take the job. Fifty gold is fifty gold. #drive:wealth]
     ~ drive_moment("wealth")
@@ -54,9 +54,9 @@ Reeve Ansel Corbin's hall is a long room full of ledgers and worried people. The
     ~ drive_moment("glory")
     "When this is done," you say, "they'll be telling the story in every tavern on the north road." Varrow snorts. Corbin just looks relieved that somebody is confident about something.
 * [Take the job, and ask the captain what he makes of it]
-    "I'll do it," you say. "Captain, what do you make of all this?" Varrow pushes off the wall. "Goblins," he says. "Vermin with knives. Burn the warren and the raids stop." Corbin winces, but he doesn't argue.
+    "I'll do it," you say. "Captain, what do you make of all this?" Varrow pushes off the wall. "Goblins," he says. "Vermin with knives. Burn the warren and the raids stop." Corbin winces, but he doesn't argue. #speaker:varrow
 
-- "Dunn's Mill is down the brook road, south of town," Corbin says. "Start there. And please, hurry."
+- "Dunn's Mill is down the brook road, south of town," Corbin says. "Start there. And please, hurry." #speaker:corbin
 ~ set_flag("took_bounty")
 ~ start_quest("missing-miller")
 ~ set_objective("Go down the brook road to Dunn's Mill, and find out what happened to Garrick Dunn.")
@@ -75,7 +75,7 @@ Reeve Ansel Corbin's hall is a long room full of ledgers and worried people. The
 - else:
     The grocer waves. Nan Burdock watches your hands. #location:Bramblegate, the market
 }
-{not can_afford("potion-of-healing"): A Potion of Healing costs fifty gold. "Come back when the reeve's paid you," Nan says, not unkindly.}
+{not can_afford("potion-of-healing"): A Potion of Healing costs fifty gold. "Come back when the reeve's paid you," Nan says, not unkindly. #speaker:nan}
 -> stall
 
 = stall
@@ -104,15 +104,15 @@ Reeve Ansel Corbin's hall is a long room full of ledgers and worried people. The
 
 === forge ===
 { forge == 1:
-    Hob's forge is hot, loud and cheerful, much like Hob: a gnome with singed eyebrows and a leather apron three sizes too big. "Blades! Buckles! Rumours, free with any purchase, or without one!" #location:Bramblegate, Hob's forge
+    Hob's forge is hot, loud and cheerful, much like Hob: a gnome with singed eyebrows and a leather apron three sizes too big. "Blades! Buckles! Rumours, free with any purchase, or without one!" #location:Bramblegate, Hob's forge #speaker:hob
 
-    "Here's one," Hob says, leaning in. "A week back, my cousin's boy saw goblins running down off the barrow hills. Running away from them, mind, not towards them. Now what's a goblin scared of?"
+    "Here's one," Hob says, leaning in. "A week back, my cousin's boy saw goblins running down off the barrow hills. Running away from them, mind, not towards them. Now what's a goblin scared of?" #speaker:hob
     ~ set_flag("heard_goblins_fled")
     {has_flag("took_bounty"):
         ~ note_goblins_fled()
     }
 - else:
-    {&Hob looks up from his anvil and waves his hammer at you. "Back again! Nobody ever comes back. It's the noise."|Hob's hammer doesn't miss a beat. "Still in one piece? Good for business," he shouts over the clanging.|Hob is elbow-deep in a quench barrel, and waves a dripping hand at you. "Look around! Touch nothing orange."} #location:Bramblegate, Hob's forge
+    {&Hob looks up from his anvil and waves his hammer at you. "Back again! Nobody ever comes back. It's the noise."|Hob's hammer doesn't miss a beat. "Still in one piece? Good for business," he shouts over the clanging.|Hob is elbow-deep in a quench barrel, and waves a dripping hand at you. "Look around! Touch nothing orange."} #location:Bramblegate, Hob's forge #speaker:hob
 }
 -> talk
 
@@ -120,9 +120,9 @@ Reeve Ansel Corbin's hall is a long room full of ledgers and worried people. The
 = talk
 * [Ask Hob everything he knows about the barrows #drive:knowledge]
     ~ drive_moment("knowledge")
-    Hob is delighted to be asked. Kings were buried up there in the old days, he says, with their swords and their crowns and their grudges. "Nobody's dug in those hills for a hundred years. Bad luck. Worse drainage."
+    Hob is delighted to be asked. Kings were buried up there in the old days, he says, with their swords and their crowns and their grudges. "Nobody's dug in those hills for a hundred years. Bad luck. Worse drainage." #speaker:hob
 
-    "The big one's the Kings' Barrow," he adds, quieter. "Folk say it's never been opened. Folk say a lot of things."
+    "The big one's the Kings' Barrow," he adds, quieter. "Folk say it's never been opened. Folk say a lot of things." #speaker:hob
     -> talk
 + [Back to the square]
     -> bramblegate
@@ -131,7 +131,7 @@ Reeve Ansel Corbin's hall is a long room full of ledgers and worried people. The
 { temple == 1:
     The Temple of the Steadfast Flame is cool and dim, lit by one great candle that never quite goes out. Prior Jessamy Crane is trimming its wick: a soft-spoken man with ink on his fingers and a nervous smile. #location:Bramblegate, the temple
 
-    "All are welcome at the Flame," he says. "Even at this hour. Especially at this hour."
+    "All are welcome at the Flame," he says. "Even at this hour. Especially at this hour." #speaker:crane
 - else:
     {&Prior Crane looks up from the great candle and nods.|The great candle burns on. Prior Crane is bent over a ledger, and gives you a small, tired smile.|Prior Crane is sweeping wax from the altar steps. He straightens up when he sees you.} #location:Bramblegate, the temple
 }
@@ -144,7 +144,7 @@ Reeve Ansel Corbin's hall is a long room full of ledgers and worried people. The
     You kneel before the Flame and pray for Garrick Dunn, wherever he is. After a moment the Prior kneels beside you. Neither of you says anything. It helps more than you expected.
     -> talk
 * [Ask the Prior about the barrows #check:insight:15]
-    "The barrows?" He talks easily enough about old kings and sacred rest and the Flame's duty to the dead.
+    "The barrows?" He talks easily enough about old kings and sacred rest and the Flame's duty to the dead. #speaker:crane
     { check("insight", 15):
         ~ set_flag("crane_hiding_something")
         But his hand shakes on the candle snuffer every time you say "Kings' Barrow", and he never quite meets your eyes. He's hiding something.
@@ -184,18 +184,18 @@ Reeve Ansel Corbin's hall is a long room full of ledgers and worried people. The
 === lark ===
 You've barely stepped back into the square when a girl of about fourteen plants herself in your path. She has flour in her hair, a hatchet in her belt that's far too big for her, and a stubborn jaw. #location:Bramblegate, the square
 
-"You're the one the reeve hired," she says. "I'm Lark. Lark Dunn. Garrick's my da." She glances towards the watch-house and drops her voice. "Everyone says goblins. But goblins don't take people. They take flour and chickens, and they run. Something else took my da."
+"You're the one the reeve hired," she says. "I'm Lark. Lark Dunn. Garrick's my da." She glances towards the watch-house and drops her voice. "Everyone says goblins. But goblins don't take people. They take flour and chickens, and they run. Something else took my da." #speaker:lark
 
 * [Promise her you'll bring him home #drive:kinship]
     ~ drive_moment("kinship")
     "I'll bring him home," you say. She looks at you hard, the way people do when they've been promised things before. Then she nods, once.
 * [Ask what makes her so sure]
-    "Because I know goblins," she says. "They've squabbled over our hens for years. They never took anybody. Not once."
+    "Because I know goblins," she says. "They've squabbled over our hens for years. They never took anybody. Not once." #speaker:lark
 * [Tell her to go home and leave it to you]
-    "Home's where it happened," she says flatly, and for a moment she looks every bit of fourteen. Then the jaw comes back. "Just find him."
+    "Home's where it happened," she says flatly, and for a moment she looks every bit of fourteen. Then the jaw comes back. "Just find him." #speaker:lark
 * {can_cast("druidcraft")} [Coax the crushed flower on her cloak back into bloom #spell:druidcraft]
     ~ cast("druidcraft")
-    There's a marigold pinned to her cloak, crushed and brown at the edges. You touch it and whisper, and it uncurls, gold as butter. Lark stares at it. "Da grows those by the millrace," she says, very quietly. Then the jaw comes back. "Just find him."
+    There's a marigold pinned to her cloak, crushed and brown at the edges. You touch it and whisper, and it uncurls, gold as butter. Lark stares at it. "Da grows those by the millrace," she says, very quietly. Then the jaw comes back. "Just find him." #speaker:lark
     ~ set_flag("lark_flower")
 
 - She's gone before you can say anything else, darting off between the market stalls.

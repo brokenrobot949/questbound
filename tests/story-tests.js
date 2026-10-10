@@ -9,6 +9,11 @@ import { jumpTo, listScenes, makeChoice, revealRoll } from '../js/engine/story/s
 import { forceNextD20 } from '../js/engine/rules/dice.js';
 import { createRng } from '../js/engine/rules/rng.js';
 import { gameToSave, loadGame, newGame } from '../js/engine/save/save-format.js';
+import { canRerollRoll, keepRoll, rerollRoll } from '../js/engine/rules/inspiration.js';
+import { personSprite } from '../js/engine/ui/speakers.js';
+import { findClothColor, findHairColor, findSkinTone } from '../js/engine/character/look.js';
+import { people } from '../data/campaign/people.js';
+import { sprites } from '../data/campaign/sprites.js';
 import { quickStartHeroes } from '../data/campaign/quick-start.js';
 
 // Wren Ashdown, the Quick Start Fighter.
@@ -205,6 +210,79 @@ test('Chapter 1: townsfolk don’t repeat their greeting after each answer, and 
   assertTrue(!go('Tear down').some((t) => t.startsWith('CAPABLE FOLK')), 'the notices aren’t read out again');
   go('Back to the square');
   assertEqual(go('Read the notice board').length, 1, 'a second look is one line');
+});
+
+// ---- Who speaks ----
+
+test('Speakers: every #speaker tag names someone in people.js, and everyone there can be drawn', async () => {
+  const main = await (await fetch(new URL('main.ink', STORY_URL))).text();
+  const files = [...main.matchAll(/^INCLUDE (.+)$/gm)].map((m) => m[1].trim());
+  const source = (await Promise.all(files.map(async (f) => (await fetch(new URL(f, STORY_URL))).text()))).join('\n');
+  const used = new Set([...source.matchAll(/#speaker:([a-z0-9-]+)/g)].map((m) => m[1]));
+  assertEqual([...used].filter((id) => !people.some((p) => p.id === id)), [], 'unknown speakers');
+  assertTrue(used.size >= 10, `${used.size} people speak in Chapter 1`);
+  for (const person of people) {
+    if (person.sprite) {
+      assertTrue(Boolean(sprites[person.sprite]), `${person.id}: no sprite ${person.sprite}`);
+      continue;
+    }
+    const { look } = person;
+    assertTrue(Boolean(findSkinTone(look.skin) && findHairColor(look.hairColor) && findClothColor(look.outfit) && findClothColor(look.accent)), `${person.id}: a look colour isn't in hero-looks.js`);
+    assertEqual(personSprite(person).frames.length, 2, person.id);
+  }
+});
+
+test('Speakers: a line someone speaks carries who it is on the page', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'speakers', character: testHero });
+  const pike = game.page.beats.find((b) => b.type === 'text' && b.text.startsWith('"Gate shuts at sundown,"'));
+  assertEqual(pike.speaker, 'pike');
+  assertTrue(game.page.beats.filter((b) => b.type === 'text' && !b.speaker).length > 0, 'narration has no speaker');
+});
+
+// ---- Heroic Inspiration ----
+
+// A new game at the north gate, Wren failing to talk Warden Pike round (a natural 1).
+async function failedAtTheGate(inspired = true) {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'inspired', character: testHero });
+  game.inspiration = inspired;
+  forceNextD20(1);
+  game.page = makeChoice(game, game.story.currentChoices.find((c) => c.text.startsWith('Talk her into opening the gate')));
+  return { game, beat: game.page.beats.find((b) => b.type === 'roll') };
+}
+const talkedRound = (game) => game.journal.deeds.some((d) => d.text.startsWith('Talked Warden Pike'));
+
+test('Heroic Inspiration: a failed check can be rerolled, and the scene plays out from the new roll', async () => {
+  const { game, beat } = await failedAtTheGate();
+  assertTrue(!canRerollRoll(game, beat), 'not before the player has seen the roll');
+  revealRoll(game, beat);
+  assertTrue(canRerollRoll(game, beat) && !talkedRound(game));
+  const record = gameToSave(game);
+  game.page = rerollRoll(game, beat);
+  const again = game.page.beats.find((b) => b.type === 'roll');
+  // (Wren is Human, so a night's rest at the inn can give her Inspiration back.)
+  assertEqual([again.result.rerolled.from, again.result.natural, again.revealed, game.undo], [1, again.result.rerolled.to, false, null]);
+  assertTrue(game.page.beats.some((b) => b.type === 'note' && b.text.startsWith('You spend your Heroic Inspiration')));
+  assertEqual(talkedRound(game), again.result.success, 'the story follows the new roll');
+  assertEqual(game.page.beats.filter((b) => b.type === 'chosen').length, 1, 'the choice once, not twice');
+
+  // Closing the game in between changes nothing: the save rerolls the same way.
+  const loaded = loadGame(await freshRuntime(), record);
+  const same = rerollRoll(loaded, loaded.page.beats.find((b) => b.type === 'roll'));
+  assertEqual(same.beats.find((b) => b.type === 'roll').result.natural, again.result.natural);
+});
+
+test('Heroic Inspiration: no reroll without it, for a kept roll, or for someone else’s roll', async () => {
+  const plain = await failedAtTheGate(false);
+  revealRoll(plain.game, plain.beat);
+  assertTrue(!canRerollRoll(plain.game, plain.beat) && plain.game.undo === null, 'no Inspiration, nothing kept to go back to');
+
+  const { game, beat } = await failedAtTheGate();
+  revealRoll(game, beat);
+  const theirs = { type: 'roll', revealed: true, result: { ...beat.result, opponent: 'Warden Pike' } };
+  game.page.beats.push(theirs);
+  assertTrue(!canRerollRoll(game, theirs), 'the warden’s die isn’t yours');
+  keepRoll(beat);
+  assertTrue(!canRerollRoll(game, beat) && game.inspiration, 'kept, and the Inspiration with it');
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

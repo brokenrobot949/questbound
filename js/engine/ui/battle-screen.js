@@ -9,7 +9,9 @@
 // starts aimed at the most foes it can catch without you); tap the grid to aim it elsewhere,
 // then Cast. Misty Step lights the squares it can reach in purple. A spell on yourself
 // (Mage Armor, healing, Bless, Sanctuary) has a Cast button. Other actions, Bonus Actions and
-// End Turn sit under the spells.
+// End Turn sit under the spells. After an attack of yours misses, a hero with Heroic
+// Inspiration gets a Reroll button at the top, until they do anything else. A fight well
+// under your strength offers Resolve, which plays it out at once (combat/resolve.js).
 //
 // Whatever follows a choice plays out a line at a time, at the Battle speed set in Settings:
 // each turn is announced, creatures walk square by square, damage pops up over whoever took
@@ -17,6 +19,8 @@
 // itself is already decided and saved; this only shows it.
 
 import * as fight from '../combat/battle.js';
+import { attackToReroll, rerollAttack } from '../rules/inspiration.js';
+import { canResolve, resolveFight } from '../combat/resolve.js';
 import { key } from '../combat/grid.js';
 import { directionTowards } from '../combat/areas.js';
 import { heroSprite } from '../character/look.js';
@@ -173,8 +177,30 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     render();
   }
 
-  // Runs one of the hero's actions and saves, then plays out whatever followed.
-  async function act(action) {
+  // Heroic Inspiration: the attack just made happens again with a new die. Its old lines leave
+  // the log, and the new ones play out in their place.
+  async function rerollMissed() {
+    if (view.replaying) return;
+    let result;
+    try {
+      result = rerollAttack(game);
+    } catch (error) {
+      help.textContent = error.message;
+      return;
+    }
+    for (let i = view.shown; i > result.kept; i--) if (logList.lastChild) logList.lastChild.remove();
+    view.shown = result.kept;
+    view.option = null;
+    view.aim = null;
+    onSave(game);
+    await replay(result.before);
+    render();
+    onShown();
+  }
+
+  // Runs one of the hero's actions and saves, then plays out whatever followed (all at once
+  // if instant: Resolve).
+  async function act(action, { instant = false } = {}) {
     if (view.replaying) return;
     const before = fight.battleScene(game);
     try {
@@ -186,7 +212,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     view.option = null;
     view.aim = null;
     onSave(game);
-    await replay(before);
+    await replay(before, { instant });
     render();
     onShown();
   }
@@ -194,15 +220,16 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
   // ---- Playing out what happened ----
 
   // Plays the log lines not shown yet, one at a time: walks, then the line, then a pause.
-  // before: the scene before the first of them, when known.
-  async function replay(before = null) {
+  // before: the scene before the first of them, when known. instant: show them all at once,
+  // as Skip does.
+  async function replay(before = null, { instant = false } = {}) {
     const log = game.battle ? game.battle.log : [];
     if (view.shown >= log.length) return;
     const previous = view.shown > 0 ? fight.replayOf(log[view.shown - 1]) : null;
     const first = fight.replayOf(log[view.shown]);
     view.scene = copyScene(before || (previous && previous.scene) || (first && first.scene) || fight.battleScene(game));
     view.replaying = true;
-    view.skip = false;
+    view.skip = instant;
     clearPopups();
     render();
     bringIntoView();
@@ -359,6 +386,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     if (heroConditions.includes('outlined')) notes.push('Outlined: attacks on you have Advantage');
     if (heroConditions.includes('dodging')) notes.push('Dodging');
     if (hero.temp) notes.push(`${hero.temp} Temporary Hit Points`);
+    if (game.inspiration) notes.push('★ Heroic Inspiration');
     status.textContent = notes.join(' · ');
     objective.textContent = fight.objectiveText(battle);
     order.replaceChildren(
@@ -416,6 +444,13 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
           ? `You're Prone: your attacks have Disadvantage, and foes beside you have Advantage. Stand up for ${fight.heroStandCost(game)} feet of movement, or crawl (${turn.movementLeft} feet left, each square costs double).`
           : `Your turn. Tap a lit square to move (${turn.movementLeft} feet left), or choose an action.`;
     const summary = (option) => attackSummary(option, { slotsLeft: (level) => slotsLeft(game, level) }).join(' · ');
+
+    // The attack just made missed: Heroic Inspiration can roll it again.
+    const missed = attackToReroll(game);
+    if (missed) {
+      const what = `Spend Heroic Inspiration to roll that attack again: you rolled ${missed.roll.natural}. The new roll stands.`;
+      controls.append(actionCard('Reroll ★', what, rerollMissed, 'is-primary'));
+    }
 
     // A button that chooses an attack or spell (tap it again to put it back). A spell has one
     // button, whichever slot it's cast with.
@@ -498,6 +533,11 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       if (chosen && chosen.bonusAction) controls.append(aimPanel(chosen, options));
     }
 
+    // A fight well under your strength can be played out at once.
+    if (canResolve(game)) {
+      const what = 'Well under your strength: play the fight out at once, with real rolls. Weapons and cantrips only, no spell slots or features; it stops if you drop below half your Hit Points.';
+      controls.append(actionCard('Resolve', what, () => act(() => resolveFight(game), { instant: true })));
+    }
     controls.append(actionCard('End turn', 'Your foes take their turns', () => act(() => fight.endHeroTurn(game)), 'is-primary'));
   }
 

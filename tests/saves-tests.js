@@ -95,7 +95,7 @@ test('A save holds game state, Ink state, dice state, session count and last-pla
   const game = newGame(runtime, { slot: 2, seed: 'contents', character: testHero, now: new Date('2026-10-01T09:00:00Z') });
   const record = gameToSave(game, new Date('2026-10-06T12:00:00Z'));
   assertEqual(Object.keys(record).sort(), ['createdAt', 'game', 'ink', 'lastBackupSession', 'rng', 'savedAt', 'seed', 'sessionCount', 'slot', 'version']);
-  assertEqual(Object.keys(record.game).sort(), ['activeSpells', 'battle', 'character', 'day', 'dungeon', 'featureUses', 'flags', 'hp', 'inspiration', 'inventory', 'journal', 'lastBattle', 'levelUp', 'location', 'money', 'objective', 'page', 'rollLog', 'session', 'slotsUsed', 'tempHp', 'time', 'xp']);
+  assertEqual(Object.keys(record.game).sort(), ['activeSpells', 'battle', 'character', 'day', 'dungeon', 'featureUses', 'flags', 'hp', 'inspiration', 'inventory', 'journal', 'lastBattle', 'levelUp', 'location', 'money', 'objective', 'page', 'rollLog', 'session', 'slotsUsed', 'tempHp', 'time', 'undo', 'xp']);
   assertEqual([record.version, record.slot, record.sessionCount, record.lastBackupSession], [SAVE_VERSION, 2, 1, 0]);
   assertEqual([record.createdAt, record.savedAt], ['2026-10-01T09:00:00.000Z', '2026-10-06T12:00:00.000Z']);
   assertTrue(record.rng.length === 4 && record.rng.every(Number.isInteger), 'dice state should be four whole numbers');
@@ -604,6 +604,11 @@ test('Migration: a version 12 game gains no Temporary Hit Points and no spells o
   const game = migrateSave(v12, migrations, 13).game;
   assertEqual([game.tempHp, game.activeSpells, game.battle.concentration], [0, [], null]);
   assertEqual(migrateSave({ version: 12, slot: 1, game: { battle: null } }, migrations, 13).game.battle, null, 'no fight, nothing to add');
+});
+
+test('Migration: a version 13 game has no undo point for Heroic Inspiration yet, and becomes version 14', () => {
+  const save = migrateSave({ version: 13, slot: 1, game: { inspiration: true } }, migrations, 14);
+  assertEqual([save.version, save.game.undo, save.game.inspiration], [14, null, true]);
 });
 
 test('Sessions: a new session sums up the last one in the journal if the player just closed the game', async () => {

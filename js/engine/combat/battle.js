@@ -42,13 +42,14 @@
 
 import { encounters } from '../../../data/campaign/encounters.js';
 import { monsters } from '../../../data/srd/monsters.js';
-import { d20Test, retarget } from '../rules/d20-test.js';
+import { d20Test, retarget, startD20Count, stopD20Count } from '../rules/d20-test.js';
 import { rollDice, rollDie } from '../rules/dice.js';
 import { armorClass, findAbility, findClass, hasFeature, initiative as heroInitiative, savingThrow, speed as heroSpeed } from '../character/sheet.js';
 import { heal, featureUsesLeft, maxHp, slotsLeft, spendFeature, spendSlot } from '../character/resources.js';
 import { activeSpellIds, castSelfSpell, soakDamage } from '../character/spell-effects.js';
 import { canCastSpell, findSpell, freeCastKey, freeCastsLeft } from '../character/spells.js';
 import { spellSaveDc } from '../character/casting.js';
+import { takeUndoPoint } from '../save/undo.js';
 import { hasItem, removeItem } from '../character/inventory.js';
 import { SQUARE_FEET, cellAt, feetBetween, inBounds, isAdjacent, isStandable, key, parseMap, reachableSquares, squaresBetween, stepCost } from './grid.js';
 import { areaSquares, DIRECTIONS, findDirection, lineOfEffect } from './areas.js';
@@ -189,6 +190,11 @@ function log(game, text, extra = {}, { moves = [], area = null } = {}) {
     walk.path = [];
   }
   replays.set(entry, { scene: battleScene(game), moves: [...walked, ...moves], area });
+}
+
+// A line in the fight log from outside the fight's own rules (spending Heroic Inspiration).
+export function addLogLine(game, text) {
+  log(game, text);
 }
 
 // What a log line remembers for the replay ({ scene, moves, area }), or null for a line from a
@@ -603,8 +609,9 @@ export function attackPreview(game, optionId, targetId) {
   return preview;
 }
 
-// Attacks a foe with a weapon, or casts a spell aimed at one creature.
-export function heroAttack(game, optionId, targetId) {
+// Attacks a foe with a weapon, or casts a spell aimed at one creature. reroll: a Heroic
+// Inspiration reroll plan for one of its d20s (see rules/inspiration.js), or null.
+export function heroAttack(game, optionId, targetId, { reroll = null } = {}) {
   requireHeroTurn(game);
   const battle = game.battle;
   const option = heroAttackOptions(game).find((o) => o.id === optionId);
@@ -617,16 +624,25 @@ export function heroAttack(game, optionId, targetId) {
   if (!inRange(hero, target, option)) throw new Error(`${target.name} is out of range.`);
   const wrong = option.how === 'save' ? wrongTarget(option, target) : null;
   if (wrong) throw new Error(`${option.name} can't be cast on ${target.name}: ${wrong.toLowerCase()}.`);
-  useAction(game, option);
-  if (option.concentration) startConcentration(game, option);
-  const { critical } = performAttack(game, hero, target, option);
-  if (option.concentration) tidyConcentration(game);
-  checkEnd(game);
+  // With Heroic Inspiration in hand, keep an undo point: a missed attack roll can be rerolled.
+  takeUndoPoint(game, 'attack', { attack: { optionId, targetId }, logLength: battle.log.length });
+  startD20Count(reroll);
+  let critical;
+  try {
+    useAction(game, option);
+    if (option.concentration) startConcentration(game, option);
+    ({ critical } = performAttack(game, hero, target, option));
+    if (option.concentration) tidyConcentration(game);
+    checkEnd(game);
+  } finally {
+    stopD20Count();
+  }
   // Champion: straight after a Critical Hit, move up to half your Speed without provoking.
   if (critical && !battle.outcome && battle.heroState === 'up' && hasFeature(game.character, 'remarkable-athlete')) {
     battle.turnState.athleteMove = Math.floor(speedOf(game, hero) / 2 / 5) * 5;
     log(game, `Remarkable Athlete: you can move up to ${battle.turnState.athleteMove} feet straight away without provoking Opportunity Attacks.`);
   }
+  if (game.undo) game.undo.after = battle.log.length;
 }
 
 // The nearest foe still standing that an attack can reach, or null.
@@ -719,6 +735,7 @@ function performAttack(game, attacker, target, option) {
   const blessed = you ? blessing(game) : [];
   const rolled = blessed.length ? { ...option, modifiers: [...option.modifiers, ...blessed] } : option;
   let roll = attackRoll(game.rng, rolled, acOf(game, target), advantage, disadvantage);
+  if (you) roll.yours = true; // the hero's own roll, which Heroic Inspiration can reroll
   // Guiding Bolt's light is used up by the first attack roll against its target.
   battle.effects = battle.effects.filter((e) => !(e.target === target.id && e.kind === 'guided'));
   if (target.side === 'hero' && roll.success && !roll.criticalHit) roll = castShield(game, roll);

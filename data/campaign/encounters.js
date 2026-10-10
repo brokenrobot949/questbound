@@ -21,6 +21,8 @@
 //   whileHeroDown  what each monster does on its turn while the hero lies at 0 Hit Points
 //                ({name} is the monster's name). These foes don't finish off a fallen hero:
 //                the hero's death saves decide it.
+//   byHand       true for a story or boss fight: it's always played by hand, never offered
+//                Resolve (a fight with a hymn never is either)
 
 // Dunn's Mill: a stone cellar with a plank floor, flour sacks and a barrel.
 const millLegend = {
@@ -106,6 +108,7 @@ export const encounters = [
     id: 'nettle-duel',
     name: 'Single Combat with Mother Nettle',
     difficulty: 'High (200 XP budget for one level 2 hero; a Goblin Boss is 200 XP)',
+    byHand: true,
     map: { dungeon: 'brackenhollow', room: 'hall' },
     hero: { x: 3, y: 1 },
     monsters: [{ monster: 'goblin-boss', name: 'Mother Nettle', pos: { x: 3, y: 6 } }],
@@ -124,6 +127,7 @@ export const encounters = [
     id: 'nettle-band',
     name: 'Nettle’s Whole Band',
     difficulty: 'Deadly: far beyond High (a Goblin Boss, three Goblin Warriors and two Goblin Minions are 400 XP; High for one level 2 hero is 200)',
+    byHand: true,
     map: { dungeon: 'brackenhollow', room: 'hall' },
     hero: { x: 3, y: 1 },
     monsters: [
@@ -155,6 +159,7 @@ export const encounters = [
     id: 'breach-hymn',
     name: 'The Hymn at the Breach',
     difficulty: 'Low, rising to Moderate if the hymn raises a second Skeleton (a Cultist and a Skeleton are 75 XP, then 125; for one level 2 hero Low is 100 and Moderate 150)',
+    byHand: true,
     map: { dungeon: 'brackenhollow', room: 'breach' },
     hero: { x: 3, y: 1 },
     monsters: [

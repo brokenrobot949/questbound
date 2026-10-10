@@ -15,9 +15,11 @@
 //   #time:Dusk                    the time of day now; shown in the status line
 //   #room:brackenhollow/mouth     the hero is in this room of this dungeon (data/campaign/
 //                                 dungeons.js); the map shows it. #room:none leaves the dungeon.
+//   #speaker:pike                 someone speaks in this line (an id from data/campaign/
+//                                 people.js); their portrait and name show beside it
 
 export function parseTags(tags) {
-  const parsed = { check: null, spell: null, location: null, time: null, drive: null, buy: null, combat: null, surprise: false, go: null, room: null };
+  const parsed = { check: null, spell: null, location: null, time: null, drive: null, buy: null, combat: null, surprise: false, go: null, room: null, speaker: null };
   for (const tag of tags || []) {
     const colon = tag.indexOf(':');
     const key = (colon < 0 ? tag : tag.slice(0, colon)).trim();
@@ -43,6 +45,8 @@ export function parseTags(tags) {
       parsed.go = value;
     } else if (key === 'room') {
       parsed.room = value;
+    } else if (key === 'speaker') {
+      parsed.speaker = value;
     }
   }
   return parsed;

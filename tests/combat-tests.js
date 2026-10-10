@@ -17,6 +17,9 @@ import { continueAfterBattle, currentLocation, makeChoice, startFight } from '..
 import { gameToSave, loadGame, newGame } from '../js/engine/save/save-format.js';
 import { validateCharacter } from '../js/engine/character/validate.js';
 import { attackSummary, averageDamage } from '../js/engine/ui/attack-text.js';
+import { attackToReroll, rerollAttack } from '../js/engine/rules/inspiration.js';
+import { canResolve, resolveFight, resolveLimit } from '../js/engine/combat/resolve.js';
+import { maxHp } from '../js/engine/character/resources.js';
 
 const wren = quickStartHeroes.find((h) => h.id === 'wren').character;
 const juniper = quickStartHeroes.find((h) => h.id === 'juniper').character;
@@ -575,6 +578,76 @@ test('Action buttons say what an attack does: to hit, damage, the average, and r
   assertEqual(missile, ['3 darts that never miss', '1d4 + 1 force each', '10.5 on average', 'range 120 ft', 'uses a level 1 slot (4 left)']);
   assertTrue(attackSummary(options.find((o) => o.id === 'spell-fire-bolt')).includes('half damage even on a miss'), 'Potent Cantrip');
   assertEqual(averageDamage({ dice: '2d6', bonus: 3 }, { greatWeapon: true }), 11, 'Great Weapon Fighting counts 1s and 2s as 3s');
+});
+
+// ---- Quick Resolve ----
+
+test('Resolve: offered only for a fight well under the hero’s strength, and never for a story fight', () => {
+  assertEqual([resolveLimit(1), resolveLimit(2), resolveLimit(3)], [25, 50, 75], 'half the Low budget');
+  assertTrue(!canResolve(millFight(wren)), 'two Goblin Minions (50 XP) are a real fight at level 1');
+  assertTrue(canResolve(millFight(champion)), 'at level 3 they’re well under');
+  const hurt = millFight(champion);
+  hurt.hp = Math.floor(maxHp(champion) / 2) - 1;
+  assertTrue(!canResolve(hurt), 'not below half your Hit Points');
+  const duel = gameFor(champion);
+  forceNextD20(20);
+  fight.startBattle(duel, 'nettle-duel', 0);
+  assertTrue(fight.isHeroTurn(duel) && !canResolve(duel), 'Mother Nettle is always fought by hand');
+});
+
+test('Resolve: plays the fight out with real rolls, spending nothing, and says how it went', () => {
+  const game = millFight(champion, 'resolve');
+  const { outcome, stopped, rounds } = resolveFight(game);
+  assertEqual([outcome, stopped], ['victory', false], game.battle.log.map((e) => e.text).join(' / '));
+  assertTrue(rounds >= 1 && game.battle.log.some((e) => e.text.startsWith('Resolved in')));
+  assertEqual([game.featureUses, game.slotsUsed], [{}, []], 'no Second Wind, no Action Surge');
+});
+
+test('Resolve: stops and hands the fight back once the hero is below half their Hit Points', () => {
+  const game = millFight(champion, 'tough');
+  game.hp = Math.ceil(maxHp(champion) / 2);
+  for (const [i, goblin] of fight.enemies(game.battle).entries()) {
+    goblin.pos = { x: 2 + i * 2, y: 2 };
+    goblin.hp = 60;
+  }
+  const result = resolveFight(game);
+  assertEqual([result.stopped, result.outcome, fight.isHeroTurn(game)], [true, null, true], game.battle.log.map((e) => e.text).join(' / '));
+  assertTrue(game.hp * 2 < maxHp(champion) && game.battle.log.at(-1).text.includes('the fight is yours to play'));
+});
+
+// ---- Heroic Inspiration ----
+
+// The mill fight with Wren holding Heroic Inspiration and a goblin beside her, swinging and
+// rolling a 1 (or the face given).
+function swingAtGoblin(seed, face = 1) {
+  const game = millFight(wren, seed);
+  game.inspiration = true;
+  const goblin = fight.enemies(game.battle)[0];
+  goblin.pos = { x: 3, y: 2 };
+  goblin.hp = 50;
+  const weapon = heroAttackOptions(game).find((o) => o.source === 'weapon' && o.how === 'melee');
+  forceNextD20(face);
+  fight.heroAttack(game, weapon.id, goblin.id);
+  return { game, goblin };
+}
+
+test('Heroic Inspiration: a missed attack can be rolled again straight away, and the new roll stands', () => {
+  const { game } = swingAtGoblin('inspired');
+  const missed = attackToReroll(game);
+  assertTrue(missed && missed.roll.natural === 1 && missed.roll.yours);
+  const { kept } = rerollAttack(game);
+  assertTrue(game.battle.log[kept].text.startsWith('You spend your Heroic Inspiration'));
+  const roll = game.battle.log.slice(kept).find((e) => e.roll && e.roll.kind === 'attack').roll;
+  assertEqual([roll.rerolled.from, roll.natural, game.inspiration, attackToReroll(game)], [1, roll.rerolled.to, false, null]);
+  assertEqual(game.battle.log.filter((e) => e.roll && e.roll.kind === 'attack' && e.roll.yours).length, 1, 'the missed swing is gone from the log');
+});
+
+test('Heroic Inspiration: not for a hit, and not once the hero has done something else', () => {
+  assertEqual(attackToReroll(swingAtGoblin('hit', 20).game), null);
+  const { game } = swingAtGoblin('moved');
+  const step = [...fight.heroReachable(game).values()].find((s) => s.cost > 0);
+  fight.heroMove(game, step.pos);
+  assertEqual(attackToReroll(game), null);
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

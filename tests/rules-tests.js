@@ -4,7 +4,7 @@
 import { test, assertEqual, assertTrue, assertThrows, scriptedRng, run } from './harness.js';
 import { createRng } from '../js/engine/rules/rng.js';
 import { forceNextD20, peekForcedD20, rollDie, rollDice } from '../js/engine/rules/dice.js';
-import { d20Test } from '../js/engine/rules/d20-test.js';
+import { d20Test, startD20Count, stopD20Count } from '../js/engine/rules/d20-test.js';
 import { abilityCheck } from '../js/engine/rules/ability-check.js';
 import {
   abilityModifier,
@@ -40,7 +40,7 @@ import { spells } from '../data/srd/spells.js';
 import { defaultLook, heroSprite, lookProblems, rollLook } from '../js/engine/character/look.js';
 import * as spriteParts from '../data/campaign/hero-sprite.js';
 import { hairStyles, headgear as headgearOptions, speciesLooks } from '../data/campaign/hero-looks.js';
-import { difficultyName, rollLine } from '../js/engine/ui/roll-format.js';
+import { difficultyLabel, difficultyName, rollLine } from '../js/engine/ui/roll-format.js';
 import { parseTags } from '../js/engine/story/tags.js';
 import { skills } from '../data/srd/skills.js';
 import { abilities } from '../data/srd/abilities.js';
@@ -370,9 +370,10 @@ test('Roll line names a Critical Hit', () => {
 });
 
 test('Ink tags: #check:persuasion:15 is a Persuasion check against DC 15; #location sets the place', () => {
-  const none = { check: null, spell: null, location: null, time: null, drive: null, buy: null, combat: null, surprise: false, go: null, room: null };
+  const none = { check: null, spell: null, location: null, time: null, drive: null, buy: null, combat: null, surprise: false, go: null, room: null, speaker: null };
   assertEqual(parseTags(['check:persuasion:15']), { ...none, check: { testId: 'persuasion', dc: 15 } });
   assertEqual(parseTags(['spell:light']).spell, 'light');
+  assertEqual(parseTags(['location:Bramblegate, Hob’s forge', 'speaker:hob']), { ...none, location: 'Bramblegate, Hob’s forge', speaker: 'hob' });
   assertEqual(parseTags(['location: Bramblegate, north gate']).location, 'Bramblegate, north gate');
   assertEqual(parseTags(['time:Dusk', 'drive:wealth', 'buy:torch']), { ...none, time: 'Dusk', drive: 'wealth', buy: 'torch' });
   assertEqual(parseTags(null), none);
@@ -936,6 +937,26 @@ test('Sheet: every number adds up from its parts, so tapping it can show the mat
     ];
     for (const v of values) assertEqual(v.parts.reduce((sum, p) => sum + p.value, 0), v.value);
   }
+});
+
+test('Check difficulty setting: a word, the DC, or nothing before the roll', () => {
+  assertEqual([difficultyLabel(15), difficultyLabel(15, 'word'), difficultyLabel(17, 'number'), difficultyLabel(17, 'hidden')], ['Medium', 'Medium', 'DC 17', '']);
+});
+
+test('Heroic Inspiration: a reroll changes only that d20 test’s kept die, and the roll says so', () => {
+  const rollThree = (plan) => {
+    const rng = createRng('reroll');
+    startD20Count(plan);
+    const rolls = [d20Test({ rng, kind: 'check', label: 'First' }), d20Test({ rng, kind: 'check', label: 'Second', advantage: ['Help'] }), d20Test({ rng, kind: 'check', label: 'Third' })];
+    stopD20Count();
+    return rolls;
+  };
+  const plain = rollThree(null);
+  const [first, second, third] = rollThree({ sequence: 1, face: 17 });
+  assertEqual([first.sequence, second.sequence, third.sequence, first.rerolled, third.rerolled], [0, 1, 2, null, null]);
+  assertEqual([first.dice, third.dice], [plain[0].dice, plain[2].dice], 'the other dice fall just as they did');
+  assertEqual([second.rerolled.from, second.rerolled.to, second.dice.includes(17), second.natural], [plain[1].natural, 17, true, Math.max(...second.dice)]);
+  assertTrue(rollLine(second).includes(`${plain[1].natural} → 17`) && rollLine(second).includes('Heroic Inspiration'), rollLine(second));
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

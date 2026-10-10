@@ -14,13 +14,25 @@ export function difficultyName(dc) {
   return name;
 }
 
+// How hard a check is, before it's rolled, as the "Check difficulty" setting asks: the word
+// ("Medium"), the number ("DC 15") or nothing (''). show: 'word', 'number' or 'hidden'. The
+// roll itself always shows the DC once it's made.
+export function difficultyLabel(dc, show = 'word') {
+  if (show === 'hidden') return '';
+  if (show === 'number') return `DC ${dc}`;
+  return difficultyName(dc);
+}
+
 // "d20 (14)", or with two dice "d20 with advantage (14 and 7, keep 14)".
-// A result forced in debug mode says so: "d20 (20, forced)".
+// A result forced in debug mode says so: "d20 (20, forced)". A die rerolled with Heroic
+// Inspiration shows both faces: "d20 (4 → 15, Heroic Inspiration)".
 export function diceText(result) {
   const forced = result.forced ? ', forced' : '';
-  if (result.mode === 'normal') return `d20 (${result.dice[0]}${forced})`;
-  const [first, second] = result.dice;
-  return `d20 with ${result.mode} (${first} and ${second}, keep ${result.natural}${forced})`;
+  const rerolled = result.rerolled;
+  const face = (i) => (rerolled && rerolled.index === i ? `${rerolled.from} → ${result.dice[i]}` : String(result.dice[i]));
+  const inspired = rerolled ? ', Heroic Inspiration' : '';
+  if (result.mode === 'normal') return `d20 (${face(0)}${forced}${inspired})`;
+  return `d20 with ${result.mode} (${face(0)} and ${face(1)}, keep ${result.natural}${forced}${inspired})`;
 }
 
 // "+3", "+0" or "−1".

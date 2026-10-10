@@ -51,7 +51,7 @@ The wolf lifts its head and looks at you. Its lips peel back from red teeth, but
 * {can_cast("speak-with-animals")} [Ask the wolf, in its own tongue, what it's doing here #spell:speak-with-animals]
     ~ cast("speak-with-animals")
     The spell takes its time. The wolf watches you work it, and when it settles, its growl comes to you as words: short, hungry words, most of them about meat.
-    "Deer gone from the hills. Dead things walk where the deer walked. They smell like the ground." It noses the goblin. "This one ran from the stone place, and fell. Mine now."
+    "Deer gone from the hills. Dead things walk where the deer walked. They smell like the ground." It noses the goblin. "This one ran from the stone place, and fell. Mine now." #speaker:wolf
     You ask it, politely, to eat somewhere else. It thinks about that for a long moment, then drags its meal into the bracken, grumbling about deer.
     ~ quest_note("missing-miller", "A wolf on the quarry road says the deer are gone from the hills: dead things walk there now, smelling of the ground.")
     ~ add_deed("Asked a starving wolf on the quarry road to move along, in its own tongue. It did.")
@@ -91,7 +91,7 @@ The wolf goes down and stays down. Up close it's nothing but bone and grey fur. 
 // Fate's Mercy: Odda Brasswick, a priest of the Steadfast Flame, finds you on the road.
 You wake to the creak of cart wheels and the smell of pine resin. You're lying in the back of a wagon of firewood, wrapped in a blanket that isn't yours. A broad dwarf woman in a priest's grey walks beside the ox, singing under her breath. #location:The quarry road #time:Dusk
 
-"Ah. Awake," she says. "Odda Brasswick, of the Steadfast Flame. I found that wolf standing over you and gave it a crack with my staff, and it remembered its manners. Somebody had been through your pockets before I got there, mind. Little bare footprints all round you." She clicks her tongue at the ox. "Goblins. Hungry ones. Everything's hungry this year."
+"Ah. Awake," she says. "Odda Brasswick, of the Steadfast Flame. I found that wolf standing over you and gave it a crack with my staff, and it remembered its manners. Somebody had been through your pockets before I got there, mind. Little bare footprints all round you." She clicks her tongue at the ox. "Goblins. Hungry ones. Everything's hungry this year." #speaker:odda
 
 She takes you back to the temple in Bramblegate, sees you fed, and won't hear a word of thanks. #location:Bramblegate, the temple #time:Night
 ~ lose_coins()
