@@ -28,26 +28,32 @@ export function damageDice(damage) {
   return `${damage.dice}${bonus} ${damage.type}`;
 }
 
-// What an attack option does, as short phrases to join with " · ". slotsLeft(level), if
-// given, says how many slots of a level are left, for spells that use one.
+// What an attack or spell option does, as short phrases to join with " · ". slotsLeft(level),
+// if given, says how many slots of a level are left, for spells that use one.
 export function attackSummary(option, { slotsLeft = null } = {}) {
   const toHit = `${signedNumber(option.modifiers.reduce((sum, m) => sum + m.value, 0))} to hit`;
-  const average = averageText(averageDamage(option.damage, option));
-  const dice = damageDice(option.damage);
+  const save = option.saveAbility ? `${findAbility(option.saveAbility).abbreviation} save against DC ${option.saveDc}` : null;
   const parts = [];
-  if (option.how === 'darts') {
-    parts.push(`${option.darts} darts that never miss`, `${dice} each`, `${averageText(averageDamage(option.damage) * option.darts)} on average`);
+  if (option.bonusAction) parts.push('Bonus Action');
+  if (option.how === 'self') parts.push(selfText(option));
+  else if (option.how === 'teleport') parts.push(`teleport up to ${option.range[1]} ft to a square you can see`);
+  else if (option.how === 'darts') {
+    parts.push(`${option.darts} darts that never miss`, `${damageDice(option.damage)} each`, `${averageText(averageDamage(option.damage) * option.darts)} on average`);
   } else if (option.how === 'rays') {
-    parts.push(`${option.rays} rays, each ${toHit}`, `${dice} a ray`, `${average} on average a ray`);
-  } else if (option.how === 'save') {
-    parts.push(`${findAbility(option.saveAbility).abbreviation} save against DC ${option.saveDc}`, dice, `${average} on average`);
+    parts.push(`${option.rays} rays, each ${toHit}`, `${damageDice(option.damage)} a ray`, `${averageText(averageDamage(option.damage))} on average a ray`);
   } else {
-    parts.push(toHit, dice, `${average} on average`);
+    parts.push(save || toHit);
+    if (option.damage) parts.push(damageDice(option.damage), `${averageText(averageDamage(option.damage, option))} on average`);
+    if (option.condition) parts.push(CONDITIONS[option.condition]);
+    if (option.halfOnSave) parts.push('half on a save');
+    if (option.push) parts.push(`pushed ${option.push} ft on a failed save`);
   }
-  parts.push(reachText(option));
+  if (option.how !== 'self' && option.how !== 'teleport') parts.push(reachText(option));
   if (option.rider) parts.push(RIDERS[option.rider]);
   if (option.potent) parts.push(`half damage even on a ${option.how === 'save' ? 'save' : 'miss'}`);
   if (option.heavyDisadvantage) parts.push('Disadvantage: too heavy for you');
+  if (option.concentration) parts.push('Concentration');
+  if (option.freeCast) parts.push('free: once per Long Rest');
   if (option.slotLevel) {
     const left = slotsLeft ? ` (${slotsLeft(option.slotLevel)} left)` : '';
     parts.push(`uses a level ${option.slotLevel} slot${left}`);
@@ -55,8 +61,32 @@ export function attackSummary(option, { slotsLeft = null } = {}) {
   return parts;
 }
 
-// "melee", "range 80/320 ft", "thrown 20/60 ft", "range 120 ft"
+// What a spell you cast on yourself does, from its data (data/srd/spells.js), for the Sheet.
+export function selfSpellText(combat) {
+  return selfText({ self: combat.self, baseAc: combat.baseAc, lasts: combat.lasts, speedBonus: combat.speed, tempHp: combat.tempHp });
+}
+
+// What a spell on yourself does: Mage Armor, False Life, Longstrider.
+function selfText(option) {
+  const lasts = option.lasts === 'hour' ? 'for about an hour' : 'until your next Long Rest';
+  if (option.self === 'mage-armor') return `your AC becomes ${option.baseAc} + Dex ${lasts}`;
+  if (option.self === 'longstrider') return `your Speed +${option.speedBonus} ft ${lasts}`;
+  const temp = option.tempHp;
+  const average = averageText(averageDamage({ dice: temp.dice, bonus: temp.bonus }));
+  return `gain ${temp.dice} + ${temp.bonus} Temporary Hit Points (${average} on average)`;
+}
+
+// What a failed save does, for spells that leave a condition.
+const CONDITIONS = { drowsy: 'drowsy, then asleep', paralyzed: 'Paralyzed' };
+
+// "melee", "range 80/320 ft", "thrown 20/60 ft", "range 120 ft", "15-ft cone from you",
+// "10-ft-radius sphere within 60 ft", "a Humanoid within 60 ft"
 function reachText(option) {
+  if (option.area) {
+    const { shape, size } = option.area;
+    return shape === 'sphere' ? `${size}-ft-radius sphere within ${option.range[1]} ft` : `${size}-ft ${shape} from you`;
+  }
+  if (option.creatureType) return `a ${option.creatureType} within ${option.range[1]} ft`;
   if (option.how === 'melee') return option.reach > 5 ? `melee, reach ${option.reach} ft` : 'melee';
   const [normal, long] = option.range;
   const distance = normal === long ? `${normal} ft` : `${normal}/${long} ft`;
@@ -68,4 +98,5 @@ const RIDERS = {
   slowed: 'on a hit, its Speed drops by 10 ft',
   'no-reactions': 'on a hit, no Opportunity Attacks from it',
   'no-healing': 'on a hit, it can’t regain Hit Points',
+  poisoned: 'on a hit, Poisoned until the end of your next turn',
 };

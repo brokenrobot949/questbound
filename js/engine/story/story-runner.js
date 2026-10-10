@@ -18,6 +18,7 @@ import { parseTags } from './tags.js';
 import { enterRoom, parseRoomTag } from '../world/dungeons.js';
 import { finishBattle, startBattle } from '../combat/battle.js';
 import { dmNotes } from '../../../data/campaign/dm-voice.js';
+import { timePasses } from '../character/spell-effects.js';
 
 // How many rolls the roll log keeps in the save. Older ones drop off.
 export const ROLL_LOG_LIMIT = 200;
@@ -98,7 +99,12 @@ export function currentDungeon(game) {
 // Before the story moves on: what the player has seen of this page becomes the starting point.
 function settleSeen(game) {
   game.location = currentLocation(game);
+  const before = game.time;
   game.time = currentTime(game);
+  // The time of day has moved on, about an hour or more: spells that last that long end.
+  if (before && game.time !== before) {
+    for (const spell of timePasses(game)) game.pending.push({ type: 'note', text: dmNotes.spellWoreOff.replace('{spell}', spell) });
+  }
   game.dungeon = currentDungeon(game);
 }
 

@@ -74,14 +74,19 @@ export function speciesSpells(character) {
   const option = speciesOption(character);
   const cantrips = [sp.cantrip, option && option.cantrip, ...((option && option.cantrips) || [])].filter(Boolean);
   const always = [];
-  if (option && option.alwaysPrepared) always.push({ id: option.alwaysPrepared, note: 'without a spell slot as many times as your Proficiency Bonus per Long Rest' });
-  if (option && option.level3Spell && character.level >= 3) always.push({ id: option.level3Spell, note: 'once per Long Rest without a spell slot' });
-  if (option && option.level5Spell && character.level >= 5) always.push({ id: option.level5Spell, note: 'once per Long Rest without a spell slot' });
+  const bonus = proficiencyBonus(character.level);
+  if (option && option.alwaysPrepared) always.push({ id: option.alwaysPrepared, note: 'without a spell slot as many times as your Proficiency Bonus per Long Rest', freeUses: bonus });
+  if (option && option.level3Spell && character.level >= 3) always.push({ id: option.level3Spell, note: 'once per Long Rest without a spell slot', freeUses: 1 });
+  if (option && option.level5Spell && character.level >= 5) always.push({ id: option.level5Spell, note: 'once per Long Rest without a spell slot', freeUses: 1 });
   return { label: option ? option.name : sp.name, ability: character.spellcastingAbility, cantrips, always };
 }
 
 // Every spell the hero has, grouped by where it comes from, for the character sheet:
-// [{ label, ability, cantrips: [spell], prepared: [spell], spellbook: [spell], always: [{ spell, note }] }]
+// [{ label, ability, cantrips: [spell], prepared: [spell], spellbook: [spell],
+//    always: [{ spell, note, freeUses }] }]
+// freeUses: how many times the spell can be cast without a spell slot each Long Rest (it can
+// always be cast with a slot too). Free casts spent are counted in game.featureUses, under
+// freeCastKey(spell id).
 export function spellGroups(character) {
   const groups = [];
   const cls = findClass(character.classId);
@@ -102,7 +107,7 @@ export function spellGroups(character) {
       cantrips: entry.cantrips.map(findSpell),
       prepared: [],
       spellbook: [],
-      always: entry.spell ? [{ spell: findSpell(entry.spell), note: 'once per Long Rest without a spell slot' }] : [],
+      always: entry.spell ? [{ spell: findSpell(entry.spell), note: 'once per Long Rest without a spell slot', freeUses: 1 }] : [],
     });
   }
   const fromSpecies = speciesSpells(character);
@@ -113,10 +118,24 @@ export function spellGroups(character) {
       cantrips: fromSpecies.cantrips.map(findSpell),
       prepared: [],
       spellbook: [],
-      always: fromSpecies.always.map(({ id, note }) => ({ spell: findSpell(id), note })),
+      always: fromSpecies.always.map(({ id, note, freeUses }) => ({ spell: findSpell(id), note, freeUses })),
     });
   }
   return groups;
+}
+
+// Where the free casts of a spell spent since the last Long Rest are counted in
+// game.featureUses (a Long Rest clears them).
+export const freeCastKey = (spellId) => `free-cast:${spellId}`;
+
+// How many free casts of a spell the hero has left before their next Long Rest (0 if the
+// spell doesn't come with any).
+export function freeCastsLeft(game, spellId) {
+  let uses = 0;
+  for (const group of spellGroups(game.character)) {
+    for (const entry of group.always) if (entry.spell && entry.spell.id === spellId) uses = Math.max(uses, entry.freeUses || 0);
+  }
+  return Math.max(0, uses - ((game.featureUses || {})[freeCastKey(spellId)] || 0));
 }
 
 // Spell save DC and spell attack bonus for a spellcasting ability, with their parts.

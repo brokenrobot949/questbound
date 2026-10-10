@@ -1,20 +1,26 @@
 // The Sheet tab during play: the hero's sheet (every number taps open to show its maths),
-// plus what changes in play: Heroic Inspiration, coins and the pack, and the armour worn and
-// every attack the hero has, with the numbers the fight uses.
+// plus what changes in play: Heroic Inspiration, coins and the pack, the armour worn and
+// every attack the hero has (with the numbers the fight uses), the spells on the hero, and
+// buttons to cast Mage Armor, False Life or Longstrider between fights.
 
 import { findBond, findDrive } from '../character/creation.js';
 import { findItem, itemText, moneyText } from '../character/inventory.js';
 import { armorClass, findArmor } from '../character/sheet.js';
 import { heroAttackOptions } from '../combat/attacks.js';
 import { shield } from '../../../data/srd/armor.js';
-import { attackSummary } from './attack-text.js';
+import { attackSummary, selfSpellText } from './attack-text.js';
+import { activeSpellIds, castSelfSpell, lastsText, selfSpellsToCast } from '../character/spell-effects.js';
+import { findSpell } from '../character/spells.js';
+import { actionButton } from './backup-panels.js';
 import { featureUsesLeft, featureUsesMax, maxHp, slotsAt, slotsLeft } from '../character/resources.js';
 import { levelUpReady, nextLevelXp } from '../character/level-up.js';
 import { heroSheet } from './hero-sheet.js';
 import { el } from './dom.js';
 import { expandable } from './widgets.js';
 
-export function sheetPanel(game) {
+// onCast(game): the hero cast a spell from the Sheet (save the game). note: a line to show
+// at the top of the casting section, saying what the last spell did.
+export function sheetPanel(game, { onCast = () => {}, note = null } = {}) {
   const { character } = game;
   const panel = el('div', 'sheet-panel');
 
@@ -22,6 +28,8 @@ export function sheetPanel(game) {
   const now = el('section', 'sheet-block');
   now.append(el('h3', 'section-heading', 'Right now'));
   now.append(el('p', 'sheet-line', `Hit Points: ${game.hp} of ${maxHp(character)}`));
+  if (game.tempHp) now.append(el('p', 'sheet-line', `Temporary Hit Points: ${game.tempHp} (lost first; gone after a Long Rest)`));
+  for (const { id, lasts } of game.activeSpells || []) now.append(el('p', 'sheet-line', `On you: ${findSpell(id).name}, ${lastsText(lasts)}`));
   const next = nextLevelXp(character);
   let xpNote = ` (level ${character.level} is as high as the game goes for now)`;
   if (levelUpReady(game)) xpNote = ' (level up ready: see the Adventure tab)';
@@ -39,9 +47,14 @@ export function sheetPanel(game) {
   }
   now.append(el('p', 'section-hint', 'A long rest brings back Hit Points, spell slots and every use of your features.'));
   panel.append(now);
+  const casting = castBlock(game, note, (text) => {
+    onCast(game);
+    panel.replaceWith(sheetPanel(game, { onCast, note: text }));
+  });
+  if (casting) panel.append(casting);
   panel.append(gearBlock(game));
 
-  panel.append(heroSheet(character));
+  panel.append(heroSheet(character, { spellsOn: activeSpellIds(game) }));
 
   const drive = findDrive(character.drive);
   const bond = findBond(character.bond.type);
@@ -80,9 +93,10 @@ function gearBlock(game) {
   const { character } = game;
   const block = el('section', 'sheet-block');
   block.append(el('h3', 'section-heading', 'Armour and weapons'));
-  const ac = armorClass(character).value;
+  const ac = armorClass(character, activeSpellIds(game)).value;
   const worn = character.armorId ? findArmor(character.armorId) : null;
-  block.append(el('p', 'sheet-line', `Wearing: ${worn ? worn.name : 'no armour'} (Armor Class ${ac})`));
+  const mageArmor = !worn && activeSpellIds(game).includes('mage-armor');
+  block.append(el('p', 'sheet-line', `Wearing: ${worn ? worn.name : mageArmor ? 'no armour, but Mage Armor' : 'no armour'} (Armor Class ${ac})`));
   if (character.shield) block.append(el('p', 'sheet-line', `Shield: on your arm (+${shield.acBonus} Armor Class)`));
 
   const options = heroAttackOptions(game);
@@ -97,11 +111,39 @@ function gearBlock(game) {
     if (ways.length === 0) block.append(el('p', 'pack-item', `${item.name}: ${whyNot(game, item)}`));
   }
 
-  // Attack spells, once each (at the lowest slot level with a slot left).
+  // Spells for a fight, once each (a free cast first, or the lowest slot level left).
   const spells = options.filter((option, i) => option.source === 'spell' && options.findIndex((o) => o.spellId === option.spellId) === i);
   if (spells.length) {
-    block.append(el('p', 'sheet-line', 'Attack spells'));
+    block.append(el('p', 'sheet-line', 'Spells in a fight'));
     for (const option of spells) block.append(el('p', 'pack-item', `${option.name}: ${attackSummary(option).join(' · ')}`));
+  }
+  return block;
+}
+
+// Spells the hero casts on themselves before trouble starts: a button for each way they can
+// cast it (a free cast, or each spell slot level they have left). onCast(text) after one.
+function castBlock(game, note, onCast) {
+  const choices = selfSpellsToCast(game);
+  if (choices.length === 0) return null;
+  const block = el('section', 'sheet-block');
+  block.append(el('h3', 'section-heading', 'Cast a spell on yourself'));
+  if (note) block.append(el('p', 'dm-note', note));
+  if (game.battle) {
+    block.append(el('p', 'section-hint', 'In a fight, cast your spells from the battle screen.'));
+    return block;
+  }
+  block.append(el('p', 'section-hint', 'Best cast before trouble starts: each one uses a spell slot.'));
+  for (const { spell, slots, problem } of choices) {
+    const row = el('div', 'sheet-cast');
+    row.append(el('p', 'sheet-line', `${spell.name}: ${selfSpellText(spell.combat)}`));
+    if (problem) row.append(el('p', 'section-hint', problem));
+    const buttons = el('div', 'slot-actions');
+    for (const slot of slots) {
+      const label = slot === 'free' ? 'Cast it free (once per Long Rest)' : `Cast (level ${slot} slot)`;
+      buttons.append(actionButton(label, () => onCast(`You cast ${castSelfSpell(game, spell.id, slot)}`)));
+    }
+    if (slots.length) row.append(buttons);
+    block.append(row);
   }
   return block;
 }

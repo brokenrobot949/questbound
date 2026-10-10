@@ -175,4 +175,12 @@ export const migrations = {
     };
     return { ...save, version: 12, game: { ...game, objective: null, session, journal: { ...game.journal, sessions: [] } } };
   },
+
+  // Version 13 adds spells that last on the hero (Mage Armor, Longstrider) and Temporary Hit
+  // Points (False Life): none yet. A fight in progress has nobody concentrating.
+  12: (save) => {
+    const { game } = save;
+    const battle = game.battle ? { ...game.battle, concentration: null } : null;
+    return { ...save, version: 13, game: { ...game, tempHp: 0, activeSpells: [], battle } };
+  },
 };

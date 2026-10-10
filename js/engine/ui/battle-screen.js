@@ -4,7 +4,11 @@
 // On the hero's turn, lit squares show where they can move: tap one to go there. Every action
 // button says what it does, and every attack its chance to hit, damage and reach. Choose an
 // attack, then a foe (on the grid or in the list) to attack it; each foe's button shows the
-// chance to hit first. Other actions, Bonus Actions and End Turn sit under the attacks.
+// chance to hit first. Spells have a button each: choose one, pick the spell slot to use (or
+// a free cast), then aim it. An area spell shows the squares it would cover in orange (it
+// starts aimed at the most foes it can catch without you); tap the grid to aim it elsewhere,
+// then Cast. Misty Step lights the squares it can reach in purple. Other actions, Bonus
+// Actions and End Turn sit under the spells.
 //
 // Whatever follows a choice plays out a line at a time, at the Battle speed set in Settings:
 // each turn is announced, creatures walk square by square, damage pops up over whoever took
@@ -13,6 +17,7 @@
 
 import * as fight from '../combat/battle.js';
 import { key } from '../combat/grid.js';
+import { directionTowards } from '../combat/areas.js';
 import { heroSprite } from '../character/look.js';
 import { featureUsesLeft, featureUsesMax, maxHp, slotsLeft } from '../character/resources.js';
 import { getSetting } from '../save/settings.js';
@@ -36,6 +41,18 @@ const PACE = {
 const DAMAGE_COLOR = '#ff8a7a';
 const HEALING_COLOR = '#7fd99a';
 
+// Washes over squares on the grid: an area spell's reach, and where Misty Step can go.
+const AREA_WASH = ['rgba(240, 140, 60, 0.35)', 'rgba(240, 140, 60, 0.9)'];
+const TELEPORT_WASH = ['rgba(180, 140, 230, 0.35)', 'rgba(180, 140, 230, 0.9)'];
+// Tints under a creature with a condition, and words for the turn order.
+const CONDITION_TINTS = { paralyzed: 'rgba(180, 140, 230, 0.45)', poisoned: 'rgba(110, 200, 90, 0.4)', shield: 'rgba(120, 170, 240, 0.45)' };
+const CONDITION_WORDS = [
+  ['asleep', 'Asleep'],
+  ['drowsy', 'Drowsy'],
+  ['paralyzed', 'Paralyzed'],
+  ['poisoned', 'Poisoned'],
+];
+
 // Log lines already played on screen during this visit, so nothing plays twice.
 const played = new WeakSet();
 
@@ -48,12 +65,16 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
   const heroFrames = look.frames.map((rows) => spriteImage(look, rows));
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // option: the attack chosen, waiting for a target. replaying: lines are playing out, and
-  // scene is what the grid shows meanwhile (null: the fight as it stands). walkers: creatures
-  // part-way between squares. popups: damage and healing numbers over creatures. caption: the
-  // line playing now; lastCaption: the last thing that happened, shown between turns.
+  // option: the attack or spell chosen, waiting to be aimed; aim: where an area spell is aimed
+  // ({ direction } or { at }). replaying: lines are playing out, and scene is what the grid
+  // shows meanwhile (null: the fight as it stands). walkers: creatures part-way between
+  // squares. popups: damage and healing numbers over creatures. flash: squares a spell just
+  // covered. caption: the line playing now; lastCaption: the last thing that happened, shown
+  // between turns.
   const view = {
     option: null,
+    aim: null,
+    flash: null,
     replaying: false,
     skip: false,
     wake: null,
@@ -70,6 +91,8 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
   const panel = el('section', 'battle');
   panel.setAttribute('aria-label', 'Battle');
   const header = el('div', 'battle-header');
+  // Concentration, Shield and Temporary Hit Points, when there are any.
+  const status = el('p', 'battle-status');
   const order = el('ol', 'battle-order');
   order.setAttribute('aria-label', 'Turn order');
   const objective = el('p', 'battle-objective');
@@ -83,7 +106,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
   const logList = el('ol', 'battle-log');
   logList.setAttribute('aria-live', 'polite');
   logList.setAttribute('aria-label', 'Fight log');
-  panel.append(header, order, objective, canvas, caption, help, controls, logList);
+  panel.append(header, status, order, objective, canvas, caption, help, controls, logList);
   container.replaceChildren(panel);
 
   const timer = reduceMotion
@@ -104,10 +127,39 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       x: Math.floor(((event.clientX - rect.left) / rect.width) * map.width),
       y: Math.floor(((event.clientY - rect.top) / rect.height) * map.height),
     };
+    const chosen = chosenOption();
+    const aiming = chosen && chosen.targeting;
+    if (aiming === 'direction' || aiming === 'point') return aimAt(chosen, pos);
+    if (aiming === 'square') {
+      if (fight.teleportSquares(game, chosen.id).some((s) => s.x === pos.x && s.y === pos.y)) act(() => fight.heroTeleport(game, chosen.id, pos));
+      return;
+    }
+    if (aiming === 'self') return;
     const foe = fight.enemies(game.battle).find((c) => c.hp > 0 && c.pos.x === pos.x && c.pos.y === pos.y);
-    if (foe && view.option) return act(() => fight.heroAttack(game, view.option, foe.id));
+    if (foe && chosen) return act(() => fight.heroAttack(game, chosen.id, foe.id));
     if (!foe && fight.heroReachable(game).has(key(pos))) act(() => fight.heroMove(game, pos));
   });
+
+  // The attack or spell chosen, if it's still there (a slot can run out), or null.
+  function chosenOption() {
+    return view.option ? fight.heroAttackOptions(game).find((o) => o.id === view.option) || null : null;
+  }
+
+  // Aims an area spell at a tapped square: a direction for one that starts from you, the
+  // centre for one that doesn't.
+  function aimAt(option, pos) {
+    const towards = directionTowards(fight.heroCombatant(game.battle).pos, pos);
+    const aim = option.targeting === 'direction' ? (towards ? { direction: towards.id } : null) : { at: pos };
+    if (!aim) return;
+    try {
+      fight.areaFor(game, option.id, aim);
+    } catch (error) {
+      help.textContent = error.message;
+      return;
+    }
+    view.aim = aim;
+    render();
+  }
 
   // Runs one of the hero's actions and saves, then plays out whatever followed.
   async function act(action) {
@@ -120,6 +172,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       return;
     }
     view.option = null;
+    view.aim = null;
     onSave(game);
     await replay(before);
     render();
@@ -144,9 +197,11 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     while (view.shown < log.length) {
       const entry = log[view.shown];
       const info = fight.replayOf(entry);
+      view.flash = null;
       if (info) {
         if (!view.skip) for (const move of info.moves) await walk(move);
         view.popups = view.skip ? [] : changesBetween(view.scene, info.scene);
+        view.flash = view.skip ? null : info.area;
         view.scene = copyScene(info.scene);
       }
       appendLogLine(entry);
@@ -158,6 +213,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     }
     view.replaying = false;
     view.scene = null;
+    view.flash = null;
     // The last damage numbers linger a moment.
     view.popupTimer = setTimeout(clearPopups, pace().line);
   }
@@ -187,10 +243,15 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     if (view.wake) view.wake();
   }
 
-  // Walks a creature along its path, a square at a time.
+  // Walks a creature along its path, a square at a time. A teleport (Misty Step) just moves it.
   async function walk(move) {
     const unit = view.scene.units.find((u) => u.id === move.id);
     if (!unit) return;
+    if (move.teleport) {
+      unit.pos = { ...move.path[move.path.length - 1] };
+      draw();
+      return;
+    }
     unit.pos = { ...move.from };
     for (const next of move.path) {
       if (!reduceMotion && !view.skip) await slide(move.id, unit.pos, next, pace().step);
@@ -275,8 +336,15 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
 
     header.replaceChildren(
       el('span', 'battle-round', `Round ${scene.round}`),
-      el('span', 'battle-hp', `HP ${hero.hp}/${maxHp(game.character)}`),
+      el('span', 'battle-hp', `HP ${hero.hp}/${maxHp(game.character)}${hero.temp ? ` +${hero.temp}` : ''}`),
     );
+    const heroConditions = hero.conditions || [];
+    const notes = [];
+    if (scene.concentration) notes.push(`Concentrating on ${scene.concentration}`);
+    if (heroConditions.includes('shield')) notes.push('Shield up: +5 AC');
+    if (heroConditions.includes('dodging')) notes.push('Dodging');
+    if (hero.temp) notes.push(`${hero.temp} Temporary Hit Points`);
+    status.textContent = notes.join(' · ');
     objective.textContent = fight.objectiveText(battle);
     order.replaceChildren(
       ...battle.order
@@ -286,8 +354,14 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
           const c = fight.combatantById(battle, unit.id);
           const down = c.side === 'enemy' ? unit.hp <= 0 : scene.heroState !== 'up';
           const name = c.side === 'hero' ? 'You' : c.name;
-          let label = !down && unit.prone ? `${name} (Prone)` : name;
-          if (unit.escaped) label = `${name} (fled)`;
+          const conditions = unit.conditions || [];
+          const tags = [];
+          if (unit.escaped) tags.push('fled');
+          else if (!down) {
+            for (const [kind, word] of CONDITION_WORDS) if (conditions.includes(kind)) tags.push(word);
+            if (unit.prone && !conditions.includes('asleep')) tags.push('Prone');
+          }
+          const label = tags.length ? `${name} (${tags.join(', ')})` : name;
           return el('li', `battle-order-entry${unit.id === scene.actor ? ' is-current' : ''}${down ? ' is-down' : ''}`, label);
         }),
     );
@@ -318,38 +392,46 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     const prone = fight.isProne(battle, 'hero');
     const options = fight.heroAttackOptions(game);
     const chosen = options.find((o) => o.id === view.option) || null;
+    if (!chosen) view.option = null;
     help.textContent = chosen
-      ? `${chosen.name}: choose a foe to attack. Tap it on the grid, or below.`
+      ? aimHelp(chosen)
       : turn.athleteMove
         ? `Remarkable Athlete: tap a gold square to move up to ${turn.athleteMove} feet without provoking Opportunity Attacks, or carry on.`
         : prone
           ? `You're Prone: your attacks have Disadvantage, and foes beside you have Advantage. Stand up for ${fight.heroStandCost(game)} feet of movement, or crawl (${turn.movementLeft} feet left, each square costs double).`
           : `Your turn. Tap a lit square to move (${turn.movementLeft} feet left), or choose an action.`;
+    const summary = (option) => attackSummary(option, { slotsLeft: (level) => slotsLeft(game, level) }).join(' · ');
 
-    const attacks = actionGroup(turn.action ? 'Attack (action used)' : 'Attack');
-    for (const option of options) {
-      const what = attackSummary(option, { slotsLeft: (level) => slotsLeft(game, level) }).join(' · ');
-      const card = actionCard(option.name, what, () => {
-        view.option = view.option === option.id ? null : option.id;
+    // A button that chooses an attack or spell (tap it again to put it back). A spell has one
+    // button, whichever slot it's cast with.
+    const choiceCard = (option) => {
+      const pressed = Boolean(chosen && (chosen.id === option.id || (option.spellId && chosen.spellId === option.spellId)));
+      const card = actionCard(spellName(option), summary(option), () => {
+        view.option = pressed ? null : option.id;
+        view.aim = !pressed && option.area ? fight.suggestAim(game, option.id) : null;
         render();
       });
-      card.setAttribute('aria-pressed', String(view.option === option.id));
-      // Action Surge's extra action can't cast a spell.
-      card.disabled = turn.action || (turn.surged && option.source === 'spell');
-      attacks.list.append(card);
-    }
-    controls.append(attacks.group);
+      card.setAttribute('aria-pressed', String(pressed));
+      const why = fight.heroCantUse(game, option.id);
+      card.disabled = Boolean(why);
+      if (why) card.title = why;
+      return card;
+    };
 
-    if (chosen) {
-      const targets = actionGroup(`Target for ${chosen.name}`);
-      for (const foe of fight.enemies(battle).filter((c) => c.hp > 0)) {
-        const preview = fight.attackPreview(game, chosen.id, foe.id);
-        const card = actionCard(foe.name, targetText(preview), () => act(() => fight.heroAttack(game, chosen.id, foe.id)));
-        card.disabled = !preview.inRange;
-        card.title = preview.describe;
-        targets.list.append(card);
-      }
-      controls.append(targets.group);
+    const weapons = options.filter((o) => o.source === 'weapon');
+    if (weapons.length) {
+      const attacks = actionGroup(turn.action ? 'Attack (action used)' : 'Attack');
+      for (const option of weapons) attacks.list.append(choiceCard(option));
+      controls.append(attacks.group);
+      if (chosen && chosen.source === 'weapon') controls.append(aimPanel(chosen, options));
+    }
+
+    const spells = firstOfEach(options.filter((o) => o.source === 'spell' && !o.bonusAction));
+    if (spells.length) {
+      const group = actionGroup(turn.action ? 'Spells (action used)' : 'Spells');
+      for (const option of spells) group.list.append(choiceCard(option));
+      controls.append(group.group);
+      if (chosen && chosen.source === 'spell' && !chosen.bonusAction) controls.append(aimPanel(chosen, options));
     }
 
     // Standing up from Prone uses movement, not an action.
@@ -383,7 +465,8 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     controls.append(other.group);
 
     const bonuses = fight.heroBonusActions(game);
-    if (bonuses.length) {
+    const bonusSpells = firstOfEach(options.filter((o) => o.source === 'spell' && o.bonusAction));
+    if (bonuses.length || bonusSpells.length) {
       const bonus = actionGroup(turn.bonus ? 'Bonus Action (used)' : 'Bonus Action');
       if (bonuses.includes('second-wind')) {
         const level = game.character.level;
@@ -395,10 +478,72 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
         const what = `Regain 2d4 + 2 Hit Points (7 on average) · ${potions} in your pack`;
         bonus.list.append(disabledIf(turn.bonus, actionCard('Drink a Potion of Healing', what, () => act(() => fight.heroDrinkPotion(game)))));
       }
+      for (const option of bonusSpells) bonus.list.append(choiceCard(option));
       controls.append(bonus.group);
+      if (chosen && chosen.bonusAction) controls.append(aimPanel(chosen, options));
     }
 
     controls.append(actionCard('End turn', 'Your foes take their turns', () => act(() => fight.endHeroTurn(game)), 'is-primary'));
+  }
+
+  // What to do next with the chosen attack or spell.
+  function aimHelp(option) {
+    const name = spellName(option);
+    if (option.targeting === 'direction') return `${name}: tap the grid on the side you want it to go. The orange squares are what it covers.`;
+    if (option.targeting === 'point') return `${name}: tap the square to centre it on, up to ${option.range[1]} feet away. The orange squares are what it covers.`;
+    if (option.targeting === 'self') return `${name}: on yourself.`;
+    if (option.targeting === 'square') return `${name}: tap a purple square to step there.`;
+    return `${name}: choose a foe. Tap it on the grid, or below.`;
+  }
+
+  // Under the chosen attack or spell: which spell slot to use, then where to aim it.
+  function aimPanel(chosen, options) {
+    const box = el('div', 'battle-aim');
+    const variants = chosen.spellId ? options.filter((o) => o.spellId === chosen.spellId) : [];
+    if (variants.length > 1) {
+      const row = el('div', 'battle-slots');
+      row.setAttribute('role', 'group');
+      row.setAttribute('aria-label', 'Spell slot');
+      for (const variant of variants) {
+        const label = variant.freeCast ? 'Free (once per Long Rest)' : `Level ${variant.slotLevel} slot (${slotsLeft(game, variant.slotLevel)} left)`;
+        const chip = battleButton(label, () => {
+          view.option = variant.id;
+          render();
+        }, 'battle-slot');
+        chip.setAttribute('aria-pressed', String(variant.id === chosen.id));
+        chip.disabled = Boolean(fight.heroCantUse(game, variant.id));
+        row.append(chip);
+      }
+      box.append(row);
+    }
+    const targeting = chosen.targeting || 'foe';
+    if (targeting === 'foe') {
+      const targets = actionGroup(`Target for ${spellName(chosen)}`);
+      for (const foe of fight.enemies(game.battle).filter((c) => c.hp > 0)) {
+        const preview = fight.attackPreview(game, chosen.id, foe.id);
+        const card = actionCard(foe.name, targetText(preview), () => act(() => fight.heroAttack(game, chosen.id, foe.id)));
+        card.disabled = !preview.inRange;
+        card.title = preview.describe;
+        targets.list.append(card);
+      }
+      box.append(targets.group);
+    } else if (targeting === 'direction' || targeting === 'point') {
+      let area = null;
+      try {
+        area = view.aim ? fight.areaFor(game, chosen.id, view.aim) : null;
+      } catch {
+        area = null;
+      }
+      const caught = area ? area.caught.map((c) => (c.side === 'hero' ? 'you' : c.name)) : [];
+      const what = !area ? 'Tap the grid to aim it first' : caught.length ? `Catches ${caught.join(', ')}` : 'Catches nobody';
+      if (area && area.caught.some((c) => c.side === 'hero')) box.append(el('p', 'battle-warning', 'Careful: you’re inside it too.'));
+      const cast = actionCard(`Cast ${spellName(chosen)}`, what, () => act(() => fight.heroCastArea(game, chosen.id, view.aim)), 'is-primary');
+      cast.disabled = !area;
+      box.append(cast);
+    } else if (targeting === 'self') {
+      box.append(actionCard(`Cast ${spellName(chosen)}`, '', () => act(() => fight.heroCastSelf(game, chosen.id)), 'is-primary'));
+    }
+    return box;
   }
 
   function outcomeCard(battle) {
@@ -441,14 +586,35 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     // Where the hero can move. A pale wash with a bright edge, so it shows on wood and stone
     // alike; gold squares are a free move (Remarkable Athlete).
     if (fight.isHeroTurn(game) && !view.replaying && !view.option) {
-      ctx.lineWidth = scale;
       for (const step of fight.heroReachable(game).values()) {
         if (step.cost === 0) continue;
-        ctx.fillStyle = step.free ? 'rgba(240, 200, 90, 0.35)' : 'rgba(222, 238, 214, 0.32)';
-        ctx.strokeStyle = step.free ? 'rgba(240, 200, 90, 0.9)' : 'rgba(222, 238, 214, 0.85)';
-        const inset = 2 * scale;
-        ctx.fillRect(step.pos.x * size + inset, step.pos.y * size + inset, size - 2 * inset, size - 2 * inset);
-        ctx.strokeRect(step.pos.x * size + inset + scale / 2, step.pos.y * size + inset + scale / 2, size - 2 * inset - scale, size - 2 * inset - scale);
+        const colours = step.free ? ['rgba(240, 200, 90, 0.35)', 'rgba(240, 200, 90, 0.9)'] : ['rgba(222, 238, 214, 0.32)', 'rgba(222, 238, 214, 0.85)'];
+        washSquare(ctx, step.pos, size, scale, colours);
+      }
+    }
+
+    // The chosen spell: the squares an area would cover, or where Misty Step can go. During
+    // a replay, the squares a spell just covered.
+    const chosen = !view.replaying && fight.isHeroTurn(game) ? chosenOption() : null;
+    let aimed = null;
+    if (chosen && chosen.area && view.aim) {
+      try {
+        aimed = fight.areaFor(game, chosen.id, view.aim);
+      } catch {
+        aimed = null;
+      }
+    }
+    for (const pos of (aimed && aimed.squares) || view.flash || []) washSquare(ctx, pos, size, scale, AREA_WASH);
+    if (chosen && chosen.targeting === 'square') for (const pos of fight.teleportSquares(game, chosen.id)) washSquare(ctx, pos, size, scale, TELEPORT_WASH);
+
+    // Tints under creatures held, poisoned or shielded.
+    for (const unit of scene.units) {
+      if (unit.escaped || (unit.id !== 'hero' && unit.hp <= 0)) continue;
+      for (const kind of unit.conditions || []) {
+        if (!CONDITION_TINTS[kind]) continue;
+        const pos = at(unit);
+        ctx.fillStyle = CONDITION_TINTS[kind];
+        ctx.fillRect(pos.x * size, pos.y * size, size, size);
       }
     }
 
@@ -475,6 +641,15 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     const heroAt = at(hero);
     blit(ctx, heroFrames[up ? frame : 0], 0, 0, heroAt.x, heroAt.y, size, { alpha: up ? 1 : 0.5, lying: !up || hero.prone });
     drawHealthBar(ctx, heroAt, hero.hp / maxHp(game.character), size, scale);
+
+    // Sleepers snore; whoever an aimed area would catch is framed in orange.
+    for (const unit of scene.units) {
+      const conditions = unit.conditions || [];
+      if (unit.hp > 0 && (conditions.includes('asleep') || conditions.includes('drowsy'))) {
+        drawBadge(ctx, conditions.includes('asleep') ? 'Zz' : 'z', at(unit), size, scale);
+      }
+    }
+    if (aimed) for (const c of aimed.caught) frameSquare(ctx, c.pos, size, scale, AREA_WASH[1]);
 
     // Whose turn it is.
     const actor = scene.units.find((u) => u.id === scene.actor);
@@ -515,16 +690,53 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
   }
 }
 
-// Each creature's Hit Points that went down (damage) or up (healing) between two scenes.
+// Each creature's Hit Points (and Temporary Hit Points) that went down (damage) or up
+// (healing) between two scenes.
 function changesBetween(before, after) {
   const popups = [];
+  const total = (unit) => unit.hp + (unit.temp || 0);
   for (const unit of after.units) {
     const was = before.units.find((u) => u.id === unit.id);
-    if (!was || was.hp === unit.hp) continue;
-    if (unit.hp < was.hp) popups.push({ id: unit.id, text: `-${was.hp - unit.hp}`, color: DAMAGE_COLOR });
-    else popups.push({ id: unit.id, text: `+${unit.hp - was.hp}`, color: HEALING_COLOR });
+    if (!was || total(was) === total(unit)) continue;
+    if (total(unit) < total(was)) popups.push({ id: unit.id, text: `-${total(was) - total(unit)}`, color: DAMAGE_COLOR });
+    else popups.push({ id: unit.id, text: `+${total(unit) - total(was)}`, color: HEALING_COLOR });
   }
   return popups;
+}
+
+// One button for each spell: the first of its options (a free cast, then the lowest slot).
+function firstOfEach(options) {
+  return options.filter((option, i) => options.findIndex((o) => o.spellId === option.spellId) === i);
+}
+
+// "Burning Hands", without "(level 2 slot)" or "(free)".
+function spellName(option) {
+  return option.name.replace(/ \((free|level \d+ slot)\)$/, '');
+}
+
+// A pale wash with a bright edge over a square.
+function washSquare(ctx, pos, size, scale, [fill, edge]) {
+  const inset = 2 * scale;
+  ctx.lineWidth = scale;
+  ctx.fillStyle = fill;
+  ctx.strokeStyle = edge;
+  ctx.fillRect(pos.x * size + inset, pos.y * size + inset, size - 2 * inset, size - 2 * inset);
+  ctx.strokeRect(pos.x * size + inset + scale / 2, pos.y * size + inset + scale / 2, size - 2 * inset - scale, size - 2 * inset - scale);
+}
+
+// A little word in the top corner of a square ("Zz" over a sleeper).
+function drawBadge(ctx, text, pos, size, scale) {
+  ctx.save();
+  ctx.font = `${5 * scale}px 'Press Start 2P', monospace`;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'top';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 2 * scale;
+  ctx.strokeStyle = '#140c1c';
+  ctx.strokeText(text, pos.x * size + size - scale, pos.y * size + scale);
+  ctx.fillStyle = '#9fc4f0';
+  ctx.fillText(text, pos.x * size + size - scale, pos.y * size + scale);
+  ctx.restore();
 }
 
 function copyScene(scene) {
@@ -533,6 +745,7 @@ function copyScene(scene) {
 
 // "65% to hit · Advantage: Pack Tactics", "80% it fails the save", "Out of range".
 function targetText(preview) {
+  if (preview.invalid) return preview.invalid;
   if (!preview.inRange) return 'Out of range';
   const percent = `${Math.round(preview.chance * 100)}%`;
   const how = preview.option.how;

@@ -47,6 +47,7 @@ export const dmNotes = {
   fellDead: 'Darkness takes you.',
   levelUpNote: 'You are now level {level}. Your Hit Point maximum rises by {hp}.',
   levelUpDeed: 'Reached level {level}.',
+  spellWoreOff: 'Time passes, and your {spell} wears off.',
   source: 'original',
 };
 

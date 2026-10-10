@@ -16,7 +16,9 @@
 //                  flag ids set by set_flag in Ink, e.g. "saw_barrow_light"), journal (see
 //                  story/journal.js), money (in copper) and inventory (see
 //                  character/inventory.js), hp, slotsUsed, featureUses and xp (see
-//                  character/resources.js), battle (a fight in progress, or null; see
+//                  character/resources.js), tempHp and activeSpells (Temporary Hit Points
+//                  and spells on the hero; see character/spell-effects.js), battle (a fight
+//                  in progress, or null; see
 //                  combat/battle.js), lastBattle ({ encounterId, outcome } of the last fight),
 //                  levelUp (a level-up in progress, or null; see character/level-up.js),
 //                  dungeon (the dungeon room the hero is in and the rooms explored, or null;
@@ -35,7 +37,7 @@ import { levelUpOk } from '../character/level-up.js';
 import { migrations } from './migrations.js';
 import { validateCharacter } from '../character/validate.js';
 
-export const SAVE_VERSION = 12;
+export const SAVE_VERSION = 13;
 
 // runtime: { story, game } — the compiled story, and whichever game is being played.
 
@@ -102,6 +104,8 @@ export function gameToSave(game, now = new Date()) {
       inventory: game.inventory,
       hp: game.hp,
       slotsUsed: game.slotsUsed,
+      tempHp: game.tempHp,
+      activeSpells: game.activeSpells,
       featureUses: game.featureUses,
       xp: game.xp,
       battle: game.battle,
@@ -140,6 +144,8 @@ export function loadGame(runtime, record) {
     inventory: save.game.inventory,
     hp: save.game.hp,
     slotsUsed: save.game.slotsUsed,
+    tempHp: save.game.tempHp,
+    activeSpells: save.game.activeSpells,
     featureUses: save.game.featureUses,
     xp: save.game.xp,
     battle: save.game.battle,

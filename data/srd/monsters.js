@@ -19,6 +19,8 @@
 //                   ally within 5 feet, who becomes the target instead)
 //   immunities      damage types it takes no damage from; vulnerabilities: double damage;
 //   resistances     half damage
+//   conditionImmunities  conditions it can't have, e.g. 'poisoned'. Immunity to 'exhaustion'
+//                   also means it never sleeps, so the Sleep spell can't touch it.
 //   An attack's damage can carry plus: { amount, type }: a flat extra of another type, as in
 //                   "3 (1d4 + 1) Slashing damage plus 1 Necrotic damage"
 //   'undead-fortitude' (trait): when damage drops it to 0 Hit Points, a Constitution save
@@ -147,6 +149,7 @@ export const monsters = [
     saves: { strength: 1, dexterity: -2, constitution: 3, intelligence: -4, wisdom: 0, charisma: -3 },
     initiative: -2,
     immunities: ['poison'],
+    conditionImmunities: ['exhaustion', 'poisoned'],
     darkvision: 60,
     passivePerception: 8,
     cr: '1/4',
@@ -171,6 +174,7 @@ export const monsters = [
     initiative: 3,
     vulnerabilities: ['bludgeoning'],
     immunities: ['poison'],
+    conditionImmunities: ['exhaustion', 'poisoned'],
     darkvision: 60,
     passivePerception: 9,
     cr: '1/4',

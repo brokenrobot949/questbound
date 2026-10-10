@@ -2,6 +2,7 @@
 // device, not to a save slot. (The full Menu screen arrives later; this is its first piece.)
 
 import { getSetting, setSetting } from '../save/settings.js';
+import { setReactionPolicy } from '../combat/battle.js';
 import { actionButton } from './backup-panels.js';
 import { el } from './dom.js';
 
@@ -17,6 +18,11 @@ const OPTIONS = [
     hint: "Skips tapping the die. You still see every roll in full.",
   },
   {
+    name: 'autoShield',
+    label: 'Cast Shield by itself',
+    hint: 'If you have the Shield spell ready, the game casts it with your lowest spell slot whenever an attack would hit you and Shield would make it miss. Turn this off to save your slots.',
+  },
+  {
     name: 'battleSpeed',
     label: 'Battle speed',
     hint: 'How quickly each turn of a fight plays out. Skip shows the rest of a turn at once.',
@@ -28,9 +34,10 @@ const OPTIONS = [
   },
 ];
 
-// Puts the display settings into effect. Call at startup and after any change.
+// Puts the settings into effect. Call at startup and after any change.
 export function applySettings() {
   document.documentElement.dataset.narration = getSetting('plainNarration') ? 'plain' : 'pixel';
+  setReactionPolicy({ shield: getSetting('autoShield') });
 }
 
 // onClose(): the player pressed Done.

@@ -26,6 +26,7 @@ import { species } from '../../../data/srd/species.js';
 import { backgrounds } from '../../../data/srd/backgrounds.js';
 import { feats } from '../../../data/srd/feats.js';
 import { armor, shield, unarmoredBaseAc } from '../../../data/srd/armor.js';
+import { spells } from '../../../data/srd/spells.js';
 import { maxAbilityScore } from '../../../data/srd/character-creation.js';
 
 // ---- Looking things up ----
@@ -232,7 +233,9 @@ export function hitDice(character) {
   return { count: character.level, die: cls.hitDie, text: `${character.level}d${cls.hitDie}` };
 }
 
-export function armorClass(character) {
+// spellsOn: ids of spells on the hero right now (see character/spell-effects.js), for
+// Mage Armor here and Longstrider in speed().
+export function armorClass(character, spellsOn = []) {
   const worn = character.armorId ? findArmor(character.armorId) : null;
   if (character.armorId && !worn) throw new Error(`Unknown armor: ${character.armorId}`);
   const dex = abilityModifierOf(character, 'dexterity');
@@ -241,6 +244,8 @@ export function armorClass(character) {
     parts.push({ label: worn.name, value: worn.baseAc });
     const counted = worn.dexCap === null ? dex : Math.min(dex, worn.dexCap);
     if (worn.dexCap !== 0) parts.push({ label: worn.dexCap === null ? 'Dex' : `Dex (max +${worn.dexCap})`, value: counted });
+  } else if (spellsOn.includes('mage-armor')) {
+    parts.push({ label: 'Mage Armor', value: spellCombat('mage-armor').baseAc }, { label: 'Dex', value: dex });
   } else {
     parts.push({ label: 'Unarmored', value: unarmoredBaseAc }, { label: 'Dex', value: dex });
   }
@@ -255,7 +260,7 @@ export function armorClass(character) {
 
 // Walking speed: the species' Speed (some lineages change it), less 10 feet in armour the
 // character isn't strong enough for.
-export function speed(character) {
+export function speed(character, spellsOn = []) {
   const option = speciesOption(character);
   const base = (option && option.speed) || speciesOf(character).speed;
   const parts = [{ label: option && option.speed ? option.name : speciesOf(character).name, value: base }];
@@ -263,8 +268,11 @@ export function speed(character) {
   if (worn && worn.strength && abilityScore(character, 'strength').value < worn.strength) {
     parts.push({ label: `${worn.name} needs Str ${worn.strength}`, value: -10 });
   }
+  if (spellsOn.includes('longstrider')) parts.push({ label: 'Longstrider', value: spellCombat('longstrider').speed });
   return derived(parts);
 }
+
+const spellCombat = (id) => spells.find((s) => s.id === id).combat;
 
 export function darkvision(character) {
   const option = speciesOption(character);

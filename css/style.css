@@ -1983,6 +1983,54 @@ h3.debug-heading {
   color: var(--past);
 }
 
+/* The Sheet's "Cast a spell on yourself": each spell, then a button for each slot */
+.sheet-cast {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+/* Concentration, Shield and Temporary Hit Points, under the round and HP */
+.battle-status {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--size-ui);
+  color: #9fc4f0;
+}
+
+.battle-status:empty {
+  display: none;
+}
+
+/* Under a chosen spell: its slot, then where to aim it */
+.battle-aim {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent);
+}
+
+.battle-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.battle-slot[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--page);
+}
+
+.battle-warning {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--size-ui);
+  color: var(--bad);
+}
+
 .battle-log-line.is-turn {
   margin-top: 4px;
   padding-top: 6px;

@@ -91,3 +91,13 @@ export function d20Test({
     criticalHit: kind === 'attack' && natural >= criticalOn,
   };
 }
+
+// The same roll judged against a new target number: no new dice. For a target that changes
+// after the roll is seen, as when the Shield spell raises AC against an attack that hit. A
+// natural 20 or 1 on an attack still decides it whatever the number.
+export function retarget(result, value) {
+  if (!result.target) throw new Error('This roll had no target number to change');
+  const success = result.automatic ? result.success : result.total >= value;
+  const outcome = result.kind === 'attack' ? (success ? 'hit' : 'miss') : success ? 'success' : 'failure';
+  return { ...result, target: { ...result.target, value }, success, outcome };
+}

@@ -95,7 +95,7 @@ test('A save holds game state, Ink state, dice state, session count and last-pla
   const game = newGame(runtime, { slot: 2, seed: 'contents', character: testHero, now: new Date('2026-10-01T09:00:00Z') });
   const record = gameToSave(game, new Date('2026-10-06T12:00:00Z'));
   assertEqual(Object.keys(record).sort(), ['createdAt', 'game', 'ink', 'lastBackupSession', 'rng', 'savedAt', 'seed', 'sessionCount', 'slot', 'version']);
-  assertEqual(Object.keys(record.game).sort(), ['battle', 'character', 'day', 'dungeon', 'featureUses', 'flags', 'hp', 'inspiration', 'inventory', 'journal', 'lastBattle', 'levelUp', 'location', 'money', 'objective', 'page', 'rollLog', 'session', 'slotsUsed', 'time', 'xp']);
+  assertEqual(Object.keys(record.game).sort(), ['activeSpells', 'battle', 'character', 'day', 'dungeon', 'featureUses', 'flags', 'hp', 'inspiration', 'inventory', 'journal', 'lastBattle', 'levelUp', 'location', 'money', 'objective', 'page', 'rollLog', 'session', 'slotsUsed', 'tempHp', 'time', 'xp']);
   assertEqual([record.version, record.slot, record.sessionCount, record.lastBackupSession], [SAVE_VERSION, 2, 1, 0]);
   assertEqual([record.createdAt, record.savedAt], ['2026-10-01T09:00:00.000Z', '2026-10-06T12:00:00.000Z']);
   assertTrue(record.rng.length === 4 && record.rng.every(Number.isInteger), 'dice state should be four whole numbers');
@@ -597,6 +597,13 @@ test('Migration: a version 11 game gains session summaries, an aim and a session
   const game = migrateSave(v11, migrations, 12).game;
   assertEqual([game.objective, game.journal.sessions], [null, []]);
   assertEqual(game.session, { number: 4, startedAt: '2026-10-01T10:00:00.000Z', day: 2, xp: 75, level: 1, deeds: 1, quests: { 'missing-miller': 'active' }, ended: false });
+});
+
+test('Migration: a version 12 game gains no Temporary Hit Points and no spells on the hero, and becomes version 13', () => {
+  const v12 = { version: 12, slot: 1, game: { hp: 9, battle: { round: 2, effects: [] } } };
+  const game = migrateSave(v12, migrations, 13).game;
+  assertEqual([game.tempHp, game.activeSpells, game.battle.concentration], [0, [], null]);
+  assertEqual(migrateSave({ version: 12, slot: 1, game: { battle: null } }, migrations, 13).game.battle, null, 'no fight, nothing to add');
 });
 
 test('Sessions: a new session sums up the last one in the journal if the player just closed the game', async () => {

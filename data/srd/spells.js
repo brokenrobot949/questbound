@@ -10,17 +10,41 @@
 //   text          paragraphs are separated by a blank line
 //   upgrade       "Cantrip Upgrade" or "Using a Higher-Level Spell Slot" text, if any
 //
-// combat: how the spell works on the battle grid, for spells that do so far:
-//   kind     'attack' (a spell attack roll), 'save' (the target makes a saving throw),
-//            'darts' (Magic Missile: automatic hits), or 'rays' (Scorching Ray: a ranged
-//            spell attack for each ray)
+// combat: how the spell works in a fight (and, for 'self' spells, outside one):
+//   kind     'attack'    a spell attack roll against one creature
+//            'save'      one creature makes a saving throw
+//            'darts'     Magic Missile: automatic hits
+//            'rays'      Scorching Ray: a ranged spell attack for each ray
+//            'area'      every creature in an area makes a saving throw (see area below)
+//            'self'      a spell on yourself; it can be cast from the Sheet between fights too
+//            'teleport'  Misty Step: to a square you can see within range
+//            'reaction'  Shield: the game casts it for you (see Settings) when it would turn a
+//                        hit into a miss
 //   attack   'melee' or 'ranged';  save: the ability the target saves with
-//   range    in feet;  damage: { dice, bonus, type }
+//   range    in feet (0 for an area that starts from you);  damage: { dice, bonus, type }
+//   upcast   dice added to the damage for each slot level above the spell's own ('1d6')
 //   darts, rays  how many at the spell's own level; one more for each slot level above it
 //   scales   a cantrip whose dice grow at character levels 5, 11 and 17
 //   rider    a lasting effect on a hit: 'slowed' (Speed −10 ft), 'no-reactions',
-//            'no-healing' (until the start of your next turn)
-// Spells without it can't be cast in a fight yet.
+//            'no-healing' (until the start of your next turn), 'poisoned' (until the end
+//            of your next turn)
+//   area     { shape: 'cone' | 'cube' | 'sphere', size: feet }: a Cone's length, a Cube's
+//            side, a Sphere's radius (combat/areas.js shows how these lie on the grid)
+//   halfOnSave  a creature that makes its save still takes half the damage
+//   push     feet a failed save pushes a creature away from you (Thunderwave)
+//   foesOnly the spell affects only the creatures you choose, which is always your foes
+//   condition what a failed save does: 'drowsy' (Sleep: Incapacitated until the end of its
+//            next turn, then a second save or Unconscious) or 'paralyzed' (Hold Person: a
+//            new save at the end of each of its turns ends it)
+//   creatureType  only creatures of this type can be chosen ('Humanoid')
+//   bonusAction   cast as a Bonus Action instead of an action
+//   self     for 'self' spells: 'mage-armor' (AC 13 + Dex while unarmoured), 'false-life'
+//            (tempHp dice, plus upcastTempHp more for each slot level above 1) or
+//            'longstrider' (speed: extra feet); lasts: 'long-rest' (until your next Long
+//            Rest) or 'hour' (until the time of day moves on, or a rest)
+//   acBonus  for Shield: the bonus to AC until the start of your next turn
+// Concentration spells use the spell's own concentration flag. Spells without combat
+// can't be cast in a fight yet; some unlock choices in scenes instead.
 
 export const spells = [
   // ---- Cantrips ----
@@ -297,6 +321,7 @@ export const spells = [
   },
   {
     id: 'burning-hands',
+    combat: { kind: 'area', area: { shape: 'cone', size: 15 }, range: 0, save: 'dexterity', damage: { dice: '3d6', type: 'fire' }, upcast: '1d6', halfOnSave: true },
     name: 'Burning Hands',
     level: 1,
     school: 'Evocation',
@@ -405,6 +430,7 @@ export const spells = [
   },
   {
     id: 'false-life',
+    combat: { kind: 'self', self: 'false-life', tempHp: { dice: '2d4', bonus: 4 }, upcastTempHp: 5 },
     name: 'False Life',
     level: 1,
     school: 'Necromancy',
@@ -485,6 +511,7 @@ export const spells = [
   },
   {
     id: 'longstrider',
+    combat: { kind: 'self', self: 'longstrider', speed: 10, lasts: 'hour' },
     name: 'Longstrider',
     level: 1,
     school: 'Transmutation',
@@ -501,6 +528,7 @@ export const spells = [
   },
   {
     id: 'mage-armor',
+    combat: { kind: 'self', self: 'mage-armor', baseAc: 13, lasts: 'long-rest' },
     name: 'Mage Armor',
     level: 1,
     school: 'Abjuration',
@@ -533,6 +561,7 @@ export const spells = [
   },
   {
     id: 'ray-of-sickness',
+    combat: { kind: 'attack', attack: 'ranged', range: 60, damage: { dice: '2d8', type: 'poison' }, upcast: '1d8', rider: 'poisoned' },
     name: 'Ray of Sickness',
     level: 1,
     school: 'Necromancy',
@@ -564,6 +593,7 @@ export const spells = [
   },
   {
     id: 'shield',
+    combat: { kind: 'reaction', acBonus: 5 },
     name: 'Shield',
     level: 1,
     school: 'Abjuration',
@@ -579,6 +609,7 @@ export const spells = [
   },
   {
     id: 'sleep',
+    combat: { kind: 'area', area: { shape: 'sphere', size: 5 }, range: 60, save: 'wisdom', condition: 'drowsy', foesOnly: true },
     name: 'Sleep',
     level: 1,
     school: 'Enchantment',
@@ -609,6 +640,7 @@ export const spells = [
   },
   {
     id: 'thunderwave',
+    combat: { kind: 'area', area: { shape: 'cube', size: 15 }, range: 0, save: 'constitution', damage: { dice: '2d8', type: 'thunder' }, upcast: '1d8', halfOnSave: true, push: 10 },
     name: 'Thunderwave',
     level: 1,
     school: 'Evocation',
@@ -627,6 +659,7 @@ export const spells = [
   // ---- Level 2 ----
   {
     id: 'hold-person',
+    combat: { kind: 'save', range: 60, save: 'wisdom', condition: 'paralyzed', creatureType: 'Humanoid' },
     name: 'Hold Person',
     level: 2,
     school: 'Enchantment',
@@ -674,6 +707,7 @@ export const spells = [
   },
   {
     id: 'misty-step',
+    combat: { kind: 'teleport', range: 30, bonusAction: true },
     name: 'Misty Step',
     level: 2,
     school: 'Conjuration',
@@ -706,6 +740,7 @@ export const spells = [
   },
   {
     id: 'shatter',
+    combat: { kind: 'area', area: { shape: 'sphere', size: 10 }, range: 60, save: 'constitution', damage: { dice: '3d8', type: 'thunder' }, upcast: '1d8', halfOnSave: true },
     name: 'Shatter',
     level: 2,
     school: 'Evocation',

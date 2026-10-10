@@ -178,6 +178,21 @@ The free rules hold over 300 spells, and each needs either combat code or a stor
 
 Phase 1 ships 44 spells (16 cantrips, 22 level 1, 6 level 2): enough choice for a Wizard of levels 1–3, for Magic Initiate on the Cleric, Druid or Wizard list, and every spell a species grants by character level 3. In a scene, a choice that needs a spell is shown only to heroes who can cast it: a known cantrip, a prepared or always-prepared spell, or a ritual in a Wizard's spellbook.
 
+How the Wizard's spells work in the game so far:
+
+- **In a fight**, every spell has a button under **Spells** (or **Bonus Action**) that says what it does. Choose one, pick the spell slot to use (a higher slot adds dice, darts or rays), then aim it.
+- **Spell attacks and single targets:** Fire Bolt, Ray of Frost, Shocking Grasp, Chill Touch, Poison Spray, Magic Missile, Scorching Ray, Ray of Sickness (Poisoned until the end of your next turn), and Hold Person (Paralyzed; Humanoids only, so not goblins, who are Fey).
+- **Area spells:** Burning Hands (a 15-foot Cone), Thunderwave (a 15-foot Cube that pushes foes 10 feet) and Shatter (a 10-foot-radius Sphere up to 60 feet away, which catches you too if you're inside it). Damage is rolled once for everyone; each makes the save, and a save takes half. The grid shows the area in orange before you cast. It starts aimed at the most foes it can catch without you, and you tap the grid to aim it elsewhere.
+- **Areas on the grid:** a Cone is 1, 3 and 3 squares ahead (7 squares on a diagonal too), a Cube a block beside you, and a Sphere every square within its radius, counted like movement. Walls block an area.
+- **Sleep:** a 5-foot-radius Sphere of foes, who make a Wisdom save or grow drowsy (no actions). At the end of their next turn they save again or fall asleep (Unconscious and Prone). Damage wakes a sleeper, and so does an awake friend shaking it. The dead never sleep.
+- **Concentration:** Sleep and Hold Person last while you concentrate, one spell at a time. Taking damage means a Constitution save (DC 10 or half the damage) or the spell ends. Dropping to 0 Hit Points or the fight ending also ends it. The battle screen shows what you're concentrating on.
+- **The helpless:** the Unconscious and Paralyzed fail Strength and Dexterity saves, attacks against them have Advantage, and a hit from within 5 feet is a Critical Hit. A singer who can't speak can't sing, so Sleep or Hold Person on the Choir's acolyte stops the hymn.
+- **Shield** is a reaction the game casts for you, with your lowest slot, whenever an attack would hit you and +5 AC would make it miss. It's never cast when it wouldn't help. **Cast Shield by itself** in Settings turns this off, to save your slots. (Asking each time can come later.)
+- **Misty Step:** a Bonus Action teleport to an empty square you can see within 30 feet (shown in purple), with no Opportunity Attacks. You can spend only one spell slot a turn, so after Misty Step your action can only be a cantrip.
+- **On yourself:** Mage Armor (AC 13 + Dex until your next Long Rest, without armour), False Life (Temporary Hit Points, lost first and gone after a Long Rest) and Longstrider (+10 feet of Speed for about an hour, which ends when the story's time of day moves on). Cast them from the Sheet's **Cast a spell on yourself** between fights, or as an action in one.
+- **Free casts:** a spell from Magic Initiate (Juniper's Thunderwave) or a species can be cast once per Long Rest without a slot, as the 2024 rules allow. The button offers that first.
+- **Not yet in fights:** Charm Person, Fog Cloud, Invisibility and the utility spells (Comprehend Languages, Detect Magic, Disguise Self, Knock, Light, Mage Hand, Minor Illusion, Mending, Prestidigitation, Dancing Lights). These are for scenes: a few already unlock choices, and the rest come with the story. The Cleric and Druid spells Magic Initiate offers come next.
+
 **Rests**
 
 - **Short rest** (1 hour): spend Hit Dice to heal; recharge short-rest features. Allowed anywhere you're not in danger.
@@ -271,7 +286,7 @@ Initiative, attack rolls against AC, critical hits, damage types and resistances
 **Quick resolve and speed**
 
 - A fight well under your party's strength offers **Resolve**: the engine plays it out instantly with real rolls and reports HP lost and resources spent. Story and boss fights are always played by hand.
-- Settings cover animation speed (Battle speed: Slow, Normal or Fast), auto-roll, automatic reactions and auto end-turn.
+- Settings cover animation speed (Battle speed: Slow, Normal or Fast), auto-roll, automatic reactions (so far: Cast Shield by itself) and auto end-turn.
 
 ## World and Exploration
 

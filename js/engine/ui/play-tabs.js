@@ -8,7 +8,8 @@ const TABS = ['adventure', 'sheet', 'journal', 'menu'];
 
 // getGame(): the active game. onOpenMenu(): fills the Menu tab when it opens.
 // onJournalRead(game): the player has seen the journal's new entries (save the game).
-export function setupPlayTabs({ root, getGame, onOpenMenu, onJournalRead }) {
+// onSpellCast(game): the hero cast a spell from the Sheet (save, and update the status line).
+export function setupPlayTabs({ root, getGame, onOpenMenu, onJournalRead, onSpellCast = () => {} }) {
   const nav = root.getElementById('bottom-nav');
   const buttons = [...nav.querySelectorAll('[data-tab]')];
   let current = 'adventure';
@@ -27,7 +28,7 @@ export function setupPlayTabs({ root, getGame, onOpenMenu, onJournalRead }) {
       if (button.dataset.tab === tab) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     }
-    if (tab === 'sheet' && game) root.getElementById('tab-sheet').replaceChildren(sheetPanel(game));
+    if (tab === 'sheet' && game) root.getElementById('tab-sheet').replaceChildren(sheetPanel(game, { onCast: onSpellCast }));
     if (tab === 'journal' && game) {
       root.getElementById('tab-journal').replaceChildren(journalPanel(game));
       if (game.journal.unread) {

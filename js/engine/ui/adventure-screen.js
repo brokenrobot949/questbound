@@ -27,6 +27,7 @@ import {
   proficiencyBonus,
 } from '../character/sheet.js';
 import { findSpell } from '../character/spells.js';
+import { activeSpellIds } from '../character/spell-effects.js';
 import { heroSprite } from '../character/look.js';
 import { spriteCanvas } from './sprite-canvas.js';
 import { abilities } from '../../../data/srd/abilities.js';
@@ -45,6 +46,8 @@ const TUMBLE_STEP_MS = 60;
 // sessionStart: { recap } when a new session begins, to open with its title card (recap is
 // from story/sessions.js, or null); null otherwise.
 // onPageShown(): called whenever new story has been shown (the Journal tab may have news).
+// Returns { refresh() }: redraws the status line and hero strip (after a spell is cast from
+// the Sheet, say).
 export function startAdventureScreen({ game, root, onSave, backupReminder = false, sessionStart = null, onPageShown = () => {} }) {
   const narration = root.getElementById('narration');
   const choices = root.getElementById('choices');
@@ -58,10 +61,11 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
   const mapArea = root.getElementById('map-area');
   let mapRequest = 0;
 
-  // "Day 2 · Morning · HP 12/12 · 18 GP · ★ Inspiration": as far as the player has seen.
+  // "Day 2 · Morning · HP 12/12 (+7) · 18 GP · ★ Inspiration": as far as the player has seen.
+  // (+7) is Temporary Hit Points.
   const updateStatus = () => {
     const time = currentTime(game);
-    const hp = `HP ${game.hp}/${maxHp(game.character)}`;
+    const hp = `HP ${game.hp}/${maxHp(game.character)}${game.tempHp ? ` (+${game.tempHp})` : ''}`;
     const parts = [`Day ${game.day}`, time, hp, moneyText(game.money), game.inspiration ? '★ Inspiration' : null];
     status.textContent = parts.filter(Boolean).join(' · ');
   };
@@ -69,7 +73,7 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
   const renderHeroStrip = () =>
     root
       .getElementById('hero-strip')
-      .replaceChildren(spriteCanvas(heroSprite(game.character), { scale: 2 }), el('span', 'hero-strip-text', heroSummary(game.character)));
+      .replaceChildren(spriteCanvas(heroSprite(game.character), { scale: 2 }), el('span', 'hero-strip-text', heroSummary(game.character, activeSpellIds(game))));
   renderHeroStrip();
   root.getElementById('slot-note').textContent = `Slot ${game.slot} · Session ${game.sessionCount}`;
   narration.replaceChildren();
@@ -116,6 +120,13 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
   renderRollLog(root, game);
   if (game.notice) narration.append(el('p', 'dm-note', game.notice));
   showPage();
+  // (The functions below are hoisted, so returning here is fine.)
+  return {
+    refresh: () => {
+      updateStatus();
+      renderHeroStrip();
+    },
+  };
 
   // Shows the current page beat by beat, waiting for the player to tap any unrevealed d20.
   async function showPage() {
@@ -436,14 +447,15 @@ function spellName(id) {
 }
 
 // "Wren Ashdown · Human Fighter 1 · HP 12 · AC 17 · Str +3 Dex +1 … · Proficiency +2"
-// (HP here is the maximum; the status line shows what's left.)
-function heroSummary(character) {
+// (HP here is the maximum; the status line shows what's left.) spellsOn: spells on the hero,
+// for Mage Armor's AC.
+function heroSummary(character, spellsOn = []) {
   const mods = abilities.map((a) => `${a.abbreviation} ${signedNumber(abilityModifierOf(character, a.id))}`);
   return [
     character.name,
     describeCharacter(character),
     `HP ${maxHitPoints(character).value}`,
-    `AC ${armorClass(character).value}`,
+    `AC ${armorClass(character, spellsOn).value}`,
     mods.join(' '),
     `Proficiency +${proficiencyBonus(character.level)}`,
   ].join(' · ');

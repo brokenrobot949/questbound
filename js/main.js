@@ -88,6 +88,9 @@ async function start() {
     }
   }
 
+  // The Adventure tab while a game is on: refresh() redraws its status line and hero strip.
+  let adventure = null;
+
   // The bar along the bottom during play. The Menu tab holds Settings, Credits and the way
   // back to the save slots.
   const tabs = setupPlayTabs({
@@ -98,6 +101,10 @@ async function start() {
       area.replaceChildren(settingsPanel({ onClose: () => tabs.show('adventure') }));
     },
     onJournalRead: (game) => autosave(game),
+    onSpellCast: (game) => {
+      autosave(game);
+      if (adventure) adventure.refresh();
+    },
   });
 
   const saveStatus = document.getElementById('save-status');
@@ -117,7 +124,7 @@ async function start() {
   // sessionStart: { recap } when a new session begins (its title card shows), else null.
   function showAdventure(game, backupReminder = false, sessionStart = null) {
     tabs.show('adventure', { fresh: true });
-    startAdventureScreen({ game, root: document, onSave: autosave, backupReminder, sessionStart, onPageShown: () => tabs.refresh() });
+    adventure = startAdventureScreen({ game, root: document, onSave: autosave, backupReminder, sessionStart, onPageShown: () => tabs.refresh() });
     if (debugPanel) debugPanel.refresh();
   }
 

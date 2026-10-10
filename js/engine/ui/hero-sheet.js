@@ -36,7 +36,8 @@ import { expandable, mathsNumber } from './widgets.js';
 
 const capitalise = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 
-export function heroSheet(character) {
+// spellsOn: ids of spells on the hero now (Mage Armor, Longstrider), which change AC and Speed.
+export function heroSheet(character, { spellsOn = [] } = {}) {
   const sheet = el('div', 'hero-sheet');
   const option = speciesOption(character);
   const background = findBackground(character.backgroundId);
@@ -44,7 +45,7 @@ export function heroSheet(character) {
   const who = el('div', 'sheet-who');
   who.append(el('h2', 'sheet-name', character.name));
   who.append(el('p', 'sheet-line', `${speciesText(character, option)} · ${findClass(character.classId).name} ${character.level} · ${background.name} background`));
-  const senses = [`${capitalise(character.size)}`, `Speed ${speed(character).value} ft`];
+  const senses = [`${capitalise(character.size)}`, `Speed ${speed(character, spellsOn).value} ft`];
   const dark = darkvision(character);
   if (dark) senses.push(`Darkvision ${dark} ft`);
   const resist = resistances(character);
@@ -58,9 +59,9 @@ export function heroSheet(character) {
   sheet.append(
     grid('Combat', [
       mathsNumber({ label: 'Hit Points', stat: maxHitPoints(character) }),
-      mathsNumber({ label: 'Armor Class', stat: armorClass(character) }),
+      mathsNumber({ label: 'Armor Class', stat: armorClass(character, spellsOn) }),
       mathsNumber({ label: 'Initiative', stat: initiative(character), format: signedNumber }),
-      mathsNumber({ label: 'Speed', stat: speed(character), unit: ' ft' }),
+      mathsNumber({ label: 'Speed', stat: speed(character, spellsOn), unit: ' ft' }),
       mathsNumber({ label: 'Proficiency', stat: { value: pb, parts: [{ label: `Level ${character.level}`, value: pb }] }, format: signedNumber }),
       mathsNumber({ label: 'Passive Perception', stat: passivePerception(character) }),
     ]),

@@ -5,8 +5,11 @@
 //   game.slotsUsed    spell slots spent, by spell level: [level 1, level 2, …]
 //   game.featureUses  uses spent of limited features, e.g. { 'second-wind': 1, 'action-surge': 1 }
 //   game.xp           experience points
+//   game.tempHp       Temporary Hit Points (see character/spell-effects.js)
+//   game.activeSpells spells on the hero that last a while, e.g. Mage Armor
 //
-// A Long Rest brings all of them back (except XP).
+// A Long Rest brings all of them back (except XP), and ends Temporary Hit Points and the
+// spells on the hero.
 
 import { findClass, maxHitPoints } from './sheet.js';
 
@@ -16,7 +19,7 @@ export function maxHp(character) {
 
 // A hero who has just arrived: full Hit Points, nothing spent.
 export function freshResources(character) {
-  return { hp: maxHp(character), slotsUsed: [], featureUses: {}, xp: 0 };
+  return { hp: maxHp(character), slotsUsed: [], featureUses: {}, xp: 0, tempHp: 0, activeSpells: [] };
 }
 
 export function heal(game, amount) {
@@ -29,6 +32,8 @@ export function longRestRecovery(game) {
   game.hp = maxHp(game.character);
   game.slotsUsed = [];
   game.featureUses = {};
+  game.tempHp = 0;
+  game.activeSpells = [];
 }
 
 // Spell slots the class has at this spell level, and how many are left.
@@ -73,5 +78,10 @@ export function resourceProblems(state) {
   if (!Array.isArray(state.slotsUsed) || !state.slotsUsed.every((n) => n === null || (Number.isInteger(n) && n >= 0))) problems.push('spell slots');
   if (!state.featureUses || typeof state.featureUses !== 'object') problems.push('feature uses');
   if (!Number.isInteger(state.xp) || state.xp < 0) problems.push('XP');
+  if (!Number.isInteger(state.tempHp) || state.tempHp < 0) problems.push('Temporary Hit Points');
+  const lasting = ['long-rest', 'hour'];
+  if (!Array.isArray(state.activeSpells) || !state.activeSpells.every((s) => s && typeof s.id === 'string' && lasting.includes(s.lasts))) {
+    problems.push('spells on the hero');
+  }
   return problems;
 }
