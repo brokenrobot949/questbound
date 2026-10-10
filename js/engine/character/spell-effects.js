@@ -1,6 +1,7 @@
-// Spells the hero casts on themselves that outlast the moment: Mage Armor, Longstrider, and
-// False Life's Temporary Hit Points. They can be cast from the Sheet between fights or as an
-// action in one. They change in play, so they live on the game (and are saved):
+// Spells the hero casts on themselves outside the moment of a fight: Mage Armor, Longstrider,
+// False Life's Temporary Hit Points, and the healing of Cure Wounds and Healing Word. They can
+// be cast from the Sheet between fights or in one. The lasting ones change in play, so they
+// live on the game (and are saved):
 //
 //   game.activeSpells  [{ id, lasts }]: spells on the hero now. lasts is 'long-rest' (ends at
 //                      the next Long Rest: Mage Armor's 8 hours) or 'hour' (ends when the
@@ -9,21 +10,24 @@
 //                      lost before Hit Points, they don't stack (you keep the higher), and
 //                      they last until they're used up or you finish a Long Rest.
 //
-// Spells and their numbers are in data/srd/spells.js (combat.kind 'self').
+// Spells and their numbers are in data/srd/spells.js (combat.kind 'self' and 'heal').
 
-import { findSpell, canCastSpell, freeCastKey, freeCastsLeft } from './spells.js';
-import { slotsLeft, spendSlot } from './resources.js';
-import { armorClass, speed } from './sheet.js';
+import { findSpell, canCastSpell, freeCastKey, freeCastsLeft, spellAbility, upcastDice, upcastHelps } from './spells.js';
+import { heal, maxHp, slotsAt, slotsLeft, spendSlot } from './resources.js';
+import { abilityModifierOf, armorClass, speed } from './sheet.js';
 import { rollDice } from '../rules/dice.js';
 import { spells } from '../../../data/srd/spells.js';
 
 export const activeSpellIds = (game) => (game.activeSpells || []).map((s) => s.id);
 
+// Spells that can be cast on the hero between fights, from the Sheet.
+const BETWEEN_FIGHTS = ['self', 'heal'];
+
 // Why the hero can't cast this spell on themselves now, or null. slotLevel: the spell slot's
 // level, or 'free' for a free cast (Magic Initiate's spell, once per Long Rest).
 export function selfSpellProblem(game, spellId, slotLevel) {
   const spell = findSpell(spellId);
-  if (!spell || !spell.combat || spell.combat.kind !== 'self') return `${spell ? spell.name : spellId} isn't a spell you cast on yourself.`;
+  if (!spell || !spell.combat || !BETWEEN_FIGHTS.includes(spell.combat.kind)) return `${spell ? spell.name : spellId} isn't a spell you cast on yourself.`;
   if (!canCastSpell(game.character, spellId)) return `You haven't prepared ${spell.name}.`;
   if (slotLevel === 'free') {
     if (freeCastsLeft(game, spellId) < 1) return `You have no free casts of ${spell.name} left until your next Long Rest.`;
@@ -32,37 +36,68 @@ export function selfSpellProblem(game, spellId, slotLevel) {
   }
   if (spell.combat.self === 'mage-armor' && game.character.armorId) return 'Mage Armor only works on someone who isn’t wearing armour.';
   if (spell.combat.lasts && activeSpellIds(game).includes(spellId)) return `${spell.name} is already on you.`;
+  if (spell.combat.kind === 'heal' && game.hp >= maxHp(game.character)) return 'You’re at full Hit Points.';
   return null;
 }
 
 // The self spells the hero could cast now, each with the ways they can: [{ spell, slots:
-// ['free', 1, 2], problem }] ('free' for a free cast). For the Sheet.
+// ['free', 1, 2], problem }] ('free' for a free cast). A higher slot is offered only when it
+// does more (Cure Wounds heals more; Mage Armor doesn't change). For the Sheet.
 export function selfSpellsToCast(game) {
   const list = [];
-  for (const spell of spells.filter((s) => s.combat && s.combat.kind === 'self')) {
+  for (const spell of spells.filter((s) => s.combat && BETWEEN_FIGHTS.includes(s.combat.kind))) {
     if (!canCastSpell(game.character, spell.id)) continue;
     const slots = [];
     if (!selfSpellProblem(game, spell.id, 'free')) slots.push('free');
-    for (let level = spell.level; level <= 9; level++) if (!selfSpellProblem(game, spell.id, level)) slots.push(level);
-    list.push({ spell, slots, problem: slots.length ? null : selfSpellProblem(game, spell.id, spell.level) });
+    for (let level = spell.level; level <= 9; level++) {
+      if (selfSpellProblem(game, spell.id, level)) continue;
+      slots.push(level);
+      if (!upcastHelps(spell)) break;
+    }
+    // Why not, if not: asked of the free cast if one is left or the hero has no slots for it
+    // (so a Fighter hears "you're at full Hit Points" or "no free casts left"), else of the
+    // spell's own slot level.
+    const anySlots = [...Array(10).keys()].some((level) => level >= spell.level && slotsAt(game.character, level) > 0);
+    const why = selfSpellProblem(game, spell.id, freeCastsLeft(game, spell.id) > 0 || !anySlots ? 'free' : spell.level);
+    list.push({ spell, slots, problem: slots.length ? null : why });
   }
   return list;
 }
 
-// Casts it: spends the slot, then gives the Temporary Hit Points or puts the spell on the
-// hero. Returns a sentence saying what happened, for the fight log or a DM note.
+// The Hit Points a healing spell gives back, before rolling: { dice, bonus } (the bonus is the
+// spellcasting ability modifier for wherever the hero got the spell). above: slot levels above
+// the spell's own.
+export function healingFor(character, spellId, above = 0) {
+  const spell = findSpell(spellId);
+  const ability = spellAbility(character, spellId);
+  return { dice: upcastDice(spell.combat.heal.dice, spell.combat.upcast, above), bonus: ability ? abilityModifierOf(character, ability) : 0 };
+}
+
+// Casts it: spends the slot, then heals, gives the Temporary Hit Points or puts the spell on
+// the hero. Returns a sentence saying what happened, for the fight log or a DM note.
 export function castSelfSpell(game, spellId, slotLevel) {
   const problem = selfSpellProblem(game, spellId, slotLevel);
   if (problem) throw new Error(problem);
   const spell = findSpell(spellId);
   const c = spell.combat;
   const free = slotLevel === 'free';
+  const above = free ? 0 : slotLevel - spell.level;
   if (free) game.featureUses[freeCastKey(spellId)] = (game.featureUses[freeCastKey(spellId)] || 0) + 1;
   else spendSlot(game, slotLevel);
+  if (c.kind === 'heal') {
+    const { dice, bonus } = healingFor(game.character, spellId, above);
+    const [count, sides] = dice.split('d').map(Number);
+    const roll = rollDice(game.rng, count, sides);
+    const total = Math.max(0, roll.total + bonus);
+    const gained = heal(game, total);
+    const sign = bonus < 0 ? '−' : '+';
+    const sum = `${dice} (${roll.rolls.join(', ')})${bonus ? ` ${sign} ${Math.abs(bonus)}` : ''} = ${total}`;
+    return `${spell.name}: ${sum}. You regain ${gained} Hit Point${gained === 1 ? '' : 's'}.`;
+  }
   if (c.self === 'false-life') {
     const [count, sides] = c.tempHp.dice.split('d').map(Number);
     const roll = rollDice(game.rng, count, sides);
-    const extra = free ? 0 : (slotLevel - spell.level) * (c.upcastTempHp || 0);
+    const extra = above * (c.upcastTempHp || 0);
     const gained = roll.total + c.tempHp.bonus + extra;
     const had = game.tempHp || 0;
     game.tempHp = Math.max(had, gained); // they don't stack: keep the higher
@@ -96,4 +131,3 @@ export function soakDamage(game, amount) {
 export function lastsText(lasts) {
   return lasts === 'hour' ? 'for about an hour' : 'until your next Long Rest';
 }
-

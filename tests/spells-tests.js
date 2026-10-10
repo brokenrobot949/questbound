@@ -1,6 +1,7 @@
 // Spell checks: areas of effect, the Wizard's spells in a fight, Concentration, Shield, the
-// spells a hero casts on themselves, and spells in scenes. Open tests/spells.html through the
-// local server to run them. Add checks here whenever a spell's rules change.
+// spells a hero casts on themselves, the Cleric and Druid spells Magic Initiate gives, Hellish
+// Rebuke, and spells in scenes. Open tests/spells.html through the local server to run them.
+// Add checks here whenever a spell's rules change.
 
 import { test, assertEqual, assertTrue, assertThrows, scriptedRng, run } from './harness.js';
 import { createRng } from '../js/engine/rules/rng.js';
@@ -11,7 +12,7 @@ import { heroAttackOptions } from '../js/engine/combat/attacks.js';
 import * as fight from '../js/engine/combat/battle.js';
 import { startingInventory } from '../js/engine/character/inventory.js';
 import { freshResources, longRestRecovery, maxHp } from '../js/engine/character/resources.js';
-import { activeSpellIds, castSelfSpell, selfSpellProblem, timePasses } from '../js/engine/character/spell-effects.js';
+import { activeSpellIds, castSelfSpell, selfSpellProblem, selfSpellsToCast, timePasses } from '../js/engine/character/spell-effects.js';
 import { freeCastKey } from '../js/engine/character/spells.js';
 import { takeDamage } from '../js/engine/character/hazards.js';
 import { armorClass, speed } from '../js/engine/character/sheet.js';
@@ -87,6 +88,11 @@ test('Areas: a 15-foot Cube is a 3 × 3 block beside you; a Sphere is every squa
   assertEqual([east.length, east.every((s) => s.x >= 5 && s.x <= 7 && s.y >= 3 && s.y <= 5)], [9, true]);
   assertEqual(areaSquares(open, { shape: 'cube', size: 15 }, middle, 'sw').length, 9);
   assertEqual([areaSquares(open, { shape: 'sphere', size: 5 }, middle).length, areaSquares(open, { shape: 'sphere', size: 10 }, middle).length], [9, 25]);
+});
+
+test('Areas: a Cube placed on a square (Faerie Fire’s 20 feet) is a 4 × 4 block around it', () => {
+  const placed = areaSquares(open, { shape: 'cube', size: 20 }, middle);
+  assertEqual([placed.length, placed.every((s) => s.x >= 3 && s.x <= 6 && s.y >= 3 && s.y <= 6)], [16, true]);
 });
 
 test('Areas: walls block an area, and tapping a square aims at the nearest of eight directions', () => {
@@ -317,6 +323,146 @@ test('Spell buttons say what each spell does', () => {
   assertEqual(text('spell-burning-hands-2').includes('4d6 fire · 14 on average'), true, 'a level 2 slot adds a die');
 });
 
+// ---- The Cleric and Druid spells (Magic Initiate), and Hellish Rebuke ----
+
+// Wren with Magic Initiate (Cleric) and its one level 1 spell, cast with Charisma (13: +1,
+// so spell save DC 11 and spell attack +3). A Fighter has no slots: the spell is free once
+// per Long Rest.
+const initiate = (spell, list = 'cleric') => ({
+  ...wren,
+  magicInitiate: [{ source: 'background', list, ability: 'charisma', cantrips: list === 'cleric' ? ['guidance', 'sacred-flame'] : ['druidcraft', 'guidance'], spell }],
+});
+// The level 3 Wizard with Magic Initiate (Cleric) too, with Wisdom (14: +2): the spell is free
+// once, then takes her slots.
+const clericWizard = (spell) => ({ ...caster, magicInitiate: [{ source: 'background', list: 'cleric', ability: 'wisdom', cantrips: ['guidance', 'sacred-flame'], spell }] });
+
+// The mill fight with one goblin (AC 12, Wis save −1, Dagger +4 for 1d4 + 2) where a check
+// wants it, and the other out of it.
+function soloGoblin(character, pos, hp = 40) {
+  const game = fightWith(character);
+  const [goblin, other] = fight.enemies(game.battle);
+  goblin.pos = { ...pos };
+  goblin.hp = hp;
+  other.hp = 0;
+  return { game, goblin };
+}
+const swordOf = (game) => heroAttackOptions(game).find((o) => o.source === 'weapon' && o.how === 'melee');
+const lastRoll = (game, kind) => game.battle.log.filter((e) => e.roll && e.roll.kind === kind).pop().roll;
+
+test('Cure Wounds: 2d8 + your spellcasting modifier from the Sheet; a higher slot heals more, a full one can’t', () => {
+  const game = gameFor(clericWizard('cure-wounds'));
+  game.hp = 5;
+  assertEqual(selfSpellsToCast(game).find((c) => c.spell.id === 'cure-wounds').slots, ['free', 1, 2]);
+  assertEqual(selfSpellsToCast(game).find((c) => c.spell.id === 'mage-armor').slots, [1], 'a higher slot does nothing more for Mage Armor');
+  game.rng = scriptedRng([3, 5]);
+  assertEqual(castSelfSpell(game, 'cure-wounds', 'free'), 'Cure Wounds: 2d8 (3, 5) + 2 = 10. You regain 10 Hit Points.');
+  game.rng = scriptedRng([8, 8, 8, 8]);
+  assertTrue(castSelfSpell(game, 'cure-wounds', 2).startsWith('Cure Wounds: 4d8 (8, 8, 8, 8) + 2 = 34. You regain 5'), 'up to the maximum');
+  assertEqual([game.hp, game.slotsUsed[1]], [maxHp(game.character), 1]);
+  assertTrue(selfSpellProblem(game, 'cure-wounds', 1).includes('full Hit Points'));
+  const fighter = gameFor(initiate('cure-wounds'));
+  const why = () => selfSpellsToCast(fighter).find((c) => c.spell.id === 'cure-wounds').problem;
+  assertTrue(why().includes('full Hit Points'), `a Fighter has no slots, but that's not why: ${why()}`);
+  fighter.featureUses[freeCastKey('cure-wounds')] = 1;
+  fighter.hp = 1;
+  assertTrue(why().includes('no free casts'), why());
+});
+
+test('Healing Word: a Bonus Action in a fight, so the action is still free; not at full Hit Points', () => {
+  const { game } = soloGoblin(initiate('healing-word'), { x: 3, y: 2 });
+  assertTrue(fight.heroCantUse(game, 'spell-healing-word-free').includes('full Hit Points'));
+  game.hp = 3;
+  game.rng = scriptedRng([2, 3]);
+  fight.heroCastSelf(game, 'spell-healing-word-free');
+  assertEqual([game.hp, game.battle.turnState.bonus, game.battle.turnState.action], [9, true, false]);
+  assertTrue(said(game, 'You cast Healing Word: 2d4 (2, 3) + 1 = 6. You regain 6 Hit Points.'));
+  assertTrue(fight.heroCantUse(game, swordOf(game).id) === null && !heroAttackOptions(game).some((o) => o.spellId === 'healing-word'), 'the free cast is spent');
+});
+
+test('Bless: 1d4 on your attack rolls and saving throws while you concentrate', () => {
+  const { game, goblin } = soloGoblin(initiate('bless'), { x: 3, y: 2 });
+  fight.heroCastSelf(game, 'spell-bless-free');
+  assertEqual([game.battle.concentration.name, fight.conditionsOf(game.battle, 'hero')], ['Bless', ['blessed']]);
+  assertTrue(fight.heroCantUse(game, 'spell-bless-free') !== null);
+  game.battle.turnState.action = false; // as if it were the next turn
+  assertTrue(fight.attackPreview(game, swordOf(game).id, goblin.id).describe.includes('+ 1d4 (Bless)'));
+  fight.heroAttack(game, swordOf(game).id, goblin.id);
+  const bless = lastRoll(game, 'attack').modifiers.find((m) => m.label === 'Bless');
+  assertTrue(bless && bless.value >= 1 && bless.value <= 4, JSON.stringify(lastRoll(game, 'attack').modifiers));
+  // The goblin hits (18) for 3; the Concentration save adds 1d4 too.
+  game.rng = scriptedRng([18, 1, 2, 10, 1, 1, 1, 1]);
+  fight.endHeroTurn(game);
+  assertTrue(lastRoll(game, 'save').modifiers.some((m) => m.label === 'Bless'), 'the Concentration save');
+});
+
+test('Sanctuary: a foe must make a Wisdom save to attack you; it ends when you attack', () => {
+  const { game, goblin } = soloGoblin(initiate('sanctuary'), { x: 3, y: 2 });
+  fight.heroCastSelf(game, 'spell-sanctuary-free');
+  assertEqual([game.battle.turnState.bonus, game.battle.turnState.action], [true, false]);
+  const full = game.hp;
+  forceNextD20(1); // the goblin's Wisdom save
+  fight.endHeroTurn(game);
+  assertTrue(said(game, 'Sanctuary turns it aside') && game.hp === full, game.battle.log.map((e) => e.text).join(' / '));
+  assertEqual(lastRoll(game, 'save').target, { type: 'DC', value: 11 });
+  fight.heroAttack(game, swordOf(game).id, goblin.id);
+  assertTrue(said(game, 'Your Sanctuary ends: you attack.') && !fight.conditionsOf(game.battle, 'hero').includes('sanctuary'));
+});
+
+test('Guiding Bolt: 4d6 radiant, and the next attack roll against the target has Advantage', () => {
+  const { game, goblin } = soloGoblin(initiate('guiding-bolt'), { x: 3, y: 6 });
+  forceNextD20(15);
+  fight.heroAttack(game, 'spell-guiding-bolt-free', goblin.id);
+  assertTrue(said(game, 'Guiding Bolt (free) hits Goblin Minion 1: 4d6') && has(game, goblin, 'guided'));
+  fight.endHeroTurn(game); // the goblin comes over and stabs; it's still glowing on your turn
+  goblin.pos = { x: 3, y: 2 };
+  assertTrue(has(game, goblin, 'guided'));
+  fight.heroAttack(game, swordOf(game).id, goblin.id);
+  assertEqual(lastRoll(game, 'attack').advantage, ['Goblin Minion 1 is lit by Guiding Bolt']);
+  assertTrue(!has(game, goblin, 'guided'), 'used up by that roll');
+  assertTrue(attackSummary(heroAttackOptions(fightWith(clericWizard('guiding-bolt'))).find((o) => o.id === 'spell-guiding-bolt-2')).join(' · ').includes('5d6 radiant'), 'a level 2 slot adds a die');
+});
+
+test('Faerie Fire: a 20-foot Cube; a failed Dexterity save outlines a foe, and attacks on it have Advantage', () => {
+  const druidWizard = { ...caster, magicInitiate: [{ source: 'background', list: 'druid', ability: 'intelligence', cantrips: ['druidcraft', 'guidance'], spell: 'faerie-fire' }] };
+  const { game, goblin } = soloGoblin(druidWizard, { x: 3, y: 5 });
+  const ids = heroAttackOptions(game).filter((o) => o.spellId === 'faerie-fire').map((o) => o.id);
+  assertEqual(ids, ['spell-faerie-fire-free', 'spell-faerie-fire'], 'no higher slots: they would do nothing more');
+  const aim = fight.suggestAim(game, 'spell-faerie-fire-free');
+  assertTrue(fight.areaFor(game, 'spell-faerie-fire-free', aim).caught.every((c) => c.side !== 'hero'));
+  forceNextD20(1);
+  fight.heroCastArea(game, 'spell-faerie-fire-free', { at: { x: 3, y: 5 } });
+  assertTrue(has(game, goblin, 'outlined') && game.battle.concentration.name === 'Faerie Fire');
+  assertEqual(fight.attackPreview(game, 'spell-fire-bolt', goblin.id).advantage, ['Goblin Minion 1 is outlined by Faerie Fire']);
+  assertEqual(attackSummary(heroAttackOptions(game).find((o) => o.id === 'spell-faerie-fire')).join(' · '), 'Dex save against DC 13 · outlined: attacks against it have Advantage · 20-ft cube within 60 ft · Concentration · uses a level 1 slot');
+});
+
+test('Hellish Rebuke: cast for you with its free use when a foe hurts you; once, and only if Settings allow', () => {
+  const tiefling = { ...caster, speciesId: 'tiefling', size: 'medium', speciesChoice: 'infernal', spellcastingAbility: 'charisma' };
+  const { game, goblin } = soloGoblin(tiefling, { x: 3, y: 2 });
+  forceNextD20(19); // 23 hits even with Shield, so Shield stays in the book
+  fight.endHeroTurn(game);
+  assertTrue(said(game, 'Hellish Rebuke!') && goblin.hp < 40, game.battle.log.map((e) => e.text).join(' / '));
+  assertEqual([game.featureUses[freeCastKey('hellish-rebuke')], game.slotsUsed[0] || 0], [1, 0]);
+  assertEqual(lastRoll(game, 'save').target, { type: 'DC', value: 10 }, 'Charisma 10: 8 + 0 + 2');
+  forceNextD20(19);
+  fight.endHeroTurn(game);
+  assertEqual(game.battle.log.filter((e) => e.text.startsWith('Hellish Rebuke!')).length, 1, 'no free use left');
+
+  fight.setReactionPolicy({ rebuke: false });
+  const off = soloGoblin(tiefling, { x: 3, y: 2 }).game;
+  forceNextD20(19);
+  fight.endHeroTurn(off);
+  fight.setReactionPolicy({ rebuke: true });
+  assertTrue(!said(off, 'Hellish Rebuke!'), 'turned off in Settings');
+});
+
+test('Spell buttons say what the Cleric spells do', () => {
+  const text = (character, id) => attackSummary(heroAttackOptions(fightWith(character)).find((o) => o.id === id)).join(' · ');
+  assertEqual(text(initiate('healing-word'), 'spell-healing-word-free'), 'Bonus Action · regain 2d4 + 1 Hit Points · 6 on average · free: once per Long Rest');
+  assertEqual(text(initiate('bless'), 'spell-bless-free'), '+1d4 to your attack rolls and saving throws · Concentration · free: once per Long Rest');
+  assertEqual(text(initiate('sanctuary'), 'spell-sanctuary-free'), 'Bonus Action · foes make a Wis save against DC 11 to attack you; ends if you attack or cast a spell · free: once per Long Rest');
+});
+
 // ---- Spells in scenes ----
 
 const STORY_URL = new URL('../story/', import.meta.url);
@@ -339,19 +485,12 @@ const acolyteFighter = {
   magicInitiate: [{ source: 'background', list: 'cleric', ability: 'wisdom', cantrips: ['guidance', 'spare-the-dying'], spell: 'cure-wounds' }],
 };
 
-// Spells with no use in a fight yet that are waiting for scenes still to be written, or for
-// the next slice. Every other spell without one must unlock a choice somewhere.
+// Spells with no use in a fight yet that are waiting for scenes still to be written. Every
+// other spell without one must unlock a choice somewhere.
 const WAITING = {
   knock: 'Chapter 2: freeing Fen from the stocks (a level 2 spell, so not before level 3)',
   invisibility: 'Chapter 2: sneaking into the Choir camp at Cairnfield (level 2)',
   guidance: 'works on every ability check in a scene instead',
-  bless: 'next slice: Cleric spells in a fight',
-  'cure-wounds': 'next slice',
-  'faerie-fire': 'next slice',
-  'guiding-bolt': 'next slice',
-  'healing-word': 'next slice',
-  'hellish-rebuke': 'next slice',
-  sanctuary: 'next slice',
 };
 
 test('Scenes: every spell without a use in a fight unlocks a choice in a scene (or waits for one)', async () => {

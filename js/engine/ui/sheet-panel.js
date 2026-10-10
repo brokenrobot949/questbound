@@ -1,7 +1,8 @@
 // The Sheet tab during play: the hero's sheet (every number taps open to show its maths),
 // plus what changes in play: Heroic Inspiration, coins and the pack, the armour worn and
 // every attack the hero has (with the numbers the fight uses), the spells on the hero, and
-// buttons to cast Mage Armor, False Life or Longstrider between fights.
+// buttons to cast Mage Armor, False Life, Longstrider, Cure Wounds or Healing Word between
+// fights.
 
 import { findBond, findDrive } from '../character/creation.js';
 import { findItem, itemText, moneyText } from '../character/inventory.js';
@@ -120,8 +121,9 @@ function gearBlock(game) {
   return block;
 }
 
-// Spells the hero casts on themselves before trouble starts: a button for each way they can
-// cast it (a free cast, or each spell slot level they have left). onCast(text) after one.
+// Spells the hero casts on themselves between fights, before trouble starts or after it: a
+// button for each way they can cast it (a free cast, or each spell slot level they have left
+// that makes a difference). onCast(text) after one.
 function castBlock(game, note, onCast) {
   const choices = selfSpellsToCast(game);
   if (choices.length === 0) return null;
@@ -132,10 +134,13 @@ function castBlock(game, note, onCast) {
     block.append(el('p', 'section-hint', 'In a fight, cast your spells from the battle screen.'));
     return block;
   }
-  block.append(el('p', 'section-hint', 'Best cast before trouble starts: each one uses a spell slot.'));
+  const healing = choices.some(({ spell }) => spell.combat.kind === 'heal');
+  const guarding = choices.some(({ spell }) => spell.combat.kind !== 'heal');
+  const when = healing && guarding ? 'Guard yourself before trouble starts, and heal after it.' : healing ? 'Heal yourself after a fight.' : 'Best cast before trouble starts.';
+  block.append(el('p', 'section-hint', `${when} Each cast uses a spell slot, or a free cast if you have one.`));
   for (const { spell, slots, problem } of choices) {
     const row = el('div', 'sheet-cast');
-    row.append(el('p', 'sheet-line', `${spell.name}: ${selfSpellText(spell.combat)}`));
+    row.append(el('p', 'sheet-line', `${spell.name}: ${selfSpellText(spell, game.character)}`));
     if (problem) row.append(el('p', 'section-hint', problem));
     const buttons = el('div', 'slot-actions');
     for (const slot of slots) {

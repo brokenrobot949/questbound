@@ -12,13 +12,16 @@
 //                slotSpent } for the current turn: surged after Action Surge; athleteMove is
 //                the free move Remarkable Athlete gives straight after a Critical Hit (feet,
 //                or 0); slotSpent once a spell slot has been used (one a turn)
-//   effects      [{ kind, target, endsOn, endsAt, fromRound, concentration, dc }]:
+//   effects      [{ kind, target, endsOn, endsAt, fromRound, concentration, dc, untilRound }]:
 //                'dodging', 'slowed', 'no-reactions', 'no-healing' and 'shield' last until
-//                the start of endsOn's next turn; 'poisoned' (endsAt 'end') until the end of
-//                endsOn's next turn after fromRound; 'prone' until the creature stands up;
-//                and the spell conditions 'drowsy', 'asleep' and 'paralyzed' (see "Spell
-//                conditions" below), which last while the hero concentrates (concentration
-//                true) and carry the DC of the save that ends them
+//                the start of endsOn's next turn; 'poisoned' and 'guided' (endsAt 'end')
+//                until the end of endsOn's next turn after fromRound; 'prone' until the
+//                creature stands up; the spell conditions 'drowsy', 'asleep', 'paralyzed'
+//                and 'outlined' (see "Spell conditions" below), which last while the hero
+//                concentrates (concentration true), the first three carrying the DC of the
+//                save that ends them; and the hero's wards (see "Wards" below): 'blessed'
+//                (concentration) and 'sanctuary' (with the DC foes save against, until the
+//                start of the hero's turn in untilRound)
 //   concentration  the spell the hero is concentrating on: { spellId, name }, or null
 //   reactionsUsed  ids that have used their reaction since their last turn
 //   heroState    'up', 'down' (0 Hit Points, making death saves), 'stable' or 'dead'
@@ -40,11 +43,12 @@
 import { encounters } from '../../../data/campaign/encounters.js';
 import { monsters } from '../../../data/srd/monsters.js';
 import { d20Test, retarget } from '../rules/d20-test.js';
-import { rollDice } from '../rules/dice.js';
+import { rollDice, rollDie } from '../rules/dice.js';
 import { armorClass, findAbility, findClass, hasFeature, initiative as heroInitiative, savingThrow, speed as heroSpeed } from '../character/sheet.js';
 import { heal, featureUsesLeft, maxHp, slotsLeft, spendFeature, spendSlot } from '../character/resources.js';
 import { activeSpellIds, castSelfSpell, soakDamage } from '../character/spell-effects.js';
-import { canCastSpell, findSpell } from '../character/spells.js';
+import { canCastSpell, findSpell, freeCastKey, freeCastsLeft } from '../character/spells.js';
+import { spellSaveDc } from '../character/casting.js';
 import { hasItem, removeItem } from '../character/inventory.js';
 import { SQUARE_FEET, cellAt, feetBetween, inBounds, isAdjacent, isStandable, key, parseMap, reachableSquares, squaresBetween, stepCost } from './grid.js';
 import { areaSquares, DIRECTIONS, findDirection, lineOfEffect } from './areas.js';
@@ -108,14 +112,24 @@ export const isProne = (battle, id) => hasEffect(battle, id, 'prone');
 //                and so does an ally shaking it as an action.
 //   'paralyzed'  Hold Person: as Unconscious but not Prone, and a Wisdom save at the end of
 //                each of its turns ends it
+//   'outlined'   Faerie Fire: attack rolls against it have Advantage
+//   'guided'     Guiding Bolt: the next attack roll against it has Advantage (the roll uses
+//                it up), until the end of the caster's next turn
 // An Incapacitated singer can't sing (it can't speak), so the hymn stops.
 const INCAPACITATING = ['drowsy', 'asleep', 'paralyzed'];
 export const isIncapacitated = (battle, id) => battle.effects.some((e) => e.target === id && INCAPACITATING.includes(e.kind));
 const isHelpless = (battle, id) => hasEffect(battle, id, 'asleep') || hasEffect(battle, id, 'paralyzed');
 const autoFails = (battle, c, abilityId) => c.side === 'enemy' && isHelpless(battle, c.id) && ['strength', 'dexterity'].includes(abilityId);
 
+// ---- Wards (spells the hero casts on themselves for the fight) ----
+//   'blessed'    Bless: the hero adds 1d4 to attack rolls and saving throws while they
+//                concentrate
+//   'sanctuary'  Sanctuary: a foe that attacks the hero must first make a Wisdom save, or the
+//                attack is lost. It ends when the hero attacks, casts a spell or deals
+//                damage, or after a minute (10 rounds).
+
 // Conditions on a creature, for the battle screen: e.g. ['asleep', 'poisoned'].
-const SHOWN = ['drowsy', 'asleep', 'paralyzed', 'poisoned', 'shield', 'dodging'];
+const SHOWN = ['drowsy', 'asleep', 'paralyzed', 'poisoned', 'outlined', 'guided', 'shield', 'dodging', 'blessed', 'sanctuary'];
 export function conditionsOf(battle, id) {
   return SHOWN.filter((kind) => hasEffect(battle, id, kind));
 }
@@ -126,9 +140,10 @@ function canReact(game, c) {
   return upright(game, c) && !isIncapacitated(battle, c.id) && !battle.reactionsUsed.includes(c.id) && !hasEffect(battle, c.id, 'no-reactions');
 }
 
-// Reactions the game takes for the hero: Shield, cast when it would turn a hit into a miss.
-// The Settings screen turns it on or off (see setReactionPolicy).
-const reactionPolicy = { shield: true };
+// Reactions the game takes for the hero: Shield, cast when it would turn a hit into a miss,
+// and Hellish Rebuke, cast with its free use when a foe hurts the hero. The Settings screen
+// turns each on or off (see setReactionPolicy).
+const reactionPolicy = { shield: true, rebuke: true };
 export function setReactionPolicy(policy) {
   Object.assign(reactionPolicy, policy);
 }
@@ -291,6 +306,11 @@ function beginTurn(game) {
   battle.reactionsUsed = battle.reactionsUsed.filter((id) => id !== c.id);
   battle.turnState = { movementLeft: speedOf(game, c), action: false, bonus: false, disengaged: false, savageUsed: false, surged: false, athleteMove: 0, slotSpent: false };
   log(game, c.side === 'hero' ? 'Your turn.' : `${c.name}'s turn.`, { turnOf: c.id });
+  const ward = battle.effects.find((e) => e.target === c.id && e.kind === 'sanctuary');
+  if (ward && battle.round >= ward.untilRound) {
+    battle.effects.splice(battle.effects.indexOf(ward), 1);
+    log(game, 'Your Sanctuary fades: its minute is up.');
+  }
   if (c.side === 'hero' && battle.heroState === 'down') deathSave(game);
 }
 
@@ -452,6 +472,7 @@ export function heroMove(game, pos) {
   if (!step || step.cost === 0) throw new Error("You can't reach that square this turn.");
   game.battle.turnState.athleteMove = 0;
   moveAlong(game, heroCombatant(game.battle), step.path, { free: Boolean(step.free) });
+  checkEnd(game); // a Hellish Rebuke on the way can finish the fight
 }
 
 // Moves one square at a time, provoking an Opportunity Attack from any foe whose reach the
@@ -490,6 +511,7 @@ function opportunityAttack(game, attacker, target) {
   if (options.length === 0) return;
   game.battle.reactionsUsed.push(attacker.id);
   log(game, attacker.side === 'hero' ? `${target.name} tries to slip past you: an Opportunity Attack!` : `You leave ${attacker.name}'s reach: an Opportunity Attack!`);
+  if (attacker.side === 'hero') breakSanctuary(game, 'you attack');
   performAttack(game, attacker, target, options[0]);
 }
 
@@ -500,7 +522,8 @@ function attackConditions(game, attacker, target, option) {
   const battle = game.battle;
   const advantage = [];
   const disadvantage = [];
-  if (hasEffect(battle, target.id, 'dodging')) disadvantage.push(`${target.side === 'hero' ? 'You are' : `${target.name} is`} Dodging`);
+  const is = (c) => (c.side === 'hero' ? 'You are' : `${c.name} is`);
+  if (hasEffect(battle, target.id, 'dodging')) disadvantage.push(`${is(target)} Dodging`);
   if (option.how === 'ranged' || option.how === 'rays') {
     if (feetBetween(attacker.pos, target.pos) > option.range[0]) disadvantage.push('Long range');
     const foeNearby = battle.combatants.some((c) => c.side !== attacker.side && upright(game, c) && !isIncapacitated(battle, c.id) && isAdjacent(c.pos, attacker.pos));
@@ -508,9 +531,10 @@ function attackConditions(game, attacker, target, option) {
   }
   if (option.heavyDisadvantage) disadvantage.push('Heavy weapon without the Strength or Dexterity 13 it needs');
   if (target.side === 'hero' && battle.heroState !== 'up') advantage.push('You are Unconscious');
-  const is = (c) => (c.side === 'hero' ? 'You are' : `${c.name} is`);
   if (hasEffect(battle, target.id, 'asleep')) advantage.push(`${is(target)} Unconscious`);
   if (hasEffect(battle, target.id, 'paralyzed')) advantage.push(`${is(target)} Paralyzed`);
+  if (hasEffect(battle, target.id, 'outlined')) advantage.push(`${is(target)} outlined by Faerie Fire`);
+  if (hasEffect(battle, target.id, 'guided')) advantage.push(`${is(target)} lit by Guiding Bolt`);
   if (hasEffect(battle, attacker.id, 'poisoned')) disadvantage.push(`${is(attacker)} Poisoned`);
   if (isProne(battle, attacker.id)) disadvantage.push(`${is(attacker)} Prone`);
   if (isProne(battle, target.id)) {
@@ -567,9 +591,12 @@ export function attackPreview(game, optionId, targetId) {
     preview.chance = 1;
     preview.describe = `Never misses: ${option.darts} darts`;
   } else {
+    // Bless adds 1d4: the chance is the average over its four faces.
     const criticalOn = option.criticalOn || 20;
-    preview.chance = hitChance(bonus, acOf(game, target), mode, criticalOn);
-    preview.describe = `${option.how === 'rays' ? `${option.rays} rays, each ` : ''}+${bonus} to hit against AC ${acOf(game, target)}`;
+    const ac = acOf(game, target);
+    const blessed = hasEffect(battle, 'hero', 'blessed');
+    preview.chance = blessed ? [1, 2, 3, 4].reduce((sum, d4) => sum + hitChance(bonus + d4, ac, mode, criticalOn), 0) / 4 : hitChance(bonus, ac, mode, criticalOn);
+    preview.describe = `${option.how === 'rays' ? `${option.rays} rays, each ` : ''}+${bonus}${blessed ? ' + 1d4 (Bless)' : ''} to hit against AC ${ac}`;
     if (criticalOn < 20) preview.describe += ` · Critical Hit on ${criticalOn}–20`;
   }
   if (option.potent) preview.describe += ` · half damage even on a ${option.how === 'save' ? 'save' : 'miss'} (Potent Cantrip)`;
@@ -673,12 +700,27 @@ function performAttack(game, attacker, target, option) {
     return { critical: false };
   }
 
+  // Sanctuary: a foe must make a Wisdom save to attack the hero, or the attack is lost.
+  const ward = target.side === 'hero' && !you ? battle.effects.find((e) => e.target === 'hero' && e.kind === 'sanctuary') : null;
+  if (ward) {
+    const save = monsterSave(game.rng, findMonster(attacker.monsterId), 'wisdom', ward.dc);
+    if (!save.success) {
+      log(game, `${attacker.name} goes for you with its ${option.name}, then falters: Sanctuary turns it aside.`, { roll: save });
+      return { critical: false };
+    }
+    log(game, `${attacker.name} pushes past your Sanctuary.`, { roll: save });
+  }
+
   // A Goblin Boss can pull an ally into the way.
   const redirected = redirectAttack(game, target);
   if (redirected !== target) return performAttack(game, attacker, redirected, option);
 
   const { advantage, disadvantage } = attackConditions(game, attacker, target, option);
-  let roll = attackRoll(game.rng, option, acOf(game, target), advantage, disadvantage);
+  const blessed = you ? blessing(game) : [];
+  const rolled = blessed.length ? { ...option, modifiers: [...option.modifiers, ...blessed] } : option;
+  let roll = attackRoll(game.rng, rolled, acOf(game, target), advantage, disadvantage);
+  // Guiding Bolt's light is used up by the first attack roll against its target.
+  battle.effects = battle.effects.filter((e) => !(e.target === target.id && e.kind === 'guided'));
   if (target.side === 'hero' && roll.success && !roll.criticalHit) roll = castShield(game, roll);
   // Hitting an Unconscious or Paralyzed creature from within 5 feet is a Critical Hit.
   const helpless = target.side === 'hero' ? battle.heroState !== 'up' : isHelpless(battle, target.id);
@@ -702,7 +744,7 @@ function performAttack(game, attacker, target, option) {
   const plus = option.damage.plus || null;
   const plusText = plus ? ` plus ${plus.amount} ${plus.type}` : '';
   log(game, `${improved || (critical ? 'Critical hit! ' : '')}${how}: ${damageText(damage, option.damage.dice)} damage${plusText}${savaged}.`, { roll });
-  applyDamage(game, target, damage.total, { type: damage.type, critical, plus });
+  applyDamage(game, target, damage.total, { type: damage.type, critical, plus, from: attacker });
   if (option.rider && target.hp > 0) addRider(game, attacker, target, option);
   if (option.onHit && !battle.outcome) onHitCondition(game, target, option.onHit);
   return { critical };
@@ -765,6 +807,11 @@ function addRider(game, attacker, target, option) {
     }
   } else if (option.rider === 'no-healing') {
     battle.effects.push({ kind: 'no-healing', target: target.id, endsOn: attacker.id });
+  } else if (option.rider === 'guided') {
+    // Until the end of the caster's next turn.
+    battle.effects = battle.effects.filter((e) => !(e.target === target.id && e.kind === 'guided'));
+    battle.effects.push({ kind: 'guided', target: target.id, endsOn: attacker.id, endsAt: 'end', fromRound: battle.round });
+    log(game, `${target.name} glitters with light: the next attack roll against it has Advantage.`);
   }
 }
 
@@ -786,10 +833,13 @@ function monsterDamage(game, target, amount, type) {
   return amount;
 }
 
-// Damage of one type, plus any flat extra of another type (plus: { amount, type }).
+// Damage of one type, plus any flat extra of another type (plus: { amount, type }). from: the
+// creature that dealt it, if it can be paid back (Hellish Rebuke).
 function applyDamage(game, target, amount, damage) {
+  const before = target.side === 'hero' ? game.hp + (game.tempHp || 0) : 0;
   takeHit(game, target, amount, damage);
   rescene(game);
+  if (target.side === 'hero' && damage.from && game.hp + (game.tempHp || 0) < before) hellishRebuke(game, damage.from);
 }
 
 function takeHit(game, target, amount, { type, critical = false, plus = null }) {
@@ -933,11 +983,20 @@ function useAction(game, option, { slotAlreadySpent = false } = {}) {
   if (option.bonusAction) turn.bonus = true;
   else turn.action = true;
   turn.athleteMove = 0;
+  breakSanctuary(game, option.source === 'spell' ? 'you cast a spell' : 'you attack');
   if (option.freeCast && !slotAlreadySpent) game.featureUses[option.freeCast] = (game.featureUses[option.freeCast] || 0) + 1;
   if (option.slotLevel) {
     if (!slotAlreadySpent) spendSlot(game, option.slotLevel);
     turn.slotSpent = true;
   }
+}
+
+// Why a spell on the hero would do nothing now (healing at full Hit Points, a ward already
+// up), or null.
+function optionProblem(game, option) {
+  if (option.how === 'heal' && game.hp >= maxHp(game.character)) return 'You’re at full Hit Points.';
+  if (option.how === 'ward' && hasEffect(game.battle, 'hero', option.effect)) return `${findSpell(option.spellId).name} is already on you.`;
+  return null;
 }
 
 // Why the hero can't use an attack or spell right now, or null if they can (for the battle
@@ -948,16 +1007,33 @@ export function heroCantUse(game, optionId) {
   if (!option) return 'You can’t use that now.';
   try {
     checkCanAct(game, option);
-    return null;
+    return optionProblem(game, option);
   } catch (error) {
     return error.message;
   }
+}
+
+// Bless: while it's on the hero, each of their attack rolls and saving throws adds 1d4.
+// Returns the modifier to add (one, or none).
+function blessing(game) {
+  if (!hasEffect(game.battle, 'hero', 'blessed')) return [];
+  const roll = rollDie(game.rng, 4);
+  return [{ label: 'Bless', value: roll, source: `Bless: 1d4 (${roll})` }];
+}
+
+// Sanctuary ends as soon as the hero attacks, casts a spell or deals damage.
+function breakSanctuary(game, why) {
+  const battle = game.battle;
+  if (!hasEffect(battle, 'hero', 'sanctuary')) return;
+  battle.effects = battle.effects.filter((e) => !(e.target === 'hero' && e.kind === 'sanctuary'));
+  log(game, `Your Sanctuary ends: ${why}.`);
 }
 
 // A saving throw by the hero: to keep Concentration, or against their own Shatter.
 function heroSave(game, abilityId, dc, label) {
   const ability = findAbility(abilityId);
   const modifiers = savingThrow(game.character, abilityId).parts.map((p) => ({ ...p, source: `${ability.name} saving throw` }));
+  modifiers.push(...blessing(game));
   return d20Test({ rng: game.rng, kind: 'save', label: `${label} (${ability.name} save)`, modifiers, target: { type: 'DC', value: dc } });
 }
 
@@ -996,12 +1072,13 @@ function concentrationCheck(game, damage) {
   else endConcentration(game, `Your concentration breaks: ${name} ends.`, save);
 }
 
-// Puts a spell's condition on a foe, unless it's immune. Returns true if it took hold.
-const CONDITION_NAMES = { poisoned: 'Poisoned', paralyzed: 'Paralyzed', drowsy: 'put to sleep', asleep: 'put to sleep' };
+// Puts a spell's condition on a creature (Faerie Fire can catch the hero too), unless it's
+// immune. Returns true if it took hold.
+const CONDITION_NAMES = { poisoned: 'Poisoned', paralyzed: 'Paralyzed', drowsy: 'put to sleep', asleep: 'put to sleep', outlined: 'outlined' };
 function applyCondition(game, target, kind, extra = {}) {
   const battle = game.battle;
-  const monster = findMonster(target.monsterId);
-  if ((monster.conditionImmunities || []).includes(kind)) {
+  const monster = target.side === 'enemy' ? findMonster(target.monsterId) : null;
+  if (monster && (monster.conditionImmunities || []).includes(kind)) {
     log(game, `${target.name} can't be ${CONDITION_NAMES[kind]}.`);
     return false;
   }
@@ -1009,6 +1086,9 @@ function applyCondition(game, target, kind, extra = {}) {
   battle.effects.push({ kind, target: target.id, endsOn: null, ...extra });
   if (kind === 'paralyzed') log(game, `${target.name} is Paralyzed: it can't move or act, attacks against it have Advantage, and a hit from within 5 feet is a Critical Hit.`);
   if (kind === 'drowsy') log(game, `${target.name}'s eyes droop: too drowsy to act until the end of its next turn, when it must save again or fall asleep.`);
+  if (kind === 'outlined') {
+    log(game, target.side === 'hero' ? 'Violet light outlines you: attacks against you have Advantage.' : `Violet light outlines ${target.name}: attacks against it have Advantage.`);
+  }
   if (INCAPACITATING.includes(kind)) silenceSinger(game, target);
   return true;
 }
@@ -1064,6 +1144,7 @@ function endOfTurn(game, c) {
 function castShield(game, roll) {
   const battle = game.battle;
   if (!reactionPolicy.shield || !canReact(game, heroCombatant(battle)) || hasEffect(battle, 'hero', 'shield')) return roll;
+  if (hasEffect(battle, 'hero', 'sanctuary')) return roll; // casting it would end Sanctuary
   if (!canCastSpell(game.character, 'shield')) return roll;
   const spell = findSpell('shield');
   let slot = null;
@@ -1076,6 +1157,28 @@ function castShield(game, roll) {
   battle.effects.push({ kind: 'shield', target: 'hero', endsOn: 'hero' });
   log(game, `Shield! A shimmering barrier springs up (your reaction, a level ${slot} slot): your AC is ${ac} until your next turn.`);
   return retarget(roll, ac);
+}
+
+// Hellish Rebuke, a reaction: when a foe within 60 feet hurts the hero, the game casts it
+// with its free use (a Tiefling's, once per Long Rest), if Settings allow and the hero's
+// reaction is free. It never spends a spell slot, and never ends the hero's Sanctuary. The
+// foe makes a Dexterity save and takes half the fire damage on a success.
+function hellishRebuke(game, attacker) {
+  const battle = game.battle;
+  if (!reactionPolicy.rebuke || battle.outcome || attacker.side !== 'enemy' || attacker.hp <= 0) return;
+  const hero = heroCombatant(battle);
+  if (!canReact(game, hero) || hasEffect(battle, 'hero', 'sanctuary') || freeCastsLeft(game, 'hellish-rebuke') < 1) return;
+  const spell = findSpell('hellish-rebuke');
+  if (feetBetween(hero.pos, attacker.pos) > spell.combat.range) return;
+  game.featureUses[freeCastKey(spell.id)] = (game.featureUses[freeCastKey(spell.id)] || 0) + 1;
+  battle.reactionsUsed.push('hero');
+  const damage = rollDamage(game.rng, spell.combat.damage);
+  const dodging = hasEffect(battle, attacker.id, 'dodging') ? ['Dodging'] : [];
+  const save = monsterSave(game.rng, findMonster(attacker.monsterId), 'dexterity', spellSaveDc(game.character, spell.id), dodging);
+  const amount = save.success ? Math.floor(damage.total / 2) : damage.total;
+  const halved = save.success ? `, halved to ${amount} by its Dexterity save` : '';
+  log(game, `Hellish Rebuke! (your reaction, its free cast) Green flames engulf ${attacker.name}: ${damageText(damage, spell.combat.damage.dice)} damage${halved}.`, { roll: save });
+  applyDamage(game, attacker, amount, { type: damage.type });
 }
 
 // The squares an area spell would cover aimed this way, and who's in them: { option, squares,
@@ -1154,7 +1257,8 @@ export function heroCastArea(game, optionId, aim) {
   for (const c of caught) {
     if (battle.outcome) break;
     if (option.condition === 'drowsy') putToSleep(game, c, option);
-    else areaDamage(game, c, option, damage, hero);
+    else if (option.damage) areaDamage(game, c, option, damage, hero);
+    else areaCondition(game, c, option);
   }
   if (option.concentration) tidyConcentration(game);
   checkEnd(game);
@@ -1180,6 +1284,27 @@ function areaDamage(game, c, option, damage, hero) {
   log(game, text, { roll: save });
   if (amount) applyDamage(game, c, amount, { type: damage.type });
   if (!saved && option.push && !you && c.hp > 0 && !battle.outcome) pushAway(game, c, hero.pos, option.push);
+}
+
+// Faerie Fire on one creature (the hero too, if they're inside it): a Dexterity save, or it's
+// outlined in light.
+function areaCondition(game, c, option) {
+  const battle = game.battle;
+  const you = c.side === 'hero';
+  const ability = findAbility(option.saveAbility).name;
+  const helpless = autoFails(battle, c, option.saveAbility);
+  const dodging = option.saveAbility === 'dexterity' && hasEffect(battle, c.id, 'dodging') ? ['Dodging'] : [];
+  let save = null;
+  if (you) save = heroSave(game, option.saveAbility, option.saveDc, option.name);
+  else if (!helpless) save = monsterSave(game.rng, findMonster(c.monsterId), option.saveAbility, option.saveDc, dodging);
+  const who = you ? 'You' : c.name;
+  const s = you ? '' : 's';
+  if (save && save.success) {
+    log(game, `${who} make${s} the ${ability} save.`, { roll: save });
+    return;
+  }
+  log(game, helpless ? `${c.name} can't move to save itself.` : `${who} fail${s} the ${ability} save.`, { roll: save });
+  applyCondition(game, c, option.condition, { concentration: option.concentration });
 }
 
 // Sleep on one foe: a creature that never sleeps (immune to Exhaustion) shrugs it off; the
@@ -1224,18 +1349,39 @@ function pushAway(game, c, from, feet) {
   log(game, `${c.name} is thrown back ${path.length * SQUARE_FEET} feet.`, {}, { moves: [{ id: c.id, from: start, path }] });
 }
 
-// Mage Armor, False Life or Longstrider, cast as the turn's action (see character/spell-effects.js).
+// A spell on the hero, cast as the turn's action (or Bonus Action): Mage Armor, False Life or
+// Longstrider; Cure Wounds or Healing Word (see character/spell-effects.js); or a ward, Bless
+// or Sanctuary.
 export function heroCastSelf(game, optionId) {
   requireHeroTurn(game);
   const battle = game.battle;
   const option = heroAttackOptions(game).find((o) => o.id === optionId);
-  if (!option || option.how !== 'self') throw new Error(`You can't cast ${optionId} on yourself right now.`);
+  if (!option || option.targeting !== 'self') throw new Error(`You can't cast ${optionId} on yourself right now.`);
   checkCanAct(game, option);
+  const problem = optionProblem(game, option);
+  if (problem) throw new Error(problem);
+  if (option.how === 'ward') return castWard(game, option);
   const faster = option.speedBonus && !activeSpellIds(game).includes(option.spellId);
   const text = castSelfSpell(game, option.spellId, option.freeCast ? 'free' : option.slotLevel);
   useAction(game, option, { slotAlreadySpent: true });
   if (faster) battle.turnState.movementLeft += option.speedBonus; // quicker this very turn
   log(game, `You cast ${text}`);
+}
+
+// Bless (Concentration) or Sanctuary (a minute: 10 rounds), on the hero for the fight.
+function castWard(game, option) {
+  const battle = game.battle;
+  useAction(game, option);
+  if (option.concentration) startConcentration(game, option);
+  if (option.effect === 'blessed') {
+    battle.effects.push({ kind: 'blessed', target: 'hero', endsOn: null, concentration: true });
+    log(game, `You cast ${findSpell(option.spellId).name}: while you concentrate, you add 1d4 to your attack rolls and saving throws.`);
+  } else if (option.effect === 'sanctuary') {
+    battle.effects.push({ kind: 'sanctuary', target: 'hero', endsOn: null, dc: option.saveDc, untilRound: battle.round + 10 });
+    log(game, `You cast ${findSpell(option.spellId).name}: a foe must make a DC ${option.saveDc} Wisdom save to attack you. It ends if you attack, cast a spell or deal damage.`);
+  } else {
+    throw new Error(`Unknown ward: ${option.effect}`);
+  }
 }
 
 // Where Misty Step can take the hero: an empty square they can see, within its range.

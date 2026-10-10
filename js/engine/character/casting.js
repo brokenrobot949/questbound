@@ -10,7 +10,7 @@
 //   'free'     a free cast (Magic Initiate's spell, a species spell), once per Long Rest
 //   'slot'     the lowest spell slot left that's high enough for the spell
 
-import { canCastSpell, findSpell, freeCastKey, freeCastsLeft, spellGroups, spellNumbers } from './spells.js';
+import { canCastSpell, findSpell, freeCastKey, freeCastsLeft, spellAbility, spellNumbers } from './spells.js';
 import { slotsLeft, spendSlot } from './resources.js';
 import { rollDie } from '../rules/dice.js';
 
@@ -58,10 +58,7 @@ export function guidanceModifiers(game) {
 // The spell save DC a spell is cast with: the one for wherever the hero got it (their class,
 // Magic Initiate or their species, each with its own spellcasting ability).
 export function spellSaveDc(character, spellId) {
-  for (const group of spellGroups(character)) {
-    if (!group.ability) continue;
-    const has = [...group.cantrips, ...group.prepared, ...group.spellbook, ...group.always.map((a) => a.spell)].some((s) => s && s.id === spellId);
-    if (has) return spellNumbers(character, group.ability).saveDc.value;
-  }
-  throw new Error(`The hero doesn't have ${spellId}`);
+  const ability = spellAbility(character, spellId);
+  if (!ability) throw new Error(`The hero doesn't have ${spellId}`);
+  return spellNumbers(character, ability).saveDc.value;
 }

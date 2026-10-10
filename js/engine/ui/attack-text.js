@@ -4,6 +4,7 @@
 
 import { parseDice } from '../combat/attacks.js';
 import { findAbility } from '../character/sheet.js';
+import { healingFor } from '../character/spell-effects.js';
 import { signedNumber } from './roll-format.js';
 
 const MINUS = '−';
@@ -36,6 +37,8 @@ export function attackSummary(option, { slotsLeft = null } = {}) {
   const parts = [];
   if (option.bonusAction) parts.push('Bonus Action');
   if (option.how === 'self') parts.push(selfText(option));
+  else if (option.how === 'heal') parts.push(...healText(option.heal));
+  else if (option.how === 'ward') parts.push(WARDS[option.effect](option));
   else if (option.how === 'teleport') parts.push(`teleport up to ${option.range[1]} ft to a square you can see`);
   else if (option.how === 'darts') {
     parts.push(`${option.darts} darts that never miss`, `${damageDice(option.damage)} each`, `${averageText(averageDamage(option.damage) * option.darts)} on average`);
@@ -48,7 +51,7 @@ export function attackSummary(option, { slotsLeft = null } = {}) {
     if (option.halfOnSave) parts.push('half on a save');
     if (option.push) parts.push(`pushed ${option.push} ft on a failed save`);
   }
-  if (option.how !== 'self' && option.how !== 'teleport') parts.push(reachText(option));
+  if (option.targeting !== 'self' && option.how !== 'teleport') parts.push(reachText(option));
   if (option.rider) parts.push(RIDERS[option.rider]);
   if (option.potent) parts.push(`half damage even on a ${option.how === 'save' ? 'save' : 'miss'}`);
   if (option.heavyDisadvantage) parts.push('Disadvantage: too heavy for you');
@@ -62,9 +65,27 @@ export function attackSummary(option, { slotsLeft = null } = {}) {
 }
 
 // What a spell you cast on yourself does, from its data (data/srd/spells.js), for the Sheet.
-export function selfSpellText(combat) {
+export function selfSpellText(spell, character) {
+  const combat = spell.combat;
+  if (combat.kind === 'heal') {
+    const [what, average] = healText(healingFor(character, spell.id));
+    return `${what} (${average})`;
+  }
   return selfText({ self: combat.self, baseAc: combat.baseAc, lasts: combat.lasts, speedBonus: combat.speed, tempHp: combat.tempHp });
 }
+
+// "regain 2d8 + 3 Hit Points", "12 on average": what a healing spell gives back.
+function healText(heal) {
+  const average = averageText(Math.max(0, averageDamage(heal)));
+  const bonus = heal.bonus ? ` ${heal.bonus < 0 ? MINUS : '+'} ${Math.abs(heal.bonus)}` : '';
+  return [`regain ${heal.dice}${bonus} Hit Points`, `${average} on average`];
+}
+
+// What a ward on yourself does for the fight.
+const WARDS = {
+  blessed: () => '+1d4 to your attack rolls and saving throws',
+  sanctuary: (option) => `foes make a Wis save against DC ${option.saveDc} to attack you; ends if you attack or cast a spell`,
+};
 
 // What a spell on yourself does: Mage Armor, False Life, Longstrider.
 function selfText(option) {
@@ -77,14 +98,15 @@ function selfText(option) {
 }
 
 // What a failed save does, for spells that leave a condition.
-const CONDITIONS = { drowsy: 'drowsy, then asleep', paralyzed: 'Paralyzed' };
+const CONDITIONS = { drowsy: 'drowsy, then asleep', paralyzed: 'Paralyzed', outlined: 'outlined: attacks against it have Advantage' };
 
 // "melee", "range 80/320 ft", "thrown 20/60 ft", "range 120 ft", "15-ft cone from you",
 // "10-ft-radius sphere within 60 ft", "a Humanoid within 60 ft"
 function reachText(option) {
   if (option.area) {
     const { shape, size } = option.area;
-    return shape === 'sphere' ? `${size}-ft-radius sphere within ${option.range[1]} ft` : `${size}-ft ${shape} from you`;
+    if (shape === 'sphere') return `${size}-ft-radius sphere within ${option.range[1]} ft`;
+    return option.range[1] ? `${size}-ft ${shape} within ${option.range[1]} ft` : `${size}-ft ${shape} from you`;
   }
   if (option.creatureType) return `a ${option.creatureType} within ${option.range[1]} ft`;
   if (option.how === 'melee') return option.reach > 5 ? `melee, reach ${option.reach} ft` : 'melee';
@@ -99,4 +121,5 @@ const RIDERS = {
   'no-reactions': 'on a hit, no Opportunity Attacks from it',
   'no-healing': 'on a hit, it can’t regain Hit Points',
   poisoned: 'on a hit, Poisoned until the end of your next turn',
+  guided: 'on a hit, the next attack on it has Advantage',
 };

@@ -138,6 +138,33 @@ export function freeCastsLeft(game, spellId) {
   return Math.max(0, uses - ((game.featureUses || {})[freeCastKey(spellId)] || 0));
 }
 
+// The spellcasting ability a spell is cast with: the one for wherever the hero got it (their
+// class, Magic Initiate or their species, each with its own). Null if they don't have it.
+export function spellAbility(character, spellId) {
+  for (const group of spellGroups(character)) {
+    if (!group.ability) continue;
+    const has = [...group.cantrips, ...group.prepared, ...group.spellbook, ...group.always.map((a) => a.spell)].some((s) => s && s.id === spellId);
+    if (has) return group.ability;
+  }
+  return null;
+}
+
+// True if casting the spell with a higher slot does more in the game: more damage or healing
+// dice, darts, rays or Temporary Hit Points. (Extra creatures wait for companions.)
+export function upcastHelps(spell) {
+  const c = spell.combat || {};
+  return Boolean(c.upcast || c.darts || c.rays || c.upcastTempHp);
+}
+
+// Dice grown for a higher slot: upcastDice('2d8', '2d8', 1) is '4d8'.
+export function upcastDice(dice, upcast, above) {
+  if (!upcast || !above) return dice;
+  const [count, sides] = dice.split('d').map(Number);
+  const [more, moreSides] = upcast.split('d').map(Number);
+  if (sides !== moreSides) throw new Error(`Upcast dice ${upcast} must match ${dice}`);
+  return `${count + more * above}d${sides}`;
+}
+
 // Spell save DC and spell attack bonus for a spellcasting ability, with their parts.
 export function spellNumbers(character, abilityId) {
   const mod = abilityModifierOf(character, abilityId);

@@ -23,6 +23,11 @@ const OPTIONS = [
     hint: 'If you have the Shield spell ready, the game casts it with your lowest spell slot whenever an attack would hit you and Shield would make it miss. Turn this off to save your slots.',
   },
   {
+    name: 'autoRebuke',
+    label: 'Cast Hellish Rebuke by itself',
+    hint: 'If you have Hellish Rebuke, the game casts it with its free use (once per Long Rest) the first time a foe within 60 feet hurts you in a fight. It never spends your spell slots.',
+  },
+  {
     name: 'battleSpeed',
     label: 'Battle speed',
     hint: 'How quickly each turn of a fight plays out. Skip shows the rest of a turn at once.',
@@ -37,7 +42,7 @@ const OPTIONS = [
 // Puts the settings into effect. Call at startup and after any change.
 export function applySettings() {
   document.documentElement.dataset.narration = getSetting('plainNarration') ? 'plain' : 'pixel';
-  setReactionPolicy({ shield: getSetting('autoShield') });
+  setReactionPolicy({ shield: getSetting('autoShield'), rebuke: getSetting('autoRebuke') });
 }
 
 // onClose(): the player pressed Done.

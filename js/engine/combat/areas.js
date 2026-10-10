@@ -8,12 +8,16 @@
 //           5, 5, 7 for longer ones). On a diagonal, the squares in that corner near the
 //           diagonal line: 7 for a 15-foot Cone, the same as straight ahead.
 //   Cube    from your square: a block as many squares across as the Cube's side, straight
-//           ahead (centred on you) or in the corner of a diagonal.
+//           ahead (centred on you) or in the corner of a diagonal. A Cube placed within
+//           range (Faerie Fire) is a block around the square you choose: with an even side,
+//           the extra row and column go right and down (a 20-foot Cube is the chosen square,
+//           one more to its left and above, and two more to its right and below).
 //   Sphere  every square within its radius of the centre square, counted the way movement
 //           is (each diagonal is 5 feet): a 5-foot radius is a 3 × 3 block, 10 feet is 5 × 5.
 // A Cone's or Cube's point of origin isn't part of it, so your own square never is; a
-// Sphere's centre is. Walls block an area: a square only counts if a straight line from the
-// point of origin reaches it without passing through a wall.
+// Sphere's centre, or a placed Cube's chosen square, is. Walls block an area: a square only
+// counts if a straight line from the point of origin reaches it without passing through a
+// wall.
 
 import { SQUARE_FEET, cellAt, inBounds } from './grid.js';
 
@@ -43,11 +47,13 @@ export function directionTowards(from, to) {
 
 // The squares an area covers on a map. shape and size come from the spell's area
 // ({ shape: 'cone', size: 15 }); origin is the caster's square for a Cone or Cube and the
-// centre for a Sphere; direction (a DIRECTIONS id) is needed for a Cone or Cube.
+// centre for a Sphere or a placed Cube; direction (a DIRECTIONS id) is needed for a Cone or a
+// Cube from the caster.
 export function areaSquares(map, { shape, size }, origin, direction = null) {
   const length = Math.round(size / SQUARE_FEET);
   let offsets;
   if (shape === 'sphere') offsets = sphereOffsets(length);
+  else if (shape === 'cube' && !direction) offsets = placedCubeOffsets(length);
   else {
     const dir = findDirection(direction);
     if (!dir) throw new Error(`A ${shape} needs a direction`);
@@ -80,6 +86,13 @@ function coneOffsets(length, { dx, dy }) {
     const reach = Math.floor(d / 2);
     for (let side = -reach; side <= reach; side++) offsets.push(dx ? [d * dx, side] : [side, d * dy]);
   }
+  return offsets;
+}
+
+function placedCubeOffsets(side) {
+  const low = -Math.floor((side - 1) / 2);
+  const offsets = [];
+  for (let dy = low; dy < low + side; dy++) for (let dx = low; dx < low + side; dx++) offsets.push([dx, dy]);
   return offsets;
 }
 

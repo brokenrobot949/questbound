@@ -7,8 +7,9 @@
 // chance to hit first. Spells have a button each: choose one, pick the spell slot to use (or
 // a free cast), then aim it. An area spell shows the squares it would cover in orange (it
 // starts aimed at the most foes it can catch without you); tap the grid to aim it elsewhere,
-// then Cast. Misty Step lights the squares it can reach in purple. Other actions, Bonus
-// Actions and End Turn sit under the spells.
+// then Cast. Misty Step lights the squares it can reach in purple. A spell on yourself
+// (Mage Armor, healing, Bless, Sanctuary) has a Cast button. Other actions, Bonus Actions and
+// End Turn sit under the spells.
 //
 // Whatever follows a choice plays out a line at a time, at the Battle speed set in Settings:
 // each turn is announced, creatures walk square by square, damage pops up over whoever took
@@ -45,12 +46,23 @@ const HEALING_COLOR = '#7fd99a';
 const AREA_WASH = ['rgba(240, 140, 60, 0.35)', 'rgba(240, 140, 60, 0.9)'];
 const TELEPORT_WASH = ['rgba(180, 140, 230, 0.35)', 'rgba(180, 140, 230, 0.9)'];
 // Tints under a creature with a condition, and words for the turn order.
-const CONDITION_TINTS = { paralyzed: 'rgba(180, 140, 230, 0.45)', poisoned: 'rgba(110, 200, 90, 0.4)', shield: 'rgba(120, 170, 240, 0.45)' };
+const CONDITION_TINTS = {
+  paralyzed: 'rgba(180, 140, 230, 0.45)',
+  poisoned: 'rgba(110, 200, 90, 0.4)',
+  outlined: 'rgba(225, 100, 240, 0.45)', // Faerie Fire
+  guided: 'rgba(250, 230, 130, 0.5)', // Guiding Bolt
+  shield: 'rgba(120, 170, 240, 0.45)',
+  sanctuary: 'rgba(240, 240, 255, 0.35)',
+};
 const CONDITION_WORDS = [
   ['asleep', 'Asleep'],
   ['drowsy', 'Drowsy'],
   ['paralyzed', 'Paralyzed'],
   ['poisoned', 'Poisoned'],
+  ['outlined', 'Outlined'],
+  ['guided', 'Glowing'],
+  ['blessed', 'Blessed'],
+  ['sanctuary', 'Sanctuary'],
 ];
 
 // Log lines already played on screen during this visit, so nothing plays twice.
@@ -91,7 +103,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
   const panel = el('section', 'battle');
   panel.setAttribute('aria-label', 'Battle');
   const header = el('div', 'battle-header');
-  // Concentration, Shield and Temporary Hit Points, when there are any.
+  // Concentration, wards, Shield and Temporary Hit Points, when there are any.
   const status = el('p', 'battle-status');
   const order = el('ol', 'battle-order');
   order.setAttribute('aria-label', 'Turn order');
@@ -341,7 +353,10 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     const heroConditions = hero.conditions || [];
     const notes = [];
     if (scene.concentration) notes.push(`Concentrating on ${scene.concentration}`);
+    if (heroConditions.includes('blessed')) notes.push('Blessed: +1d4 to attacks and saves');
+    if (heroConditions.includes('sanctuary')) notes.push('Sanctuary: foes must save to attack you');
     if (heroConditions.includes('shield')) notes.push('Shield up: +5 AC');
+    if (heroConditions.includes('outlined')) notes.push('Outlined: attacks on you have Advantage');
     if (heroConditions.includes('dodging')) notes.push('Dodging');
     if (hero.temp) notes.push(`${hero.temp} Temporary Hit Points`);
     status.textContent = notes.join(' · ');
@@ -607,7 +622,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     for (const pos of (aimed && aimed.squares) || view.flash || []) washSquare(ctx, pos, size, scale, AREA_WASH);
     if (chosen && chosen.targeting === 'square') for (const pos of fight.teleportSquares(game, chosen.id)) washSquare(ctx, pos, size, scale, TELEPORT_WASH);
 
-    // Tints under creatures held, poisoned or shielded.
+    // Tints under creatures held, poisoned, outlined, glowing, shielded or in Sanctuary.
     for (const unit of scene.units) {
       if (unit.escaped || (unit.id !== 'hero' && unit.hp <= 0)) continue;
       for (const kind of unit.conditions || []) {

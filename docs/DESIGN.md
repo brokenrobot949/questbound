@@ -178,9 +178,9 @@ The free rules hold over 300 spells, and each needs either combat code or a stor
 
 Phase 1 ships 44 spells (16 cantrips, 22 level 1, 6 level 2): enough choice for a Wizard of levels 1–3, for Magic Initiate on the Cleric, Druid or Wizard list, and every spell a species grants by character level 3. In a scene, a choice that needs a spell is shown only to heroes who can cast it: a known cantrip, a prepared or always-prepared spell, or a ritual in a Wizard's spellbook.
 
-How the Wizard's spells work in the game so far:
+How spells work in the game so far:
 
-- **In a fight**, every spell has a button under **Spells** (or **Bonus Action**) that says what it does. Choose one, pick the spell slot to use (a higher slot adds dice, darts or rays), then aim it.
+- **In a fight**, every spell has a button under **Spells** (or **Bonus Action**) that says what it does. Choose one, pick the spell slot to use (a higher slot adds dice, darts or rays), then aim it. A higher slot is only offered when it does more: the extra creatures that Hold Person, Bless or Longstrider can take wait for companions, so those use your lowest slot left.
 - **Spell attacks and single targets:** Fire Bolt, Ray of Frost, Shocking Grasp, Chill Touch, Poison Spray, Magic Missile, Scorching Ray, Ray of Sickness (Poisoned until the end of your next turn), and Hold Person (Paralyzed; Humanoids only, so not goblins, who are Fey).
 - **Area spells:** Burning Hands (a 15-foot Cone), Thunderwave (a 15-foot Cube that pushes foes 10 feet) and Shatter (a 10-foot-radius Sphere up to 60 feet away, which catches you too if you're inside it). Damage is rolled once for everyone; each makes the save, and a save takes half. The grid shows the area in orange before you cast. It starts aimed at the most foes it can catch without you, and you tap the grid to aim it elsewhere.
 - **Areas on the grid:** a Cone is 1, 3 and 3 squares ahead (7 squares on a diagonal too), a Cube a block beside you, and a Sphere every square within its radius, counted like movement. Walls block an area.
@@ -191,12 +191,19 @@ How the Wizard's spells work in the game so far:
 - **Misty Step:** a Bonus Action teleport to an empty square you can see within 30 feet (shown in purple), with no Opportunity Attacks. You can spend only one spell slot a turn, so after Misty Step your action can only be a cantrip.
 - **On yourself:** Mage Armor (AC 13 + Dex until your next Long Rest, without armour), False Life (Temporary Hit Points, lost first and gone after a Long Rest) and Longstrider (+10 feet of Speed for about an hour, which ends when the story's time of day moves on). Cast them from the Sheet's **Cast a spell on yourself** between fights, or as an action in one.
 - **Free casts:** a spell from Magic Initiate (Juniper's Thunderwave) or a species can be cast once per Long Rest without a slot, as the 2024 rules allow. The button offers that first.
+- **The Cleric and Druid spells Magic Initiate gives** (a Fighter with the Acolyte background, or a Human whose Versatile feat is Magic Initiate, can have them). Until companions join the fights, the ones that can help a friend go on you:
+  - **Cure Wounds** (an action, 2d8 + your spellcasting modifier) and **Healing Word** (a Bonus Action, 2d4 + the modifier) heal you, in a fight or from the Sheet between fights. A higher slot adds 2d8 or 2d4. They're greyed out at full Hit Points.
+  - **Bless:** +1d4 to your attack rolls and saving throws while you concentrate, shown in each roll.
+  - **Sanctuary** (a Bonus Action): a foe that attacks you must first make a Wisdom save against your spell save DC, or its attack is lost. It ends when you attack, cast a spell or deal damage, or after a minute (10 rounds). The game never casts Shield or Hellish Rebuke for you while it's up.
+  - **Guiding Bolt:** a ranged spell attack for 4d6 radiant; the next attack roll against the target before the end of your next turn has Advantage. Radiant damage gets past a zombie's Undead Fortitude.
+  - **Faerie Fire:** a 20-foot Cube (a 4 × 4 block) within 60 feet. Each creature in it makes a Dexterity save or is outlined in violet light, and attacks against it have Advantage while you concentrate. It catches you too if you're inside, so the suggested aim never does.
+- **Hellish Rebuke** (a Tiefling of the Infernal legacy, from level 3) is a reaction the game casts for you with its free use, the first time a foe within 60 feet hurts you: the foe makes a Dexterity save against 2d10 fire damage, half on a success. It never spends your spell slots. **Cast Hellish Rebuke by itself** in Settings turns this off.
 - **In scenes:** a spell choice shows only to a hero who can cast it now, and its card says what it costs: "Spell · Light" for a cantrip, "· as a Ritual" (10 minutes longer, no slot), "· free" (Magic Initiate's once-per-Long-Rest cast), or "· level 1 slot". The scene takes the cheapest way, and a DM note says what was spent.
   - A Wizard can cast any Ritual in their spellbook, prepared or not; anyone else needs the ritual spell prepared.
   - A spell its target saves against, such as Charm Person on Warden Pike, rolls that save in the open. The die is the NPC's, so the colours flip: their success is your setback.
   - STORY.md lists where each spell is useful in Chapter 1. Knock and Invisibility wait for Chapter 2, because a hero first has them at level 3.
 - **Guidance:** a hero who knows it adds 1d4 to every ability check in a scene, shown in the roll's breakdown.
-- **Not yet in fights:** Charm Person, Fog Cloud and Invisibility (they work in scenes), and the Cleric and Druid spells Magic Initiate offers (Bless, Cure Wounds, Healing Word, Guiding Bolt, Faerie Fire, Sanctuary) and Hellish Rebuke, which come next.
+- **Not yet in fights:** Charm Person, Fog Cloud and Invisibility. They work in scenes.
 
 **Rests**
 
@@ -291,7 +298,7 @@ Initiative, attack rolls against AC, critical hits, damage types and resistances
 **Quick resolve and speed**
 
 - A fight well under your party's strength offers **Resolve**: the engine plays it out instantly with real rolls and reports HP lost and resources spent. Story and boss fights are always played by hand.
-- Settings cover animation speed (Battle speed: Slow, Normal or Fast), auto-roll, automatic reactions (so far: Cast Shield by itself) and auto end-turn.
+- Settings cover animation speed (Battle speed: Slow, Normal or Fast), auto-roll, automatic reactions (so far: Cast Shield by itself and Cast Hellish Rebuke by itself) and auto end-turn.
 
 ## World and Exploration
 

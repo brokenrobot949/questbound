@@ -17,25 +17,37 @@
 //            'rays'      Scorching Ray: a ranged spell attack for each ray
 //            'area'      every creature in an area makes a saving throw (see area below)
 //            'self'      a spell on yourself; it can be cast from the Sheet between fights too
+//            'heal'      you regain Hit Points (heal dice, plus your spellcasting ability
+//                        modifier); it can be cast from the Sheet between fights too
+//            'ward'      a spell on yourself for the rest of the fight: effect 'blessed'
+//                        (Bless: +1d4 to your attack rolls and saving throws) or 'sanctuary'
+//                        (a foe must make a Wisdom save to attack you)
 //            'teleport'  Misty Step: to a square you can see within range
-//            'reaction'  Shield: the game casts it for you (see Settings) when it would turn a
-//                        hit into a miss
+//            'reaction'  the game casts it for you (see Settings): Shield when it would turn a
+//                        hit into a miss, Hellish Rebuke (trigger 'damaged') when a creature
+//                        within range hurts you
+//   Bless, Healing Word and the rest can touch other creatures too; until companions join
+//   the fights, they're cast on you.
 //   attack   'melee' or 'ranged';  save: the ability the target saves with
 //   range    in feet (0 for an area that starts from you);  damage: { dice, bonus, type }
-//   upcast   dice added to the damage for each slot level above the spell's own ('1d6')
+//   heal     { dice }: the Hit Points a 'heal' spell gives back, before the modifier
+//   upcast   dice added to the damage (or healing) for each slot level above the spell's own
 //   darts, rays  how many at the spell's own level; one more for each slot level above it
 //   scales   a cantrip whose dice grow at character levels 5, 11 and 17
 //   rider    a lasting effect on a hit: 'slowed' (Speed −10 ft), 'no-reactions',
 //            'no-healing' (until the start of your next turn), 'poisoned' (until the end
-//            of your next turn)
+//            of your next turn), 'guided' (the next attack roll against it before the end of
+//            your next turn has Advantage)
 //   area     { shape: 'cone' | 'cube' | 'sphere', size: feet }: a Cone's length, a Cube's
-//            side, a Sphere's radius (combat/areas.js shows how these lie on the grid)
+//            side, a Sphere's radius (combat/areas.js shows how these lie on the grid). With
+//            a range, the area goes on a square within it; with range 0 it starts from you.
 //   halfOnSave  a creature that makes its save still takes half the damage
 //   push     feet a failed save pushes a creature away from you (Thunderwave)
 //   foesOnly the spell affects only the creatures you choose, which is always your foes
 //   condition what a failed save does: 'drowsy' (Sleep: Incapacitated until the end of its
-//            next turn, then a second save or Unconscious) or 'paralyzed' (Hold Person: a
-//            new save at the end of each of its turns ends it)
+//            next turn, then a second save or Unconscious), 'paralyzed' (Hold Person: a
+//            new save at the end of each of its turns ends it) or 'outlined' (Faerie Fire:
+//            attack rolls against it have Advantage)
 //   creatureType  only creatures of this type can be chosen ('Humanoid')
 //   bonusAction   cast as a Bonus Action instead of an action
 //   self     for 'self' spells: 'mage-armor' (AC 13 + Dex while unarmoured), 'false-life'
@@ -44,7 +56,9 @@
 //            Rest) or 'hour' (until the time of day moves on, or a rest)
 //   acBonus  for Shield: the bonus to AC until the start of your next turn
 // Concentration spells use the spell's own concentration flag. Spells without combat
-// can't be cast in a fight yet; some unlock choices in scenes instead.
+// can't be cast in a fight yet; they unlock choices in scenes instead.
+// A higher spell slot is offered only for a spell it improves (more dice, darts, rays or
+// Temporary Hit Points); the extra creatures some spells take wait for companions.
 
 export const spells = [
   // ---- Cantrips ----
@@ -305,6 +319,7 @@ export const spells = [
   // ---- Level 1 ----
   {
     id: 'bless',
+    combat: { kind: 'ward', effect: 'blessed', range: 30 },
     name: 'Bless',
     level: 1,
     school: 'Enchantment',
@@ -369,6 +384,7 @@ export const spells = [
   },
   {
     id: 'cure-wounds',
+    combat: { kind: 'heal', range: 5, heal: { dice: '2d8' }, upcast: '2d8' },
     name: 'Cure Wounds',
     level: 1,
     school: 'Abjuration',
@@ -415,6 +431,7 @@ export const spells = [
   },
   {
     id: 'faerie-fire',
+    combat: { kind: 'area', area: { shape: 'cube', size: 20 }, range: 60, save: 'dexterity', condition: 'outlined' },
     name: 'Faerie Fire',
     level: 1,
     school: 'Evocation',
@@ -463,6 +480,7 @@ export const spells = [
   },
   {
     id: 'guiding-bolt',
+    combat: { kind: 'attack', attack: 'ranged', range: 120, damage: { dice: '4d6', type: 'radiant' }, upcast: '1d6', rider: 'guided' },
     name: 'Guiding Bolt',
     level: 1,
     school: 'Evocation',
@@ -479,6 +497,7 @@ export const spells = [
   },
   {
     id: 'healing-word',
+    combat: { kind: 'heal', range: 60, heal: { dice: '2d4' }, upcast: '2d4', bonusAction: true },
     name: 'Healing Word',
     level: 1,
     school: 'Abjuration',
@@ -495,6 +514,7 @@ export const spells = [
   },
   {
     id: 'hellish-rebuke',
+    combat: { kind: 'reaction', trigger: 'damaged', range: 60, save: 'dexterity', damage: { dice: '2d10', type: 'fire' }, upcast: '1d10', halfOnSave: true },
     name: 'Hellish Rebuke',
     level: 1,
     school: 'Evocation',
@@ -578,6 +598,7 @@ export const spells = [
   },
   {
     id: 'sanctuary',
+    combat: { kind: 'ward', effect: 'sanctuary', range: 30, save: 'wisdom', bonusAction: true },
     name: 'Sanctuary',
     level: 1,
     school: 'Abjuration',
@@ -593,7 +614,7 @@ export const spells = [
   },
   {
     id: 'shield',
-    combat: { kind: 'reaction', acBonus: 5 },
+    combat: { kind: 'reaction', trigger: 'hit', acBonus: 5 },
     name: 'Shield',
     level: 1,
     school: 'Abjuration',

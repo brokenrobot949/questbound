@@ -10,6 +10,7 @@ const DEFAULTS = {
   plainNarration: false, // show the story in a plain font instead of the pixel font
   battleSpeed: 'normal', // how fast turns play out in a fight: 'slow', 'normal' or 'fast'
   autoShield: true, // cast the Shield spell by itself when it would turn a hit into a miss
+  autoRebuke: true, // cast Hellish Rebuke (its free use) by itself when a foe hurts you
 };
 
 // Settings changed on this visit. If storage is full or blocked, they still last until the page closes.

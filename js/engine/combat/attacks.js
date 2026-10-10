@@ -4,7 +4,8 @@
 //
 // An attack option (what the attacker can use):
 //   { id, name, source: 'weapon' | 'spell' | 'monster',
-//     how: 'melee' | 'ranged' | 'save' | 'darts' | 'rays' | 'area' | 'self' | 'teleport',
+//     how: 'melee' | 'ranged' | 'save' | 'darts' | 'rays' | 'area' | 'self' | 'heal' | 'ward' |
+//          'teleport',
 //     reach (feet, melee), range ([normal, long] feet, ranged), modifiers (to hit, for d20Test),
 //     damage: { dice, bonus, type, extraOnAdvantage } (null for spells that do no damage),
 //     saveDc, saveAbility, darts, rays,
@@ -15,13 +16,15 @@
 // targeting: 'foe' (choose a creature), 'direction' (an area that starts from you: Burning
 // Hands), 'point' (an area centred on a square within range: Shatter), 'self' or 'square'
 // (Misty Step); and from the spell's data, area, halfOnSave, push, condition, foesOnly,
-// creatureType, self, tempHp and speedBonus (see data/srd/spells.js).
+// creatureType, self, tempHp, speedBonus, effect (a 'ward' spell's: 'blessed' or
+// 'sanctuary') and heal ({ dice, bonus }: a healing spell's dice and spellcasting modifier)
+// (see data/srd/spells.js).
 
 import { d20Test } from '../rules/d20-test.js';
 import { rollDice } from '../rules/dice.js';
 import { abilityModifierOf, characterFeats, findAbility, findClass, hasFeature, proficiencyBonus, abilityScore, resistances } from '../character/sheet.js';
 import { findItem } from '../character/inventory.js';
-import { freeCastKey, freeCastsLeft, spellGroups, spellNumbers } from '../character/spells.js';
+import { freeCastKey, freeCastsLeft, spellGroups, spellNumbers, upcastDice, upcastHelps } from '../character/spells.js';
 import { slotsLeft } from '../character/resources.js';
 
 // The highest spell slot level there is.
@@ -102,8 +105,9 @@ export function heroAttackOptions(game) {
   }
 
   // Spells: cantrips and prepared spells that work in a fight. A levelled spell is offered
-  // once for each slot level it can use that has slots left; a higher slot adds damage dice
-  // (upcast), or a dart or a ray (Magic Missile, Scorching Ray), or Temporary Hit Points.
+  // once for each slot level it can use that has slots left, when a higher slot adds damage
+  // or healing dice (upcast), or a dart or a ray (Magic Missile, Scorching Ray), or Temporary
+  // Hit Points; otherwise only with the lowest slot left.
   // A spell that comes with free casts (Magic Initiate's, a species') is offered free first,
   // while one is left (freeCast: where the use is counted). Shield isn't offered: it's a
   // reaction the game casts for you (combat/battle.js).
@@ -118,25 +122,28 @@ export function heroAttackOptions(game) {
       if (c.self === 'mage-armor' && character.armorId) continue; // only for the unarmoured
       if (c.lasts && (game.activeSpells || []).some((s) => s.id === spell.id)) continue; // already on the hero
       const modifiers = numbers.attackBonus.parts.map((p) => ({ ...p, source: `${group.label} spellcasting` }));
-      const made = { modifiers, saveDc: numbers.saveDc.value, level: character.level, potent };
+      const made = { modifiers, saveDc: numbers.saveDc.value, level: character.level, potent, abilityMod: abilityModifierOf(character, group.ability) };
       if (spell.level > 0 && freeCastsLeft(game, spell.id) > 0) {
         options.push({ ...spellOption(spell, null, 0, made), id: `spell-${spell.id}-free`, name: `${spell.name} (free)`, freeCast: freeCastKey(spell.id) });
       }
       const slots = [];
       if (spell.level === 0) slots.push(null);
       else for (let slot = spell.level; slot <= TOP_SLOT; slot++) if (slotsLeft(game, slot) > 0) slots.push(slot);
+      if (!upcastHelps(spell)) slots.splice(1);
       for (const slot of slots) options.push(spellOption(spell, slot, slot ? slot - spell.level : 0, made));
     }
   }
   return options;
 }
 
-// How each kind of spell is aimed (see the option fields above).
-const TARGETING = { attack: 'foe', save: 'foe', darts: 'foe', rays: 'foe', self: 'self', teleport: 'square' };
+// How each kind of spell is aimed (see the option fields above). Healing and wards go on you
+// until companions join the fights.
+const TARGETING = { attack: 'foe', save: 'foe', darts: 'foe', rays: 'foe', self: 'self', heal: 'self', ward: 'self', teleport: 'square' };
 
-function spellOption(spell, slot, above, { modifiers, saveDc, level, potent }) {
+function spellOption(spell, slot, above, { modifiers, saveDc, level, potent, abilityMod }) {
   const c = spell.combat;
   const melee = c.kind === 'attack' && c.attack === 'melee';
+  const onYou = TARGETING[c.kind] === 'self';
   return {
     id: above ? `spell-${spell.id}-${slot}` : `spell-${spell.id}`,
     name: above ? `${spell.name} (level ${slot} slot)` : spell.name,
@@ -149,7 +156,7 @@ function spellOption(spell, slot, above, { modifiers, saveDc, level, potent }) {
     bonusAction: Boolean(c.bonusAction),
     concentration: Boolean(spell.concentration),
     reach: melee ? c.range : null,
-    range: melee || c.kind === 'self' ? null : [c.range, c.range],
+    range: melee || onYou ? null : [c.range, c.range],
     modifiers,
     damage: c.damage ? { dice: spellDice(spell, level, above), bonus: c.damage.bonus || 0, type: c.damage.type } : null,
     saveDc,
@@ -169,6 +176,8 @@ function spellOption(spell, slot, above, { modifiers, saveDc, level, potent }) {
     speedBonus: c.speed || 0,
     baseAc: c.baseAc || null,
     lasts: c.lasts || null,
+    effect: c.effect || null,
+    heal: c.heal ? { dice: upcastDice(c.heal.dice, c.upcast, above), bonus: abilityMod } : null,
   };
 }
 
@@ -177,11 +186,7 @@ function spellOption(spell, slot, above, { modifiers, saveDc, level, potent }) {
 function spellDice(spell, level, above) {
   const c = spell.combat;
   if (spell.level === 0 && c.scales) return cantripDice(c.damage.dice, level);
-  if (!c.upcast || !above) return c.damage.dice;
-  const base = parseDice(c.damage.dice);
-  const more = parseDice(c.upcast);
-  if (more.sides !== base.sides) throw new Error(`${spell.name}: upcast dice must match the damage dice`);
-  return `${base.count + more.count * above}d${base.sides}`;
+  return upcastDice(c.damage.dice, c.upcast, above);
 }
 
 // A monster's attacks, from its stat block.
