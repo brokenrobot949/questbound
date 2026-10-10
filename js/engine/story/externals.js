@@ -16,6 +16,7 @@ import { addItem, buyItem, canAfford, COPPER_PER, findItem, hasItem, moneyText, 
 import { findDrive } from '../character/creation.js';
 import { addDeed, findQuest, finishQuest, questNote, startQuest } from './journal.js';
 import { longRestRecovery } from '../character/resources.js';
+import { approve, findCompanion, inParty, joinParty, leaveParty, PARTY_LIMIT, partyLongRest } from '../character/party.js';
 import { tacticalMind } from '../character/features.js';
 import { takeDamage } from '../character/hazards.js';
 import { dmNotes } from '../../../data/campaign/dm-voice.js';
@@ -107,6 +108,47 @@ export function bindExternals(story, runtime) {
   story.BindExternalFunction('has_species', (id) => runtime.game.character.speciesId === id, false);
   story.BindExternalFunction('has_background', (id) => runtime.game.character.backgroundId === id, false);
 
+  // join_party(id): a companion (data/campaign/companions.js) joins the hero, e.g.
+  // ~ join_party("odda"). Up to two travel at once, so check party_full() first. The DM says
+  // who joined. leave_party(id): they go their own way.
+  story.BindExternalFunction(
+    'join_party',
+    (id) => {
+      const { game } = runtime;
+      if (inParty(game, id)) return;
+      joinParty(game, id);
+      note(game, dmNotes.joinedParty, { name: findCompanion(id).character.name });
+    },
+    false,
+  );
+  story.BindExternalFunction(
+    'leave_party',
+    (id) => {
+      const { game } = runtime;
+      if (!inParty(game, id)) return;
+      leaveParty(game, id);
+      note(game, dmNotes.leftParty, { name: findCompanion(id).character.name });
+    },
+    false,
+  );
+
+  // in_party(id): true if that companion is travelling with the hero (fallen or not).
+  // party_full(): true if two companions already are.
+  story.BindExternalFunction('in_party', (id) => inParty(runtime.game, id), false);
+  story.BindExternalFunction('party_full', () => (runtime.game.party || []).length >= PARTY_LIMIT, false);
+
+  // approve(id, change): a companion liked (1) or disliked (-1) what the hero just did, e.g.
+  // ~ approve("fen", 1) for sparing someone. Nothing happens if they aren't with the hero.
+  // The companions' likes and dislikes are in data/campaign/companions.js.
+  story.BindExternalFunction(
+    'approve',
+    (id, change) => {
+      if (!findCompanion(id)) throw new Error(`Unknown companion: ${id}`);
+      approve(runtime.game, id, change);
+    },
+    false,
+  );
+
   // has_drive(id): true if the hero's Drive is this one (data/campaign/drives.js).
   story.BindExternalFunction('has_drive', (id) => runtime.game.character.drive === id, false);
 
@@ -138,6 +180,7 @@ export function bindExternals(story, runtime) {
       const { game } = runtime;
       game.day += 1;
       longRestRecovery(game);
+      partyLongRest(game);
       // The Human's Resourceful trait.
       if (game.character.speciesId === 'human' && !game.inspiration) {
         game.inspiration = true;

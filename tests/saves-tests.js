@@ -15,6 +15,8 @@ import { createRng } from '../js/engine/rules/rng.js';
 import { beginLevelUp, chooseHitPoints } from '../js/engine/character/level-up.js';
 import { beginSession, endSession, recap, whatNow } from '../js/engine/story/sessions.js';
 import { quickStartHeroes } from '../data/campaign/quick-start.js';
+import { joinParty } from '../js/engine/character/party.js';
+import { startBattle } from '../js/engine/combat/battle.js';
 
 // Wren Ashdown, the Quick Start Fighter.
 const testHero = quickStartHeroes.find((h) => h.id === 'wren').character;
@@ -95,7 +97,7 @@ test('A save holds game state, Ink state, dice state, session count and last-pla
   const game = newGame(runtime, { slot: 2, seed: 'contents', character: testHero, now: new Date('2026-10-01T09:00:00Z') });
   const record = gameToSave(game, new Date('2026-10-06T12:00:00Z'));
   assertEqual(Object.keys(record).sort(), ['createdAt', 'game', 'ink', 'lastBackupSession', 'rng', 'savedAt', 'seed', 'sessionCount', 'slot', 'version']);
-  assertEqual(Object.keys(record.game).sort(), ['activeSpells', 'battle', 'canPrepare', 'character', 'day', 'dungeon', 'featureUses', 'flags', 'hp', 'inspiration', 'inventory', 'journal', 'lastBattle', 'levelUp', 'location', 'money', 'objective', 'page', 'rollLog', 'session', 'slotsUsed', 'tempHp', 'time', 'undo', 'xp']);
+  assertEqual(Object.keys(record.game).sort(), ['activeSpells', 'battle', 'canPrepare', 'character', 'day', 'dungeon', 'featureUses', 'flags', 'hp', 'inspiration', 'inventory', 'journal', 'lastBattle', 'levelUp', 'location', 'money', 'objective', 'page', 'party', 'rollLog', 'session', 'slotsUsed', 'tempHp', 'time', 'undo', 'xp']);
   assertEqual([record.version, record.slot, record.sessionCount, record.lastBackupSession], [SAVE_VERSION, 2, 1, 0]);
   assertEqual([record.createdAt, record.savedAt], ['2026-10-01T09:00:00.000Z', '2026-10-06T12:00:00.000Z']);
   assertTrue(record.rng.length === 4 && record.rng.every(Number.isInteger), 'dice state should be four whole numbers');
@@ -625,6 +627,25 @@ test('Migration: a version 15 Fighter takes the weapons in their pack for Weapon
   assertEqual([validateCharacter(game.character), game.undo.state.character.classChoices.weaponMasteries], [[], ['spear', 'shortbow', 'greatsword']]);
   const wizard = { version: 15, slot: 1, game: { character: { classId: 'wizard', classChoices: {} }, inventory: [], undo: null } };
   assertEqual(migrateSave(wizard, migrations, 16).game.character.classChoices, {}, 'only Fighters have Weapon Mastery so far');
+});
+
+test('Migration: a version 16 game has nobody in the party yet, and becomes version 17', () => {
+  const save = migrateSave({ version: 16, slot: 1, game: { undo: { kind: 'choice', state: { hp: 5 } } } }, migrations, 17);
+  assertEqual([save.version, save.game.party, save.game.undo.state.party], [17, [], []]);
+});
+
+test('Party: companions, and a fight with them in it, save and load exactly', async () => {
+  const runtime = await freshRuntime();
+  const game = newGame(runtime, { slot: 1, seed: 'party-save', character: testHero });
+  joinParty(game, 'odda');
+  joinParty(game, 'fen');
+  game.party[1].hp = 4;
+  startBattle(game, 'mill-scavengers', 0);
+  const record = gameToSave(game);
+  const loaded = loadGame(await freshRuntime(), validateSave(migrateSave(structuredClone(record))));
+  assertEqual([loaded.party, loaded.battle.combatants], [game.party, game.battle.combatants]);
+  assertEqual(loaded.battle.combatants.filter((c) => c.companion).map((c) => c.id), ['odda', 'fen']);
+  assertThrows(() => validateSave({ ...record, game: { ...record.game, party: [{ id: 'nobody' }] } }), 'a companion who isn’t in the data');
 });
 
 test('Sessions: a new session sums up the last one in the journal if the player just closed the game', async () => {

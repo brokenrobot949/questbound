@@ -214,7 +214,7 @@ The free rules include one subclass per class, such as Champion, Thief, Life Dom
 - **The basics:** Dexterity, d8 Hit Dice, Dexterity and Intelligence saves, four skills from Acrobatics, Athletics, Deception, Insight, Intimidation, Investigation, Perception, Persuasion, Sleight of Hand or Stealth. Simple weapons, and Martial weapons with Finesse or Light (Shortsword, Scimitar); Light armour; Thieves' Tools. Kit A is leather armour, two Daggers, a Shortsword, a Shortbow with 20 arrows and a Quiver, Thieves' Tools and a Burglar's Pack, with 8 GP; kit B is 100 GP.
 - **Expertise** (on the Skills step): two skills the Rogue is proficient in add twice the Proficiency Bonus, marked ★ on the sheet. Sleight of Hand and Stealth are suggested.
 - **Weapon Mastery:** two kinds of weapon (see Combat).
-- **Sneak Attack:** once a turn, a hit with a Finesse or Ranged weapon deals an extra 1d6 (2d6 at level 3) if the roll had Advantage, or if a friend of the Rogue stands beside the target and the roll had no Disadvantage. Until companions join the fights, only Advantage counts. Its usual sources are Vex, Hide and Steady Aim. The game always uses it on the first hit that qualifies; the target's card says "Sneak Attack +1d6 on a hit", and the roll shows the dice.
+- **Sneak Attack:** once a turn, a hit with a Finesse or Ranged weapon deals an extra 1d6 (2d6 at level 3) if the roll had Advantage, or if a friend of the Rogue stands beside the target and the roll had no Disadvantage. With companions beside the foe it often comes without Advantage; alone, its usual sources are Vex, Hide and Steady Aim. The game always uses it on the first hit that qualifies; the target's card says "Sneak Attack +1d6 on a hit", and the roll shows the dice.
 - **Thieves' Cant:** a Rogue reads the thieves' chalk marks in scenes. (The "one other language" waits for languages to be tracked.)
 - **Cunning Action** (level 2): Dash, Disengage or Hide as a Bonus Action.
 - **Steady Aim** (level 3): a Bonus Action before moving, which gives Advantage on the next attack this turn but leaves no more movement this turn.
@@ -506,6 +506,32 @@ You play one character, but up to two companions can travel with you, chosen fro
 - **Camp scenes:** Long rests in the wild open a short camp scene with companion conversations. At 1–3 minutes each, they suit short sessions.
 - **Death:** Companions make death saves like you do. A dead companion can be raised at a temple or by spell; a few story choices can cost one their life for good.
 
+**How companions work so far (Phase 2)**
+
+- **Odda Brasswick** (dwarf Cleric, Acolyte, Protector) and **Fen Underbough** (halfling Rogue, Criminal) are full characters, built like heroes. Up to two travel with you.
+- **Joining and leaving:** a scene adds or removes a companion (`join_party`, `leave_party`), and the DM says so. Chapter 2 is where Odda and Fen join. Until it's written, debug mode can add or remove them.
+- **Levels:** they're always your level. Their big picks are set for now: Odda takes the Life Domain at level 3, Fen the Thief. Each later level takes the fixed Hit Points, and their Hit Points rise when yours do.
+- **The Party section of the Sheet** shows each companion's portrait, Hit Points, likes and dislikes, full sheet and **tactic**:
+  - **Aggressive:** goes after the foe they'd hurt most.
+  - **Defensive:** stays within 10 feet of you and fights what comes near, or Dodges.
+  - **Support:** heals first, then fights from beside you. This is Odda's to start with; Fen starts Aggressive.
+  - **Hold:** doesn't move, and fights only what they can reach from there.
+- **In a fight:**
+  - They start on the free squares nearest you, roll their own Initiative and take their own turns.
+  - Whatever the tactic, they first help anyone at 0 Hit Points, you first. They use a healing spell if they have one (Odda's Healing Word, then Cure Wounds), or else Spare the Dying, or the Help action's DC 10 Medicine check to stabilise.
+  - So far they spend spell slots only on healing; they attack with weapons and cantrips (Odda's Sacred Flame).
+  - They don't yet cast Concentration spells or use Bonus Action features such as Cunning Action. Fen does take the Nick extra attack with his dagger.
+  - Fen's Sneak Attack counts you or Odda standing beside his target, as the rule says, and your Sneak Attack counts them.
+- **Foes** go after the nearest of the party on their feet, the most wounded of equals. Nobody attacks someone who's down, and a hidden hero has to be found first.
+- **When you fall**, the fight goes on while a companion stands. You make death saves, and they try to get you back up. The fight is lost only if you die, or you're stable at 0 Hit Points with no companion left standing; then Fate's Mercy happens as before. After a win, anyone at 0 Hit Points comes to with 1.
+- **Companions fall** and make death saves as you do. Three failures, or a blow of their whole Hit Point maximum, and they die. A fallen companion stays with you but doesn't fight until raised: at a temple or by a spell, once those exist. Debug mode can raise them for now.
+- **Long Rests** bring them back to full, as they do you.
+- **Approval:** each companion keeps a score. Scenes raise or lower it with `approve(id, change)` when you do something they like or dislike (their likes and dislikes are in the data and on the Sheet). The score isn't shown to the player; debug mode shows it.
+- **Not yet:**
+  - Your own spells and potions on a companion (healing, Bless).
+  - Controlling their turns yourself.
+  - Camp scenes, the Lone Wolf setting, and sizing fights for the party. Chapter 1's fights are built for one hero, and companions arrive in Chapter 2.
+
 **Lone Wolf**
 
 A setting chosen at character creation. You travel alone and encounters are rebuilt for one character. It's harder at levels 1–4, so the DM offers more chances to avoid fights.
@@ -664,7 +690,7 @@ Rules content is typed into `data/srd/` from the SRD 5.2.1 document, one phase a
 **Saves**
 
 - Three save slots in the browser's IndexedDB storage, which holds far more than localStorage. Settings stay in localStorage. Every key is prefixed with `questbound:`.
-- Autosave after every choice and every combat turn. The dice generator's state is saved too, so reloading can't reroll. While you hold Heroic Inspiration, the save also keeps the moment before your last choice or attack, so a reroll still works after the game is closed (save version 14). It also notes when a Wizard or Cleric has just rested and can change their prepared spells (version 15). Version 16 adds a Fighter's Weapon Mastery weapons, taken from their pack for older saves.
+- Autosave after every choice and every combat turn. The dice generator's state is saved too, so reloading can't reroll. While you hold Heroic Inspiration, the save also keeps the moment before your last choice or attack, so a reroll still works after the game is closed (save version 14). It also notes when a Wizard or Cleric has just rested and can change their prepared spells (version 15). Version 16 adds a Fighter's Weapon Mastery weapons, taken from their pack for older saves, and version 17 the party.
 - Every save has a version number and a migration path.
 - Export and import as a downloadable file or a copyable text code, with a backup reminder every 10 sessions.
 

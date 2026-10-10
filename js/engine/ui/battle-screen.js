@@ -81,6 +81,9 @@ const CONDITION_WORDS = [
   ['sanctuary', 'Sanctuary'],
 ];
 
+// How someone in the party is doing at 0 Hit Points, in the turn order and the status line.
+const STATE_WORDS = { down: 'down', stable: 'stable', dead: 'dead' };
+
 // Log lines already played on screen during this visit, so nothing plays twice.
 const played = new WeakSet();
 
@@ -91,6 +94,15 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
   const art = await loadArt();
   const look = heroSprite(game.character);
   const heroFrames = look.frames.map((rows) => spriteImage(look, rows));
+  // A companion's two frames, drawn from their sheet once.
+  const companionArt = new Map();
+  const companionFrames = (c) => {
+    if (!companionArt.has(c.id)) {
+      const sprite = heroSprite(fight.actorGame(game, c).character);
+      companionArt.set(c.id, sprite.frames.map((rows) => spriteImage(sprite, rows)));
+    }
+    return companionArt.get(c.id);
+  };
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // option: the attack or spell chosen, waiting to be aimed; aim: where an area spell is aimed
@@ -391,6 +403,12 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     );
     const heroConditions = hero.conditions || [];
     const notes = [];
+    // Each companion's Hit Points, or how they're doing at 0.
+    for (const c of fight.companionCombatants(battle)) {
+      const unit = scene.units.find((u) => u.id === c.id);
+      const max = fight.maxHpOf(game, c);
+      notes.push(unit.state === 'up' ? `${c.name} ${unit.hp}/${max}` : `${c.name} ${STATE_WORDS[unit.state]}`);
+    }
     if (scene.concentration) notes.push(`Concentrating on ${scene.concentration}`);
     if (heroConditions.includes('blessed')) notes.push('Blessed: +1d4 to attacks and saves');
     if (heroConditions.includes('sanctuary')) notes.push('Sanctuary: foes must save to attack you');
@@ -411,11 +429,12 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
         .filter(Boolean)
         .map((unit) => {
           const c = fight.combatantById(battle, unit.id);
-          const down = c.side === 'enemy' ? unit.hp <= 0 : scene.heroState !== 'up';
-          const name = c.side === 'hero' ? 'You' : c.name;
+          const down = c.side === 'enemy' ? unit.hp <= 0 : unit.state !== 'up';
+          const name = fight.isHero(c) ? 'You' : c.name;
           const conditions = unit.conditions || [];
           const tags = [];
           if (unit.escaped) tags.push('fled');
+          else if (c.side === 'hero' && down) tags.push(STATE_WORDS[unit.state]);
           else if (!down) {
             for (const [kind, word] of CONDITION_WORDS) if (conditions.includes(kind)) tags.push(word);
             if (unit.prone && !conditions.includes('asleep')) tags.push('Prone');
@@ -439,7 +458,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       renderHeroControls();
     } else {
       const current = fight.currentCombatant(battle);
-      help.textContent = `${current.side === 'hero' ? 'You' : current.name}…`;
+      help.textContent = `${fight.isHero(current) ? 'You' : current.name}…`;
     }
     canvas.setAttribute('aria-label', describeGrid(scene));
     draw();
@@ -652,9 +671,10 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       } catch {
         area = null;
       }
-      const caught = area ? area.caught.map((c) => (c.side === 'hero' ? 'you' : c.name)) : [];
+      const caught = area ? area.caught.map((c) => (fight.isHero(c) ? 'you' : c.name)) : [];
       const what = !area ? 'Tap the grid to aim it first' : caught.length ? `Catches ${caught.join(', ')}` : 'Catches nobody';
-      if (area && area.caught.some((c) => c.side === 'hero')) box.append(el('p', 'battle-warning', 'Careful: you’re inside it too.'));
+      const friends = area ? area.caught.filter((c) => c.side === 'hero') : [];
+      if (friends.length) box.append(el('p', 'battle-warning', `Careful: it catches ${friends.map((c) => (fight.isHero(c) ? 'you' : c.name)).join(' and ')} too.`));
       const cast = actionCard(`Cast ${spellName(chosen)}`, what, () => act(() => fight.heroCastArea(game, chosen.id, view.aim)), 'is-primary');
       cast.disabled = !area;
       box.append(cast);
@@ -746,7 +766,15 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
 
     // Creatures: the fallen first, so the standing are drawn on top. The fallen lie faded on
     // their side; the Prone lie on their side.
-    const foes = scene.units.filter((u) => u.id !== 'hero' && !u.escaped).sort((a, b) => (a.hp > 0) - (b.hp > 0));
+    const foes = scene.units.filter((u) => fight.combatantById(battle, u.id).side === 'enemy' && !u.escaped).sort((a, b) => (a.hp > 0) - (b.hp > 0));
+    // Companions: drawn as heroes are, faded and lying down at 0 Hit Points.
+    for (const c of fight.companionCombatants(battle)) {
+      const unit = scene.units.find((u) => u.id === c.id);
+      const pos = at(unit);
+      const standing = unit.state === 'up';
+      blit(ctx, companionFrames(c)[standing ? frame : 0], 0, 0, pos.x, pos.y, size, { alpha: standing ? 1 : unit.state === 'dead' ? 0.3 : 0.5, lying: !standing || unit.prone });
+      if (unit.state !== 'dead') drawHealthBar(ctx, pos, unit.hp / fight.maxHpOf(game, c), size, scale);
+    }
     for (const unit of foes) {
       const c = fight.combatantById(battle, unit.id);
       const standing = unit.hp > 0;
@@ -795,7 +823,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
   function describeGrid(scene) {
     const hero = scene.units.find((u) => u.id === 'hero');
     const foes = scene.units
-      .filter((u) => u.id !== 'hero' && u.hp > 0)
+      .filter((u) => fight.combatantById(game.battle, u.id).side === 'enemy' && u.hp > 0)
       .map((u) => `${fight.combatantById(game.battle, u.id).name} ${squares(hero.pos, u.pos)} away`);
     return `Battle grid. ${foes.length ? foes.join(', ') : 'No foes standing'}.`;
   }

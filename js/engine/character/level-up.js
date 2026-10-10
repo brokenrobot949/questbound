@@ -25,6 +25,7 @@ import { classSpellCounts, domainSpells, findSpell, highestSpellLevel, preparePi
 import { aidBonus, maxHp } from './resources.js';
 import { validateCharacter } from './validate.js';
 import { addDeed } from '../story/journal.js';
+import { memberMaxHp, partyLevelUp } from './party.js';
 
 // The XP a level needs (Character Advancement table).
 export function xpForLevel(level) {
@@ -253,8 +254,10 @@ export function finishLevelUp(game) {
   const issues = validateCharacter(hero);
   if (issues.length) throw new Error(`That level-up breaks the rules: ${issues[0]}`);
   const hpGained = maxHp(hero) - maxHp(game.character);
+  const before = game.character.level;
   game.character = hero;
   game.hp = Math.min(maxHp(hero) + aidBonus(game), Math.max(0, game.hp) + hpGained);
+  partyLevelUp(game, before); // companions level with the hero
   game.levelUp = null;
   addDeed(game, dmNotes.levelUpDeed.replace('{level}', hero.level));
   return { level: hero.level, hpGained };
@@ -286,6 +289,10 @@ export function lowerLevel(game, level) {
   game.levelUp = null;
   game.hp = Math.min(game.hp, maxHp(hero) + aidBonus(game));
   game.slotsUsed = [];
+  for (const member of game.party || []) {
+    member.hp = Math.min(member.hp, memberMaxHp(game, member));
+    member.slotsUsed = [];
+  }
 }
 
 // Checks a saved level-up's shape, for loading saves.

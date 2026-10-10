@@ -20,6 +20,8 @@ import { attackSummary, averageDamage } from '../js/engine/ui/attack-text.js';
 import { attackToReroll, rerollAttack } from '../js/engine/rules/inspiration.js';
 import { canResolve, resolveFight, resolveLimit } from '../js/engine/combat/resolve.js';
 import { maxHp } from '../js/engine/character/resources.js';
+import { joinParty, memberOf, setTactic } from '../js/engine/character/party.js';
+import { freeCastKey } from '../js/engine/character/spells.js';
 
 const wren = quickStartHeroes.find((h) => h.id === 'wren').character;
 const juniper = quickStartHeroes.find((h) => h.id === 'juniper').character;
@@ -367,6 +369,106 @@ test('Hide: foes search instead of attacking; the hero’s attack has Advantage,
   forceNextD20(20); // 20 − 1 = 19 finds Stealth 19
   fight.endHeroTurn(found);
   assertTrue(found.battle.log.some((e) => e.text.includes('spots you')) && !fight.conditionsOf(found.battle, 'hero').includes('hidden'));
+});
+
+// ---- Companions ----
+
+// Scripted d20 faces first, then the seeded dice: for setting up a fight exactly.
+function scriptedThen(faces, seed) {
+  const queue = [...faces];
+  const rest = createRng(seed);
+  return { nextInt: (n) => (queue.length ? queue.shift() - 1 : rest.nextInt(n)), getState: () => rest.getState() };
+}
+
+// Wren with Odda and Fen in the mill fight. Initiative is rolled in the order the combatants
+// are listed (Wren, the two goblins, then Odda and Fen); by default Wren goes first, then
+// Odda, then Fen, then the goblins. after: d20 faces scripted after Initiative.
+function partyFight({ character = wren, initiative = [20, 1, 1, 19, 10], after = [], seed = 'party', setUp = () => {} } = {}) {
+  const game = { ...gameFor(character, seed), party: [] };
+  joinParty(game, 'odda');
+  joinParty(game, 'fen');
+  setUp(game);
+  game.rng = scriptedThen([...initiative, ...after], seed);
+  fight.startBattle(game, 'mill-scavengers', 0);
+  return game;
+}
+
+const said = (game, text) => game.battle.log.some((e) => e.text.includes(text));
+
+test('Companions: they start beside the hero, roll Initiative, and take their own turns', () => {
+  const game = partyFight();
+  const battle = game.battle;
+  assertEqual(battle.order, ['hero', 'odda', 'fen', 'goblin-minion-1', 'goblin-minion-2']);
+  const [odda, fen] = fight.companionCombatants(battle);
+  assertEqual([odda.name, odda.pos, fen.name, fen.pos], ['Odda', { x: 2, y: 1 }, 'Fen', { x: 4, y: 1 }]);
+  assertTrue(fight.isHeroTurn(game));
+  fight.endHeroTurn(game);
+  assertTrue(said(game, "Odda's turn.") && said(game, "Fen's turn.") && said(game, "Goblin Minion 2's turn."));
+  assertTrue(game.battle.log.some((e) => e.roll && e.roll.kind === 'attack' && e.text.startsWith('Fen ')) || said(game, 'Fen moves'), 'Fen goes after the goblins');
+});
+
+test('Companions: foes go after the nearest of the party; Fen gets Sneak Attack with the hero beside the foe', () => {
+  const game = partyFight();
+  const [goblin, other] = fight.enemies(game.battle);
+  other.hp = 0;
+  goblin.hp = goblin.maxHp = 40;
+  goblin.pos = { x: 5, y: 1 }; // beside Fen (4, 1), two squares from the hero
+  assertEqual(fight.attackPreview(game, 'shortsword-melee', goblin.id, 'fen').sneak, null, 'nobody else beside it');
+  goblin.pos = { x: 4, y: 2 }; // beside the hero (3, 1) and Fen
+  const preview = fight.attackPreview(game, 'shortsword-melee', goblin.id, 'fen');
+  assertEqual([preview.sneak, preview.mode], ['1d6', 'normal'], 'an ally beside the target is enough');
+  goblin.pos = { x: 5, y: 1 };
+  fight.endHeroTurn(game);
+  const swing = game.battle.log.find((e) => e.roll && e.roll.kind === 'attack' && e.text.startsWith('Goblin Minion 1'));
+  assertTrue(swing && swing.text.includes('Fen'), swing ? swing.text : 'no goblin attack');
+});
+
+test('Companions: with the hero down, Odda heals them back up and the fight goes on', () => {
+  // Wren starts at 0 Hit Points; her death save is a 10.
+  const game = partyFight({ after: [10], setUp: (g) => (g.hp = 0) });
+  assertTrue(said(game, 'Odda casts Healing Word (free) on you'), game.battle.log.map((e) => e.text).join(' / '));
+  assertEqual([game.battle.heroState, game.hp > 0, fight.isHeroTurn(game) || Boolean(game.battle.outcome)], ['up', true, true]);
+});
+
+test('Companions: with no healing left, Odda stabilises a fallen Fen with Spare the Dying', () => {
+  const game = partyFight({
+    setUp: (g) => {
+      memberOf(g, 'odda').slotsUsed = [2];
+      memberOf(g, 'odda').featureUses[freeCastKey('healing-word')] = 1;
+      memberOf(g, 'fen').hp = 0;
+    },
+  });
+  const fen = fight.combatantById(game.battle, 'fen');
+  assertEqual(fen.state, 'down');
+  fight.endHeroTurn(game);
+  assertTrue(said(game, 'Odda casts Spare the Dying: Fen stops bleeding'));
+  assertEqual(fen.state, 'stable');
+});
+
+test('Companions: the fight is lost only once nobody is left standing; a win patches the fallen up', () => {
+  // Everyone starts at 0: Wren saves 10, 10, 10 while Odda and Fen roll 5s.
+  const lost = partyFight({ after: [10, 5, 5, 10, 5, 5, 10], setUp: (g) => { g.hp = 0; for (const m of g.party) m.hp = 0; } });
+  assertEqual([lost.battle.heroState, lost.battle.outcome, fight.combatantById(lost.battle, 'odda').state], ['stable', 'defeat', 'down']);
+
+  const won = partyFight({ setUp: (g) => (memberOf(g, 'fen').hp = 0) });
+  for (const goblin of fight.enemies(won.battle)) goblin.hp = 0;
+  const last = fight.enemies(won.battle)[0];
+  last.hp = 1;
+  last.pos = { x: 3, y: 2 };
+  forceNextD20(19);
+  fight.heroAttack(won, 'greatsword-melee', last.id);
+  assertEqual([won.battle.outcome, memberOf(won, 'fen').hp, fight.combatantById(won.battle, 'fen').state], ['victory', 1, 'up']);
+  assertTrue(said(won, 'Fen comes to with 1 Hit Point.'));
+});
+
+test('Companions: tactics; Hold never moves, and Defensive stays within 10 feet of the hero', () => {
+  const game = partyFight({ setUp: (g) => { setTactic(g, 'fen', 'hold'); setTactic(g, 'odda', 'defensive'); } });
+  const fen = fight.combatantById(game.battle, 'fen');
+  const odda = fight.combatantById(game.battle, 'odda');
+  const fenAt = { ...fen.pos };
+  fight.endHeroTurn(game);
+  assertEqual(fen.pos, fenAt, 'Hold');
+  assertTrue(squaresBetween(odda.pos, fight.heroCombatant(game.battle).pos) <= 2, 'Defensive');
 });
 
 // ---- Level 2 and 3 features ----

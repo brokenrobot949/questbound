@@ -26,8 +26,9 @@
 //                  (this session's starting point; see story/sessions.js), page, rollLog,
 //                  undo (the moment before the last choice or attack, kept while the hero
 //                  holds Heroic Inspiration so a failed roll can be rerolled; see save/undo.js)
-//                  and canPrepare (true straight after a Long Rest, until the next story
+//                  canPrepare (true straight after a Long Rest, until the next story
 //                  choice: a Wizard or Cleric can change their prepared spells on the Sheet)
+//                  and party (the companions with the hero; see character/party.js)
 
 import { createRng, Rng } from '../rules/rng.js';
 import { currentDungeon, currentLocation, currentTime, runPage } from '../story/story-runner.js';
@@ -41,8 +42,9 @@ import { levelUpOk } from '../character/level-up.js';
 import { migrations } from './migrations.js';
 import { validateCharacter } from '../character/validate.js';
 import { undoOk } from './undo.js';
+import { partyProblems } from '../character/party.js';
 
-export const SAVE_VERSION = 16;
+export const SAVE_VERSION = 17;
 
 // runtime: { story, game } — the compiled story, and whichever game is being played.
 
@@ -77,6 +79,7 @@ export function newGame(runtime, { slot, seed, character, rngState = null, now =
     rollLog: [],
     undo: null,
     canPrepare: false,
+    party: [],
     pending: [],
     notice: null,
   };
@@ -125,6 +128,7 @@ export function gameToSave(game, now = new Date()) {
       rollLog: game.rollLog,
       undo: game.undo || null,
       canPrepare: Boolean(game.canPrepare),
+      party: game.party || [],
     }),
   };
 }
@@ -167,6 +171,7 @@ export function loadGame(runtime, record) {
     rollLog: save.game.rollLog,
     undo: save.game.undo || null,
     canPrepare: save.game.canPrepare,
+    party: save.game.party,
     lastPlayed: save.savedAt, // when this save was last played, for the recap (not saved again)
     pending: [],
     notice: null,
@@ -235,6 +240,7 @@ export function validateSave(save) {
     if (!Array.isArray(game.rollLog)) problems.push('roll log');
     if (!undoOk(game.undo)) problems.push('undo point');
     if (typeof game.canPrepare !== 'boolean') problems.push('preparing spells');
+    problems.push(...partyProblems(game.party));
   }
 
   if (problems.length > 0) {

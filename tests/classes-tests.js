@@ -1,6 +1,6 @@
-// Class checks: each class's own rules, for the Cleric and the Rogue (Phase 2). Open
-// tests/classes.html through the local server to run them. Add checks here whenever a class
-// or one of its features changes.
+// Class checks: each class's own rules, for the Cleric and the Rogue (Phase 2), and the
+// companions who travel with the hero. Open tests/classes.html through the local server to
+// run them. Add checks here whenever a class, one of its features, or a companion changes.
 
 import { test, assertEqual, assertTrue, assertThrows, scriptedRng, run } from './harness.js';
 import { createRng } from '../js/engine/rules/rng.js';
@@ -23,6 +23,7 @@ import { jumpTo, makeChoice } from '../js/engine/story/story-runner.js';
 import { gameToSave, newGame } from '../js/engine/save/save-format.js';
 import { attackSummary } from '../js/engine/ui/attack-text.js';
 import { quickStartHeroes } from '../data/campaign/quick-start.js';
+import { approve, companionCharacter, joinParty, leaveParty, memberMaxHp, memberOf, partyLevelUp, partyLongRest, partyProblems, setTactic } from '../js/engine/character/party.js';
 
 // Posy Hearthstone, the Quick Start Cleric: a halfling Acolyte, Thaumaturge, Wisdom 17 (+3, so
 // spell save DC 13 and spell attack +5), Constitution 13 (+1), chain shirt and Shield.
@@ -468,6 +469,41 @@ test('Rogue scenes: Thieves’ Tools open the postern; a Rogue reads the thieves
   assertEqual(choiceWith(cleric, 'postern'), null, 'no Thieves’ Tools, no postern');
   cleric.page = jumpTo(cleric, 'notice_board');
   assertEqual(choiceWith(cleric, 'chalk marks'), null);
+});
+
+// ---- Companions ----
+
+test('Companions: Odda and Fen are legal characters at every level, levelling with the hero', () => {
+  for (const id of ['odda', 'fen']) {
+    for (const level of [1, 2, 3]) assertEqual(validateCharacter(companionCharacter(id, level)), [], `${id} at level ${level}`);
+  }
+  const odda = companionCharacter('odda', 3);
+  assertEqual([odda.subclassId, domainSpells(odda).includes('cure-wounds'), maxHitPoints(odda).value], ['life', true, 24], 'Life Domain at 3; 8 + 5 + 5, Con +1 and Dwarven Toughness +1 a level');
+  assertEqual([companionCharacter('fen', 3).subclassId, companionCharacter('fen', 9).level], ['thief', 3], 'no higher than the rules data goes');
+});
+
+test('Party: up to two companions join with full Hit Points and their kit; rests and levels carry them along', () => {
+  const game = gameFor(posy);
+  game.party = [];
+  const odda = joinParty(game, 'odda');
+  assertEqual([odda.hp, odda.tactic, odda.approval, odda.inventory.some((e) => e.id === 'mace')], [10, 'support', 0, true]);
+  joinParty(game, 'fen');
+  assertThrows(() => joinParty(game, 'brakka'), 'no such companion yet');
+  assertEqual(game.party.map((m) => m.id), ['odda', 'fen']);
+  approve(game, 'fen', 1);
+  setTactic(game, 'fen', 'defensive');
+  assertEqual([memberOf(game, 'fen').approval, memberOf(game, 'fen').tactic], [1, 'defensive']);
+  odda.hp = 3;
+  odda.slotsUsed = [2];
+  partyLongRest(game);
+  assertEqual([odda.hp, odda.slotsUsed], [10, []]);
+  // The hero reaches level 2, and so do they.
+  game.character = { ...game.character, level: 2, hitPointRolls: [null], spells: { ...posy.spells, prepared: [...posy.spells.prepared, 'detect-magic'] } };
+  partyLevelUp(game, 1);
+  assertEqual([odda.hp, memberMaxHp(game, odda)], [17, 17]);
+  assertEqual(partyProblems(game.party), []);
+  leaveParty(game, 'fen');
+  assertEqual(game.party.map((m) => m.id), ['odda']);
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

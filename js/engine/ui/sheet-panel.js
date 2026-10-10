@@ -7,7 +7,7 @@
 
 import { findBond, findDrive } from '../character/creation.js';
 import { findItem, itemText, moneyText } from '../character/inventory.js';
-import { armorClass, findArmor, findMastery, findWeapon, masteredWeapons } from '../character/sheet.js';
+import { armorClass, describeCharacter, findArmor, findMastery, findWeapon, masteredWeapons } from '../character/sheet.js';
 import { heroAttackOptions } from '../combat/attacks.js';
 import { shield } from '../../../data/srd/armor.js';
 import { attackSummary, selfSpellText } from './attack-text.js';
@@ -19,6 +19,10 @@ import { levelUpReady, nextLevelXp } from '../character/level-up.js';
 import { heroSheet } from './hero-sheet.js';
 import { el } from './dom.js';
 import { chip, chipRow, expandable } from './widgets.js';
+import { findCompanion, findTactic, memberGame, memberMaxHp, setTactic } from '../character/party.js';
+import { tactics } from '../../../data/campaign/companions.js';
+import { heroSprite } from '../character/look.js';
+import { portrait } from './sprite-canvas.js';
 
 // onCast(game): the hero cast a spell from the Sheet (save the game). note: a line to show
 // at the top of the casting section, saying what the last spell did.
@@ -50,6 +54,11 @@ export function sheetPanel(game, { onCast = () => {}, note = null } = {}) {
   }
   now.append(el('p', 'section-hint', 'A long rest brings back Hit Points, spell slots and every use of your features.'));
   panel.append(now);
+  const party = partyBlock(game, () => {
+    onCast(game);
+    panel.replaceWith(sheetPanel(game, { onCast }));
+  });
+  if (party) panel.append(party);
   const preparing = prepareBlock(game, () => {
     onCast(game);
     panel.replaceWith(sheetPanel(game, { onCast }));
@@ -131,6 +140,49 @@ function gearBlock(game) {
   if (spells.length) {
     block.append(el('p', 'sheet-line', 'Spells in a fight'));
     for (const option of spells) block.append(el('p', 'pack-item', `${option.name}: ${attackSummary(option).join(' · ')}`));
+  }
+  return block;
+}
+
+// The companions with the hero: each one's portrait, Hit Points, what they like and dislike,
+// how they fight (a chip for each tactic; onChange() after a change), and their full sheet.
+function partyBlock(game, onChange) {
+  if (!(game.party || []).length) return null;
+  const block = el('section', 'sheet-block');
+  block.append(el('h3', 'section-heading', 'Party'));
+  block.append(el('p', 'section-hint', 'Your companions fight on their own. Choose how each one fights.'));
+  for (const member of game.party) {
+    const companion = findCompanion(member.id);
+    const character = memberGame(game, member).character;
+    const row = el('div', 'party-member');
+    const who = el('div', 'party-who');
+    who.append(el('p', 'sheet-line', `${character.name} · ${describeCharacter(character)}`));
+    const hp = member.fallen ? 'Fallen: they can be raised at a temple, or by a spell' : `Hit Points: ${member.hp} of ${memberMaxHp(game, member)}`;
+    who.append(el('p', 'sheet-line', hp));
+    who.append(el('p', 'section-hint', companion.summary));
+    who.append(el('p', 'section-hint', `Likes ${companion.likes.join(', ')}. Dislikes ${companion.dislikes.join(', ')}.`));
+    row.append(portrait(heroSprite(character), { scale: 3, label: character.name }), who);
+    block.append(row);
+    block.append(
+      chipRow(
+        tactics.map((tactic) =>
+          chip({
+            key: `tactic-${member.id}-${tactic.id}`,
+            label: tactic.name,
+            selected: member.tactic === tactic.id,
+            onToggle: () => {
+              setTactic(game, member.id, tactic.id);
+              onChange();
+            },
+          }),
+        ),
+        `How ${character.name} fights`,
+      ),
+    );
+    block.append(el('p', 'section-hint', findTactic(member.tactic).summary));
+    const sheet = el('details', 'expandable');
+    sheet.append(el('summary', '', `${character.name.split(' ')[0]}’s sheet`), heroSheet(character, { spellsOn: (member.activeSpells || []).map((s) => s.id) }));
+    block.append(sheet);
   }
   return block;
 }

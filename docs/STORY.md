@@ -112,7 +112,7 @@ A hidden score from 0 to 100. It rises when you use a shard's power, when a dark
 | **Lucan Morrow**, tiefling outcast | Warlock | Ch 8 | Bold choices, mercy for outcasts | Self-righteousness, the Regency | His patron, the Hollow Ledger, is something the Unking half-unmade, and it wants to finish the job or be finished (Ch 11, 15) |
 | **Tor Highvane**, goliath wanderer | Barbarian | Ch 10 | Honour, endurance, the truth told aloud | Lies by kings, cowardice | The last of the clan King Osric destroyed. He wants the truth known, or the Caldwen line ended (Ch 10–13) |
 
-Approval works as DESIGN.md says. High approval unlocks the personal quest and a better epilogue. Low approval means they leave, or become the Act III betrayer.
+Approval works as DESIGN.md says. High approval unlocks the personal quest and a better epilogue. Low approval means they leave, or become the Act III betrayer. In a scene, a choice that touches a companion's likes or dislikes calls `approve(id, 1)` or `approve(id, -1)` while they're with the hero.
 
 ## The Bond: who you left behind
 
@@ -275,12 +275,12 @@ Fate's Mercy costs XP along the way, so a hero who lost fights may still be leve
 
 1. **The miller's missing daughter.** *(The side-quest example from DESIGN.md, now part of the main line.)* At dawn Lark went down the mill tunnel with a lantern and her father's hatchet, and the dead have dug it clear. A short delve (4 rooms): Ghouls in the old ossuary, and Lark cornered on a ledge. You rescue her. She becomes a recurring face, and wants to be your apprentice.
    - A Ghoul's claws have left Lark Paralyzed. Lesser Restoration (a Life Cleric has it from level 3) frees her at once; otherwise you carry her out, and the Ghouls follow.
-2. **Odda Brasswick arrives.** A dwarf priest sent by her order's mother-house to look into the walking dead: brusque, kind, and always brewing tea. She helps with the rescue and joins. *(Companion.)*
+2. **Odda Brasswick arrives.** A dwarf priest sent by her order's mother-house to look into the walking dead: brusque, kind, and always brewing tea. She helps with the rescue and joins (`join_party("odda")`). *(Companion.)*
 3. **Fen in the stocks.** A halfling pickpocket, caught with the reeve's purse. Bounty hunters arrive (a Bandit Captain and two Bandits): "Dead or alive. The Choir pays double for dead."
    - Fen begs: "I know where they're taking your miller. I used to sing with them."
    - A Rogue who read the thieves' chalk marks in Bramblegate (`read_cant_marks`) knows him at once: he's the songbird with the bounty on him.
    - **Choices:**
-     - Free him: pick the lock (Thieves' Tools, or Knock it open, loudly), persuade Varrow, or pay his fine. He joins. *(Companion.)*
+     - Free him: pick the lock (Thieves' Tools, or Knock it open, loudly), persuade Varrow, or pay his fine. He joins (`join_party("fen")`). *(Companion.)*
      - Hand him over (a Wealth Drive moment).
      - Fight the hunters (Moderate).
    - Turning Fen away doesn't dead-end anything: Nettle's goblins or the hunters give up the same lead, at a price.

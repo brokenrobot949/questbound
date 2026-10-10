@@ -9,6 +9,7 @@ import { findClass } from './engine/character/sheet.js';
 import { lowerLevel, xpForLevel } from './engine/character/level-up.js';
 import { beginSession, endSession, recap } from './engine/story/sessions.js';
 import { addItem, COPPER_PER } from './engine/character/inventory.js';
+import { joinParty, leaveParty, memberMaxHp, memberOf } from './engine/character/party.js';
 import { openSaveStore } from './engine/save/save-store.js';
 import { gameToSave, loadGame, newGame } from './engine/save/save-format.js';
 import { isBackupDue } from './engine/save/backup.js';
@@ -248,6 +249,23 @@ async function start() {
           change((game) => {
             if (!Number.isInteger(quantity) || quantity < 1) throw new Error('Give 1 or more.');
             addItem(game.inventory, id, quantity);
+          }),
+        // Companions join, leave, or are raised (a fallen one, back at full Hit Points).
+        joinParty: (id) =>
+          change((game) => {
+            if (game.battle) throw new Error('Not in the middle of a fight.');
+            joinParty(game, id);
+          }),
+        leaveParty: (id) =>
+          change((game) => {
+            if (game.battle) throw new Error('Not in the middle of a fight.');
+            leaveParty(game, id);
+          }),
+        raiseCompanion: (id) =>
+          change((game) => {
+            const member = memberOf(game, id);
+            member.fallen = false;
+            member.hp = memberMaxHp(game, member);
           }),
         setSubclass: (id) =>
           change((game) => {

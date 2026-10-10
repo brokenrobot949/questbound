@@ -208,4 +208,12 @@ export const migrations = {
     const undo = game.undo && game.undo.state ? { ...game.undo, state: { ...game.undo.state, character: withMasteries(game.undo.state.character, game.undo.state.inventory) } } : game.undo;
     return { ...save, version: 16, game: { ...game, character: withMasteries(game.character, game.inventory), undo } };
   },
+
+  // Version 17 adds the party: the companions travelling with the hero. Nobody had joined
+  // before it, and the undo point's copy of the game has no companions either.
+  16: (save) => {
+    const { game } = save;
+    const undo = game.undo && game.undo.state ? { ...game.undo, state: { ...game.undo.state, party: [] } } : game.undo;
+    return { ...save, version: 17, game: { ...game, party: [], undo } };
+  },
 };

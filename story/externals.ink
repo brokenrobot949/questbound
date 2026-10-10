@@ -87,6 +87,19 @@ EXTERNAL has_item(item)
 //   * {has_item("rations")} [Toss it your rations] ~ take_item("rations")
 EXTERNAL take_item(item)
 
+// join_party(id): a companion joins the hero (data/campaign/companions.js), and the DM says
+// so; leave_party(id): they leave. Up to two travel at once: check party_full() before a
+// third joins. in_party(id): true if they're with the hero.
+//   * {not party_full()} [Ask Odda to come with you] ~ join_party("odda")
+EXTERNAL join_party(id)
+EXTERNAL leave_party(id)
+EXTERNAL in_party(id)
+EXTERNAL party_full()
+
+// approve(id, change): a companion with the hero liked (1) or disliked (-1) what they just
+// did, e.g. ~ approve("fen", 1). Their likes and dislikes are in companions.js.
+EXTERNAL approve(id, change)
+
 // take_damage(dice, type): the hero takes damage outside a fight, from a trap or a fall, e.g.
 //   ~ temp fall = take_damage("1d6", "bludgeoning")
 // At 0 Hit Points they make death saving throws (the player sees each roll) with nobody to

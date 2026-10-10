@@ -96,6 +96,15 @@ export const people = [
     look: { skin: 'tan', hairStyle: 'long', hairColor: 'auburn', beard: false, outfit: 'yellow', accent: 'red', headgear: 'none' },
     source: 'original',
   },
+  {
+    id: 'fen',
+    name: 'Fen Underbough',
+    species: 'halfling',
+    size: 'small',
+    armor: 'leather-armor',
+    look: { skin: 'peach', hairStyle: 'tousled', hairColor: 'brown', beard: false, outfit: 'green', accent: 'brown', headgear: 'hood' },
+    source: 'original',
+  },
 
   // ---- Brackenhollow and the Choir ----
   { id: 'nettle', name: 'Mother Nettle', sprite: 'goblin-boss', source: 'original' },

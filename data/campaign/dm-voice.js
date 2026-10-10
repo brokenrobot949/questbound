@@ -32,6 +32,9 @@ export const dmNotes = {
   alreadyInspired: 'That’s your Drive ({drive}) talking, though you already have Heroic Inspiration.',
   inspirationReroll: 'You spend your Heroic Inspiration and roll again. The new roll stands.',
   prepareAfterRest: 'Rested, you can change your prepared spells on the Sheet before you move on.',
+  // A companion joins or leaves ({name}). The Sheet's Party section has their sheet and tactic.
+  joinedParty: '{name} joins you. You can see their sheet, and choose how they fight, in the Party section of the Sheet.',
+  leftParty: '{name} goes their own way.',
   questStarted: 'New quest: {title}. It’s in your journal.',
   questUpdated: 'Journal: {title} updated.',
   questFinished: 'Quest complete: {title}.',

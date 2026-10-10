@@ -1,7 +1,7 @@
 // Debug mode (add ?debug to the address): a "Debug" button that opens a panel of testing tools.
 // Jump to any scene, view and edit story flags and Ink variables, set the hero's level, give
-// XP, gold and items, force the next d20, toggle auto-roll, reset the current save, and read
-// the playtest log.
+// XP, gold and items, add or remove companions, force the next d20, toggle auto-roll, reset the
+// current save, and read the playtest log.
 
 import { listScenes } from '../story/story-runner.js';
 import { describeCharacter, findClass } from '../character/sheet.js';
@@ -11,14 +11,15 @@ import { formatDuration, summarizeLog } from '../save/playtest-log.js';
 import { offlineReport } from '../save/offline.js';
 import { nextLevelXp } from '../character/level-up.js';
 import { equipment } from '../../../data/srd/equipment.js';
+import { companions } from '../../../data/campaign/companions.js';
 import { actionButton } from './backup-panels.js';
 import { el } from './dom.js';
 
 // getGame(): the game being played, or null on the title screen.
 // offline: a promise of how offline play started ("on", "off-local", "off-debug", "unsupported").
 // actions: { jumpTo(path), restartStory(), setLevel(n), setSubclass(id), giveXp(n),
-//            giveGold(gp), giveItem(id, quantity), setFlags(list), setInkVariable(name, value),
-//            resetSave() }
+//            giveGold(gp), giveItem(id, quantity), joinParty(id), leaveParty(id),
+//            raiseCompanion(id), setFlags(list), setInkVariable(name, value), resetSave() }
 // Each action applies the change, saves and redraws; the panel then redraws itself.
 export function setupDebugPanel({ root, getGame, tracker, offline, actions }) {
   const toggle = root.getElementById('debug-toggle');
@@ -48,7 +49,7 @@ export function setupDebugPanel({ root, getGame, tracker, offline, actions }) {
     panel.replaceChildren(heading('Debug mode'));
     if (problem) panel.append(el('p', 'debug-problem', problem));
     if (game) {
-      panel.append(sceneSection(game), flagSection(game), inkVariableSection(game), heroSection(game));
+      panel.append(sceneSection(game), flagSection(game), inkVariableSection(game), heroSection(game), partySection(game));
     } else {
       panel.append(el('p', 'debug-note', 'Open a save slot to use the scene, flag, hero and save tools.'));
     }
@@ -180,6 +181,27 @@ export function setupDebugPanel({ root, getGame, tracker, offline, actions }) {
         row(pick, actionButton('Set subclass', () => run(() => actions.setSubclass(pick.value || null)))),
       );
     }
+    return section;
+  }
+
+  // Companions: add or remove one (until the story brings them in), raise a fallen one, and see
+  // their approval.
+  function partySection(game) {
+    const section = el('section', 'debug-section');
+    section.append(heading('Party', 'h3'));
+    for (const companion of companions) {
+      const member = (game.party || []).find((m) => m.id === companion.id);
+      const name = companion.character.name;
+      if (!member) {
+        section.append(row(el('span', 'debug-label', name), actionButton('Join', () => run(() => actions.joinParty(companion.id)))));
+        continue;
+      }
+      const buttons = [actionButton('Leave', () => run(() => actions.leaveParty(companion.id)))];
+      if (member.fallen) buttons.push(actionButton('Raise', () => run(() => actions.raiseCompanion(companion.id))));
+      const state = member.fallen ? 'fallen' : `${member.hp} HP`;
+      section.append(row(el('span', 'debug-label', `${name}: ${state}, approval ${member.approval}`), ...buttons));
+    }
+    section.append(el('p', 'debug-note', 'Up to two companions travel at once. They join and leave between fights.'));
     return section;
   }
 

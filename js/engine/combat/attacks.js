@@ -187,13 +187,13 @@ export function heroAttackOptions(game) {
   return options;
 }
 
-// The Light property's extra attack, if it's on offer now: on the hero's turn, after an
-// attack with a Light weapon as the Attack action, while the extra attack is unused and no
+// The Light property's extra attack, if it's on offer now: on the attacker's own turn (the
+// hero's, or a companion's), after an attack with a Light weapon as the Attack action, while the extra attack is unused and no
 // Shield fills the other hand. Returns { itemId: the weapon used, nick: whether the hero uses
 // its Nick mastery }, or null.
 function lightExtra(game) {
   const battle = game.battle;
-  if (!battle || battle.outcome || battle.order[battle.turn] !== 'hero') return null;
+  if (!battle || battle.outcome || battle.order[battle.turn] !== (game.actorId || 'hero')) return null;
   const turn = battle.turnState;
   if (!turn || !turn.light || turn.extraUsed || game.character.shield) return null;
   const mastery = masteryFor(game.character, turn.light);
