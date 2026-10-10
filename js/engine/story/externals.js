@@ -22,7 +22,8 @@ import { dmNotes } from '../../../data/campaign/dm-voice.js';
 
 export function bindExternals(story, runtime) {
   // check(skill, dc): the hero makes an ability check against a DC, e.g. check("persuasion", 15).
-  // skill is a skill id from data/srd/skills.js, or an ability id for a plain ability check.
+  // skill is a skill id from data/srd/skills.js, a tool id ("thieves-tools": the tool's ability,
+  // plus Proficiency if the hero is proficient with it), or an ability id for a plain check.
   // Returns true on a success. A Fighter's Tactical Mind can turn a failure into a success,
   // and a hero who knows Guidance adds 1d4.
   story.BindExternalFunction(

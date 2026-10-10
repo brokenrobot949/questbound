@@ -2,22 +2,24 @@
 // then rolls through d20Test so the result carries the full breakdown.
 
 import { d20Test } from './d20-test.js';
-import { checkAdvantage, checkModifiers } from '../character/sheet.js';
+import { checkAdvantage, checkDisadvantage, checkModifiers } from '../character/sheet.js';
 
-// testId: a skill id ('persuasion') or an ability id ('strength') from data/srd/.
+// testId: a skill id ('persuasion'), a tool id ('thieves-tools') or an ability id ('strength')
+// from data/srd/.
 // dc: the Difficulty Class to meet or beat.
-// Features that give Advantage on this check (Remarkable Athlete) are added on top.
+// Features that give Advantage on this check (Remarkable Athlete) are added on top, and so is
+// Disadvantage from noisy armour on Stealth.
 // extraModifiers: bonuses rolled for this check alone, e.g. Guidance's 1d4.
 export function abilityCheck({ rng, character, testId, dc, advantage = [], disadvantage = [], extraModifiers = [] }) {
   if (!Number.isInteger(dc)) throw new Error(`A check needs a whole-number DC, got ${dc}`);
-  const { ability, skill, modifiers } = checkModifiers(character, testId);
+  const { ability, skill, tool, modifiers } = checkModifiers(character, testId);
   const result = d20Test({
     rng,
     kind: 'check',
-    label: `${skill ? skill.name : ability.name} check`,
+    label: `${skill ? skill.name : tool ? tool.name : ability.name} check`,
     modifiers: [...modifiers, ...extraModifiers],
     advantage: [...advantage, ...checkAdvantage(character, testId)],
-    disadvantage,
+    disadvantage: [...disadvantage, ...checkDisadvantage(character, testId)],
     target: { type: 'DC', value: dc },
   });
   return { ...result, testId, ability: ability.id, skill: skill ? skill.id : null };

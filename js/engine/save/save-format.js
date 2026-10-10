@@ -42,7 +42,7 @@ import { migrations } from './migrations.js';
 import { validateCharacter } from '../character/validate.js';
 import { undoOk } from './undo.js';
 
-export const SAVE_VERSION = 15;
+export const SAVE_VERSION = 16;
 
 // runtime: { story, game } — the compiled story, and whichever game is being played.
 

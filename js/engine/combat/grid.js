@@ -32,6 +32,34 @@ export function isStandable(map, pos) {
   return Boolean(cell && cell.terrain !== 'wall' && cell.terrain !== 'obstacle');
 }
 
+// What's in the way on a straight line from the middle of one square to the middle of
+// another (the two end squares themselves don't count): 'wall' if a wall is (it blocks sight
+// and attacks: Total Cover), 'obstacle' if only an obstacle is (sacks, a barrel, a tree: they
+// block sight, so a creature can hide behind them), or null for a clear line. A line that runs
+// exactly between two squares, past a corner, is blocked only if both squares block it.
+export function lineBlock(map, from, to) {
+  const steps = squaresBetween(from, to) * 8;
+  const order = { wall: 2, obstacle: 1 };
+  let worst = null;
+  for (let i = 1; i < steps; i++) {
+    const x = from.x + ((to.x - from.x) * i) / steps;
+    const y = from.y + ((to.y - from.y) * i) / steps;
+    // The squares the point lies in: two on a boundary between squares, four on a corner.
+    const near = (v) => (Math.abs(v - Math.floor(v) - 0.5) < 1e-9 ? [Math.floor(v), Math.ceil(v)] : [Math.round(v)]);
+    const cells = near(x).flatMap((cx) => near(y).map((cy) => ({ x: cx, y: cy })));
+    if (cells.some((c) => samePos(c, from) || samePos(c, to))) continue;
+    const blocks = cells.map((c) => {
+      const cell = cellAt(map, c);
+      if (!cell || cell.terrain === 'wall') return 'wall';
+      return cell.terrain === 'obstacle' ? 'obstacle' : null;
+    });
+    if (blocks.includes(null)) continue;
+    const here = blocks.includes('obstacle') ? 'obstacle' : 'wall';
+    if (!worst || order[here] > order[worst]) worst = here;
+  }
+  return worst;
+}
+
 // Squares between two creatures: diagonals count the same as straight lines.
 export function squaresBetween(a, b) {
   return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));

@@ -3,7 +3,7 @@
 // fight itself uses (combat/attacks.js).
 
 import { parseDice } from '../combat/attacks.js';
-import { findAbility } from '../character/sheet.js';
+import { findAbility, findMastery } from '../character/sheet.js';
 import { discipleOfLife, healingFor } from '../character/spell-effects.js';
 import { signedNumber } from './roll-format.js';
 
@@ -55,6 +55,9 @@ export function attackSummary(option, { slotsLeft = null } = {}) {
   }
   if (option.targeting !== 'self' && option.how !== 'teleport') parts.push(reachText(option));
   if (option.rider) parts.push(RIDERS[option.rider]);
+  if (option.sneakAttack) parts.push(`Sneak Attack +${option.sneakAttack} with Advantage, once a turn`);
+  if (option.nick) parts.push('part of your Attack action (Nick)');
+  if (option.mastery && !(option.extra && option.mastery.id === 'nick')) parts.push(masteryText(option));
   if (option.potent) parts.push(`half damage even on a ${option.how === 'save' ? 'save' : 'miss'}`);
   if (option.heavyDisadvantage) parts.push('Disadvantage: too heavy for you');
   if (option.concentration) parts.push('Concentration');
@@ -133,7 +136,17 @@ function reachText(option) {
   if (option.how === 'melee') return option.reach > 5 ? `melee, reach ${option.reach} ft` : 'melee';
   const [normal, long] = option.range;
   const distance = normal === long ? `${normal} ft` : `${normal}/${long} ft`;
-  return `${option.name.endsWith('(thrown)') ? 'thrown' : 'range'} ${distance}`;
+  const thrown = option.name.endsWith('(thrown)') || (option.properties || []).includes('thrown');
+  return `${thrown ? 'thrown' : 'range'} ${distance}`;
+}
+
+// A weapon's mastery property, as the hero uses it: "Vex: a hit gives you Advantage on your
+// next attack against that foe".
+export function masteryText(option) {
+  const { id, name, dc } = option.mastery;
+  if (id === 'topple') return `Topple: on a hit, the foe makes a Con save against DC ${dc} or falls Prone`;
+  if (id === 'graze') return option.abilityMod > 0 ? `Graze: a miss still deals ${option.abilityMod} damage` : 'Graze: a miss deals your ability modifier in damage (none for you)';
+  return `${name}: ${findMastery(id).summary}`;
 }
 
 // What a spell's hit does besides damage (see data/srd/spells.js).

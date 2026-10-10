@@ -25,6 +25,7 @@ import {
   describeCharacter,
   findAbility,
   findSkill,
+  findTool,
   maxHitPoints,
   proficiencyBonus,
 } from '../character/sheet.js';
@@ -483,7 +484,7 @@ function renderRollLog(root, game) {
 // "Persuasion · Medium", "Persuasion · DC 15" or "Persuasion", as the Check difficulty
 // setting says.
 function checkLabel(check) {
-  const named = findSkill(check.testId) || findAbility(check.testId);
+  const named = findSkill(check.testId) || findTool(check.testId) || findAbility(check.testId);
   const name = named ? named.name : check.testId;
   const difficulty = difficultyLabel(check.dc, getSetting('checkDifficulty'));
   return difficulty ? `${name} · ${difficulty}` : name;

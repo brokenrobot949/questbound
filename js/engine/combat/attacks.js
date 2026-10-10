@@ -12,6 +12,12 @@
 //     slotLevel (the spell slot it uses), rider, greatWeapon, savage, heavyDisadvantage,
 //     criticalOn (19 with Improved Critical), potent (a cantrip with Potent Cantrip),
 //     onHit (a monster attack's condition on a hit, e.g. the Wolf's Bite knocking you Prone) }
+// A weapon also carries itemId, weapon (its name), properties, abilityMod (the ability
+// modifier it attacks with), sneakAttack (a Rogue's Sneak Attack dice, with a Finesse or
+// Ranged weapon, or null) and mastery ({ id, name, dc }: the Weapon Mastery property the
+// hero uses with it, or null; dc is Topple's save DC). The Light property's extra attack is an
+// option of its own: extra true, and nick true when Nick makes it part of the Attack action
+// (bonusAction otherwise).
 // Spells also carry: spellId, spellLevel, concentration, bonusAction, and how they're aimed,
 // targeting: 'foe' (choose a creature), 'direction' (an area that starts from you: Burning
 // Hands), 'point' (an area centred on a square within range: Shatter), 'self', 'square'
@@ -29,7 +35,7 @@
 
 import { d20Test } from '../rules/d20-test.js';
 import { rollDice } from '../rules/dice.js';
-import { abilityModifierOf, characterFeats, findAbility, hasFeature, proficiencyBonus, abilityScore, resistances, weaponProficiencies } from '../character/sheet.js';
+import { abilityModifierOf, characterFeats, findAbility, hasFeature, masteryFor, proficiencyBonus, proficientWithWeapon, abilityScore, resistances, sneakAttackDice } from '../character/sheet.js';
 import { findItem } from '../character/inventory.js';
 import { freeCastKey, freeCastsLeft, spellGroups, spellNumbers, upcastDice, upcastHelps } from '../character/spells.js';
 import { discipleOfLife } from '../character/spell-effects.js';
@@ -59,7 +65,6 @@ const short = (abilityId) => findAbility(abilityId).abbreviation;
 export function heroAttackOptions(game) {
   const { character } = game;
   const options = [];
-  const proficientWith = weaponProficiencies(character);
   const pb = proficiencyBonus(character.level);
   const styles = characterFeats(character).map((entry) => entry.feat.id);
   const savage = styles.includes('savage-attacker');
@@ -67,39 +72,65 @@ export function heroAttackOptions(game) {
   const dex = abilityModifierOf(character, 'dexterity');
   const criticalOn = hasFeature(character, 'improved-critical') ? 19 : 20;
   const potent = hasFeature(character, 'potent-cantrip');
+  const sneak = sneakAttackDice(character);
+
+  // The Light property: after attacking with a Light weapon this turn (with the Attack
+  // action), one extra attack with a different Light weapon (see lightExtra).
+  const light = lightExtra(game);
 
   for (const entry of game.inventory) {
     const item = findItem(entry.id);
     if (!item || item.category !== 'weapon' || entry.quantity < 1) continue;
     const props = item.properties || [];
     if (props.includes('two-handed') && character.shield) continue; // a shield needs a free hand
-    const proficient = proficientWith.includes(item.weaponType.split('-')[0]);
+    const proficient = proficientWithWeapon(character, item);
     const twoHands = props.includes('two-handed') || (props.includes('versatile') && !character.shield);
     const dice = props.includes('versatile') && !character.shield ? item.versatile : item.damage.dice;
+    const mastery = masteryFor(character, item.id);
 
-    const make = (how, abilityId) => {
+    // extra: the Light property's extra attack, which adds no ability modifier to its damage
+    // (unless it's negative, or with Two-Weapon Fighting).
+    const make = (how, abilityId, { extra = false } = {}) => {
       const mod = abilityId === 'strength' ? str : dex;
       const modifiers = [{ label: short(abilityId), value: mod, source: `${findAbility(abilityId).name} ${abilityScore(character, abilityId).value}` }];
-      if (proficient) modifiers.push({ label: 'Proficiency', value: pb, source: `Proficient with ${item.weaponType.split('-')[0]} weapons` });
+      if (proficient) modifiers.push({ label: 'Proficiency', value: pb, source: `Proficient with ${item.name}s` });
       if (how === 'ranged' && styles.includes('archery')) modifiers.push({ label: 'Archery', value: 2, source: 'Archery fighting style' });
       // Heavy weapons need Strength 13 (melee) or Dexterity 13 (ranged).
       const needed = how === 'ranged' && props.includes('ammunition') ? 'dexterity' : 'strength';
       const heavyDisadvantage = props.includes('heavy') && abilityScore(character, needed).value < 13;
-      return {
-        id: `${item.id}-${how}`,
-        name: how === 'ranged' && props.includes('thrown') ? `${item.name} (thrown)` : item.name,
+      const name = how === 'ranged' && props.includes('thrown') ? `${item.name} (thrown)` : item.name;
+      const option = {
+        id: `${item.id}-${how}${extra ? '-extra' : ''}`,
+        name: extra ? `${name}, extra attack` : name,
         source: 'weapon',
         itemId: item.id,
+        weapon: item.name,
         how,
+        properties: props,
         reach: how === 'melee' ? 5 : null,
         range: how === 'ranged' ? item.range : null,
         modifiers,
-        damage: { dice: how === 'melee' ? dice : item.damage.dice, bonus: mod, type: item.damage.type },
+        damage: { dice: how === 'melee' ? dice : item.damage.dice, bonus: extra && !styles.includes('two-weapon-fighting') ? Math.min(0, mod) : mod, type: item.damage.type },
+        abilityMod: mod,
         greatWeapon: styles.includes('great-weapon-fighting') && how === 'melee' && twoHands,
         savage,
         heavyDisadvantage,
         criticalOn,
+        // The Weapon Mastery property the hero uses with it; Topple's save DC is 8 + the
+        // attack's ability modifier + the Proficiency Bonus.
+        mastery: mastery ? { id: mastery.id, name: mastery.name, dc: mastery.id === 'topple' ? 8 + mod + pb : null } : null,
+        // A Rogue's Sneak Attack dice, with a Finesse or a Ranged weapon (combat/battle.js says
+        // when it applies).
+        sneakAttack: sneak && (props.includes('finesse') || item.weaponType.endsWith('-ranged')) ? sneak : null,
       };
+      if (extra) {
+        // Nick (on either weapon) makes it part of the Attack action; otherwise it's a Bonus
+        // Action.
+        option.extra = true;
+        option.nick = light.nick || Boolean(mastery && mastery.id === 'nick');
+        option.bonusAction = !option.nick;
+      }
+      return option;
     };
 
     const finesseBest = props.includes('finesse') && dex > str ? 'dexterity' : 'strength';
@@ -109,6 +140,11 @@ export function heroAttackOptions(game) {
     } else {
       const ammo = item.ammunition ? game.inventory.find((e) => e.id === item.ammunition && e.quantity > 0) : true;
       if (ammo) options.push(make('ranged', 'dexterity'));
+    }
+    // A different Light weapon from the one just used: another kind, or a second of the same.
+    if (light && props.includes('light') && (item.id !== light.itemId || entry.quantity >= 2)) {
+      options.push(make('melee', finesseBest, { extra: true }));
+      if (props.includes('thrown')) options.push(make('ranged', finesseBest, { extra: true }));
     }
   }
 
@@ -149,6 +185,19 @@ export function heroAttackOptions(game) {
   const strike = spiritStrikeOption(game);
   if (strike) options.push(strike);
   return options;
+}
+
+// The Light property's extra attack, if it's on offer now: on the hero's turn, after an
+// attack with a Light weapon as the Attack action, while the extra attack is unused and no
+// Shield fills the other hand. Returns { itemId: the weapon used, nick: whether the hero uses
+// its Nick mastery }, or null.
+function lightExtra(game) {
+  const battle = game.battle;
+  if (!battle || battle.outcome || battle.order[battle.turn] !== 'hero') return null;
+  const turn = battle.turnState;
+  if (!turn || !turn.light || turn.extraUsed || game.character.shield) return null;
+  const mastery = masteryFor(game.character, turn.light);
+  return { itemId: turn.light, nick: Boolean(mastery && mastery.id === 'nick') };
 }
 
 // Spiritual Weapon, while it lasts in a fight: a Bonus Action to move it up to 20 feet and
@@ -295,7 +344,8 @@ export function monsterAttackOptions(monster) {
 
 // Damage dice and bonus. A Critical Hit rolls the dice twice over. Great Weapon Fighting
 // treats 1s and 2s as 3s; Savage Attacker rolls the dice twice and keeps the better.
-export function rollDamage(rng, damage, { critical = false, advantage = false, greatWeapon = false, savage = false } = {}) {
+// sneak: a Rogue's Sneak Attack dice ('1d6') to add, doubled on a Critical Hit too.
+export function rollDamage(rng, damage, { critical = false, advantage = false, greatWeapon = false, savage = false, sneak = null } = {}) {
   const { count, sides } = parseDice(damage.dice);
   const n = critical ? count * 2 : count;
   const once = () => {
@@ -315,15 +365,22 @@ export function rollDamage(rng, damage, { critical = false, advantage = false, g
     const more = parseDice(damage.extraOnAdvantage);
     extra = rollDice(rng, critical ? more.count * 2 : more.count, more.sides).rolls;
   }
-  const total = Math.max(0, [...dice, ...extra].reduce((s, v) => s + v, 0) + (damage.bonus || 0));
-  return { dice, extra, bonus: damage.bonus || 0, total, type: damage.type, critical, savaged };
+  let sneaked = null;
+  if (sneak) {
+    const more = parseDice(sneak);
+    sneaked = { dice: critical ? `${more.count * 2}d${more.sides}` : sneak, rolls: rollDice(rng, critical ? more.count * 2 : more.count, more.sides).rolls };
+  }
+  const total = Math.max(0, [...dice, ...extra, ...(sneaked ? sneaked.rolls : [])].reduce((s, v) => s + v, 0) + (damage.bonus || 0));
+  return { dice, extra, bonus: damage.bonus || 0, total, type: damage.type, critical, savaged, sneak: sneaked };
 }
 
-// "1d8 (5) + 3 = 8 slashing", "2d6 (4, 6) − 1 = 9 piercing".
+// "1d8 (5) + 3 = 8 slashing", "2d6 (4, 6) − 1 = 9 piercing",
+// "1d6 (4) + 3 + Sneak Attack 1d6 (5) = 12 piercing".
 export function damageText(rolled, dice) {
   const parts = [`${dice} (${rolled.dice.join(', ')})`];
   if (rolled.extra.length) parts.push(`+ ${rolled.extra.join(' + ')}`);
   if (rolled.bonus) parts.push(`${rolled.bonus < 0 ? '−' : '+'} ${Math.abs(rolled.bonus)}`);
+  if (rolled.sneak) parts.push(`+ Sneak Attack ${rolled.sneak.dice} (${rolled.sneak.rolls.join(', ')})`);
   return `${parts.join(' ')} = ${rolled.total} ${rolled.type}`;
 }
 

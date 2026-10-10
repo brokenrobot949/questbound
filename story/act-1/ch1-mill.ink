@@ -1,7 +1,7 @@
 // Chapter 1 · Bramblegate, beat 3: Dunn's Mill (docs/STORY.md).
 //
 // The hero searches the wrecked mill (Investigation, Perception, and a clue only a Fighter,
-// a Wizard or a Dwarf finds), discovers the cellar broken open from below, and then two
+// a Wizard, a Rogue or a Dwarf finds), discovers the cellar broken open from below, and then two
 // starving goblins come back for more flour: the combat tutorial. Fight them, talk them
 // down (which leads straight to Mother Nettle later), or let them run and follow the trail.
 // Losing the fight is Fate's Mercy: you wake in the temple, robbed, and the story goes on.
@@ -36,6 +36,11 @@ Dunn's Mill sits where the brook bends, its great wheel still and silent. The do
     The soot isn't random. Someone burned a sigil into the floorboards, then scuffed it: a staff with music notes climbing it like ivy. You don't know whose mark it is, but you know a ritual circle when you see one.
     ~ set_flag("saw_choir_sigil")
     ~ quest_note("missing-miller", "A sigil burned at the mill: a staff wound with music notes.")
+    -> search
+* {has_class("rogue")} [Check where a miller would hide his coin]
+    Honest folk all hide their money in the same few places. Garrick's is under the third board from the flour bin: a strongbox, still locked, still heavy. Nobody has touched it.
+    Whoever took Garrick Dunn didn't want his money. That leaves the man himself.
+    ~ quest_note("missing-miller", "Garrick Dunn's strongbox was still hidden at the mill, locked and full: whoever took him didn't want his money.")
     -> search
 * {has_species("dwarf")} [Listen to the floor]
     You stamp once, and your heel tells you what your eyes can't: the floor over the cellar rings hollow, and under the boards there's old dressed stone. Someone built down there, long before any mill.

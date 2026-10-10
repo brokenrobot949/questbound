@@ -80,7 +80,7 @@ export const clothColors = [
 export const headgear = [
   { id: 'none', name: 'None', classes: null },
   { id: 'helmet', name: 'Horned helmet', classes: ['fighter', 'cleric'] },
-  { id: 'hood', name: 'Hood', classes: ['wizard', 'cleric'] },
+  { id: 'hood', name: 'Hood', classes: ['wizard', 'cleric', 'rogue'] },
 ];
 
 // Armour colours: highlight, main, shade, dark. Worn armour changes the hero's colours.
@@ -148,4 +148,5 @@ export const classLooks = {
   fighter: { outfit: 'red', accent: 'brown', headgear: 'none' },
   wizard: { outfit: 'blue', accent: 'red', headgear: 'none' },
   cleric: { outfit: 'white', accent: 'yellow', headgear: 'none' },
+  rogue: { outfit: 'black', accent: 'grey', headgear: 'hood' },
 };

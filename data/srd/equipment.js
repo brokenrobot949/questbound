@@ -1,5 +1,5 @@
 // Equipment (SRD 5.2.1), other than armour (see armor.js). Only what the current phase needs:
-// the items in the Fighter, Wizard, Cleric and background starting kits, and what
+// the items in the Fighter, Wizard, Cleric, Rogue and background starting kits, and what
 // Bramblegate's market sells. The full tables arrive with shops.
 //
 //   category   'weapon', 'ammunition', 'tool', 'pack', 'gear' or 'potion'
@@ -14,7 +14,7 @@
 //   versatile  the damage dice when held in two hands (Versatile property)
 //   range      [normal, long] in feet, for Thrown and Ammunition weapons
 //   properties 'finesse', 'light', 'heavy', 'two-handed', 'thrown', 'ammunition', 'versatile'
-//   mastery    the Weapon Mastery property (used once masteries arrive)
+//   mastery    the Weapon Mastery property (data/srd/weapon-masteries.js)
 
 export const equipment = [
   // Weapons
@@ -33,13 +33,32 @@ export const equipment = [
   // Ammunition
   { id: 'arrow', name: 'Arrow', category: 'ammunition', bundle: 20, weight: 1, cost: { gp: 1 }, source: 'SRD 5.2.1' },
 
-  // Tools
-  { id: 'calligraphers-supplies', name: 'Calligrapher’s Supplies', category: 'tool', weight: 5, cost: { gp: 10 }, source: 'SRD 5.2.1' },
+  // Tools. ability: the ability a check with the tool uses (a scene can call for one, as in
+  // check("thieves-tools", 15)); proficiency with the tool adds the Proficiency Bonus.
+  { id: 'calligraphers-supplies', name: 'Calligrapher’s Supplies', category: 'tool', ability: 'dexterity', weight: 5, cost: { gp: 10 }, source: 'SRD 5.2.1' },
   // The SRD lets the player pick dice, dragonchess, playing cards or three-dragon ante.
-  { id: 'gaming-set', name: 'Gaming Set (dice)', category: 'tool', weight: 0, cost: { sp: 1 }, source: 'SRD 5.2.1' },
-  { id: 'thieves-tools', name: 'Thieves’ Tools', category: 'tool', weight: 1, cost: { gp: 25 }, source: 'SRD 5.2.1' },
+  { id: 'gaming-set', name: 'Gaming Set (dice)', category: 'tool', ability: 'wisdom', weight: 0, cost: { sp: 1 }, source: 'SRD 5.2.1' },
+  {
+    id: 'thieves-tools',
+    name: 'Thieves’ Tools',
+    category: 'tool',
+    ability: 'dexterity',
+    weight: 1,
+    cost: { gp: 25 },
+    text: 'Ability: Dexterity. Utilize: pick a lock (DC 15), or disarm a trap (DC 15).',
+    source: 'SRD 5.2.1',
+  },
 
   // Packs
+  {
+    id: 'burglars-pack',
+    name: 'Burglar’s Pack',
+    category: 'pack',
+    weight: 42,
+    cost: { gp: 16 },
+    contents: 'Backpack, Ball Bearings, Bell, 10 Candles, Crowbar, Hooded Lantern, 7 Flasks of Oil, 5 days of Rations, Rope, Tinderbox, and Waterskin',
+    source: 'SRD 5.2.1',
+  },
   {
     id: 'dungeoneers-pack',
     name: 'Dungeoneer’s Pack',

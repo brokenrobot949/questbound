@@ -163,7 +163,7 @@ The epilogue then shows each town, faction, companion and your Bond, built from 
 **Before beat 1: character creation.** The opening line ties to your Drive: "You came north for glory / for your faith / for coin / for answers…" You've come because the reeve posted a call for capable folk: the dead are walking, and goblins are raiding.
 
 1. **The north gate.** *(This is the Phase 0 test scene, expanded.)* Rain at dusk; the gate is barred; Warden Tamsin Pike won't open it.
-   - **Choices:** Persuasion, Intimidation or Deception. Soldier background: show your regiment's token, and the gate opens with no roll. Acolyte: ask for sanctuary. Criminal: climb the wall (Athletics). Wizard: a cantrip trick with the lantern. Or wait for dawn.
+   - **Choices:** Persuasion, Intimidation or Deception. Soldier background: show your regiment's token, and the gate opens with no roll. Acolyte: ask for sanctuary. Criminal: climb the wall (Athletics). Thieves' Tools (a Rogue's or a Criminal's): pick the postern lock (DC 15, `picked_the_postern`). Wizard: a cantrip trick with the lantern. Or wait for dawn.
    - **Failing or waiting:** you shelter under the eaves and see pale lights on the barrow hills (`saw_barrow_light`).
    - It teaches the first d20.
 2. **Morning at the Tallow and Thistle.** Morwen Tallow brings breakfast and gossip: goblins hit the mill last night, and Garrick Dunn the miller is gone. The town opens up: the inn, the temple, Hob's forge, the market, the reeve's hall and the notice board.
@@ -172,9 +172,10 @@ The epilogue then shows each town, faction, companion and your Bond, built from 
    - **Drive moments:** every Drive gets one here. Take the job for the silver (Wealth), because nobody should vanish (Justice), or for the story they'll tell (Glory); pray for the miller at the temple (Faith); quiz Hob about the barrows (Knowledge); tear down a runaway's wanted notice (Freedom); promise Lark you'll bring her father home (Kinship).
    - It teaches shopping and the journal. The market sells cheap gear, and Potions of Healing at 50 gold, which few new heroes can afford, so Morwen gives every hero one on the house ("I'm not baking with gravel").
    - Small seeds: Hob's cousin saw goblins fleeing the barrow hills; Prior Crane flinches at "Kings' Barrow" (Insight); a lost cat called Biscuit on the notice board (Too Many Cats, Phase 2).
+   - **Rogue:** Thieves' Cant reads the chalk marks low on the notice board's post: the watch is sharp, the market's been robbed enough, and a fresh mark puts a bounty on an informer, "a songbird who sang too much" (`read_cant_marks`). It's Fen, in Chapter 2.
 3. **Dunn's Mill.** Flour drifts across the step like snow.
    - **Checks:** Investigation (goblin feet *and* human boots, one set dragging) and Perception (cold grey ash, grave dirt).
-   - **Fighter:** "The door was barred from inside and broken *outward*." **Wizard:** "The ash marks a burned sigil: a staff of music notes." **Dwarf:** "This cellar floor is hollow, with old dressed stone underneath."
+   - **Fighter:** "The door was barred from inside and broken *outward*." **Wizard:** "The ash marks a burned sigil: a staff of music notes." **Rogue:** Garrick's strongbox is still under the floorboards, locked and full: whoever took him didn't want his money. **Dwarf:** "This cellar floor is hollow, with old dressed stone underneath."
    - **Discovery:** the cellar floor has been broken through from below into an old tunnel, now choked with rubble.
    - **First fight (the combat tutorial, Low):** two goblin scavengers (two Goblin Minions: 50 XP, a Low fight for one level 1 hero by the 2024 budget; the Goblin Warrior waits in the warren) come back for more flour. Fight them, talk them down (Persuasion), or roar them off (Intimidation). They're starving, and Mother Nettle sent them. Talking takes you straight to Nettle and skips the warren's outer fights; scaring them off leaves a flour trail to follow. Losing the fight is Fate's Mercy: you wake in the temple, robbed, where Lark carried you.
 4. **The quarry road.** A short trip to the old quarry. A starving Wolf worries at a goblin corpse covered in claw marks that no wolf made.
@@ -277,8 +278,9 @@ Fate's Mercy costs XP along the way, so a hero who lost fights may still be leve
 2. **Odda Brasswick arrives.** A dwarf priest sent by her order's mother-house to look into the walking dead: brusque, kind, and always brewing tea. She helps with the rescue and joins. *(Companion.)*
 3. **Fen in the stocks.** A halfling pickpocket, caught with the reeve's purse. Bounty hunters arrive (a Bandit Captain and two Bandits): "Dead or alive. The Choir pays double for dead."
    - Fen begs: "I know where they're taking your miller. I used to sing with them."
+   - A Rogue who read the thieves' chalk marks in Bramblegate (`read_cant_marks`) knows him at once: he's the songbird with the bounty on him.
    - **Choices:**
-     - Free him: pick the lock (or Knock it open, loudly), persuade Varrow, or pay his fine. He joins. *(Companion.)*
+     - Free him: pick the lock (Thieves' Tools, or Knock it open, loudly), persuade Varrow, or pay his fine. He joins. *(Companion.)*
      - Hand him over (a Wealth Drive moment).
      - Fight the hunters (Moderate).
    - Turning Fen away doesn't dead-end anything: Nettle's goblins or the hunters give up the same lead, at a price.

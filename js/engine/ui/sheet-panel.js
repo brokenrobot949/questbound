@@ -7,7 +7,7 @@
 
 import { findBond, findDrive } from '../character/creation.js';
 import { findItem, itemText, moneyText } from '../character/inventory.js';
-import { armorClass, findArmor } from '../character/sheet.js';
+import { armorClass, findArmor, findMastery, findWeapon, masteredWeapons } from '../character/sheet.js';
 import { heroAttackOptions } from '../combat/attacks.js';
 import { shield } from '../../../data/srd/armor.js';
 import { attackSummary, selfSpellText } from './attack-text.js';
@@ -117,6 +117,13 @@ function gearBlock(game) {
     const ways = options.filter((option) => option.itemId === item.id);
     for (const option of ways) block.append(el('p', 'pack-item', `${option.name}: ${attackSummary(option).join(' · ')}`));
     if (ways.length === 0) block.append(el('p', 'pack-item', `${item.name}: ${whyNot(game, item)}`));
+  }
+  const mastered = masteredWeapons(character).map(findWeapon);
+  if (mastered.length) block.append(el('p', 'section-hint', `Weapon Mastery: ${mastered.map((w) => `${w.name} (${findMastery(w.mastery).name})`).join(', ')}.`));
+  // The Light property: two Light weapons (or two of one) and a free hand.
+  const lights = weapons.filter((entry) => (findItem(entry.id).properties || []).includes('light'));
+  if (!character.shield && (lights.length >= 2 || lights.some((entry) => entry.quantity >= 2))) {
+    block.append(el('p', 'section-hint', 'Two Light weapons: in a fight, after you attack with one, you can attack with the other as a Bonus Action, without your ability modifier on its damage.'));
   }
 
   // Spells for a fight, once each (a free cast first, or the lowest slot level left).

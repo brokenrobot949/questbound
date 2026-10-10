@@ -1,5 +1,5 @@
 // Quick Start heroes (original): ready-made characters for players who want to begin right
-// away, one per class in this build (a Rogue joins when that class does).
+// away, one per class in this build.
 // Only choices are stored; the sheet works out every number from them and the rules data.
 // Safe to edit, as long as the choices stay legal: tests/rules.html checks every hero here.
 
@@ -27,7 +27,8 @@ export const quickStartHeroes = [
       speciesSkills: ['insight'], // the Human's Skillful trait
       featSkills: [], // only used by the Skilled feat
       originFeat: 'alert', // the Human's Versatile trait
-      classChoices: { fightingStyle: 'defense' },
+      // Weapon Mastery with three kinds of weapon: Graze, Sap and Slow.
+      classChoices: { fightingStyle: 'defense', weaponMasteries: ['greatsword', 'flail', 'javelin'] },
 
       drive: 'justice',
       bond: { type: 'sibling', name: 'Kit Ashdown' },
@@ -130,6 +131,48 @@ export const quickStartHeroes = [
       hitPointRolls: [],
       armorId: 'chain-shirt',
       shield: true,
+    },
+    source: 'original',
+  },
+  {
+    id: 'sorael',
+    summary: 'A wood elf cutpurse who left the city one step ahead of the watch, and reads every room for its exits.',
+    character: {
+      name: 'Sorael Thornvale',
+      level: 1,
+      classId: 'rogue',
+      subclassId: null, // chosen at level 3
+      speciesId: 'elf',
+      size: 'medium',
+      speciesChoice: 'wood-elf', // Speed 35 and Druidcraft; Longstrider from level 3
+      spellcastingAbility: 'intelligence', // for the Wood Elf's spells
+      backgroundId: 'criminal',
+
+      // The Rogue's suggested Standard Array, then the Criminal's +2 Dexterity and +1 Constitution.
+      abilityScoreMethod: 'standard-array',
+      baseAbilityScores: { strength: 12, dexterity: 15, constitution: 13, intelligence: 14, wisdom: 10, charisma: 8 },
+      backgroundIncreases: { dexterity: 2, constitution: 1 },
+
+      classSkills: ['acrobatics', 'deception', 'insight', 'investigation'], // the Criminal gives Sleight of Hand and Stealth
+      speciesSkills: ['perception'], // the Elf's Keen Senses
+      featSkills: [],
+      originFeat: null,
+      // Expertise in Stealth and Sleight of Hand; Weapon Mastery with the Dagger (Nick) and the
+      // Shortsword (Vex).
+      classChoices: { expertise: ['stealth', 'sleight-of-hand'], weaponMasteries: ['dagger', 'shortsword'] },
+
+      drive: 'freedom',
+      bond: { type: 'debt', name: 'Old Mother Quill' },
+      // The Rogue's kit (leather armour, two daggers, a shortsword, a shortbow, Thieves' Tools),
+      // and the Criminal's 50 gold instead of a second set of daggers and tools.
+      startingEquipment: { class: 'A', background: 'B' },
+      spells: null, // Rogues have no Spellcasting feature
+      magicInitiate: [],
+      look: { skin: 'porcelain', hairStyle: 'long', hairColor: 'black', beard: false, outfit: 'black', accent: 'grey', headgear: 'hood' },
+
+      hitPointRolls: [],
+      armorId: 'leather-armor',
+      shield: false,
     },
     source: 'original',
   },

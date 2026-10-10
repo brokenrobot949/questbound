@@ -14,7 +14,7 @@ import { drives } from '../../../data/campaign/drives.js';
 import { bonds } from '../../../data/campaign/bonds.js';
 import { nameTables } from '../../../data/campaign/names.js';
 import { rollDice } from '../rules/dice.js';
-import { armorTraining, divineOrderOf, findBackground, findClass, findFeat, findSpecies } from './sheet.js';
+import { armorTraining, divineOrderOf, expertiseChoices, expertiseCount, findBackground, findClass, findFeat, findSpecies, masteryChoices, weaponMasteryCount } from './sheet.js';
 import { validateCharacter } from './validate.js';
 import {
   classSpellCounts,
@@ -88,7 +88,7 @@ export function chooseClass(draft, classId) {
   next.classChoices = {};
   next.startingEquipment.class = null;
   next.spells = findClass(classId).spellcasting ? { cantrips: [], spellbook: [], prepared: [] } : null;
-  // A helmet is for Fighters and a hood for Wizards.
+  // Headgear depends on the class (a helmet for Fighters, a hood for Wizards and Rogues).
   if (next.look && !headgearFor(classId).some((h) => h.id === next.look.headgear)) next.look = { ...next.look, headgear: 'none' };
   return next;
 }
@@ -128,7 +128,7 @@ export function chooseBackground(draft, backgroundId) {
   next.classSkills = next.classSkills.filter(notGiven);
   next.speciesSkills = next.speciesSkills.filter(notGiven);
   next.featSkills = next.featSkills.filter(notGiven);
-  return syncMagicInitiate(next);
+  return keepExpertise(syncMagicInitiate(next));
 }
 
 // ---- Species ----
@@ -145,7 +145,7 @@ export function chooseSpecies(draft, speciesId) {
   next.speciesSkills = [];
   next.originFeat = null;
   next.featSkills = [];
-  return freeSpeciesSpells(syncMagicInitiate(next));
+  return keepExpertise(freeSpeciesSpells(syncMagicInitiate(next)));
 }
 
 export function chooseSpeciesOption(draft, optionId) {
@@ -172,7 +172,7 @@ export function chooseOriginFeat(draft, featId) {
   const next = copy(draft);
   next.originFeat = featId;
   if (featId !== 'skilled') next.featSkills = [];
-  return syncMagicInitiate(next);
+  return keepExpertise(syncMagicInitiate(next));
 }
 
 // ---- Ability scores ----
@@ -324,11 +324,45 @@ export function toggleSkill(draft, source, skillId) {
   const list = next[FIELD[source]];
   if (list.includes(skillId)) {
     next[FIELD[source]] = list.filter((id) => id !== skillId);
-    return next;
+    return keepExpertise(next);
   }
   if (!picks.from.includes(skillId) || list.length >= picks.count || skillTakenBy(draft, skillId, source)) return draft;
   list.push(skillId);
   return next;
+}
+
+// ---- Expertise (the Rogue), chosen on the Skills step ----
+
+// The Expertise picks: { count, from: [skills the hero is proficient in], chosen }, or null
+// for a class without Expertise (or before the background and species are chosen).
+export function expertisePicks(draft) {
+  if (!findClass(draft.classId) || !findBackground(draft.backgroundId) || !findSpecies(draft.speciesId)) return null;
+  const count = expertiseCount(draft);
+  return count ? { count, from: expertiseChoices(draft), chosen: draft.classChoices.expertise || [] } : null;
+}
+
+// Picks a skill for Expertise, or unpicks it. Ignored if it can't be picked.
+export function toggleExpertise(draft, skillId) {
+  const picks = expertisePicks(draft);
+  if (!picks) return draft;
+  const next = copy(draft);
+  if (picks.chosen.includes(skillId)) {
+    next.classChoices = { ...next.classChoices, expertise: picks.chosen.filter((id) => id !== skillId) };
+    return next;
+  }
+  if (!picks.from.includes(skillId) || picks.chosen.length >= picks.count) return draft;
+  next.classChoices = { ...next.classChoices, expertise: [...picks.chosen, skillId] };
+  return next;
+}
+
+// Expertise needs proficiency: drops picks of skills the hero is no longer proficient in.
+// Changes the draft it's given (always a fresh copy).
+function keepExpertise(draft) {
+  const chosen = (draft.classChoices && draft.classChoices.expertise) || [];
+  if (!chosen.length) return draft;
+  const picks = expertisePicks(draft);
+  draft.classChoices = { ...draft.classChoices, expertise: chosen.filter((id) => picks && picks.from.includes(id)) };
+  return draft;
 }
 
 // ---- Spells ----
@@ -589,6 +623,42 @@ export function kitShield(draft) {
   return Boolean(cls && armorTraining(draft).includes('shield') && startingKit(draft).items.some(({ item }) => item.category === 'shield'));
 }
 
+// ---- Weapon Mastery (the Fighter and the Rogue), chosen with the equipment ----
+
+// The Weapon Mastery picks: { count, from: [weapon ids], chosen: [weapon ids] }, or null for a
+// class without the feature.
+export function masteryPicks(draft) {
+  if (!findClass(draft.classId) || !weaponMasteryCount(draft)) return null;
+  return { count: weaponMasteryCount(draft), from: masteryChoices(draft), chosen: draft.classChoices.weaponMasteries || [] };
+}
+
+// Picks a weapon for Weapon Mastery, or unpicks it if already picked. Ignored if it can't be
+// picked.
+export function toggleMastery(draft, weaponId) {
+  const picks = masteryPicks(draft);
+  if (!picks) return draft;
+  const next = copy(draft);
+  if (picks.chosen.includes(weaponId)) {
+    next.classChoices = { ...next.classChoices, weaponMasteries: picks.chosen.filter((id) => id !== weaponId) };
+    return next;
+  }
+  if (!picks.from.includes(weaponId) || picks.chosen.length >= picks.count) return draft;
+  next.classChoices = { ...next.classChoices, weaponMasteries: [...picks.chosen, weaponId] };
+  return next;
+}
+
+// A start for Weapon Mastery, if nothing is picked yet: the weapons in the starting kits, in
+// the order they're listed.
+function suggestMasteries(draft) {
+  const picks = masteryPicks(draft);
+  if (!picks || picks.chosen.length) return draft;
+  const inKit = [...new Set(startingKit(draft).items.map(({ item }) => item.id))].filter((id) => picks.from.includes(id));
+  if (!inKit.length) return draft;
+  const next = copy(draft);
+  next.classChoices = { ...next.classChoices, weaponMasteries: inKit.slice(0, picks.count) };
+  return next;
+}
+
 // ---- Getting each step ready, and what each step still needs ----
 
 // Fills in sensible starting choices the first time a step is shown, so the player can
@@ -603,6 +673,7 @@ export function prepareStep(draft, step) {
   if (step === 'equipment') {
     if (!next.startingEquipment.class && kitOptions(next, 'class').length) next = chooseKit(next, 'class', 'A');
     if (!next.startingEquipment.background && kitOptions(next, 'background').length) next = chooseKit(next, 'background', 'A');
+    next = suggestMasteries(next);
   }
   return next;
 }
@@ -648,6 +719,8 @@ export function stepProblems(draft, step) {
         need(false, `Choose ${picks.count} ${what}${picks.count === 1 ? '' : 's'} (${picks.chosen.length} chosen).`);
       }
     }
+    const expertise = expertisePicks(draft);
+    if (expertise) need(expertise.chosen.length === expertise.count, `Choose ${expertise.count} skills for Expertise (${expertise.chosen.length} chosen).`);
   } else if (step === 'spells') {
     const what = { cantrips: `${cls ? cls.name : ''} cantrips`, spellbook: 'spells for your spellbook', prepared: 'spells to prepare' };
     // (A Cleric has no spellbook: classSpellPicks gives null for it, so it's skipped.)
@@ -673,6 +746,8 @@ export function stepProblems(draft, step) {
   } else if (step === 'equipment') {
     need(chosenKit(draft, 'class'), 'Choose your class equipment.');
     need(chosenKit(draft, 'background'), 'Choose your background equipment.');
+    const masteries = masteryPicks(draft);
+    if (masteries) need(masteries.chosen.length === masteries.count, `Choose ${masteries.count} weapons for Weapon Mastery (${masteries.chosen.length} chosen).`);
   } else if (step === 'review') {
     problems.push(...validateCharacter(previewHero(draft)));
   }

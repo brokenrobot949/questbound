@@ -1,9 +1,13 @@
-// Classes (SRD 5.2.1). Only what the current phase needs: the Fighter, the Wizard and the
-// Cleric at levels 1–3. More classes and levels are added as each phase needs them.
+// Classes (SRD 5.2.1). Only what the current phase needs: the Fighter, the Wizard, the Cleric
+// and the Rogue at levels 1–3. More classes and levels are added as each phase needs them.
 //
 // Numbers per level are in `levels` (index 0 is level 1). Feature text is in `features`.
 // Item ids in starting equipment match the equipment data (armour is in data/srd/armor.js;
 // weapons and gear arrive with combat).
+//
+// weaponProficiencies   kinds of weapon: 'simple', 'martial'
+// martialWeaponsWith    (the Rogue) Martial weapons with any of these properties also count
+// toolProficiencies     tools from data/srd/equipment.js
 //
 // spellcasting: the class's Spellcasting feature.
 //   ability       the spellcasting ability
@@ -11,8 +15,9 @@
 //                 come from the book
 //   preparesFrom  'list' for the Cleric: prepared spells come straight from the class's
 //                 whole spell list (of levels it has slots for)
-// Per level: cantrips, preparedSpells, slots (per spell level, starting with level 1), and
-// uses of limited features (secondWindUses, actionSurgeUses, channelDivinity).
+// Per level: cantrips, preparedSpells, slots (per spell level, starting with level 1), uses of
+// limited features (secondWindUses, actionSurgeUses, channelDivinity), and weaponMasteries
+// (how many kinds of weapon get Weapon Mastery; see data/srd/weapon-masteries.js).
 
 export const classes = [
   {
@@ -293,6 +298,99 @@ export const classes = [
           'preserve-life': {
             name: 'Preserve Life',
             text: 'As a Magic action, you present your Holy Symbol and expend a use of your Channel Divinity to evoke healing energy that can restore a number of Hit Points equal to five times your Cleric level. Choose Bloodied creatures within 30 feet of yourself (which can include you), and divide those Hit Points among them. This feature can restore a creature to no more than half its Hit Point maximum.',
+          },
+        },
+        source: 'SRD 5.2.1',
+      },
+    ],
+    source: 'SRD 5.2.1',
+  },
+
+  {
+    id: 'rogue',
+    name: 'Rogue',
+    primaryAbilities: ['dexterity'],
+    hitDie: 8,
+    hitPointsAtLevel1: 8,
+    hitPointsPerLevel: 5,
+    savingThrows: ['dexterity', 'intelligence'],
+    skillChoices: {
+      count: 4,
+      from: ['acrobatics', 'athletics', 'deception', 'insight', 'intimidation', 'investigation', 'perception', 'persuasion', 'sleight-of-hand', 'stealth'],
+    },
+    // Simple weapons, and Martial weapons that have one of these properties.
+    weaponProficiencies: ['simple'],
+    martialWeaponsWith: ['finesse', 'light'],
+    toolProficiencies: ['thieves-tools'],
+    armorTraining: ['light'],
+    startingEquipment: [
+      {
+        option: 'A',
+        items: [
+          { id: 'leather-armor', quantity: 1 },
+          { id: 'dagger', quantity: 2 },
+          { id: 'shortsword', quantity: 1 },
+          { id: 'shortbow', quantity: 1 },
+          { id: 'arrow', quantity: 20 },
+          { id: 'quiver', quantity: 1 },
+          { id: 'thieves-tools', quantity: 1 },
+          { id: 'burglars-pack', quantity: 1 },
+        ],
+        gold: 8,
+      },
+      { option: 'B', items: [], gold: 100 },
+    ],
+    standardArray: { strength: 12, dexterity: 15, constitution: 13, intelligence: 14, wisdom: 10, charisma: 8 },
+    // sneakAttack: the Sneak Attack dice; expertise: how many skills have Expertise.
+    levels: [
+      { level: 1, features: ['expertise', 'sneak-attack', 'thieves-cant', 'weapon-mastery'], sneakAttack: '1d6', weaponMasteries: 2, expertise: 2 },
+      { level: 2, features: ['cunning-action'], sneakAttack: '1d6', weaponMasteries: 2, expertise: 2 },
+      { level: 3, features: ['rogue-subclass', 'steady-aim'], sneakAttack: '2d6', weaponMasteries: 2, expertise: 2 },
+    ],
+    features: {
+      expertise: {
+        name: 'Expertise',
+        text: 'You gain Expertise in two of your skill proficiencies of your choice. Sleight of Hand and Stealth are recommended if you have proficiency in them. At Rogue level 6, you gain Expertise in two more of your skill proficiencies of your choice.',
+      },
+      'sneak-attack': {
+        name: 'Sneak Attack',
+        text: 'You know how to strike subtly and exploit a foe’s distraction. Once per turn, you can deal an extra 1d6 damage to one creature you hit with an attack roll if you have Advantage on the roll and the attack uses a Finesse or a Ranged weapon. The extra damage’s type is the same as the weapon’s type. You don’t need Advantage on the attack roll if at least one of your allies is within 5 feet of the target, the ally doesn’t have the Incapacitated condition, and you don’t have Disadvantage on the attack roll. The extra damage increases as you gain Rogue levels: 2d6 at level 3.',
+      },
+      'thieves-cant': {
+        name: 'Thieves’ Cant',
+        text: 'You picked up various languages in the communities where you plied your roguish talents. You know Thieves’ Cant and one other language of your choice, which you choose from the language tables in “Character Creation.”',
+      },
+      'weapon-mastery': {
+        name: 'Weapon Mastery',
+        text: 'Your training with weapons allows you to use the mastery properties of two kinds of weapons of your choice with which you have proficiency, such as Daggers and Shortbows. Whenever you finish a Long Rest, you can change the kinds of weapons you chose. For example, you could switch to using the mastery properties of Scimitars and Shortswords.',
+      },
+      'cunning-action': {
+        name: 'Cunning Action',
+        text: 'Your quick thinking and agility allow you to move and act quickly. On your turn, you can take one of the following actions as a Bonus Action: Dash, Disengage, or Hide.',
+      },
+      'rogue-subclass': {
+        name: 'Rogue Subclass',
+        text: 'You gain a Rogue subclass of your choice. A subclass is a specialization that grants you features at certain Rogue levels. For the rest of your career, you gain each of your subclass’s features that are of your Rogue level or lower.',
+      },
+      'steady-aim': {
+        name: 'Steady Aim',
+        text: 'As a Bonus Action, you give yourself Advantage on your next attack roll on the current turn. You can use this feature only if you haven’t moved during this turn, and after you use it, your Speed is 0 until the end of the current turn.',
+      },
+    },
+    subclasses: [
+      {
+        id: 'thief',
+        name: 'Thief',
+        summary: 'Hunt for treasure as a classic adventurer.',
+        levels: [{ level: 3, features: ['fast-hands', 'second-story-work'] }],
+        features: {
+          'fast-hands': {
+            name: 'Fast Hands',
+            text: 'As a Bonus Action, you can do one of the following. Sleight of Hand: make a Dexterity (Sleight of Hand) check to pick a lock or disarm a trap with Thieves’ Tools or to pick a pocket. Use an Object: take the Utilize action, or take the Magic action to use a magic item that requires that action.',
+          },
+          'second-story-work': {
+            name: 'Second-Story Work',
+            text: 'You’ve trained to get into especially hard-to-reach places, granting you these benefits. Climber: you gain a Climb Speed equal to your Speed. Jumper: you can determine your jump distance using your Dexterity rather than your Strength.',
           },
         },
         source: 'SRD 5.2.1',

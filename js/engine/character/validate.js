@@ -8,7 +8,7 @@ import { skills } from '../../../data/srd/skills.js';
 import { standardArray, pointBuy, maxAbilityScore } from '../../../data/srd/character-creation.js';
 import { drives } from '../../../data/campaign/drives.js';
 import { bonds } from '../../../data/campaign/bonds.js';
-import { findArmor, findBackground, findClass, findFeat, findSpecies } from './sheet.js';
+import { expertiseChoices, expertiseCount, findArmor, findBackground, findClass, findFeat, findSpecies, masteryChoices, weaponMasteryCount } from './sheet.js';
 import { spellProblems } from './spells.js';
 import { lookProblems } from './look.js';
 
@@ -128,6 +128,22 @@ export function validateCharacter(character) {
   if (character.classId === 'wizard' && character.level >= 2) {
     const ok = cls.scholarSkills.includes(choices.scholarSkill) && classSkills.concat(bg.skills, speciesSkills, featSkills).includes(choices.scholarSkill);
     need(ok, 'Choose a Scholar skill you are proficient in.');
+  }
+  // Weapon Mastery (the Fighter and the Rogue): as many different weapons as the class gives,
+  // each one the hero is proficient with.
+  if (Number.isInteger(character.level) && character.level >= 1 && character.level <= maxLevel) {
+    const count = weaponMasteryCount(character);
+    const mastered = choices.weaponMasteries || [];
+    const allowed = masteryChoices(character);
+    const ok = mastered.length === count && new Set(mastered).size === count && mastered.every((id) => allowed.includes(id));
+    need(ok, count ? `Choose ${count} different weapons you’re proficient with for Weapon Mastery.` : `A ${cls.name} has no Weapon Mastery.`);
+    // A Rogue's Expertise: as many different skills as the class gives, each one the hero is
+    // proficient in.
+    const experts = expertiseCount(character);
+    const expertise = choices.expertise || [];
+    const skilled = expertiseChoices(character);
+    const expertOk = expertise.length === experts && new Set(expertise).size === experts && expertise.every((id) => skilled.includes(id));
+    need(expertOk, experts ? `Choose ${experts} different skills you’re proficient in for Expertise.` : `A ${cls.name} has no Expertise to choose.`);
   }
 
   // Drive and Bond (original additions; see docs/DESIGN.md, "Character Creation").

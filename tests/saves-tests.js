@@ -616,6 +616,17 @@ test('Migration: a version 14 game hasn’t just finished a Long Rest, and becom
   assertEqual([save.version, save.game.canPrepare], [15, false]);
 });
 
+test('Migration: a version 15 Fighter takes the weapons in their pack for Weapon Mastery, and becomes version 16', () => {
+  const fighter = { ...structuredClone(testHero), classChoices: { fightingStyle: 'defense' } };
+  const pack = [{ id: 'chain-mail', quantity: 1 }, { id: 'spear', quantity: 1 }, { id: 'torch', quantity: 3 }, { id: 'shortbow', quantity: 1 }];
+  const v15 = { version: 15, slot: 1, game: { character: fighter, inventory: pack, undo: { kind: 'choice', state: { character: fighter, inventory: pack } } } };
+  const game = migrateSave(v15, migrations, 16).game;
+  assertEqual(game.character.classChoices, { fightingStyle: 'defense', weaponMasteries: ['spear', 'shortbow', 'greatsword'] }, 'two from the pack, then the Greatsword');
+  assertEqual([validateCharacter(game.character), game.undo.state.character.classChoices.weaponMasteries], [[], ['spear', 'shortbow', 'greatsword']]);
+  const wizard = { version: 15, slot: 1, game: { character: { classId: 'wizard', classChoices: {} }, inventory: [], undo: null } };
+  assertEqual(migrateSave(wizard, migrations, 16).game.character.classChoices, {}, 'only Fighters have Weapon Mastery so far');
+});
+
 test('Sessions: a new session sums up the last one in the journal if the player just closed the game', async () => {
   const game = newGame(await freshRuntime(), { slot: 1, seed: 'session', character: testHero });
   game.journal.deeds.push({ day: 1, text: 'Did a brave thing.' });

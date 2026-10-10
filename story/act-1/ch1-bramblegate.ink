@@ -2,7 +2,8 @@
 // (docs/STORY.md). The square leads to the reeve's hall (the bounty, and the quest), the
 // market (shopping), Hob's forge, the temple and the notice board. Every Drive gets a moment
 // here to earn Heroic Inspiration. Once the hero has taken the bounty, Lark Dunn finds them,
-// and the road to Dunn's Mill opens.
+// and the road to Dunn's Mill opens. A Rogue can read the thieves' chalk marks on the notice
+// board: a bounty on an informer, which Chapter 2 pays off (Fen in the stocks).
 
 === ch1_morning ===
 Morning comes grey and dripping. Morwen sets down a breakfast big enough for two: eggs, black bread, a slab of ham, and tea strong enough to stand a spoon in. #location:Bramblegate, the Tallow and Thistle #time:Morning
@@ -177,6 +178,11 @@ Reeve Ansel Corbin's hall is a long room full of ledgers and worried people. The
     ~ drive_moment("freedom")
     ~ set_flag("tore_down_notice")
     You tear it down, fold it small and drop it down the well. Nobody stops you. An old woman drawing water gives you a nod that says she'd have done it herself, if her knees were younger.
+    -> read
+* {has_class("rogue")} [Read the thieves' chalk marks low on the post]
+    Low on the post, where nobody honest ever looks, someone has chalked the little signs your kind leave for each other. An open eye for the watch-house: they're sharp here. A cross over the market: robbed enough already.
+    And one fresh mark, its edges still crisp: a bird with its beak tied shut, over a coin. In the cant, that's a bounty on an informer. Somebody is paying for a songbird who sang too much, and they want it quiet.
+    ~ set_flag("read_cant_marks")
     -> read
 + [Back to the square]
     -> bramblegate

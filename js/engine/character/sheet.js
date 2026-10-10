@@ -10,7 +10,7 @@
 //   abilityScoreMethod ('standard-array', 'point-buy', 'random' or 'manual'), baseAbilityScores
 //   classSkills, speciesSkills, featSkills (skills picked from each source)
 //   originFeat (the Human's Versatile feat), classChoices ({ fightingStyle, scholarSkill,
-//   divineOrder })
+//   divineOrder, weaponMasteries: [weapon ids] })
 //   drive (an id from data/campaign/drives.js), bond ({ type, name }: who the hero left behind)
 //   startingEquipment ({ class: 'A', background: 'B' }: the kit options taken at creation)
 //   spells, magicInitiate (spell choices; see spells.js)
@@ -28,6 +28,8 @@ import { backgrounds } from '../../../data/srd/backgrounds.js';
 import { feats } from '../../../data/srd/feats.js';
 import { armor, shield, unarmoredBaseAc } from '../../../data/srd/armor.js';
 import { spells } from '../../../data/srd/spells.js';
+import { equipment } from '../../../data/srd/equipment.js';
+import { weaponMasteries } from '../../../data/srd/weapon-masteries.js';
 import { maxAbilityScore } from '../../../data/srd/character-creation.js';
 
 // ---- Looking things up ----
@@ -39,6 +41,9 @@ export const findSpecies = (id) => species.find((s) => s.id === id) || null;
 export const findBackground = (id) => backgrounds.find((b) => b.id === id) || null;
 export const findFeat = (id) => feats.find((f) => f.id === id) || null;
 export const findArmor = (id) => armor.find((a) => a.id === id) || null;
+export const findWeapon = (id) => equipment.find((e) => e.id === id && e.category === 'weapon') || null;
+export const findTool = (id) => equipment.find((e) => e.id === id && e.category === 'tool') || null;
+export const findMastery = (id) => weaponMasteries.find((m) => m.id === id) || null;
 
 function classOf(character) {
   const found = findClass(character.classId);
@@ -81,6 +86,43 @@ export function divineOrderOf(character) {
 export function weaponProficiencies(character) {
   const order = divineOrderOf(character);
   return [...new Set([...classOf(character).weaponProficiencies, ...((order && order.weaponProficiencies) || [])])];
+}
+
+// Whether the character is proficient with a weapon: its kind ('simple' or 'martial') is one
+// they're proficient with, or it's a Martial weapon with a property their class allows (a
+// Rogue's Finesse or Light weapons).
+export function proficientWithWeapon(character, weapon) {
+  const kind = weapon.weaponType.split('-')[0];
+  if (weaponProficiencies(character).includes(kind)) return true;
+  const allowed = classOf(character).martialWeaponsWith || [];
+  return kind === 'martial' && (weapon.properties || []).some((p) => allowed.includes(p));
+}
+
+// ---- Weapon Mastery (the Fighter and the Rogue) ----
+// The hero chooses kinds of weapon (weapon ids, classChoices.weaponMasteries) and uses each
+// one's mastery property in fights (data/srd/weapon-masteries.js).
+
+// How many kinds of weapon the hero has Weapon Mastery with: 0 for a class without it.
+export function weaponMasteryCount(character) {
+  return classLevelRow(character).weaponMasteries || 0;
+}
+
+// The weapons the hero has chosen for Weapon Mastery.
+export function masteredWeapons(character) {
+  return weaponMasteryCount(character) ? (character.classChoices || {}).weaponMasteries || [] : [];
+}
+
+// The mastery property the hero uses with this weapon, or null.
+export function masteryFor(character, weaponId) {
+  if (!masteredWeapons(character).includes(weaponId)) return null;
+  const weapon = findWeapon(weaponId);
+  return weapon && weapon.mastery ? findMastery(weapon.mastery) : null;
+}
+
+// The weapons the hero could choose for Weapon Mastery: each one with a mastery property that
+// they're proficient with.
+export function masteryChoices(character) {
+  return equipment.filter((e) => e.category === 'weapon' && e.mastery && proficientWithWeapon(character, e)).map((e) => e.id);
 }
 
 // The armour the character is trained with ('light', 'medium', 'heavy', 'shield'): their
@@ -162,18 +204,53 @@ export function skillProficiency(character, skillId) {
   const choices = character.classChoices || {};
   const expert = character.classId === 'wizard' && character.level >= 2 && choices.scholarSkill === skillId;
   if (expert) return { level: 'expertise', sources: [...sources, 'Scholar'] };
+  // A Rogue's Expertise, in skills they're proficient in.
+  if (sources.length && (choices.expertise || []).includes(skillId) && hasFeature(character, 'expertise')) return { level: 'expertise', sources: [...sources, 'Expertise'] };
   return { level: sources.length > 0 ? 'proficient' : 'none', sources };
 }
 
+// The skills a Rogue can choose for Expertise: those they're proficient in, not counting
+// Expertise itself (or Scholar).
+export function expertiseChoices(character) {
+  return skills.filter((s) => skillProficiency({ ...character, classChoices: {} }, s.id).level !== 'none').map((s) => s.id);
+}
+
+// How many skills a Rogue has Expertise in (0 for other classes).
+export function expertiseCount(character) {
+  return hasFeature(character, 'expertise') ? classLevelRow(character).expertise || 0 : 0;
+}
+
+// The tools the character is proficient with: their class's and their background's.
+export function toolProficiencies(character) {
+  return [...new Set([...(classOf(character).toolProficiencies || []), backgroundOf(character).tool].filter(Boolean))];
+}
+
+// Whether the character is proficient with a tool, and why: the sources, e.g. ['Rogue',
+// 'Criminal background'] (empty for none).
+export function toolProficiency(character, toolId) {
+  const sources = [];
+  if ((classOf(character).toolProficiencies || []).includes(toolId)) sources.push(classOf(character).name);
+  if (backgroundOf(character).tool === toolId) sources.push(`${backgroundOf(character).name} background`);
+  return sources;
+}
+
 // Everything added to the d20 for an ability check, each with where it comes from.
-// testId is a skill ('persuasion') or, for a plain ability check, an ability ('strength').
+// testId is a skill ('persuasion'), a tool ('thieves-tools', using the tool's ability) or, for
+// a plain ability check, an ability ('strength').
 export function checkModifiers(character, testId) {
   const skill = findSkill(testId);
-  const ability = findAbility(skill ? skill.ability : testId);
-  if (!ability) throw new Error(`Unknown skill or ability: ${testId}`);
+  const tool = skill ? null : findTool(testId);
+  const ability = findAbility(skill ? skill.ability : tool ? tool.ability : testId);
+  if (!ability) throw new Error(`Unknown skill, tool or ability: ${testId}`);
 
   const score = abilityScore(character, ability.id).value;
   const modifiers = [{ label: ability.abbreviation, value: abilityModifier(score), source: `${ability.name} ${score}` }];
+
+  if (tool) {
+    const from = toolProficiency(character, tool.id);
+    const bonus = proficiencyBonus(character.level);
+    if (from.length) modifiers.push({ label: 'Proficiency', value: bonus, source: `Proficient with ${tool.name} (${from.join(', ')}); +${bonus} at level ${character.level}` });
+  }
 
   if (skill) {
     const proficiency = skillProficiency(character, skill.id);
@@ -193,7 +270,7 @@ export function checkModifiers(character, testId) {
     }
   }
 
-  return { ability, skill, modifiers, total: modifiers.reduce((sum, m) => sum + m.value, 0) };
+  return { ability, skill, tool, modifiers, total: modifiers.reduce((sum, m) => sum + m.value, 0) };
 }
 
 // Features that give Advantage on a check, as reasons for d20Test, e.g. ['Remarkable Athlete'].
@@ -203,9 +280,19 @@ export function checkAdvantage(character, testId) {
   return reasons;
 }
 
+// What gives Disadvantage on a check, as reasons for d20Test: armour that's noisy to sneak in
+// (Chain Mail, say) on Stealth checks.
+export function checkDisadvantage(character, testId) {
+  const worn = character.armorId ? findArmor(character.armorId) : null;
+  return testId === 'stealth' && worn && worn.stealthDisadvantage ? [`${worn.name}: noisy to sneak in`] : [];
+}
+
 export function skillBonus(character, skillId) {
   return derived(checkModifiers(character, skillId).modifiers.map(({ label, value }) => ({ label, value })));
 }
+
+// The bonus to a check with a tool, e.g. Thieves' Tools: its ability, plus Proficiency.
+export const toolBonus = skillBonus;
 
 export function savingThrow(character, abilityId) {
   const ability = findAbility(abilityId);
@@ -303,6 +390,16 @@ export function speed(character, spellsOn = []) {
 
 const spellCombat = (id) => spells.find((s) => s.id === id).combat;
 
+// A Climb Speed: a Thief's Second-Story Work gives one equal to their Speed. 0 for none.
+export function climbSpeed(character, spellsOn = []) {
+  return hasFeature(character, 'second-story-work') ? speed(character, spellsOn).value : 0;
+}
+
+// A Rogue's Sneak Attack dice ('1d6', then '2d6' at level 3), or null.
+export function sneakAttackDice(character) {
+  return hasFeature(character, 'sneak-attack') ? classLevelRow(character).sneakAttack : null;
+}
+
 export function darkvision(character) {
   const option = speciesOption(character);
   return Math.max(speciesOf(character).darkvision || 0, (option && option.darkvision) || 0);
@@ -362,6 +459,12 @@ export function characterFeatures(character) {
   }
   const order = divineOrderOf(character);
   if (order) list.push({ name: `Divine Order: ${order.name}`, text: order.summary, level: 1, source: cls.name });
+  const mastered = masteredWeapons(character).map((id) => ({ weapon: findWeapon(id), mastery: masteryFor(character, id) })).filter((m) => m.weapon && m.mastery);
+  if (mastered.length) {
+    const names = mastered.map(({ weapon, mastery }) => `${weapon.name} (${mastery.name})`).join(', ');
+    const texts = [...new Set(mastered.map(({ mastery }) => mastery))].map((m) => `${m.name}: ${m.text}`).join(' ');
+    list.push({ name: `Weapon Mastery: ${names}`, text: texts, level: 1, source: cls.name });
+  }
   const sub = subclassOf(character);
   if (sub) {
     for (const row of sub.levels.filter((r) => r.level <= character.level)) {

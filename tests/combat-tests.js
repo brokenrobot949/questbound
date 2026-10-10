@@ -4,7 +4,7 @@
 import { test, assertEqual, assertTrue, assertThrows, scriptedRng, run } from './harness.js';
 import { createRng } from '../js/engine/rules/rng.js';
 import { forceNextD20 } from '../js/engine/rules/dice.js';
-import { parseMap, reachableSquares, squaresBetween, key } from '../js/engine/combat/grid.js';
+import { lineBlock, parseMap, reachableSquares, squaresBetween, key } from '../js/engine/combat/grid.js';
 import { heroAttackOptions, hitChance, rollDamage } from '../js/engine/combat/attacks.js';
 import * as fight from '../js/engine/combat/battle.js';
 import { startingInventory } from '../js/engine/character/inventory.js';
@@ -61,6 +61,12 @@ test('Grid: pass through an ally but not an enemy, and stop in nobody’s square
   assertTrue(ally.has(key({ x: 2, y: 0 })) && !ally.has(key({ x: 1, y: 0 })));
   const foe = reachableSquares(map, { x: 0, y: 0 }, 10, (p) => (p.x === 1 ? 'enemy' : null));
   assertTrue(!foe.has(key({ x: 2, y: 0 })));
+});
+
+test('Grid: walls block sight and attacks; obstacles block sight only; neighbours always see each other', () => {
+  const map = parseMap(['.....', '..#..', '.....', '..o..', '.....'], { ...legend, o: { terrain: 'obstacle' } });
+  assertEqual([lineBlock(map, { x: 0, y: 1 }, { x: 4, y: 1 }), lineBlock(map, { x: 0, y: 3 }, { x: 4, y: 3 }), lineBlock(map, { x: 0, y: 0 }, { x: 4, y: 0 })], ['wall', 'obstacle', null]);
+  assertEqual(lineBlock(parseMap(['.#', '#.'], legend), { x: 0, y: 0 }, { x: 1, y: 1 }), null, 'diagonal neighbours, past a corner');
 });
 
 // ---- Attack options and maths ----
@@ -228,6 +234,139 @@ test('Fight: winning gives the monsters’ XP once the player carries on', () =>
   assertEqual([game.battle.outcome, game.battle.xp], ['victory', 50]);
   const { outcome, choiceIndex } = fight.finishBattle(game);
   assertEqual([outcome, choiceIndex, game.xp, game.battle, game.lastBattle.outcome], ['victory', 0, 50, null, 'victory']);
+});
+
+// ---- Weapon Mastery and the Light property ----
+
+// Wren with kit B (a Scimitar, a Shortsword and a Longbow) and Two-Weapon Fighting, with
+// Weapon Mastery of all three: Nick, Vex and Slow.
+const duelist = {
+  ...wren,
+  startingEquipment: { class: 'B', background: 'A' },
+  armorId: 'studded-leather-armor',
+  classChoices: { fightingStyle: 'two-weapon-fighting', weaponMasteries: ['scimitar', 'shortsword', 'longbow'] },
+};
+
+// The mill fight with one goblin beside the hero (at 3, 1), tough enough to take a few hits,
+// and the other one out of it.
+function duel(character) {
+  const game = millFight(character);
+  const [goblin, other] = fight.enemies(game.battle);
+  goblin.pos = { x: 3, y: 2 };
+  goblin.hp = goblin.maxHp = 30;
+  other.hp = 0;
+  return { game, goblin };
+}
+
+const lastAttackRoll = (game) => game.battle.log.filter((e) => e.roll && e.roll.kind === 'attack').pop().roll;
+
+test('Weapon Mastery: Vex gives Advantage on the next attack; Nick makes the Light extra attack part of the Attack action', () => {
+  assertEqual(validateCharacter(duelist), []);
+  const { game, goblin } = duel(duelist);
+  assertTrue(!heroAttackOptions(game).some((o) => o.extra), 'no extra attack before a Light weapon is used');
+  forceNextD20(18);
+  fight.heroAttack(game, 'shortsword-melee', goblin.id);
+  assertTrue(fight.conditionsOf(game.battle, goblin.id).includes('vexed'), 'a Shortsword hit vexes');
+  const extra = heroAttackOptions(game).find((o) => o.id === 'scimitar-melee-extra');
+  assertEqual([extra.nick, extra.bonusAction, extra.damage.bonus], [true, false, 3], 'Nick; Two-Weapon Fighting adds Str to the damage');
+  assertEqual(fight.attackPreview(game, extra.id, goblin.id).advantage, ['Vex: your Shortsword hit it']);
+  fight.heroAttack(game, extra.id, goblin.id);
+  assertEqual(lastAttackRoll(game).mode, 'advantage');
+  assertTrue(!fight.conditionsOf(game.battle, goblin.id).includes('vexed'), 'the Advantage is used up');
+  assertEqual([game.battle.turnState.bonus, heroAttackOptions(game).some((o) => o.extra)], [false, false], 'the Bonus Action is still free, and the extra attack comes once a turn');
+});
+
+test('Light: without Nick the extra attack is a Bonus Action, with no ability modifier on its damage', () => {
+  const plain = { ...duelist, classChoices: { fightingStyle: 'defense', weaponMasteries: ['shortsword', 'longbow', 'spear'] } };
+  assertEqual(validateCharacter(plain), []);
+  const { game, goblin } = duel(plain);
+  forceNextD20(18);
+  fight.heroAttack(game, 'scimitar-melee', goblin.id);
+  const extra = heroAttackOptions(game).find((o) => o.id === 'shortsword-melee-extra');
+  assertEqual([extra.nick, extra.bonusAction, extra.damage.bonus, extra.mastery.id], [false, true, 0, 'vex']);
+  fight.heroAttack(game, extra.id, goblin.id);
+  assertTrue(game.battle.turnState.bonus, 'it took the Bonus Action');
+  const shielded = duel({ ...plain, shield: true }).game;
+  fight.heroAttack(shielded, 'scimitar-melee', fight.enemies(shielded.battle)[0].id);
+  assertTrue(!heroAttackOptions(shielded).some((o) => o.extra), 'a Shield leaves no hand for a second weapon');
+});
+
+test('Weapon Mastery: Sap gives the foe Disadvantage on its next attack; Slow cuts its Speed', () => {
+  const { game, goblin } = duel(wren);
+  forceNextD20(18);
+  fight.heroAttack(game, 'flail-melee', goblin.id);
+  assertTrue(fight.conditionsOf(game.battle, goblin.id).includes('sapped'));
+  fight.endHeroTurn(game);
+  const attack = game.battle.log.find((e) => e.roll && e.roll.kind === 'attack' && e.text.startsWith('Goblin Minion 1'));
+  assertTrue(attack.roll.disadvantage.includes('Goblin Minion 1 is Sapped'), JSON.stringify(attack.roll.disadvantage));
+  assertTrue(!fight.conditionsOf(game.battle, goblin.id).includes('sapped'), 'used up');
+
+  const thrown = duel(wren);
+  thrown.goblin.pos = { x: 3, y: 5 };
+  forceNextD20(18);
+  fight.heroAttack(thrown.game, 'javelin-ranged', thrown.goblin.id);
+  assertTrue(fight.conditionsOf(thrown.game.battle, thrown.goblin.id).includes('slowed'), 'a Javelin hit slows');
+});
+
+test('Weapon Mastery: Topple knocks a foe Prone on a failed save; Graze hurts even on a miss', () => {
+  const toppler = { ...wren, classChoices: { fightingStyle: 'defense', weaponMasteries: ['greatsword', 'quarterstaff', 'javelin'] } };
+  const { game, goblin } = duel(toppler);
+  game.inventory.push({ id: 'quarterstaff', quantity: 1 });
+  assertEqual(heroAttackOptions(game).find((o) => o.id === 'quarterstaff-melee').mastery.dc, 13, '8 + Str 3 + Proficiency 2');
+  game.rng = scriptedRng([18, 4, 5, 2]); // the attack, the damage (twice: Savage Attacker), the save
+  fight.heroAttack(game, 'quarterstaff-melee', goblin.id);
+  assertTrue(fight.isProne(game.battle, goblin.id), 'a 2 on the Constitution save');
+
+  const grazed = duel(wren);
+  forceNextD20(2);
+  fight.heroAttack(grazed.game, 'greatsword-melee', grazed.goblin.id);
+  assertEqual(grazed.goblin.hp, 27, 'a miss, but Graze deals the Str +3');
+});
+
+// ---- Hiding ----
+
+// The mill fight with the hero (at 3, 2) behind the barrel (at 3, 3) from one goblin (at 3, 6),
+// and the other goblin out of it.
+function behindTheBarrel(character = wren) {
+  const { game, goblin } = duel(character);
+  goblin.pos = { x: 3, y: 6 };
+  fight.heroCombatant(game.battle).pos = { x: 3, y: 2 };
+  return { game, goblin };
+}
+
+test('Hide: only out of every foe’s sight; noisy armour gives Disadvantage on the Stealth check', () => {
+  const { game, goblin } = duel(wren);
+  goblin.pos = { x: 5, y: 6 }; // a clear view of the hero at (3, 1)
+  assertEqual(fight.heroHideProblem(game), 'Goblin Minion 1 can see you. Get a wall or an obstacle between you first.');
+  const hiding = behindTheBarrel().game;
+  assertEqual([fight.heroHideProblem(hiding), fight.foesWatching(hiding).length], [null, 0]);
+  assertThrows(() => fight.heroHide(hiding, { bonus: true }), 'a Bonus Action Hide is a Rogue’s Cunning Action');
+  forceNextD20(18);
+  fight.heroHide(hiding);
+  const roll = hiding.battle.log[hiding.battle.log.length - 1].roll;
+  assertEqual([roll.disadvantage, roll.total, roll.success], [['Chain Mail: noisy to sneak in'], 19, true]);
+  assertTrue(fight.conditionsOf(hiding.battle, 'hero').includes('hidden'));
+});
+
+test('Hide: foes search instead of attacking; the hero’s attack has Advantage, then gives them away', () => {
+  const { game, goblin } = behindTheBarrel();
+  forceNextD20(18);
+  fight.heroHide(game); // Stealth 19
+  forceNextD20(2); // the goblin's Search: 2 − 1 Perception
+  fight.endHeroTurn(game);
+  const log = game.battle.log.map((e) => e.text);
+  assertTrue(log.some((t) => t.includes('searches, but can’t find you')) && !game.battle.log.some((e) => e.roll && e.roll.kind === 'attack' && e.text.startsWith('Goblin')), log.slice(-4).join(' / '));
+  assertTrue(fight.isHeroTurn(game) && fight.conditionsOf(game.battle, 'hero').includes('hidden'), 'still hidden');
+  assertTrue(fight.attackPreview(game, 'javelin-ranged', goblin.id).advantage.includes('You’re hidden'));
+  fight.heroAttack(game, 'javelin-ranged', goblin.id);
+  assertTrue(!fight.conditionsOf(game.battle, 'hero').includes('hidden') && game.battle.log.some((e) => e.text === 'You’re no longer hidden: you attack.'));
+
+  const found = behindTheBarrel().game;
+  forceNextD20(18);
+  fight.heroHide(found);
+  forceNextD20(20); // 20 − 1 = 19 finds Stealth 19
+  fight.endHeroTurn(found);
+  assertTrue(found.battle.log.some((e) => e.text.includes('spots you')) && !fight.conditionsOf(found.battle, 'hero').includes('hidden'));
 });
 
 // ---- Level 2 and 3 features ----
@@ -570,8 +709,8 @@ test('Replay: damage shows on the line that deals it', () => {
 
 test('Action buttons say what an attack does: to hit, damage, the average, and reach', () => {
   const wrenOptions = heroAttackOptions(millFight());
-  assertEqual(attackSummary(wrenOptions.find((o) => o.id === 'greatsword-melee')), ['+5 to hit', '2d6 + 3 slashing', '10 on average', 'melee']);
-  assertEqual(attackSummary(wrenOptions.find((o) => o.id === 'javelin-ranged')), ['+5 to hit', '1d6 + 3 piercing', '6.5 on average', 'thrown 30/120 ft']);
+  assertEqual(attackSummary(wrenOptions.find((o) => o.id === 'greatsword-melee')), ['+5 to hit', '2d6 + 3 slashing', '10 on average', 'melee', 'Graze: a miss still deals 3 damage']);
+  assertEqual(attackSummary(wrenOptions.find((o) => o.id === 'spear-ranged')), ['+5 to hit', '1d6 + 3 piercing', '6.5 on average', 'thrown 20/60 ft'], 'no mastery for the spear');
   const evokerGame = millFight(evoker);
   const options = heroAttackOptions(evokerGame);
   const missile = attackSummary(options.find((o) => o.id === 'spell-magic-missile'), { slotsLeft: () => 4 });

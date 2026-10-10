@@ -29,7 +29,8 @@ import { getSetting } from '../save/settings.js';
 import { sprites } from '../../../data/campaign/sprites.js';
 import { blit, drawCell, drawTile, frameSquare, loadArt, pixelScale, sizeCanvas, spriteImage, TILE } from './tile-art.js';
 import { attackSummary, averageText } from './attack-text.js';
-import { rollLine } from './roll-format.js';
+import { rollLine, signedNumber } from './roll-format.js';
+import { skillBonus } from '../character/sheet.js';
 import { el, showFatalError } from './dom.js';
 
 const FRAME_MS = 500; // each frame of the two-frame idle animation
@@ -49,6 +50,7 @@ const HEALING_COLOR = '#7fd99a';
 // Washes over squares on the grid: an area spell's reach, and where Misty Step can go.
 const AREA_WASH = ['rgba(240, 140, 60, 0.35)', 'rgba(240, 140, 60, 0.9)'];
 const TELEPORT_WASH = ['rgba(180, 140, 230, 0.35)', 'rgba(180, 140, 230, 0.9)'];
+const HIDING_WASH = ['rgba(60, 110, 235, 0.5)', 'rgba(120, 170, 255, 1)'];
 // Tints under a creature with a condition, and words for the turn order.
 const CONDITION_TINTS = {
   paralyzed: 'rgba(180, 140, 230, 0.45)',
@@ -71,6 +73,10 @@ const CONDITION_WORDS = [
   ['poisoned', 'Poisoned'],
   ['outlined', 'Outlined'],
   ['guided', 'Glowing'],
+  ['vexed', 'Vexed'],
+  ['sapped', 'Sapped'],
+  ['slowed', 'Slowed'],
+  ['hidden', 'Hidden'],
   ['blessed', 'Blessed'],
   ['sanctuary', 'Sanctuary'],
 ];
@@ -394,6 +400,8 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     if (heroConditions.includes('outlined')) notes.push('Outlined: attacks on you have Advantage');
     if (heroConditions.includes('dodging')) notes.push('Dodging');
     if (hero.temp) notes.push(`${hero.temp} Temporary Hit Points`);
+    if (yourTurn && battle.turnState.aimed) notes.push('Steady Aim: Advantage on your next attack');
+    if (heroConditions.includes('hidden')) notes.push('Hidden: your attacks have Advantage until you attack or cast a spell');
     if (game.inspiration) notes.push('★ Heroic Inspiration');
     status.textContent = notes.join(' · ');
     objective.textContent = fight.objectiveText(battle);
@@ -450,7 +458,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
         ? `Remarkable Athlete: tap a gold square to move up to ${turn.athleteMove} feet without provoking Opportunity Attacks, or carry on.`
         : prone
           ? `You're Prone: your attacks have Disadvantage, and foes beside you have Advantage. Stand up for ${fight.heroStandCost(game)} feet of movement, or crawl (${turn.movementLeft} feet left, each square costs double).`
-          : `Your turn. Tap a lit square to move (${turn.movementLeft} feet left), or choose an action.`;
+          : `Your turn. Tap a lit square to move (${turn.movementLeft} feet left), or choose an action.${hidingSquares() ? ' Blue squares are out of every foe’s sight.' : ''}`;
     const summary = (option) => attackSummary(option, { slotsLeft: (level) => slotsLeft(game, level) }).join(' · ');
 
     // The attack just made missed: Heroic Inspiration can roll it again.
@@ -476,12 +484,14 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       return card;
     };
 
-    const weapons = options.filter((o) => o.source === 'weapon');
+    // Weapons, and the Light property's extra attack when Nick makes it part of the Attack
+    // action (otherwise it's under Bonus Action).
+    const weapons = options.filter((o) => o.source === 'weapon' && !o.bonusAction);
     if (weapons.length) {
       const attacks = actionGroup(turn.action ? 'Attack (action used)' : 'Attack');
       for (const option of weapons) attacks.list.append(choiceCard(option));
       controls.append(attacks.group);
-      if (chosen && chosen.source === 'weapon') controls.append(aimPanel(chosen, options));
+      if (chosen && chosen.source === 'weapon' && !chosen.bonusAction) controls.append(aimPanel(chosen, options));
     }
 
     const spells = firstOfEach(options.filter((o) => o.source === 'spell' && !o.bonusAction));
@@ -523,6 +533,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       card.disabled = turn.action;
       other.list.append(card);
     }
+    other.list.append(hideCard({ bonus: false }));
     // Fighters from level 2: Action Surge, once the turn's action is used.
     const surges = featureUsesMax(game.character, 'action-surge');
     if (surges) {
@@ -535,7 +546,8 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
 
     const bonuses = fight.heroBonusActions(game);
     const bonusSpells = firstOfEach(options.filter((o) => o.source === 'spell' && o.bonusAction));
-    if (bonuses.length || bonusSpells.length) {
+    const bonusWeapons = options.filter((o) => o.source === 'weapon' && o.bonusAction);
+    if (bonuses.length || bonusSpells.length || bonusWeapons.length) {
       const bonus = actionGroup(turn.bonus ? 'Bonus Action (used)' : 'Bonus Action');
       if (bonuses.includes('second-wind')) {
         const level = game.character.level;
@@ -547,7 +559,19 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
         const what = `Regain 2d4 + 2 Hit Points (7 on average) · ${potions} in your pack`;
         bonus.list.append(disabledIf(turn.bonus, actionCard('Drink a Potion of Healing', what, () => act(() => fight.heroDrinkPotion(game)))));
       }
-      for (const option of bonusSpells) bonus.list.append(choiceCard(option));
+      // A Rogue's Cunning Action (level 2) and Steady Aim (level 3).
+      if (bonuses.includes('cunning-action')) {
+        bonus.list.append(disabledIf(turn.bonus, actionCard('Dash (Cunning Action)', 'More movement this turn: as much again as your Speed', () => act(() => fight.heroDash(game, { bonus: true })))));
+        bonus.list.append(disabledIf(turn.bonus, actionCard('Disengage (Cunning Action)', 'Move away this turn without Opportunity Attacks', () => act(() => fight.heroDisengage(game, { bonus: true })))));
+        bonus.list.append(hideCard({ bonus: true }));
+      }
+      if (bonuses.includes('steady-aim')) {
+        const why = turn.moved ? ' (you’ve moved this turn)' : '';
+        const aim = actionCard('Steady Aim', `Advantage on your next attack this turn, but you can’t move again this turn. Only before you move${why}`, () => act(() => fight.heroSteadyAim(game)));
+        aim.disabled = !fight.heroCanSteadyAim(game);
+        bonus.list.append(aim);
+      }
+      for (const option of [...bonusWeapons, ...bonusSpells]) bonus.list.append(choiceCard(option));
       controls.append(bonus.group);
       if (chosen && chosen.bonusAction) controls.append(aimPanel(chosen, options));
     }
@@ -558,6 +582,24 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       controls.append(actionCard('Resolve', what, () => act(() => resolveFight(game), { instant: true })));
     }
     controls.append(actionCard('End turn', 'Your foes take their turns', () => act(() => fight.endHeroTurn(game)), 'is-primary'));
+  }
+
+  // True if the hero can move somewhere out of every foe's sight this turn.
+  function hidingSquares() {
+    return [...fight.heroReachable(game).values()].some((step) => step.cost > 0 && !step.free && !fight.foesWatching(game, step.pos).length);
+  }
+
+  // Hide: an action for anyone, or a Bonus Action with a Rogue's Cunning Action. Greyed out
+  // while a foe can see you, saying who.
+  function hideCard({ bonus }) {
+    const stealth = signedNumber(skillBonus(game.character, 'stealth').value);
+    const what = `DC ${fight.HIDE_DC} Stealth (you have ${stealth}), out of every foe’s sight: walls and obstacles hide you. Hidden, your attacks have Advantage, and foes must find you first`;
+    const why = fight.heroHideProblem(game, { bonus });
+    const seen = why && why.includes('can see you');
+    const card = actionCard(bonus ? 'Hide (Cunning Action)' : 'Hide', seen ? `${what}. ${why}` : what, () => act(() => fight.heroHide(game, { bonus })));
+    card.disabled = Boolean(why);
+    if (why) card.title = why;
+    return card;
   }
 
   // What to do next with the chosen attack or spell.
@@ -667,10 +709,12 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
 
     // Where the hero can move. A pale wash with a bright edge, so it shows on wood and stone
     // alike; gold squares are a free move (Remarkable Athlete).
+    // Blue squares are out of every foe's sight: somewhere to Hide.
     if (fight.isHeroTurn(game) && !view.replaying && !view.option) {
       for (const step of fight.heroReachable(game).values()) {
         if (step.cost === 0) continue;
-        const colours = step.free ? ['rgba(240, 200, 90, 0.35)', 'rgba(240, 200, 90, 0.9)'] : ['rgba(222, 238, 214, 0.32)', 'rgba(222, 238, 214, 0.85)'];
+        const unseen = !fight.foesWatching(game, step.pos).length;
+        const colours = step.free ? ['rgba(240, 200, 90, 0.35)', 'rgba(240, 200, 90, 0.9)'] : unseen ? HIDING_WASH : ['rgba(222, 238, 214, 0.32)', 'rgba(222, 238, 214, 0.85)'];
         washSquare(ctx, step.pos, size, scale, colours);
       }
     }
@@ -721,7 +765,9 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     const hero = scene.units.find((u) => u.id === 'hero');
     const up = scene.heroState === 'up';
     const heroAt = at(hero);
-    blit(ctx, heroFrames[up ? frame : 0], 0, 0, heroAt.x, heroAt.y, size, { alpha: up ? 1 : 0.5, lying: !up || hero.prone });
+    // A hidden hero is drawn faint.
+    const faint = (hero.conditions || []).includes('hidden') ? 0.55 : 1;
+    blit(ctx, heroFrames[up ? frame : 0], 0, 0, heroAt.x, heroAt.y, size, { alpha: up ? faint : 0.5, lying: !up || hero.prone });
     drawHealthBar(ctx, heroAt, hero.hp / heroMaxHp(game), size, scale);
 
     // Spiritual Weapon, hovering where it last struck.
@@ -870,7 +916,7 @@ function targetText(preview) {
   const percent = `${Math.round(preview.chance * 100)}%`;
   const how = preview.option.how;
   const chance = how === 'save' ? `${percent} it fails the save` : how === 'darts' ? 'Never misses' : `${percent} to hit`;
-  return [chance, ...preview.advantage.map((r) => `Advantage: ${r}`), ...preview.disadvantage.map((r) => `Disadvantage: ${r}`)].join(' · ');
+  return [chance, ...preview.advantage.map((r) => `Advantage: ${r}`), ...preview.disadvantage.map((r) => `Disadvantage: ${r}`), ...(preview.sneak ? [`Sneak Attack +${preview.sneak} on a hit`] : [])].join(' · ');
 }
 
 function squares(a, b) {

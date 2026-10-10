@@ -1,4 +1,4 @@
-// Class checks: each class's own rules, starting with the Cleric (Phase 2). Open
+// Class checks: each class's own rules, for the Cleric and the Rogue (Phase 2). Open
 // tests/classes.html through the local server to run them. Add checks here whenever a class
 // or one of its features changes.
 
@@ -8,9 +8,9 @@ import { forceNextD20 } from '../js/engine/rules/dice.js';
 import * as creation from '../js/engine/character/creation.js';
 import * as levelUp from '../js/engine/character/level-up.js';
 import * as fight from '../js/engine/combat/battle.js';
-import { heroAttackOptions } from '../js/engine/combat/attacks.js';
+import { heroAttackOptions, rollDamage } from '../js/engine/combat/attacks.js';
 import { squaresBetween } from '../js/engine/combat/grid.js';
-import { armorClass, armorTraining, checkModifiers, maxHitPoints, spellcasting, weaponProficiencies } from '../js/engine/character/sheet.js';
+import { armorClass, armorTraining, checkModifiers, climbSpeed, maxHitPoints, proficientWithWeapon, sneakAttackDice, spellcasting, weaponProficiencies } from '../js/engine/character/sheet.js';
 import { canCastSpell, classSpellCounts, domainSpells, preparePicks, togglePrepared } from '../js/engine/character/spells.js';
 import { castSelfSpell, selfSpellProblem } from '../js/engine/character/spell-effects.js';
 import { validateCharacter } from '../js/engine/character/validate.js';
@@ -321,6 +321,153 @@ test('Preparing: after a Long Rest a Cleric can change prepared spells, until th
   assertEqual([gameToSave(game).game.canPrepare, validateCharacter(game.character)], [true, []]);
   game.page = makeChoice(game, game.story.currentChoices[0]);
   assertTrue(!game.canPrepare, 'set until the next Long Rest');
+});
+
+// ---- The Rogue ----
+
+// Sorael Thornvale, the Quick Start Rogue: a wood elf Criminal, Dexterity 17 (+3), Constitution
+// 14 (+2), leather armour, Expertise in Stealth and Sleight of Hand, Weapon Mastery with the
+// Dagger (Nick) and the Shortsword (Vex).
+const sorael = quickStartHeroes.find((h) => h.id === 'sorael').character;
+const sorael2 = { ...sorael, level: 2, hitPointRolls: [null] };
+const sorael3 = { ...sorael, level: 3, subclassId: 'thief', hitPointRolls: [null, null] };
+
+// The mill fight with one goblin beside the Rogue (at 3, 1), tough enough to take a few hits,
+// and the other out of it.
+function rogueDuel(character) {
+  const game = fightWith(character, 'mill-scavengers', 'rogue-fight');
+  const [goblin, other] = fight.enemies(game.battle);
+  goblin.pos = { x: 3, y: 2 };
+  goblin.hp = goblin.maxHp = 40;
+  other.hp = 0;
+  return { game, goblin };
+}
+
+const lastHit = (game) => game.battle.log.filter((e) => e.roll && e.roll.kind === 'attack').pop();
+
+test('Rogue: Sorael, the Quick Start Rogue, is legal, with the numbers from the rules', () => {
+  assertEqual([validateCharacter(sorael), validateCharacter(sorael2), validateCharacter(sorael3)], [[], [], []]);
+  assertEqual([maxHitPoints(sorael).value, armorClass(sorael).value], [10, 14], '8 + Con 2; leather 11 + Dex 3');
+  const parts = (testId) => checkModifiers(sorael, testId).modifiers.map((m) => [m.label, m.value]);
+  assertEqual(parts('stealth'), [['Dex', 3], ['Expertise', 4]], 'Expertise doubles the Proficiency Bonus');
+  assertEqual(parts('thieves-tools'), [['Dex', 3], ['Proficiency', 2]], 'Thieves’ Tools, from the class and the background');
+  assertEqual(parts('athletics'), [['Str', 1]]);
+  const findWeapon = (id) => ({ ...creation.findItem(id) });
+  assertEqual(['shortsword', 'scimitar', 'longbow', 'greatsword', 'shortbow'].map((id) => proficientWithWeapon(sorael, findWeapon(id))), [true, true, false, false, true], 'Martial weapons only with Finesse or Light');
+  const game = gameFor(sorael);
+  assertEqual([game.money, game.inventory.find((e) => e.id === 'dagger').quantity], [5800, 2], '8 GP and the Criminal’s 50 GP');
+  const options = heroAttackOptions(game);
+  const shortsword = options.find((o) => o.id === 'shortsword-melee');
+  assertEqual([shortsword.modifiers.reduce((s, m) => s + m.value, 0), shortsword.sneakAttack, shortsword.mastery.id], [5, '1d6', 'vex']);
+  assertEqual(options.find((o) => o.id === 'shortbow-ranged').sneakAttack, '1d6', 'a Ranged weapon');
+  assertTrue(attackSummary(shortsword).includes('Sneak Attack +1d6 with Advantage, once a turn'));
+  assertEqual([sneakAttackDice(sorael), sneakAttackDice(sorael3), climbSpeed(sorael), climbSpeed(sorael3)], ['1d6', '2d6', 0, 35], 'and a Thief climbs at their Speed');
+});
+
+test('Creation: a Rogue picks four skills, Expertise in two skills they have, and two weapons to master', () => {
+  let d = creation.chooseSpecies(creation.chooseBackground(creation.chooseClass(creation.emptyDraft(), 'rogue'), 'criminal'), 'halfling');
+  assertEqual(creation.expertisePicks(d), { count: 2, from: ['sleight-of-hand', 'stealth'], chosen: [] }, 'the Criminal’s skills, to start with');
+  for (const id of ['acrobatics', 'perception', 'deception', 'insight']) d = creation.toggleSkill(d, 'class', id);
+  d = creation.toggleExpertise(creation.toggleExpertise(d, 'perception'), 'stealth');
+  assertEqual(creation.stepProblems(d, 'skills'), []);
+  assertEqual(creation.toggleExpertise(d, 'deception'), d, 'two at most');
+  d = creation.toggleSkill(d, 'class', 'perception');
+  assertEqual(d.classChoices.expertise, ['stealth'], 'no Expertise without proficiency');
+  assertEqual(creation.stepProblems(d, 'skills'), ['Choose 4 Rogue skills (3 chosen).', 'Choose 2 skills for Expertise (1 chosen).']);
+  d = creation.prepareStep(d, 'equipment');
+  const masteries = creation.masteryPicks(d);
+  assertEqual([masteries.count, masteries.chosen], [2, ['dagger', 'shortsword']], 'the kit’s weapons are suggested');
+  assertTrue(masteries.from.includes('scimitar') && !masteries.from.includes('longbow'));
+  assertTrue(validateCharacter({ ...sorael, classChoices: { ...sorael.classChoices, expertise: ['stealth', 'arcana'] } }).includes('Choose 2 different skills you’re proficient in for Expertise.'));
+});
+
+test('Sneak Attack: a hit with Advantage and a Finesse weapon adds 1d6, once a turn', () => {
+  const { game, goblin } = rogueDuel(sorael);
+  assertEqual(fight.attackPreview(game, 'shortsword-melee', goblin.id).sneak, null, 'no Advantage, no ally: no Sneak Attack');
+  game.battle.effects.push({ kind: 'prone', target: goblin.id, endsOn: null });
+  assertEqual(fight.attackPreview(game, 'shortsword-melee', goblin.id).sneak, '1d6', 'Advantage on a Prone foe within 5 feet');
+  forceNextD20(18);
+  fight.heroAttack(game, 'shortsword-melee', goblin.id);
+  assertTrue(lastHit(game).text.includes('+ Sneak Attack 1d6 ('), lastHit(game).text);
+  // The Dagger's Nick: the extra attack is part of the Attack action. It has Advantage (Prone,
+  // and Vex from the Shortsword), but Sneak Attack is spent for this turn.
+  forceNextD20(18);
+  fight.heroAttack(game, 'dagger-melee-extra', goblin.id);
+  assertTrue(lastHit(game).roll.mode === 'advantage' && !lastHit(game).text.includes('Sneak Attack'), lastHit(game).text);
+  const crit = rollDamage(createRng('crit'), { dice: '1d6', bonus: 3, type: 'piercing' }, { critical: true, sneak: '1d6' });
+  assertEqual([crit.sneak.dice, crit.sneak.rolls.length], ['2d6', 2], 'a Critical Hit doubles the Sneak Attack dice too');
+});
+
+test('Cunning Action: Dash and Disengage as a Bonus Action, from Rogue level 2', () => {
+  const first = rogueDuel(sorael).game;
+  assertThrows(() => fight.heroDash(first, { bonus: true }), 'not at level 1');
+  const { game } = rogueDuel(sorael2);
+  fight.heroDash(game, { bonus: true });
+  assertEqual([game.battle.turnState.movementLeft, game.battle.turnState.bonus, game.battle.turnState.action], [70, true, false], 'Speed 35, twice');
+  assertThrows(() => fight.heroDisengage(game, { bonus: true }), 'one Bonus Action a turn');
+  fight.heroDisengage(game);
+  assertTrue(game.battle.turnState.disengaged && game.battle.turnState.action, 'Disengage as the action, too');
+});
+
+test('Level-up: a Rogue gains Cunning Action at 2, then the Thief, Steady Aim and 2d6 Sneak Attack at 3', () => {
+  const game = gameFor(sorael, 900);
+  levelWith(game);
+  assertEqual([game.character.level, maxHitPoints(game.character).value], [2, 17], '8 + 2, then 5 + 2');
+  levelWith(game, { subclass: 'thief' });
+  const hero = game.character;
+  assertEqual([hero.level, hero.subclassId, sneakAttackDice(hero), validateCharacter(hero)], [3, 'thief', '2d6', []]);
+  assertEqual(hero.classChoices, sorael.classChoices, 'Expertise and Weapon Mastery carry on');
+});
+
+test('Cunning Action: Hide as a Bonus Action, then shoot with Advantage for Sneak Attack', () => {
+  const { game, goblin } = rogueDuel(sorael2);
+  goblin.pos = { x: 3, y: 6 };
+  fight.heroCombatant(game.battle).pos = { x: 3, y: 2 }; // behind the mill's barrel
+  forceNextD20(10);
+  fight.heroHide(game, { bonus: true });
+  const roll = game.battle.log[game.battle.log.length - 1].roll;
+  assertEqual([roll.total, roll.disadvantage, game.battle.turnState.bonus, game.battle.turnState.action], [17, [], true, false], '10 + Stealth +7 (Expertise), no noise in leather');
+  fight.heroMove(game, { x: 4, y: 2 }); // out from behind the barrel: still hidden until found
+  const preview = fight.attackPreview(game, 'shortbow-ranged', goblin.id);
+  assertEqual([preview.advantage, preview.sneak], [['You’re hidden'], '1d6']);
+  forceNextD20(15);
+  fight.heroAttack(game, 'shortbow-ranged', goblin.id);
+  assertTrue(game.battle.log.some((e) => e.text.includes('+ Sneak Attack 1d6')), 'a hidden shot gets Sneak Attack');
+});
+
+test('Steady Aim: Advantage on the next attack, if the Rogue hasn’t moved; Speed 0 afterwards', () => {
+  const { game, goblin } = rogueDuel(sorael3);
+  goblin.pos = { x: 3, y: 6 };
+  assertTrue(fight.heroCanSteadyAim(game));
+  fight.heroSteadyAim(game);
+  assertEqual(game.battle.turnState.movementLeft, 0);
+  const preview = fight.attackPreview(game, 'shortbow-ranged', goblin.id);
+  assertEqual([preview.advantage, preview.sneak], [['Steady Aim'], '2d6']);
+  fight.heroAttack(game, 'shortbow-ranged', goblin.id);
+  assertEqual([lastHit(game).roll.mode, fight.attackPreview(game, 'shortbow-ranged', goblin.id).advantage], ['advantage', []], 'used up by the attack');
+  fight.endHeroTurn(game);
+  const moved = rogueDuel(sorael3).game;
+  fight.heroMove(moved, { x: 2, y: 1 });
+  assertTrue(!fight.heroCanSteadyAim(moved), 'not after moving');
+  assertThrows(() => fight.heroSteadyAim(moved));
+});
+
+test('Rogue scenes: Thieves’ Tools open the postern; a Rogue reads the thieves’ chalk marks', async () => {
+  const story = await loadStory(new URL('../story/', import.meta.url));
+  const runtime = { story, game: null };
+  bindExternals(story, runtime);
+  const choiceWith = (game, words) => game.story.currentChoices.find((c) => c.text.includes(words)) || null;
+  const rogue = newGame(runtime, { slot: 1, seed: 'rogue-scenes', character: sorael });
+  forceNextD20(15);
+  rogue.page = makeChoice(rogue, choiceWith(rogue, 'postern'));
+  assertTrue(rogue.flags.includes('picked_the_postern'), 'Dex +3, Proficiency +2 and a 15');
+  rogue.page = jumpTo(rogue, 'notice_board');
+  rogue.page = makeChoice(rogue, choiceWith(rogue, 'chalk marks'));
+  assertTrue(rogue.flags.includes('read_cant_marks'));
+  const cleric = newGame(runtime, { slot: 2, seed: 'rogue-scenes', character: posy });
+  assertEqual(choiceWith(cleric, 'postern'), null, 'no Thieves’ Tools, no postern');
+  cleric.page = jumpTo(cleric, 'notice_board');
+  assertEqual(choiceWith(cleric, 'chalk marks'), null);
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

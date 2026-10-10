@@ -9,11 +9,13 @@ import {
   abilityScore,
   armorClass,
   characterFeatures,
+  climbSpeed,
   darkvision,
   findAbility,
   findBackground,
   findClass,
   findSpecies,
+  findTool,
   initiative,
   maxHitPoints,
   passivePerception,
@@ -25,6 +27,8 @@ import {
   speciesOption,
   spellcasting,
   speed,
+  toolBonus,
+  toolProficiencies,
 } from '../character/sheet.js';
 import { spellGroups, spellNumbers } from '../character/spells.js';
 import { heroSprite } from '../character/look.js';
@@ -46,6 +50,8 @@ export function heroSheet(character, { spellsOn = [] } = {}) {
   who.append(el('h2', 'sheet-name', character.name));
   who.append(el('p', 'sheet-line', `${speciesText(character, option)} · ${findClass(character.classId).name} ${character.level} · ${background.name} background`));
   const senses = [`${capitalise(character.size)}`, `Speed ${speed(character, spellsOn).value} ft`];
+  const climb = climbSpeed(character, spellsOn);
+  if (climb) senses.push(`Climb ${climb} ft`);
   const dark = darkvision(character);
   if (dark) senses.push(`Darkvision ${dark} ft`);
   const resist = resistances(character);
@@ -92,7 +98,11 @@ export function heroSheet(character, { spellsOn = [] } = {}) {
   );
 
   const known = skills.filter((s) => skillProficiency(character, s.id).level !== 'none');
-  sheet.append(grid('Skills you’re proficient in', known.map((s) => mathsNumber({ label: s.name, stat: skillBonus(character, s.id), format: signedNumber }))));
+  const expertMark = (s) => (skillProficiency(character, s.id).level === 'expertise' ? ' ★' : '');
+  const hint = known.some((s) => expertMark(s)) ? '★ marks Expertise: twice your Proficiency Bonus.' : '';
+  sheet.append(grid('Skills you’re proficient in', known.map((s) => mathsNumber({ label: `${s.name}${expertMark(s)}`, stat: skillBonus(character, s.id), format: signedNumber })), hint));
+  const tools = toolProficiencies(character).map(findTool).filter(Boolean);
+  if (tools.length) sheet.append(grid('Tools you’re proficient with', tools.map((t) => mathsNumber({ label: t.name, stat: toolBonus(character, t.id), format: signedNumber }))));
 
   // Spells, one block per source (class, Magic Initiate, species), each with its own
   // spellcasting ability.

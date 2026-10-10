@@ -8,7 +8,8 @@
 // mill's two Goblin Minions.
 //
 // The hero fights the plain way. Each turn they stand up if they're Prone, close in if no foe
-// is in reach, and attack the foe they'd hurt most, with a weapon or a cantrip. They never
+// is in reach, and attack the foe they'd hurt most, with a weapon or a cantrip (and with a
+// second Light weapon, its extra attack, as the Light property allows). They never
 // spend a spell slot, a free cast, Second Wind or a potion. If they're below half their Hit
 // Points at the start of one of their turns, Resolve stops and hands the fight back.
 // Everything goes through the fight's own rules (combat/battle.js), so it's logged and saved
@@ -17,6 +18,7 @@
 import {
   addLogLine,
   attackPreview,
+  clearShot,
   endHeroTurn,
   enemies,
   findEncounter,
@@ -102,6 +104,10 @@ function playTurn(game) {
     best = bestAttack(game);
   }
   if (best) heroAttack(game, best.option.id, best.foe.id);
+  // After a Light weapon, the extra attack with the other one (the action is spent, so it's
+  // all that's left to attack with).
+  const extra = isHeroTurn(game) && best ? bestAttack(game) : null;
+  if (extra && extra.option.extra) heroAttack(game, extra.option.id, extra.foe.id);
   if (isHeroTurn(game)) endHeroTurn(game);
 }
 
@@ -152,7 +158,7 @@ function approach(game) {
   for (const step of heroReachable(game).values()) {
     if (step.cost === 0) continue;
     for (const { option, foe, value } of attacks) {
-      if (!value || !inRange({ pos: step.pos }, foe, option)) continue;
+      if (!value || !inRange({ pos: step.pos }, foe, option) || !clearShot(game, step.pos, foe.pos)) continue;
       if (value > bestValue || (value === bestValue && step.cost < best.cost)) {
         best = step;
         bestValue = value;

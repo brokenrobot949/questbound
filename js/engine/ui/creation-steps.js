@@ -25,8 +25,10 @@ import {
   findBackground,
   findClass,
   findFeat,
+  findMastery,
   findSkill,
   findSpecies,
+  findWeapon,
   skillBonus,
   skillProficiency,
   speed,
@@ -89,7 +91,7 @@ export function classStep(ctx) {
           lines: [
             `Hit Die d${cls.hitDie} · Best at ${orList(cls.primaryAbilities.map(abilityName))}`,
             `Saving throws: ${andList(cls.savingThrows.map(abilityName))}`,
-            `Weapons: ${andList(cls.weaponProficiencies.map(capitalise))} · Armour: ${armourText(cls.armorTraining)}`,
+            `Weapons: ${weaponText(cls)} · Armour: ${armourText(cls.armorTraining)}`,
           ],
           selected: draft.classId === cls.id,
           onSelect: () => ctx.set(creation.chooseClass(ctx.draft, cls.id)),
@@ -141,10 +143,17 @@ export function classStep(ctx) {
     );
     nodes.push(orders);
   }
+  if (cls.levels[0].weaponMasteries) nodes.push(note('You choose the weapons for Weapon Mastery with your equipment.'));
   if (cls.spellcasting) {
     nodes.push(note(cls.spellcasting.spellbook ? 'You choose your cantrips and spellbook after your skills.' : 'You choose your cantrips and prepared spells after your skills.'));
   }
   return nodes;
+}
+
+// "Simple and Martial", or "Simple, and Martial with Finesse or Light" (the Rogue).
+function weaponText(cls) {
+  const kinds = andList(cls.weaponProficiencies.map(capitalise));
+  return cls.martialWeaponsWith ? `${kinds}, and Martial with ${orList(cls.martialWeaponsWith.map(capitalise))}` : kinds;
 }
 
 function armourText(training) {
@@ -507,6 +516,30 @@ export function skillsStep(ctx) {
     nodes.push(box);
   }
 
+  // A Rogue's Expertise: two of the skills chosen above.
+  const expertise = creation.expertisePicks(ctx.draft);
+  if (expertise) {
+    const box = section('Expertise', `Choose ${expertise.count} of your skills: ${expertise.chosen.length} chosen. You add twice your Proficiency Bonus to them. Sleight of Hand and Stealth are recommended.`);
+    const full = expertise.chosen.length >= expertise.count;
+    box.append(
+      chipRow(
+        expertise.from.map((id) => {
+          const chosen = expertise.chosen.includes(id);
+          return chip({
+            key: `expertise-${id}`,
+            label: skillName(id),
+            selected: chosen,
+            disabled: !chosen && full,
+            onToggle: () => ctx.set(creation.toggleExpertise(ctx.draft, id)),
+          });
+        }),
+        'Expertise',
+      ),
+    );
+    if (!expertise.from.length) box.append(note('Choose your skills above first.'));
+    nodes.push(box);
+  }
+
   const known = skills.filter((s) => skillProficiency(draft, s.id).level !== 'none');
   const summary = section('Your skills so far');
   summary.append(el('p', 'section-text', known.map((s) => `${s.name} ${signedNumber(skillBonus(draft, s.id).value)}`).join(' · ')));
@@ -829,7 +862,38 @@ export function equipmentStep(ctx) {
   const slowed = speed(preview).parts.find((p) => p.value < 0);
   if (slowed) box.append(note(`${slowed.label}: your Strength is lower, so your Speed drops by 10 feet while you wear it.`));
   nodes.push(box);
+  const masteries = masterySection(ctx, kit);
+  if (masteries) nodes.push(masteries);
   return nodes;
+}
+
+// Weapon Mastery (the Fighter and the Rogue): which kinds of weapon, and what each mastery
+// property does. Weapons in the starting kits are marked.
+function masterySection(ctx, kit) {
+  const picks = creation.masteryPicks(ctx.draft);
+  if (!picks) return null;
+  const box = section('Weapon Mastery', `Choose ${picks.count}: ${picks.chosen.length} chosen. In a fight, you use the mastery property of the weapons you choose.`);
+  const carried = kit.items.map(({ item }) => item.id);
+  const full = picks.chosen.length >= picks.count;
+  box.append(
+    chipRow(
+      picks.from.map((id) => {
+        const weapon = findWeapon(id);
+        const chosen = picks.chosen.includes(id);
+        return chip({
+          key: `mastery-${id}`,
+          label: `${weapon.name} · ${findMastery(weapon.mastery).name}${carried.includes(id) ? ' (in your kit)' : ''}`,
+          selected: chosen,
+          disabled: !chosen && full,
+          onToggle: () => ctx.set(creation.toggleMastery(ctx.draft, id)),
+        });
+      }),
+      'Weapon Mastery',
+    ),
+  );
+  const properties = [...new Set(picks.from.map((id) => findWeapon(id).mastery))].map(findMastery);
+  for (const mastery of properties) box.append(expandable(`${mastery.name}: ${mastery.summary}`, mastery.text));
+  return box;
 }
 
 function kitSection(ctx, which, title) {

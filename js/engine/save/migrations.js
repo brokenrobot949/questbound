@@ -191,4 +191,21 @@ export const migrations = {
   // Version 15 notes when a Wizard or Cleric has just finished a Long Rest and can change
   // their prepared spells. An older save hasn't just rested: the next Long Rest opens it.
   14: (save) => ({ ...save, version: 15, game: { ...save.game, canPrepare: false } }),
+
+  // Version 16 adds Weapon Mastery: a Fighter has chosen three kinds of weapon. A Fighter from
+  // an older save takes the weapons in their pack, in the order they're packed, then the
+  // Greatsword, Longbow and Shortsword until there are three. The undo point's copy of the
+  // hero gets the same.
+  15: (save) => {
+    const WEAPONS = ['dagger', 'mace', 'javelin', 'quarterstaff', 'spear', 'shortbow', 'flail', 'greatsword', 'scimitar', 'shortsword', 'longbow'];
+    const withMasteries = (character, inventory) => {
+      if (!character || character.classId !== 'fighter' || (character.classChoices || {}).weaponMasteries) return character;
+      const carried = (inventory || []).map((entry) => entry.id).filter((id) => WEAPONS.includes(id));
+      const weaponMasteries = [...new Set([...carried, 'greatsword', 'longbow', 'shortsword'])].slice(0, 3);
+      return { ...character, classChoices: { ...character.classChoices, weaponMasteries } };
+    };
+    const { game } = save;
+    const undo = game.undo && game.undo.state ? { ...game.undo, state: { ...game.undo.state, character: withMasteries(game.undo.state.character, game.undo.state.inventory) } } : game.undo;
+    return { ...save, version: 16, game: { ...game, character: withMasteries(game.character, game.inventory), undo } };
+  },
 };

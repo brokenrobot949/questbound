@@ -73,7 +73,7 @@ function makeHero(overrides = {}) {
     speciesSkills: ['insight'],
     featSkills: [],
     originFeat: 'alert',
-    classChoices: { fightingStyle: 'defense' },
+    classChoices: { fightingStyle: 'defense', weaponMasteries: ['greatsword', 'shortbow', 'spear'] },
     drive: 'glory',
     bond: { type: 'rival', name: 'Test Rival' },
     startingEquipment: { class: 'B', background: 'B' }, // every class and background has an option B
@@ -855,8 +855,22 @@ test('Creation: skills, species choices and Fighting Style must be legal', () =>
   assertTrue(validateCharacter(makeHero({ classSkills: ['persuasion', 'arcana'] })).length > 0, 'Arcana is not a Fighter skill');
   assertTrue(validateCharacter(makeWizard({ speciesChoice: null })).length > 0, 'an Elf needs a lineage');
   assertTrue(validateCharacter(makeWizard({ speciesSkills: ['arcana'] })).length > 0, 'Keen Senses is Insight, Perception or Survival');
-  assertTrue(validateCharacter(makeHero({ classChoices: {} })).length > 0, 'a Fighter needs a Fighting Style');
+  assertEqual(validateCharacter(makeHero({ classChoices: { weaponMasteries: ['greatsword', 'shortbow', 'spear'] } })), ['Choose a Fighting Style.']);
   assertTrue(validateCharacter(makeHero({ classId: 'bard' })).length > 0, 'unknown class');
+});
+
+test('Creation: a Fighter chooses three different weapons for Weapon Mastery', () => {
+  const masteries = (weaponMasteries) => validateCharacter(makeHero({ classChoices: { fightingStyle: 'defense', weaponMasteries } }));
+  const wrong = ['Choose 3 different weapons you’re proficient with for Weapon Mastery.'];
+  assertEqual([masteries(['greatsword', 'shortbow']), masteries(['greatsword', 'greatsword', 'spear']), masteries(['greatsword', 'shortbow', 'torch'])], [wrong, wrong, wrong]);
+  assertEqual(validateCharacter(makeWizard({ classChoices: { weaponMasteries: ['dagger'] } })), ['A Wizard has no Weapon Mastery.']);
+  // The Equipment step suggests the weapons in the kits, in order, and the player can swap them.
+  let d = creation.chooseKit(creation.chooseKit(creation.chooseBackground(creation.chooseFightingStyle(creation.chooseClass(creation.emptyDraft(), 'fighter'), 'defense'), 'soldier'), 'class', 'B'), 'background', 'A');
+  d = creation.prepareStep(d, 'equipment');
+  assertEqual(creation.masteryPicks(d).chosen, ['scimitar', 'shortsword', 'longbow']);
+  assertEqual(creation.stepProblems(creation.toggleMastery(d, 'longbow'), 'equipment'), ['Choose 3 weapons for Weapon Mastery (2 chosen).']);
+  d = creation.toggleMastery(creation.toggleMastery(d, 'longbow'), 'quarterstaff');
+  assertEqual([creation.masteryPicks(d).chosen, creation.toggleMastery(d, 'dagger')], [['scimitar', 'shortsword', 'quarterstaff'], d], 'three at most');
 });
 
 // ---- The character sheet ----

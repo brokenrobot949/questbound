@@ -132,7 +132,7 @@ Character creation follows the 2024 rules order, takes about 10 minutes, and has
 6. **Name, Drive and Bond.** Type a name or roll one from species name tables, then choose a Drive and a Bond.
 7. **Equipment.** Take the class and background starting kits, or the starting gold to shop in the first town.
 
-On screen, every skill pick (class, species and the Skilled feat) shares one Skills page after ability scores, so the player sees all the sources at once, sees the bonus each skill would give, and can't pick the same skill twice. Creation ends on a review of the finished sheet, where every number can be tapped to show its maths. The dice for rolled scores and rolled names are the new game's own seeded dice, and rolled scores can't be rerolled.
+On screen, every skill pick (class, species and the Skilled feat) shares one Skills page after ability scores, so the player sees all the sources at once, sees the bonus each skill would give, and can't pick the same skill twice. A Rogue picks Expertise on the same page. A Fighter or Rogue picks Weapon Mastery weapons on the Equipment step, with the kit's weapons suggested. Creation ends on a review of the finished sheet, where every number can be tapped to show its maths. The dice for rolled scores and rolled names are the new game's own seeded dice, and rolled scores can't be rerolled.
 
 **Drive and Bond (original additions)**
 
@@ -168,6 +168,8 @@ The DM marks the moment with a line of narration, then walks you through: hit po
 A few features would need a pop-up at an awkward moment, so the game uses them for you when it's clearly worth it:
 - **Tactical Mind** (Fighter 2) spends a Second Wind use on a failed ability check only when the extra d10 could turn it into a success, and the use is spent only if it does.
 - **Opportunity attacks** are taken automatically.
+- **Sneak Attack** (Rogue) is used on the first hit each turn that qualifies.
+- **Weapon Mastery** properties are always used: a Quarterstaff always tries to Topple, a Javelin always Slows.
 
 A setting to be asked instead can come later, alongside the Shield spell's reaction.
 
@@ -206,6 +208,19 @@ The free rules include one subclass per class, such as Champion, Thief, Life Dom
   - **Purify Food and Drink** (a Ritual) cleans the spoiled flour in the goblins' larder, and Nettle notices.
   - **Not yet:** Protection from Evil and Good, because it uses up a flask of Holy Water (25 GP) each time, and Holy Water arrives with shops. The Resistance cantrip and the rest of the level 2 list come later.
 - **Posy Hearthstone** is the Quick Start Cleric: a halfling Acolyte and Thaumaturge, with Healing Word from the Acolyte's Magic Initiate.
+
+**The Rogue (Phase 2, levels 1–3 so far)**
+
+- **The basics:** Dexterity, d8 Hit Dice, Dexterity and Intelligence saves, four skills from Acrobatics, Athletics, Deception, Insight, Intimidation, Investigation, Perception, Persuasion, Sleight of Hand or Stealth. Simple weapons, and Martial weapons with Finesse or Light (Shortsword, Scimitar); Light armour; Thieves' Tools. Kit A is leather armour, two Daggers, a Shortsword, a Shortbow with 20 arrows and a Quiver, Thieves' Tools and a Burglar's Pack, with 8 GP; kit B is 100 GP.
+- **Expertise** (on the Skills step): two skills the Rogue is proficient in add twice the Proficiency Bonus, marked ★ on the sheet. Sleight of Hand and Stealth are suggested.
+- **Weapon Mastery:** two kinds of weapon (see Combat).
+- **Sneak Attack:** once a turn, a hit with a Finesse or Ranged weapon deals an extra 1d6 (2d6 at level 3) if the roll had Advantage, or if a friend of the Rogue stands beside the target and the roll had no Disadvantage. Until companions join the fights, only Advantage counts. Its usual sources are Vex, Hide and Steady Aim. The game always uses it on the first hit that qualifies; the target's card says "Sneak Attack +1d6 on a hit", and the roll shows the dice.
+- **Thieves' Cant:** a Rogue reads the thieves' chalk marks in scenes. (The "one other language" waits for languages to be tracked.)
+- **Cunning Action** (level 2): Dash, Disengage or Hide as a Bonus Action.
+- **Steady Aim** (level 3): a Bonus Action before moving, which gives Advantage on the next attack this turn but leaves no more movement this turn.
+- **Thief** (level 3, the SRD's subclass): Second-Story Work gives a Climb Speed equal to your Speed, shown on the sheet. Fast Hands waits for things to do with a Bonus Action Utilize (caltrops, ball bearings, magic items). Climbing choices and locks come in Chapter 2.
+- **Thieves' Tools** make a check of their own in scenes: Dexterity, plus Proficiency for a Rogue or a Criminal, e.g. picking the postern lock at Bramblegate's north gate.
+- **Sorael Thornvale** is the Quick Start Rogue: a wood elf Criminal with Expertise in Stealth and Sleight of Hand, Weapon Mastery with the Dagger and the Shortsword, and the Criminal's 50 gold, enough for a Potion of Healing in Bramblegate.
 
 **Preparing spells after a Long Rest** (the Wizard and the Cleric): a Long Rest in the story ends with a DM note, and until your next story choice the Sheet's **Prepared spells** lets you swap spells in and out, up to your number. A Wizard chooses from their spellbook, a Cleric from the Cleric list.
 
@@ -320,6 +335,27 @@ Every turn, the enemies' and your own, plays out a line at a time instead of all
 
 Initiative, attack rolls against AC, critical hits, damage types and resistances, saving throws, area spells drawn as cones, spheres and lines, opportunity attacks, cover, concentration checks, the 2024 conditions, weapon mastery and death saves all work as written. Sneaking up first gives enemies disadvantage on initiative, per the 2024 surprise rule.
 
+**Weapon Mastery and two weapons** (so far)
+
+- A Fighter chooses three kinds of weapon and a Rogue two. The choice comes on the Equipment step of creation, starting with the weapons in the kits. Older saves give a Fighter the weapons in their pack. Changing them after a Long Rest comes with shops, once there are new weapons to master.
+- The properties the game's weapons have:
+  - **Vex** (Shortsword, Shortbow): a hit that deals damage gives Advantage on your next attack roll against that foe, until the end of your next turn.
+  - **Sap** (Mace, Spear, Flail): a hit gives the foe Disadvantage on its next attack roll, until the start of your next turn.
+  - **Slow** (Javelin, Longbow): a hit that deals damage takes 10 feet off the foe's Speed until the start of your next turn. Two Slows still take only 10.
+  - **Topple** (Quarterstaff): a hit makes the foe save (Constitution, DC 8 + the ability modifier + Proficiency) or fall Prone.
+  - **Graze** (Greatsword): a miss still deals your ability modifier in damage.
+  - **Nick** (Dagger, Scimitar): the Light extra attack (below) is part of the Attack action, so the Bonus Action stays free.
+  - Push and Cleave wait for weapons that have them.
+- **Two Light weapons** (Dagger, Scimitar, Shortsword), and no Shield: after you attack with one, you can attack with the other, or a second Dagger, once a turn as a Bonus Action, without your ability modifier on its damage. Two-Weapon Fighting adds the modifier. With Nick on either weapon, the extra attack is part of the Attack action and sits with the attacks; otherwise it's under Bonus Action.
+- Each weapon button names its mastery ("Vex: a hit gives you Advantage on your next attack against that foe"). The turn order marks a foe as Vexed, Sapped or Slowed.
+
+**Sight, walls and hiding**
+
+- Walls block sight and attacks (Total Cover): nobody can attack through one. Obstacles (sacks, barrels, trees, boulders, the goblin onlookers) block sight but not attacks. Cover's +2 or +5 to AC comes later. The fights so far have no walls inside the arena, so this changes none of them.
+- **Hide** is an action for anyone, and a Bonus Action with a Rogue's Cunning Action. It works only out of every foe's sight: a DC 15 Dexterity (Stealth) check. On your turn, blue squares show where you'd be out of every foe's sight. The Hide button is greyed out while a foe can see you, and it says who.
+- **Hidden** (the Invisible condition): your attacks have Advantage, attacks against you have Disadvantage, and you provoke no Opportunity Attacks. You stay hidden until you make an attack roll or cast a spell, or a foe finds you. Each foe's turn, it moves to where it can see your square, then takes the Search action: Wisdom (Perception) against your Stealth total. So a foe spends its turn looking for you instead of attacking. You're drawn faint, and the turn order says "Hidden".
+- **Noisy armour:** armour marked for Stealth Disadvantage (Chain Mail, Scale Mail and the like) gives Disadvantage on every Stealth check, in fights and scenes.
+
 **Enemy behaviour**
 
 - Each monster has a behaviour profile: brute (charges the nearest target), skirmisher (hit and run), caster (keeps distance), pack hunter or coward.
@@ -336,7 +372,7 @@ Initiative, attack rolls against AC, critical hits, damage types and resistances
 
 - A fight well under your party's strength offers **Resolve**: the engine plays it out instantly with real rolls and reports HP lost and resources spent. Story and boss fights are always played by hand.
   - **Well under** means the monsters' XP is no more than half the Low budget for one character of your level (SRD 5.2.1, XP Budget per Character): 25 XP at level 1, 50 at level 2, 75 at level 3. In Chapter 1, a level 2 hero can resolve the wolf, the warren's lookout or the mill's two goblins. Encounters marked `byHand` (Mother Nettle, the Choir at the breach) never offer it.
-  - **How you fight:** stand up if Prone, close in if nothing's in reach, and attack the foe you'd hurt most with a weapon or cantrip. Resolve never spends spell slots, free casts, Second Wind, Action Surge or potions.
+  - **How you fight:** stand up if Prone, close in if nothing's in reach, and attack the foe you'd hurt most with a weapon or cantrip, then with a second Light weapon if you have one. Resolve never spends spell slots, free casts, Second Wind, Action Surge or potions, and never hides.
   - **It hands the fight back** if you're below half your Hit Points at the start of one of your turns, and it isn't offered once you are. Otherwise it reports the rounds and Hit Points lost: "Resolved in 3 rounds: you lost 6 Hit Points."
 - Settings cover animation speed (Battle speed: Slow, Normal or Fast), auto-roll, automatic reactions (so far: Cast Shield by itself and Cast Hellish Rebuke by itself) and auto end-turn.
 
@@ -628,7 +664,7 @@ Rules content is typed into `data/srd/` from the SRD 5.2.1 document, one phase a
 **Saves**
 
 - Three save slots in the browser's IndexedDB storage, which holds far more than localStorage. Settings stay in localStorage. Every key is prefixed with `questbound:`.
-- Autosave after every choice and every combat turn. The dice generator's state is saved too, so reloading can't reroll. While you hold Heroic Inspiration, the save also keeps the moment before your last choice or attack, so a reroll still works after the game is closed (save version 14). It also notes when a Wizard or Cleric has just rested and can change their prepared spells (version 15).
+- Autosave after every choice and every combat turn. The dice generator's state is saved too, so reloading can't reroll. While you hold Heroic Inspiration, the save also keeps the moment before your last choice or attack, so a reroll still works after the game is closed (save version 14). It also notes when a Wizard or Cleric has just rested and can change their prepared spells (version 15). Version 16 adds a Fighter's Weapon Mastery weapons, taken from their pack for older saves.
 - Every save has a version number and a migration path.
 - Export and import as a downloadable file or a copyable text code, with a backup reminder every 10 sessions.
 

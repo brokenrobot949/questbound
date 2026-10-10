@@ -2,7 +2,8 @@
 //
 // Rain at dusk. The gate is barred, and Warden Tamsin Pike won't open it till dawn. Every way
 // in works out: talk, bluster or a lie (each a check), a soldier's token, a pilgrim's right of
-// sanctuary, a climb over the wall, a cantrip (Light, Prestidigitation, Thaumaturgy), Charm
+// sanctuary, a climb over the wall, the postern's lock (Thieves' Tools), a cantrip (Light,
+// Prestidigitation, Thaumaturgy), Charm
 // Person (Pike saves; she remembers it later), or simply waiting. Failing or waiting means a
 // night under the eaves, and pale lights on the barrow hills (flag saw_barrow_light).
 
@@ -52,6 +53,8 @@ Past her shoulder you can see warm windows and smoke curling from an inn chimney
     -> sanctuary
 * {has_background("criminal")} [Find a dark stretch of wall and climb it #check:athletics:15]
     -> climb
+* {has_item("thieves-tools")} [Leave her be, and try the lock on the postern door #check:thieves-tools:15]
+    -> postern
 * {can_cast("light")} [Show her you're no barrow-thing #spell:light]
     ~ cast("light")
     You touch the clasp of your cloak and speak a word. It blazes with clean white light, bright enough to show the warden your face, your empty hands and nothing of the barrow about you.
@@ -132,6 +135,26 @@ You go up and over like it's an old habit, which it is, and drop into a dark all
 Halfway up, a stone shifts under your boot and you land in the ditch with a splash that echoes off the wall. A lantern bobs towards you along the parapet.
 
 "Thought so," says the warden, peering down. "Dry corner under the eaves. Don't make me tell the captain." #speaker:pike
+-> night_at_the_gate
+
+= postern
+You thank the warden, wander off into the rain, and work your way round to the little postern door by the watch-house. Its lock is old and fat, and the rain covers the scrape of your picks.
+{ check("thieves-tools", 15):
+    -> postern_open
+- else:
+    -> postern_jammed
+}
+
+= postern_open
+One pin, then the next, then a click you feel more than hear. The door swings in on a dark lane that smells of wet straw, and you lock it behind you, out of professional courtesy. Nobody shouts. Somewhere ahead, an inn sign creaks in the wind.
+~ set_flag("picked_the_postern")
+~ add_deed("Picked the lock on Bramblegate's postern door rather than wait for morning.")
+-> into_town
+
+= postern_jammed
+A pick snaps in the lock with a crack like a twig, and a lantern bobs towards you along the wall.
+
+"That lock's older than I am, and it doesn't like strangers," says the warden, peering down. "Dry corner under the eaves. Don't make me tell the captain." #speaker:pike
 -> night_at_the_gate
 
 = gate_charmed

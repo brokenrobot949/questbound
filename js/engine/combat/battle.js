@@ -9,9 +9,13 @@
 //   combatants   [{ id, side: 'hero' | 'enemy', name, pos: { x, y }, monsterId, hp, maxHp }]
 //                (the hero's Hit Points are game.hp)
 //   turnState    { movementLeft, action, bonus, disengaged, savageUsed, surged, athleteMove,
-//                slotSpent } for the current turn: surged after Action Surge; athleteMove is
-//                the free move Remarkable Athlete gives straight after a Critical Hit (feet,
-//                or 0); slotSpent once a spell slot has been used (one a turn)
+//                slotSpent, light, extraUsed } for the current turn: surged after Action
+//                Surge; athleteMove is the free move Remarkable Athlete gives straight after a
+//                Critical Hit (feet, or 0); slotSpent once a spell slot has been used (one a
+//                turn); light, the Light weapon the hero attacked with (which opens the Light
+//                property's extra attack), and extraUsed once that extra attack is made;
+//                moved once the hero has walked a square; steadyAim after Steady Aim (Speed 0
+//                for the rest of the turn), and aimed while its Advantage is still to use
 //   effects      [{ kind, target, endsOn, endsAt, fromRound, concentration, dc, untilRound }]:
 //                'dodging', 'slowed', 'no-reactions', 'no-healing' and 'shield' last until
 //                the start of endsOn's next turn; 'poisoned' and 'guided' (endsAt 'end')
@@ -24,7 +28,11 @@
 //                start of the hero's turn in untilRound), 'shield-of-faith' (concentration) and
 //                'spiritual-weapon' (concentration; pos: the square the spectral weapon is in,
 //                damage and modifiers: its attack); and 'turned' (Turn Undead) and 'blinded'
-//                (Blindness/Deafness), until the start of the creature's turn in untilRound
+//                (Blindness/Deafness), until the start of the creature's turn in untilRound;
+//                and from the hero's Weapon Mastery, 'vexed' (Vex, with by: the weapon; the
+//                hero's next attack roll on it has Advantage, until the end of the hero's next
+//                turn) and 'sapped' (Sap: its next attack roll has Disadvantage, until the
+//                start of the hero's next turn), while Slow uses 'slowed'
 //   concentration  the spell the hero is concentrating on: { spellId, name }, or null
 //   reactionsUsed  ids that have used their reaction since their last turn
 //   heroState    'up', 'down' (0 Hit Points, making death saves), 'stable' or 'dead'
@@ -35,6 +43,7 @@
 //   outcome      null while fighting, then 'victory' or 'defeat'; xp: earned on victory
 //   surprise     true if the hero caught the foes unawares (they rolled Initiative with
 //                Disadvantage)
+//   sneakAttackTurn  'round:turn' of the turn a Rogue last dealt Sneak Attack (once a turn)
 //   hymn         for an encounter with a hymn: { singing, risen } (see encounters.js)
 // A foe that flees the fight is marked escaped, and its hp set to 0 so it no longer counts.
 //
@@ -47,14 +56,15 @@ import { encounters } from '../../../data/campaign/encounters.js';
 import { monsters } from '../../../data/srd/monsters.js';
 import { d20Test, retarget, startD20Count, stopD20Count } from '../rules/d20-test.js';
 import { rollDice, rollDie } from '../rules/dice.js';
-import { armorClass, findAbility, findClass, hasFeature, initiative as heroInitiative, savingThrow, speed as heroSpeed } from '../character/sheet.js';
+import { abilityModifier, armorClass, findAbility, findClass, hasFeature, initiative as heroInitiative, savingThrow, speed as heroSpeed } from '../character/sheet.js';
+import { abilityCheck } from '../rules/ability-check.js';
 import { heal, featureUsesLeft, heroMaxHp, slotsLeft, spendFeature, spendSlot } from '../character/resources.js';
 import { activeSpellIds, castSelfSpell, soakDamage } from '../character/spell-effects.js';
 import { canCastSpell, findSpell, freeCastKey, freeCastsLeft } from '../character/spells.js';
 import { spellSaveDc } from '../character/casting.js';
 import { takeUndoPoint } from '../save/undo.js';
 import { hasItem, removeItem } from '../character/inventory.js';
-import { SQUARE_FEET, cellAt, feetBetween, inBounds, isAdjacent, isStandable, key, parseMap, reachableSquares, squaresBetween, stepCost } from './grid.js';
+import { SQUARE_FEET, cellAt, feetBetween, inBounds, isAdjacent, isStandable, key, lineBlock, parseMap, reachableSquares, squaresBetween, stepCost } from './grid.js';
 import { areaSquares, DIRECTIONS, findDirection, lineOfEffect } from './areas.js';
 import { encounterRows } from '../world/dungeons.js';
 import {
@@ -142,7 +152,7 @@ const autoFails = (battle, c, abilityId) => c.side === 'enemy' && isHelpless(bat
 //                damage, or after a minute (10 rounds).
 
 // Conditions on a creature, for the battle screen: e.g. ['asleep', 'poisoned'].
-const SHOWN = ['drowsy', 'asleep', 'paralyzed', 'turned', 'blinded', 'grovel', 'baned', 'poisoned', 'outlined', 'guided', 'shield', 'shield-of-faith', 'dodging', 'blessed', 'sanctuary'];
+const SHOWN = ['drowsy', 'asleep', 'paralyzed', 'turned', 'blinded', 'grovel', 'baned', 'poisoned', 'outlined', 'guided', 'vexed', 'sapped', 'slowed', 'hidden', 'shield', 'shield-of-faith', 'dodging', 'blessed', 'sanctuary'];
 export function conditionsOf(battle, id) {
   return SHOWN.filter((kind) => hasEffect(battle, id, kind));
 }
@@ -291,6 +301,7 @@ export function startBattle(game, encounterId, choiceIndex, { surprise = false }
     outcome: null,
     xp: 0,
     surprise,
+    sneakAttackTurn: null,
     hymn: encounter.hymn ? { singing: true, risen: false } : null,
     concentration: null,
   };
@@ -327,6 +338,9 @@ function rollInitiative(game) {
 // Speed, with Longstrider, Ray of Frost's slowing, and 0 for the Unconscious and Paralyzed.
 function speedOf(game, c) {
   if (isHelpless(game.battle, c.id)) return 0;
+  // Steady Aim: the hero's Speed is 0 for the rest of their turn.
+  const turn = game.battle.turnState;
+  if (c.side === 'hero' && turn && turn.steadyAim && currentCombatant(game.battle) === c) return 0;
   const base = c.side === 'hero' ? heroSpeed(game.character, activeSpellIds(game)).value : findMonster(c.monsterId).speed;
   return Math.max(0, base - (hasEffect(game.battle, c.id, 'slowed') ? 10 : 0));
 }
@@ -336,7 +350,7 @@ function beginTurn(game) {
   const c = currentCombatant(battle);
   battle.effects = battle.effects.filter((e) => e.endsOn !== c.id || e.endsAt === 'end');
   battle.reactionsUsed = battle.reactionsUsed.filter((id) => id !== c.id);
-  battle.turnState = { movementLeft: speedOf(game, c), action: false, bonus: false, disengaged: false, savageUsed: false, surged: false, athleteMove: 0, slotSpent: false };
+  battle.turnState = { movementLeft: speedOf(game, c), action: false, bonus: false, disengaged: false, savageUsed: false, surged: false, athleteMove: 0, slotSpent: false, light: null, extraUsed: false, moved: false, steadyAim: false, aimed: false };
   log(game, c.side === 'hero' ? 'Your turn.' : `${c.name}'s turn.`, { turnOf: c.id });
   const ward = battle.effects.find((e) => e.target === c.id && e.kind === 'sanctuary');
   if (ward && battle.round >= ward.untilRound) {
@@ -530,6 +544,7 @@ function moveAlong(game, mover, path, { free = false } = {}) {
       if (!battle.turnState.disengaged && !free) {
         for (const foe of battle.combatants) {
           if (foe.side === mover.side || !canReact(game, foe)) continue;
+          if (mover.side === 'hero' && hidden(battle)) continue; // nobody sees a hidden hero go
           if (isAdjacent(foe.pos, mover.pos) && !isAdjacent(foe.pos, next)) {
             opportunityAttack(game, foe, mover);
             if (battle.outcome || !upright(game, mover)) return;
@@ -537,6 +552,7 @@ function moveAlong(game, mover, path, { free = false } = {}) {
         }
       }
       if (!free) battle.turnState.movementLeft -= stepCost(map, next, crawling);
+      if (mover.side === 'hero') battle.turnState.moved = true; // (no Steady Aim after moving)
       mover.pos = { ...next };
       walking.get(battle).path.push({ ...next });
     }
@@ -549,7 +565,7 @@ function moveAlong(game, mover, path, { free = false } = {}) {
 }
 
 function opportunityAttack(game, attacker, target) {
-  const options = attacker.side === 'hero' ? heroAttackOptions(game).filter((o) => o.how === 'melee' && o.source === 'weapon') : monsterAttackOptions(findMonster(attacker.monsterId)).filter((o) => o.how === 'melee');
+  const options = attacker.side === 'hero' ? heroAttackOptions(game).filter((o) => o.how === 'melee' && o.source === 'weapon' && !o.extra) : monsterAttackOptions(findMonster(attacker.monsterId)).filter((o) => o.how === 'melee');
   if (options.length === 0) return;
   game.battle.reactionsUsed.push(attacker.id);
   log(game, attacker.side === 'hero' ? `${target.name} tries to slip past you: an Opportunity Attack!` : `You leave ${attacker.name}'s reach: an Opportunity Attack!`);
@@ -578,6 +594,14 @@ function attackConditions(game, attacker, target, option) {
   if (hasEffect(battle, target.id, 'outlined')) advantage.push(`${is(target)} outlined by Faerie Fire`);
   if (hasEffect(battle, target.id, 'guided')) advantage.push(`${is(target)} lit by Guiding Bolt`);
   if (hasEffect(battle, target.id, 'blinded')) advantage.push(`${is(target)} Blinded`);
+  // Weapon Mastery: Vex (the hero's last hit on it) and Sap (on the foe that was hit).
+  const vexed = attacker.side === 'hero' && battle.effects.find((e) => e.target === target.id && e.kind === 'vexed');
+  if (vexed) advantage.push(`Vex: your ${vexed.by} hit it`);
+  if (attacker.side === 'hero' && battle.turnState && battle.turnState.aimed && isHeroTurn(game)) advantage.push('Steady Aim');
+  // Hidden: the hero's attacks have Advantage, and attacks on the hero Disadvantage.
+  if (attacker.side === 'hero' && hidden(battle)) advantage.push('You’re hidden');
+  if (target.side === 'hero' && hidden(battle)) disadvantage.push('You’re hidden');
+  if (attacker.side === 'enemy' && hasEffect(battle, attacker.id, 'sapped')) disadvantage.push(`${is(attacker)} Sapped`);
   if (hasEffect(battle, attacker.id, 'blinded')) disadvantage.push(`${is(attacker)} Blinded`);
   if (hasEffect(battle, attacker.id, 'poisoned')) disadvantage.push(`${is(attacker)} Poisoned`);
   if (isProne(battle, attacker.id)) disadvantage.push(`${is(attacker)} Prone`);
@@ -598,6 +622,95 @@ export function inRange(attacker, target, option) {
   const feet = feetBetween(option.origin || attacker.pos, target.pos);
   if (option.how === 'melee') return feet <= option.reach;
   return feet <= option.range[1];
+}
+
+// ---- Sight, walls and hiding ----
+// Walls block sight and attacks (Total Cover); obstacles (sacks, a barrel, a tree) block
+// sight only (see grid.js lineBlock). Cover's bonus to AC isn't used yet.
+
+// True if nothing but open ground lies between two squares.
+export const inSight = (game, from, to) => lineBlock(battleMap(game.battle), from, to) === null;
+
+// True if no wall stands between two squares, so an attack or a spell can reach.
+export const clearShot = (game, from, to) => lineBlock(battleMap(game.battle), from, to) !== 'wall';
+
+// Whether a creature can see another: it's up, not Incapacitated or Blinded, and nothing is in
+// the way.
+function sees(game, c, other) {
+  return upright(game, c) && !isIncapacitated(game.battle, c.id) && !hasEffect(game.battle, c.id, 'blinded') && inSight(game, c.pos, other.pos);
+}
+
+// Hiding (SRD 5.2.1, the Hide action): a DC 15 Dexterity (Stealth) check, out of every foe's
+// sight. Hidden, the hero has the Invisible condition: their attack rolls have Advantage, and
+// attack rolls against them Disadvantage. It ends once the hero makes an attack roll or casts
+// a spell, or when a foe finds them: a foe that can see the hero's square on its turn takes
+// the Search action, a Wisdom (Perception) check against the hero's Stealth total. A Rogue
+// can Hide as a Bonus Action (Cunning Action, from level 2).
+export const HIDE_DC = 15;
+const hidden = (battle) => battle.effects.find((e) => e.target === 'hero' && e.kind === 'hidden') || null;
+
+// The foes that can see the hero right now, or would see them standing at pos.
+export function foesWatching(game, pos = heroCombatant(game.battle).pos) {
+  return enemies(game.battle).filter((c) => sees(game, c, { pos }));
+}
+
+// Why the hero can't Hide now, or null. bonus: as a Rogue's Cunning Action.
+export function heroHideProblem(game, { bonus = false } = {}) {
+  if (!isHeroTurn(game)) return "It isn't your turn.";
+  const turn = game.battle.turnState;
+  if (bonus && !hasFeature(game.character, 'cunning-action')) return 'Cunning Action comes at Rogue level 2.';
+  if (bonus ? turn.bonus : turn.action) return `You have already used your ${bonus ? 'Bonus Action' : 'action'} this turn.`;
+  if (hidden(game.battle)) return 'You’re hidden already.';
+  const watching = foesWatching(game);
+  if (watching.length) return `${watching.map((c) => c.name).join(' and ')} can see you. Get a wall or an obstacle between you first.`;
+  return null;
+}
+
+export function heroHide(game, { bonus = false } = {}) {
+  const problem = heroHideProblem(game, { bonus });
+  if (problem) throw new Error(problem);
+  takeActionOrCunning(game, 'Hide', bonus);
+  const roll = abilityCheck({ rng: game.rng, character: game.character, testId: 'stealth', dc: HIDE_DC });
+  const how = bonus ? 'Cunning Action: you try to hide' : 'You try to hide';
+  if (!roll.success) return log(game, `${how}, but you aren’t quiet enough.`, { roll });
+  game.battle.effects.push({ kind: 'hidden', target: 'hero', endsOn: null, dc: roll.total });
+  log(game, `${how}, and slip out of sight. You’re hidden (Stealth ${roll.total}): your attacks have Advantage, and foes must find you first.`, { roll });
+}
+
+// The hero stops being hidden, saying why.
+function reveal(game, why) {
+  const battle = game.battle;
+  if (!hidden(battle)) return;
+  battle.effects = battle.effects.filter((e) => !(e.target === 'hero' && e.kind === 'hidden'));
+  log(game, `You’re no longer hidden: ${why}.`);
+}
+
+// A foe's turn while the hero is hidden: if it can't see the hero's square, it moves to where
+// it could (or as near as it gets); if it can see it, it takes the Search action.
+function searchForHero(game, c) {
+  const battle = game.battle;
+  const hero = heroCombatant(battle);
+  if (!sees(game, c, hero)) {
+    const map = battleMap(battle);
+    const reach = [...reachableSquares(map, c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling: isProne(battle, c.id) }).values()].filter((s) => s.path.length);
+    const viewing = reach.filter((s) => lineBlock(map, s.pos, hero.pos) === null).sort((a, b) => a.cost - b.cost)[0];
+    const toward = viewing || reach.sort((a, b) => squaresBetween(a.pos, hero.pos) - squaresBetween(b.pos, hero.pos) || a.cost - b.cost)[0];
+    if (toward) moveAlong(game, c, toward.path);
+    if (battle.outcome || c.hp <= 0 || !hidden(battle)) return checkEnd(game);
+  }
+  if (!sees(game, c, hero)) return log(game, `${c.name} prowls about, looking for you.`);
+  const monster = findMonster(c.monsterId);
+  const perception = (monster.skills || {}).perception ?? abilityModifier(monster.abilities.wisdom);
+  const roll = d20Test({
+    rng: game.rng,
+    kind: 'check',
+    label: 'Perception check (Search)',
+    modifiers: [{ label: 'Perception', value: perception, source: monster.name }],
+    target: { type: 'DC', value: hidden(battle).dc },
+  });
+  if (!roll.success) return log(game, `${c.name} searches, but can’t find you.`, { roll });
+  battle.effects = battle.effects.filter((e) => !(e.target === 'hero' && e.kind === 'hidden'));
+  log(game, `${c.name} spots you! You’re no longer hidden.`, { roll });
 }
 
 // Armor Class, with Mage Armor, the Shield spell and Shield of Faith for the hero.
@@ -684,8 +797,16 @@ export function attackPreview(game, optionId, targetId) {
     preview.chance = blessed ? [1, 2, 3, 4].reduce((sum, d4) => sum + hitChance(bonus + d4, ac, mode, criticalOn), 0) / 4 : hitChance(bonus, ac, mode, criticalOn);
     preview.describe = `${option.how === 'rays' ? `${option.rays} rays, each ` : ''}+${bonus}${blessed ? ' + 1d4 (Bless)' : ''} to hit against AC ${ac}`;
     if (criticalOn < 20) preview.describe += ` · Critical Hit on ${criticalOn}–20`;
+    // Sneak Attack's dice, if a hit now would get them.
+    preview.sneak = option.sneakAttack && sneakAttackReason(game, target, mode) ? option.sneakAttack : null;
+    if (preview.sneak) preview.describe += ` · Sneak Attack +${preview.sneak} on a hit`;
   }
   if (option.potent) preview.describe += ` · half damage even on a ${option.how === 'save' ? 'save' : 'miss'} (Potent Cantrip)`;
+  // A wall in the way gives Total Cover. (Spiritual Weapon strikes from beside the foe.)
+  if (!spirit && preview.inRange && !clearShot(game, hero.pos, target.pos)) {
+    preview.inRange = false;
+    preview.invalid = 'A wall is in the way';
+  }
   return preview;
 }
 
@@ -702,6 +823,8 @@ export function heroAttack(game, optionId, targetId, { reroll = null } = {}) {
   if (!target || target.side !== 'enemy' || target.hp <= 0) throw new Error('Choose a foe to attack.');
   const hero = heroCombatant(battle);
   if (!inRange(hero, target, option)) throw new Error(`${target.name} is out of range.`);
+  const fromAfar = option.how !== 'spirit' && option.how !== 'spirit-strike';
+  if (fromAfar && !clearShot(game, hero.pos, target.pos)) throw new Error(`A wall stands between you and ${target.name}.`);
   const wrong = option.how === 'save' ? wrongTarget(option, target) : null;
   if (wrong) throw new Error(`${option.name} can't be cast on ${target.name}: ${wrong.toLowerCase()}.`);
   // With Heroic Inspiration in hand, keep an undo point: a missed attack roll can be rerolled.
@@ -826,8 +949,13 @@ function performAttack(game, attacker, target, option) {
   const rolled = blessed.length ? { ...option, modifiers: [...option.modifiers, ...blessed] } : option;
   let roll = attackRoll(game.rng, rolled, acOf(game, target), advantage, disadvantage);
   if (you) roll.yours = true; // the hero's own roll, which Heroic Inspiration can reroll
-  // Guiding Bolt's light is used up by the first attack roll against its target.
-  battle.effects = battle.effects.filter((e) => !(e.target === target.id && e.kind === 'guided'));
+  // Guiding Bolt's light is used up by the first attack roll against its target, Vex by the
+  // hero's next attack roll against it, and Sap by the foe's next attack roll.
+  battle.effects = battle.effects.filter(
+    (e) => !(e.target === target.id && (e.kind === 'guided' || (you && e.kind === 'vexed'))) && !(e.target === attacker.id && e.kind === 'sapped'),
+  );
+  if (you && isHeroTurn(game)) battle.turnState.aimed = false; // Steady Aim's Advantage is used up too
+  if (you) reveal(game, 'you attack');
   if (target.side === 'hero' && roll.success && !roll.criticalHit) roll = castShield(game, roll);
   // Hitting an Unconscious or Paralyzed creature from within 5 feet is a Critical Hit.
   const helpless = target.side === 'hero' ? battle.heroState !== 'up' : isHelpless(battle, target.id);
@@ -840,11 +968,14 @@ function performAttack(game, attacker, target, option) {
     const tries = option.source === 'spell' ? `cast${you ? '' : 's'} ${option.name} at ${whom}` : `attack${you ? '' : 's'} ${whom} with ${option.name}`;
     if (option.ray) log(game, `${option.name} misses ${whom}.`, { roll });
     else log(game, `${who} ${tries}, and miss${you ? '' : 'es'}.`, { roll });
+    if (you && option.mastery && option.mastery.id === 'graze') graze(game, target, option);
     return { critical: false };
   }
   const savage = option.savage && !battle.turnState.savageUsed && you;
   if (savage) battle.turnState.savageUsed = true;
-  const damage = rollDamage(game.rng, option.damage, { critical, advantage: roll.mode === 'advantage', greatWeapon: option.greatWeapon, savage });
+  const sneak = you && option.sneakAttack && sneakAttackReason(game, target, roll.mode) ? option.sneakAttack : null;
+  if (sneak) battle.sneakAttackTurn = turnKey(battle);
+  const damage = rollDamage(game.rng, option.damage, { critical, advantage: roll.mode === 'advantage', greatWeapon: option.greatWeapon, savage, sneak });
   const how = option.source === 'spell' ? `${option.name} hits ${whom}` : `${who} hit${you ? '' : 's'} ${whom} with ${option.name}`;
   const savaged = damage.savaged ? ' (Savage Attacker: rolled twice, kept the better)' : '';
   const improved = roll.criticalHit && roll.natural < 20 ? 'Critical hit (Improved Critical)! ' : '';
@@ -854,7 +985,82 @@ function performAttack(game, attacker, target, option) {
   applyDamage(game, target, damage.total, { type: damage.type, critical, plus, from: attacker });
   if (option.rider && target.hp > 0) addRider(game, attacker, target, option);
   if (option.onHit && !battle.outcome) onHitCondition(game, target, option.onHit);
+  if (you && option.mastery) masteryOnHit(game, target, option, damageDealt(target, damage.total, damage.type) > 0);
   return { critical };
+}
+
+// ---- Sneak Attack (a Rogue's; SRD 5.2.1) ----
+
+// Which turn of the fight it is, so "once per turn" counts every creature's turn (an
+// Opportunity Attack on a foe's turn is a new chance).
+const turnKey = (battle) => `${battle.round}:${battle.turn}`;
+
+// Why the hero's hit on this target gets Sneak Attack, or null: once a turn, with Advantage
+// on the roll, or with an ally of the hero beside the target (not Incapacitated) and no
+// Disadvantage. (The weapon must be Finesse or Ranged: the option only carries the dice then.)
+// The game always uses it on the first hit it can.
+function sneakAttackReason(game, target, mode) {
+  const battle = game.battle;
+  if (battle.sneakAttackTurn === turnKey(battle)) return null;
+  if (mode === 'advantage') return 'Advantage';
+  if (mode === 'disadvantage') return null;
+  const ally = battle.combatants.find((c) => c.side === 'hero' && c.id !== 'hero' && upright(game, c) && !isIncapacitated(battle, c.id) && isAdjacent(c.pos, target.pos));
+  return ally ? `${ally.name} is beside it` : null;
+}
+
+// ---- Weapon Mastery (SRD 5.2.1, "Mastery Properties") ----
+// The hero uses the property of each kind of weapon they chose. Vex, Sap, Slow and Topple
+// work on a hit, Graze on a miss; Nick changes the Light property's extra attack (see
+// attacks.js).
+
+// What damage would reach a foe after its immunities, vulnerabilities and resistances.
+function damageDealt(target, amount, type) {
+  if (target.side !== 'enemy') return amount;
+  const monster = findMonster(target.monsterId);
+  if ((monster.immunities || []).includes(type)) return 0;
+  if ((monster.vulnerabilities || []).includes(type)) return amount * 2;
+  return (monster.resistances || []).includes(type) ? Math.floor(amount / 2) : amount;
+}
+
+// The round to count "until the end of your next turn" from: this round during the hero's
+// turn or after it, the round before while the hero's turn is still to come this round.
+function heroTurnRound(battle) {
+  return battle.turn < battle.order.indexOf('hero') ? battle.round - 1 : battle.round;
+}
+
+// After a hit: dealt is true if the hit did damage (Vex and Slow need it).
+function masteryOnHit(game, target, option, dealt) {
+  const battle = game.battle;
+  if (target.side !== 'enemy' || target.hp <= 0) return;
+  const { id, dc } = option.mastery;
+  if (id === 'vex' && dealt) {
+    battle.effects = battle.effects.filter((e) => !(e.target === target.id && e.kind === 'vexed'));
+    battle.effects.push({ kind: 'vexed', target: target.id, endsOn: 'hero', endsAt: 'end', fromRound: heroTurnRound(battle), by: option.weapon });
+    log(game, `Vex: your next attack on ${target.name} has Advantage.`);
+  } else if (id === 'sap') {
+    if (!hasEffect(battle, target.id, 'sapped')) battle.effects.push({ kind: 'sapped', target: target.id, endsOn: 'hero' });
+    log(game, `Sap: ${target.name} has Disadvantage on its next attack roll.`);
+  } else if (id === 'slow' && dealt) {
+    // Being slowed twice still only takes 10 feet.
+    if (!hasEffect(battle, target.id, 'slowed')) battle.effects.push({ kind: 'slowed', target: target.id, endsOn: 'hero' });
+    log(game, `Slow: ${target.name}'s Speed drops by 10 feet until your next turn.`);
+  } else if (id === 'topple' && !isProne(battle, target.id) && !(findMonster(target.monsterId).conditionImmunities || []).includes('prone')) {
+    const save = foeSave(game, target, 'constitution', dc);
+    if (save.success) {
+      log(game, `Topple: ${target.name} keeps its feet.`, { roll: save });
+    } else {
+      knockProne(game, target);
+      log(game, `Topple: ${target.name} is knocked Prone.`, { roll: save });
+    }
+  }
+}
+
+// Graze: a miss still deals the attack's ability modifier as damage, if it's above 0.
+function graze(game, target, option) {
+  const amount = option.abilityMod;
+  if (amount <= 0 || target.side !== 'enemy' || target.hp <= 0) return;
+  log(game, `Graze: your ${option.weapon} still catches ${target.name} for ${amount} ${option.damage.type} damage.`);
+  applyDamage(game, target, amount, { type: option.damage.type });
 }
 
 // A condition a monster's hit gives, such as the Wolf's Bite knocking a Medium or smaller
@@ -993,6 +1199,7 @@ function takeHit(game, target, amount, { type, critical = false, plus = null }) 
       battle.heroState = 'down';
       battle.deathSaves = { successes: 0, failures: 0 };
       knockProne(game, target); // the Unconscious condition includes Prone
+      battle.effects = battle.effects.filter((e) => !(e.target === 'hero' && e.kind === 'hidden'));
       log(game, 'You drop to 0 Hit Points and fall Unconscious.');
       if (battle.concentration) endConcentration(game, `Your concentration breaks: ${battle.concentration.name} ends.`);
       if (battle.effects.some((e) => e.kind === 'turned')) {
@@ -1045,16 +1252,43 @@ function heroDies(game, reason) {
 
 // ---- Bonus actions and other actions ----
 
-export function heroDash(game) {
-  heroUseAction(game, 'Dash');
+// Dash and Disengage take the action, or with a Rogue's Cunning Action (bonus true) the Bonus
+// Action instead.
+export function heroDash(game, { bonus = false } = {}) {
+  takeActionOrCunning(game, 'Dash', bonus);
   game.battle.turnState.movementLeft += speedOf(game, heroCombatant(game.battle));
-  log(game, 'You Dash: double movement this turn.');
+  log(game, bonus ? 'Cunning Action: you Dash as a Bonus Action, for more movement this turn.' : 'You Dash: double movement this turn.');
 }
 
-export function heroDisengage(game) {
-  heroUseAction(game, 'Disengage');
+export function heroDisengage(game, { bonus = false } = {}) {
+  takeActionOrCunning(game, 'Disengage', bonus);
   game.battle.turnState.disengaged = true;
-  log(game, 'You Disengage: you can move without provoking Opportunity Attacks this turn.');
+  log(game, `${bonus ? 'Cunning Action: you Disengage as a Bonus Action' : 'You Disengage'}: you can move without provoking Opportunity Attacks this turn.`);
+}
+
+function takeActionOrCunning(game, name, bonus) {
+  if (!bonus) return heroUseAction(game, name);
+  if (!hasFeature(game.character, 'cunning-action')) throw new Error('Cunning Action comes at Rogue level 2.');
+  heroUseBonus(game, name);
+}
+
+// Steady Aim (Rogue level 3): a Bonus Action, only if the hero hasn't moved this turn. Their
+// next attack roll this turn has Advantage, and their Speed is 0 for the rest of the turn.
+export function heroCanSteadyAim(game) {
+  const turn = game.battle && game.battle.turnState;
+  return Boolean(isHeroTurn(game) && hasFeature(game.character, 'steady-aim') && !turn.bonus && !turn.moved && !turn.steadyAim);
+}
+
+export function heroSteadyAim(game) {
+  requireHeroTurn(game);
+  const turn = game.battle.turnState;
+  if (!hasFeature(game.character, 'steady-aim')) throw new Error('Steady Aim comes at Rogue level 3.');
+  if (turn.moved) throw new Error('Steady Aim works only if you haven’t moved this turn.');
+  heroUseBonus(game, 'take Steady Aim');
+  turn.steadyAim = true;
+  turn.aimed = true;
+  turn.movementLeft = 0;
+  log(game, 'Steady Aim: you plant your feet and take your time. Your next attack roll this turn has Advantage, and you can’t move again this turn.');
 }
 
 export function heroDodge(game) {
@@ -1085,22 +1319,38 @@ function heroUseBonus(game, name) {
 // spell slot on your turn, and Action Surge's extra action can't cast a spell.
 function checkCanAct(game, option) {
   const turn = game.battle.turnState;
+  // The Light property's extra attack: once a turn, after an attack with a Light weapon; a
+  // Bonus Action unless Nick makes it part of the Attack action.
+  if (option.extra) {
+    if (!turn.light || turn.extraUsed) throw new Error('The extra attack comes once a turn, after you attack with a Light weapon.');
+    if (option.bonusAction && turn.bonus) throw new Error('You have already used your Bonus Action this turn.');
+    return;
+  }
   if (option.bonusAction && turn.bonus) throw new Error('You have already used your Bonus Action this turn.');
   if (!option.bonusAction && turn.action) throw new Error('You have already used your action this turn.');
   if (option.source === 'spell' && !option.bonusAction && turn.surged) throw new Error("Action Surge's extra action can't be used to cast a spell.");
   if (option.slotLevel && turn.slotSpent) throw new Error('You can spend only one spell slot on your turn, and you already have.');
 }
 
+// The kinds of option that make an attack roll.
+const ATTACK_ROLLS = ['melee', 'ranged', 'rays', 'spirit', 'spirit-strike'];
+
 // Spends the action (or Bonus Action), and the spell slot (or free cast) unless it's already
 // been spent.
 function useAction(game, option, { slotAlreadySpent = false } = {}) {
   const turn = game.battle.turnState;
+  if (option.extra) turn.extraUsed = true;
   if (option.bonusAction) turn.bonus = true;
-  else turn.action = true;
+  else if (!option.extra) turn.action = true;
+  // An attack with a Light weapon opens the Light property's extra attack.
+  if (option.source === 'weapon' && !option.extra && (option.properties || []).includes('light')) turn.light = option.itemId;
   turn.athleteMove = 0;
   // Sanctuary ends with an attack, a spell or damage dealt: Turn Undead and healing are none.
   const why = { spell: 'you cast a spell', weapon: 'you attack', channel: 'you deal damage' }[option.source];
   if (option.source !== 'channel' || option.damage) breakSanctuary(game, why);
+  // Casting a spell gives away a hidden hero. (A spell with an attack roll does so once the
+  // roll, with its Advantage, is made: see performAttack.)
+  if (option.source === 'spell' && !ATTACK_ROLLS.includes(option.how)) reveal(game, 'you cast a spell');
   if (option.featureUse) spendFeature(game, option.featureUse);
   if (option.freeCast && !slotAlreadySpent) game.featureUses[option.freeCast] = (game.featureUses[option.freeCast] || 0) + 1;
   if (option.slotLevel) {
@@ -1571,7 +1821,7 @@ function fleeFromHero(game, c) {
 // number of targets.
 export function nearestTargets(game, option) {
   const hero = heroCombatant(game.battle);
-  const inReach = enemies(game.battle).filter((c) => c.hp > 0 && !c.escaped && feetBetween(hero.pos, c.pos) <= option.range[1]);
+  const inReach = enemies(game.battle).filter((c) => c.hp > 0 && !c.escaped && feetBetween(hero.pos, c.pos) <= option.range[1] && clearShot(game, hero.pos, c.pos));
   return inReach.sort((a, b) => squaresBetween(hero.pos, a.pos) - squaresBetween(hero.pos, b.pos)).slice(0, option.targets);
 }
 
@@ -1679,6 +1929,8 @@ export function heroBonusActions(game) {
   const list = [];
   if (game.character.classId === 'fighter' && featureUsesLeft(game, 'second-wind') > 0) list.push('second-wind');
   if (hasItem(game, 'potion-of-healing')) list.push('potion');
+  if (hasFeature(game.character, 'cunning-action')) list.push('cunning-action');
+  if (hasFeature(game.character, 'steady-aim')) list.push('steady-aim');
   return list;
 }
 
@@ -1753,6 +2005,8 @@ function enemyTurn(game, c) {
     if (sleeper) return wake(game, sleeper, `${c.name} shakes ${sleeper.name} awake.`);
   }
   if (monster.behaviour === 'coward' && encounter.escape && c.hp <= c.maxHp / 2) return flee(game, c, encounter.escape);
+  // A hidden hero has to be found before anyone can attack them.
+  if (hidden(battle)) return searchForHero(game, c);
   const options = monsterAttackOptions(monster);
   const melee = options.find((o) => o.how === 'melee');
   const ranged = options.find((o) => o.how === 'ranged');
@@ -1770,13 +2024,15 @@ function enemyTurn(game, c) {
   const crawling = isProne(battle, c.id);
   const reach = reachableSquares(map, c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling });
   const closest = [...reach.values()].filter((s) => isAdjacent(s.pos, hero.pos)).sort((a, b) => a.cost - b.cost)[0];
-  const prefersRanged = monster.behaviour === 'skirmisher' && ranged && inRange(c, hero, ranged);
+  // A wall in the way blocks a shot.
+  const shot = ranged && clearShot(game, c.pos, hero.pos);
+  const prefersRanged = monster.behaviour === 'skirmisher' && shot && inRange(c, hero, ranged);
   if (melee && closest && !prefersRanged) {
     moveAlong(game, c, closest.path);
     if (battle.outcome || c.hp <= 0) return checkEnd(game);
     return attackTimes(melee);
   }
-  if (ranged && feetBetween(c.pos, hero.pos) <= ranged.range[0]) return attackTimes(ranged);
+  if (shot && feetBetween(c.pos, hero.pos) <= ranged.range[0]) return attackTimes(ranged);
   // Too far: Dash towards the hero.
   battle.turnState.movementLeft += speedOf(game, c);
   const farther = reachableSquares(map, c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling });
