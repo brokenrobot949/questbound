@@ -8,6 +8,9 @@
 
 === ch1_return ===
 It's full dark by the time you reach Bramblegate. Warden Pike takes one look at the state of you and lifts the bar without a word. #location:Bramblegate, north gate #time:Night
+{ has_flag("charmed_pike"):
+    She does give you one long, flat look as you pass. "You put a spell on me," she says. "Do it again, and I'll leave you out here for the dead."
+}
 { has_flag("goblins_spared"):
     On the way in you passed Dunn's Mill, and there were cookfires in the yard: a dozen goblins under a lean-to of flour sacks, waving at you. Nettle's band has moved in to keep an eye on the place.
     ~ set_flag("goblins_at_mill")

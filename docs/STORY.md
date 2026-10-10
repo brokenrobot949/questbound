@@ -249,6 +249,19 @@ The goblin bargain, the lower warren, the breach and the report take you to leve
 
 Fate's Mercy costs XP along the way, so a hero who lost fights may still be level 2 at the inn. Quest and discovery XP fill the gap, so the fights stay few and good.
 
+**Spells in Chapter 1.** Every spell a Phase 1 hero can have is good for something. Fight spells work on the grid, and the rest unlock choices in scenes. A spell's choice shows only to heroes who can cast it right now, and its card says what it costs: nothing for a cantrip, nothing but time for a Ritual, otherwise a free cast or a spell slot.
+- **The north gate:** Light, Prestidigitation or Thaumaturgy (a voice like the temple bell) gets you in. Charm Person makes Pike roll a Wisdom save. If she fails, she opens up, and back at the gate after the warren she's furious (`charmed_pike`). If she succeeds, she feels the spell and you sleep outside.
+- **Lark:** Druidcraft brings the crushed marigold on her cloak back into bloom (`lark_flower`). Her father grows them by the millrace.
+- **The quarry road:** Fire Bolt or Minor Illusion scares the wolf off. Speak with Animals asks it to move along, and it tells you the deer have gone from the hills. Detect Magic, as a Ritual, finds necromancy on the body.
+- **The quarry mouth:** Fog Cloud lets you walk in under the lookout's nose.
+- **A beaten lookout:** Spare the Dying keeps it alive (`warren_lookout_spared`). Nettle greets you differently, and with nobody killed she counts you as gentle (Persuasion DC 10).
+- **The pit passage:** Mage Hand finds the pit. Comprehend Languages reads the warning marks: "Sing-dead come up. Keep them down." (`read_goblin_marks`).
+- **The larder:** Dancing Lights soothes the goblin child as well as kindness does (`larder_child_spared`).
+- **The breach:** Disguise Self (a grey robe, a hymnal) walks you right up to the singing acolyte for a surprise attack. If you catch him, Charm Person (he saves) is a third way to make him talk.
+- **The hymnal:** its map is torn across. Mending shows the road north past the Old Ford to Cairnfield, ringed twice in red (`hymnal_mended`), which points to Chapter 2.
+- **Guidance** adds 1d4 to every ability check in a scene, cast just before.
+- **Waiting for Chapter 2:** Knock and Invisibility are level 2 spells, so a hero first has them at level 3, at the end of this chapter (see Chapter 2).
+
 **Chapter 1 side content** (Phase 2):
 - **Too Many Cats** (side quest): the inn's cats keep vanishing. A Stirge nest in the loft. Funny, short, and a good first loot.
 - **Wolf den on the north road** (the first contract on the notice board): Wolves; or find out they're starving because the dead drove off the deer.
@@ -261,7 +274,7 @@ Fate's Mercy costs XP along the way, so a hero who lost fights may still be leve
 3. **Fen in the stocks.** A halfling pickpocket, caught with the reeve's purse. Bounty hunters arrive (a Bandit Captain and two Bandits): "Dead or alive. The Choir pays double for dead."
    - Fen begs: "I know where they're taking your miller. I used to sing with them."
    - **Choices:**
-     - Free him: pick the lock, persuade Varrow, or pay his fine. He joins. *(Companion.)*
+     - Free him: pick the lock (or Knock it open, loudly), persuade Varrow, or pay his fine. He joins. *(Companion.)*
      - Hand him over (a Wealth Drive moment).
      - Fight the hunters (Moderate).
    - Turning Fen away doesn't dead-end anything: Nettle's goblins or the hunters give up the same lead, at a price.
@@ -278,7 +291,7 @@ Fate's Mercy costs XP along the way, so a hero who lost fights may still be leve
    - Odda's approval swings hard on this.
 7. **The camp at Cairnfield.** The Choir's camp among the opened barrows: acolytes (Cultists), a Cultist Fanatic called Sister Rhosyn, and the walking dead.
    - **Approaches:**
-     - Sneak in (Stealth, with Fen's help).
+     - Sneak in (Stealth, with Fen's help, or under Invisibility).
      - Blend in: Fen knows the hymns, so it's a Performance check to sing along.
      - Attack.
    - **What you learn:** Cantor Vesk opens the barrow's crown vault at the dark of the moon, three days away. The miller is alive, working the sluice gates that drain the barrow's flooded lower vault.

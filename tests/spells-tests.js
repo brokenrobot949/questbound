@@ -1,6 +1,6 @@
-// Spell checks: areas of effect, the Wizard's spells in a fight, Concentration, Shield, and
-// the spells a hero casts on themselves. Open tests/spells.html through the local server to
-// run them. Add checks here whenever a spell's rules change.
+// Spell checks: areas of effect, the Wizard's spells in a fight, Concentration, Shield, the
+// spells a hero casts on themselves, and spells in scenes. Open tests/spells.html through the
+// local server to run them. Add checks here whenever a spell's rules change.
 
 import { test, assertEqual, assertTrue, assertThrows, scriptedRng, run } from './harness.js';
 import { createRng } from '../js/engine/rules/rng.js';
@@ -16,6 +16,12 @@ import { freeCastKey } from '../js/engine/character/spells.js';
 import { takeDamage } from '../js/engine/character/hazards.js';
 import { armorClass, speed } from '../js/engine/character/sheet.js';
 import { attackSummary } from '../js/engine/ui/attack-text.js';
+import { castInScene, sceneCastCost } from '../js/engine/character/casting.js';
+import { loadStory } from '../js/engine/story/ink-loader.js';
+import { bindExternals } from '../js/engine/story/externals.js';
+import { jumpTo, makeChoice } from '../js/engine/story/story-runner.js';
+import { newGame } from '../js/engine/save/save-format.js';
+import { spells } from '../data/srd/spells.js';
 import { quickStartHeroes } from '../data/campaign/quick-start.js';
 
 const wren = quickStartHeroes.find((h) => h.id === 'wren').character;
@@ -309,6 +315,98 @@ test('Spell buttons say what each spell does', () => {
   assertEqual(text('spell-misty-step'), 'Bonus Action · teleport up to 30 ft to a square you can see · uses a level 2 slot');
   assertEqual(text('spell-mage-armor'), 'your AC becomes 13 + Dex until your next Long Rest · uses a level 1 slot');
   assertEqual(text('spell-burning-hands-2').includes('4d6 fire · 14 on average'), true, 'a level 2 slot adds a die');
+});
+
+// ---- Spells in scenes ----
+
+const STORY_URL = new URL('../story/', import.meta.url);
+
+async function storyGame(character, seed = 'scenes') {
+  const story = await loadStory(STORY_URL);
+  const runtime = { story, game: null };
+  bindExternals(story, runtime);
+  return newGame(runtime, { slot: 1, seed, character });
+}
+
+const spellChoice = (game, id) => game.story.currentChoices.find((c) => (c.tags || []).includes(`spell:${id}`));
+const notesOn = (page) => page.beats.filter((b) => b.type === 'note').map((b) => b.text);
+
+// Juniper with Charm Person prepared instead of Sleep (level 1: 2 slots), and a Fighter with
+// Magic Initiate (Cleric): Guidance, Spare the Dying and Thaumaturgy.
+const charmer = { ...juniper, spells: { ...juniper.spells, spellbook: [...juniper.spells.spellbook, 'charm-person'], prepared: ['mage-armor', 'magic-missile', 'shield', 'charm-person'] } };
+const acolyteFighter = {
+  ...wren,
+  magicInitiate: [{ source: 'background', list: 'cleric', ability: 'wisdom', cantrips: ['guidance', 'spare-the-dying'], spell: 'cure-wounds' }],
+};
+
+// Spells with no use in a fight yet that are waiting for scenes still to be written, or for
+// the next slice. Every other spell without one must unlock a choice somewhere.
+const WAITING = {
+  knock: 'Chapter 2: freeing Fen from the stocks (a level 2 spell, so not before level 3)',
+  invisibility: 'Chapter 2: sneaking into the Choir camp at Cairnfield (level 2)',
+  guidance: 'works on every ability check in a scene instead',
+  bless: 'next slice: Cleric spells in a fight',
+  'cure-wounds': 'next slice',
+  'faerie-fire': 'next slice',
+  'guiding-bolt': 'next slice',
+  'healing-word': 'next slice',
+  'hellish-rebuke': 'next slice',
+  sanctuary: 'next slice',
+};
+
+test('Scenes: every spell without a use in a fight unlocks a choice in a scene (or waits for one)', async () => {
+  const main = await (await fetch(new URL('main.ink', STORY_URL))).text();
+  const files = [...main.matchAll(/^INCLUDE (.+)$/gm)].map((m) => m[1].trim());
+  const source = (await Promise.all(files.map(async (f) => (await fetch(new URL(f, STORY_URL))).text()))).join('\n');
+  const missing = spells.filter((s) => !s.combat && !WAITING[s.id] && !source.includes(`#spell:${s.id}`)).map((s) => s.id);
+  assertEqual(missing, []);
+  const stray = [...source.matchAll(/has_spell\("([^"]+)"\)\}? \[/g)].map((m) => m[1]);
+  assertEqual(stray, [], 'spell choices use can_cast, so the card shows what they cost');
+});
+
+test('Scenes: a cantrip costs nothing, a Ritual no slot, and a spell with no slot left can’t be cast', async () => {
+  const game = await storyGame(charmer);
+  assertEqual([sceneCastCost(game, 'light').kind, sceneCastCost(game, 'detect-magic').kind, sceneCastCost(game, 'charm-person')], ['cantrip', 'ritual', { kind: 'slot', level: 1 }]);
+  castInScene(game, 'detect-magic');
+  assertEqual(game.slotsUsed[0] || 0, 0, 'Detect Magic as a Ritual, from the spellbook');
+  castInScene(game, 'charm-person');
+  castInScene(game, 'charm-person');
+  assertEqual(sceneCastCost(game, 'charm-person'), null, 'both level 1 slots spent');
+  assertThrows(() => castInScene(game, 'charm-person'));
+});
+
+test('Scenes: Charm Person at the gate uses a slot, and the warden rolls her save in the open', async () => {
+  const game = await storyGame(charmer, 'charm');
+  forceNextD20(1);
+  const page = (game.page = makeChoice(game, spellChoice(game, 'charm-person')));
+  const roll = page.beats.find((b) => b.type === 'roll').result;
+  assertEqual([roll.opponent, roll.label, roll.success], ['Warden Pike', "Warden Pike's Wisdom save against Charm Person", false]);
+  assertTrue(notesOn(page).includes('You cast Charm Person, using a level 1 slot.'));
+  // (The slot itself comes back at once: the night at the inn is a Long Rest.)
+  assertTrue(game.flags.includes('charmed_pike') && game.flags.includes('warden_opened_gate'));
+
+  const wary = await storyGame(charmer, 'charm-fails');
+  forceNextD20(20);
+  wary.page = makeChoice(wary, spellChoice(wary, 'charm-person'));
+  assertTrue(wary.flags.includes('saw_barrow_light') && !wary.flags.includes('charmed_pike'), 'she feels it, and you sleep outside');
+});
+
+test('Guidance: a hero who knows it adds 1d4 to ability checks in scenes', async () => {
+  const game = await storyGame(acolyteFighter, 'guided');
+  const talk = game.story.currentChoices.find((c) => c.text.startsWith('Talk her into opening the gate'));
+  const page = makeChoice(game, talk);
+  const guidance = page.beats.find((b) => b.type === 'roll').result.modifiers.find((m) => m.label === 'Guidance');
+  assertTrue(guidance && guidance.value >= 1 && guidance.value <= 4, JSON.stringify(guidance));
+});
+
+test('Spare the Dying: a beaten lookout lives, Nettle hears of it, and it lies on the map', async () => {
+  const game = await storyGame(acolyteFighter, 'spared');
+  game.page = jumpTo(game, 'ch1_warren.lookout_down');
+  game.page = makeChoice(game, spellChoice(game, 'spare-the-dying'));
+  assertTrue(game.flags.includes('warren_lookout_spared') && !game.flags.includes('warren_lookout_killed'));
+  game.page = jumpTo(game, 'ch1_warren.hall');
+  assertTrue(game.page.beats.some((b) => b.type === 'text' && b.text.includes('sat with him so he didn')), 'her greeting');
+  assertTrue(game.story.currentChoices.some((c) => (c.tags || []).includes('check:persuasion:10')), 'nobody died, so she listens');
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

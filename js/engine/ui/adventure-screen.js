@@ -28,6 +28,7 @@ import {
 } from '../character/sheet.js';
 import { findSpell } from '../character/spells.js';
 import { activeSpellIds } from '../character/spell-effects.js';
+import { castCostText, sceneCastCost } from '../character/casting.js';
 import { heroSprite } from '../character/look.js';
 import { spriteCanvas } from './sprite-canvas.js';
 import { abilities } from '../../../data/srd/abilities.js';
@@ -235,7 +236,7 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
         doors.push({ room: tags.go, choice });
       }
       if (tags.check) card.append(el('span', 'choice-tag', checkLabel(tags.check)));
-      if (tags.spell) card.append(el('span', 'choice-tag', `Spell · ${spellName(tags.spell)}`));
+      if (tags.spell) card.append(el('span', 'choice-tag', spellTag(game, tags.spell)));
       if (tags.buy) card.append(el('span', 'choice-tag', `Buy · ${moneyText(priceOf(tags.buy))}`));
       if (tags.combat) card.append(el('span', 'choice-tag is-fight', `${fightLabel(tags.combat)}${tags.surprise ? ' · Surprise attack' : ''}`));
       // Only the hero's own Drive is pointed out: that's the choice that earns Inspiration.
@@ -386,7 +387,8 @@ function rollPanel(result) {
 function resultBlock(beat) {
   const { result } = beat;
   const block = el('div', 'roll-result');
-  if (result.success !== null) block.classList.add(result.success ? 'is-good' : 'is-bad');
+  // Someone else's roll (an NPC's save against your spell): their success is your setback.
+  if (result.success !== null) block.classList.add(result.success !== Boolean(result.opponent) ? 'is-good' : 'is-bad');
   block.append(el('p', 'roll-outcome', outcomeText(result)));
   block.append(el('p', 'roll-line', rollLine(result)));
 
@@ -404,7 +406,7 @@ function resultBlock(beat) {
 
 // The DM's line for a natural 20 or 1, taking turns through the lines in data/campaign/dm-voice.js.
 function pickAside(game, result) {
-  if (result.natural !== 20 && result.natural !== 1) return null;
+  if (result.opponent || (result.natural !== 20 && result.natural !== 1)) return null;
   const lines = result.natural === 20 ? dmVoice.natural20 : dmVoice.natural1;
   const earlier = game.rollLog.filter((entry) => entry.result.natural === result.natural).length;
   return lines[earlier % lines.length];
@@ -441,9 +443,11 @@ function fightLabel(encounterId) {
   return rating ? `Fight · ${rating}` : 'Fight';
 }
 
-function spellName(id) {
+// "Spell · Light", "Spell · Charm Person · level 1 slot", "Spell · Detect Magic · as a Ritual"
+function spellTag(game, id) {
   const spell = findSpell(id);
-  return spell ? spell.name : id;
+  const cost = castCostText(sceneCastCost(game, id));
+  return `Spell · ${spell ? spell.name : id}${cost ? ` · ${cost}` : ''}`;
 }
 
 // "Wren Ashdown · Human Fighter 1 · HP 12 · AC 17 · Str +3 Dex +1 … · Proficiency +2"

@@ -8,7 +8,10 @@
 // game.pending, in the order they happen, for the story runner to place on the page.
 
 import { abilityCheck } from '../rules/ability-check.js';
-import { canCastSpell } from '../character/spells.js';
+import { d20Test } from '../rules/d20-test.js';
+import { canCastSpell, findSpell } from '../character/spells.js';
+import { castCostText, castInScene, guidanceModifiers, sceneCastCost, spellSaveDc } from '../character/casting.js';
+import { findAbility } from '../character/sheet.js';
 import { addItem, buyItem, canAfford, COPPER_PER, findItem, hasItem, moneyText, removeItem } from '../character/inventory.js';
 import { findDrive } from '../character/creation.js';
 import { addDeed, findQuest, finishQuest, questNote, startQuest } from './journal.js';
@@ -20,12 +23,14 @@ import { dmNotes } from '../../../data/campaign/dm-voice.js';
 export function bindExternals(story, runtime) {
   // check(skill, dc): the hero makes an ability check against a DC, e.g. check("persuasion", 15).
   // skill is a skill id from data/srd/skills.js, or an ability id for a plain ability check.
-  // Returns true on a success. A Fighter's Tactical Mind can turn a failure into a success.
+  // Returns true on a success. A Fighter's Tactical Mind can turn a failure into a success,
+  // and a hero who knows Guidance adds 1d4.
   story.BindExternalFunction(
     'check',
     (skill, dc) => {
       const { game } = runtime;
-      const result = tacticalMind(game, abilityCheck({ rng: game.rng, character: game.character, testId: skill, dc }));
+      const extraModifiers = guidanceModifiers(game);
+      const result = tacticalMind(game, abilityCheck({ rng: game.rng, character: game.character, testId: skill, dc, extraModifiers }));
       game.pending.push({ type: 'roll', result });
       return result.success;
     },
@@ -47,10 +52,53 @@ export function bindExternals(story, runtime) {
   // has_flag(id): true if that flag has been set, e.g. { has_flag("saw_barrow_light"): ... }
   story.BindExternalFunction('has_flag', (id) => runtime.game.flags.includes(flagId(id)), false);
 
-  // has_spell(id): true if the hero can cast that spell now, e.g. { has_spell("knock"): ... }
-  // That means a cantrip they know, a prepared or always-prepared spell, or a ritual in a
-  // Wizard's spellbook. id is a spell id from data/srd/spells.js.
+  // has_spell(id): true if the hero has that spell ready, slots or not: a cantrip they know,
+  // a prepared or always-prepared spell, or a ritual in a Wizard's spellbook. id is a spell
+  // id from data/srd/spells.js.
   story.BindExternalFunction('has_spell', (id) => canCastSpell(runtime.game.character, id), false);
+
+  // can_cast(id): true if the hero can cast that spell right now, with a way to pay for it:
+  // a cantrip, a Ritual, a free cast or a spell slot left (see character/casting.js). Use it
+  // to show a spell's choice, and cast(id) in the choice to cast it, e.g.
+  //   * {can_cast("knock")} [Knock the lock open #spell:knock]
+  //       ~ cast("knock")
+  // The #spell tag shows the spell, and what it will cost, on the card.
+  story.BindExternalFunction('can_cast', (id) => Boolean(sceneCastCost(runtime.game, id)), false);
+
+  // cast(id): casts the spell, spending a free cast or the lowest slot it can use (a cantrip
+  // or a Ritual costs nothing), and says so in a DM note.
+  story.BindExternalFunction(
+    'cast',
+    (id) => {
+      castSpellWithNote(runtime.game, id);
+    },
+    false,
+  );
+
+  // cast_on(id, who, ability, bonus): casts a spell that its target saves against (Charm
+  // Person on a gate warden, say), e.g. cast_on("charm-person", "Warden Pike", "wisdom", 1).
+  // who makes the save (bonus is their saving throw bonus) against the hero's spell save DC,
+  // rolled in the open. Returns true if the spell takes hold: the target failed the save.
+  story.BindExternalFunction(
+    'cast_on',
+    (id, who, ability, bonus) => {
+      const { game } = runtime;
+      castSpellWithNote(game, id);
+      const save = findAbility(ability);
+      if (!save) throw new Error(`cast_on needs an ability id, got ${ability}`);
+      const result = d20Test({
+        rng: game.rng,
+        kind: 'save',
+        label: `${who}'s ${save.name} save against ${findSpell(id).name}`,
+        modifiers: [{ label: `${save.abbreviation} save`, value: bonus, source: who }],
+        target: { type: 'DC', value: spellSaveDc(game.character, id) },
+      });
+      // opponent: the roll is someone else's, so a success is bad news for the hero.
+      game.pending.push({ type: 'roll', result: { ...result, opponent: who } });
+      return !result.success;
+    },
+    false,
+  );
 
   // has_class(id), has_species(id), has_background(id): who the hero is, for choices only
   // some heroes get, e.g. { has_background("soldier"): ... }. Ids are from data/srd/.
@@ -245,6 +293,15 @@ export function bindExternals(story, runtime) {
     },
     false,
   );
+}
+
+// Casts a spell in a scene and notes what it cost (nothing to note for a cantrip).
+function castSpellWithNote(game, id) {
+  const cost = castInScene(game, id);
+  const spell = findSpell(id).name;
+  if (cost.kind === 'ritual') note(game, dmNotes.castRitual, { spell });
+  if (cost.kind === 'free') note(game, dmNotes.castFree, { spell });
+  if (cost.kind === 'slot') note(game, dmNotes.castWithSlot, { spell, cost: castCostText(cost) });
 }
 
 // A short DM note for the page ("New quest: …"), shown where it happened in the story.

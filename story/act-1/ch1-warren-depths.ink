@@ -7,6 +7,8 @@
 // rises; catch him and he talks, or he flees and drops his hymnal. Either way you take the
 // hymnal, the dead upstairs fall still, and you climb back to Nettle (or her empty hall).
 // Losing a fight down here is Fate's Mercy: you come to where you fell, robbed.
+// Spells: Disguise Self (walk up to the singer in a grey robe), Charm Person (on the caught
+// acolyte, who saves), and Mending (the hymnal's torn map shows where the road goes).
 
 === ch1_warren_depths ===
 The passage drops into the goblins' deep halls, where their stores were kept. Crates lie smashed, spilled grain has gone green, and a single small sandal sits in the middle of the floor. At the far wall, three figures are digging. #room:brackenhollow/lower #location:Brackenhollow warren, the lower warren
@@ -79,6 +81,13 @@ A man in a grey robe stands beside a stone bier with a book held high, singing. 
         A bone cracks under your heel. The singing doesn't stop, but his eyes snap open, and the skeleton turns its empty face towards you.
         -> breach_seen
     }
+* {can_cast("disguise-self")} [Look like one of his own, and walk right up to him #spell:disguise-self]
+    ~ cast("disguise-self")
+    -> breach_disguised
+
+= breach_disguised
+You take on a grey robe, a shaved head and a hymnal of your own, and walk up the crypt humming along. The skeleton turns its empty face towards you, and away again. The singer doesn't even open his eyes. Why would he?
+-> breach_unseen
 
 = breach_unseen
 * [Strike! #combat:breach-hymn #surprise]
@@ -113,6 +122,15 @@ The acolyte lies at the foot of the bier, alive, bleeding, and still humming und
     { check("persuasion", 15):
         -> acolyte_talks
     - else:
+        -> acolyte_silent
+    }
+* {can_cast("charm-person")} [Charm him into talking #spell:charm-person]
+    You crouch beside him, speak softly, and let the spell slip in under the words.
+    { cast_on("charm-person", "The acolyte", "wisdom", 2):
+        His eyes go soft and grateful, as if yours were the first kind face he's seen in years.
+        -> acolyte_talks
+    - else:
+        He flinches away from you. "Witch-tongue," he spits, and starts to sing again, louder.
         -> acolyte_silent
     }
 
@@ -152,11 +170,22 @@ The book is a hymnal, bound in grey. Inside are old coronation hymns, written ou
 ~ quest_note("missing-miller", "Took a hymnal from the Choir at the breach: coronation hymns, a map of the barrow road, and their sigil, a staff wound with music notes.")
 ~ give_xp(25)
 
+The map's last page has been torn across, its two halves still caught in the binding. The road runs north off the edge of the tear.
+
 The crypt's far door leads on into the barrow tunnels, but a few yards in, the roof has come down. Whoever came this way brought it down behind them.
 { not has_flag("lower_dead_destroyed"):
     Back up the passage, the scraping has stopped. Without the hymn, the dead diggers have fallen where they stood.
     ~ set_flag("lower_dead_stilled")
 }
+-> hymnal_onward
+
+= hymnal_onward
+* {can_cast("mending")} [Mend the torn map #spell:mending]
+    ~ cast("mending")
+    You hold the two halves together and murmur the spell. The tear knits shut without a seam, and the road runs on: north past a crossing marked THE OLD FORD, to a cluster of little drawn mounds labelled CAIRNFIELD. Someone has ringed Cairnfield twice in red.
+    ~ set_flag("hymnal_mended")
+    ~ quest_note("missing-miller", "The hymnal's mended map: the barrow road runs north past the Old Ford to Cairnfield, ringed twice in red.")
+    -> hymnal_onward
 * [Climb back up through the warren #go:lower]
     -> back_up
 

@@ -13,10 +13,23 @@ EXTERNAL set_flag(id)
 // has_flag(id): true if that flag has been set, e.g. { has_flag("saw_barrow_light"): ... }
 EXTERNAL has_flag(id)
 
-// has_spell(id): true if the hero can cast that spell now, e.g. { has_spell("knock"): ... }
-// A known cantrip, a prepared spell, or a ritual in a Wizard's spellbook all count.
-// id is a spell id from data/srd/spells.js, such as "light" or "detect-magic".
+// has_spell(id): true if the hero has that spell ready, whatever their slots: a known
+// cantrip, a prepared spell, or a ritual in a Wizard's spellbook. id is a spell id from
+// data/srd/spells.js, such as "light" or "detect-magic".
 EXTERNAL has_spell(id)
+
+// Spells in scenes. can_cast(id): the hero can cast it right now, with a way to pay (a
+// cantrip, a Ritual, a free cast or a spell slot). cast(id): casts it, paying the cheapest
+// way, and tells the player what it cost. Show a spell's choice with can_cast and tag it
+// with the spell, so the card shows the spell and its cost:
+//   * {can_cast("knock")} [Knock the lock open #spell:knock]
+//       ~ cast("knock")
+// cast_on(id, who, ability, bonus): casts a spell its target saves against, e.g.
+//   { cast_on("charm-person", "Warden Pike", "wisdom", 1): She smiles… - else: … }
+// who rolls the save (with that bonus) in the open; true if the spell takes hold.
+EXTERNAL can_cast(id)
+EXTERNAL cast(id)
+EXTERNAL cast_on(id, who, ability, bonus)
 
 // has_class(id), has_species(id), has_background(id): who the hero is, for choices only
 // some heroes get, e.g. * {has_background("soldier")} [Show your regiment's token]

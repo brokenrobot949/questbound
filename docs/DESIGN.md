@@ -191,7 +191,12 @@ How the Wizard's spells work in the game so far:
 - **Misty Step:** a Bonus Action teleport to an empty square you can see within 30 feet (shown in purple), with no Opportunity Attacks. You can spend only one spell slot a turn, so after Misty Step your action can only be a cantrip.
 - **On yourself:** Mage Armor (AC 13 + Dex until your next Long Rest, without armour), False Life (Temporary Hit Points, lost first and gone after a Long Rest) and Longstrider (+10 feet of Speed for about an hour, which ends when the story's time of day moves on). Cast them from the Sheet's **Cast a spell on yourself** between fights, or as an action in one.
 - **Free casts:** a spell from Magic Initiate (Juniper's Thunderwave) or a species can be cast once per Long Rest without a slot, as the 2024 rules allow. The button offers that first.
-- **Not yet in fights:** Charm Person, Fog Cloud, Invisibility and the utility spells (Comprehend Languages, Detect Magic, Disguise Self, Knock, Light, Mage Hand, Minor Illusion, Mending, Prestidigitation, Dancing Lights). These are for scenes: a few already unlock choices, and the rest come with the story. The Cleric and Druid spells Magic Initiate offers come next.
+- **In scenes:** a spell choice shows only to a hero who can cast it now, and its card says what it costs: "Spell · Light" for a cantrip, "· as a Ritual" (10 minutes longer, no slot), "· free" (Magic Initiate's once-per-Long-Rest cast), or "· level 1 slot". The scene takes the cheapest way, and a DM note says what was spent.
+  - A Wizard can cast any Ritual in their spellbook, prepared or not; anyone else needs the ritual spell prepared.
+  - A spell its target saves against, such as Charm Person on Warden Pike, rolls that save in the open. The die is the NPC's, so the colours flip: their success is your setback.
+  - STORY.md lists where each spell is useful in Chapter 1. Knock and Invisibility wait for Chapter 2, because a hero first has them at level 3.
+- **Guidance:** a hero who knows it adds 1d4 to every ability check in a scene, shown in the roll's breakdown.
+- **Not yet in fights:** Charm Person, Fog Cloud and Invisibility (they work in scenes), and the Cleric and Druid spells Magic Initiate offers (Bless, Cure Wounds, Healing Word, Guiding Bolt, Faerie Fire, Sanctuary) and Hellish Rebuke, which come next.
 
 **Rests**
 

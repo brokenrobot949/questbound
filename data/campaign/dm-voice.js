@@ -48,6 +48,9 @@ export const dmNotes = {
   levelUpNote: 'You are now level {level}. Your Hit Point maximum rises by {hp}.',
   levelUpDeed: 'Reached level {level}.',
   spellWoreOff: 'Time passes, and your {spell} wears off.',
+  castWithSlot: 'You cast {spell}, using a {cost}.',
+  castRitual: 'You cast {spell} as a Ritual: ten minutes longer, and no spell slot.',
+  castFree: 'You cast {spell} without a spell slot (once per Long Rest).',
   source: 'original',
 };
 

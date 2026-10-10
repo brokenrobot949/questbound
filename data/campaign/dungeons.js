@@ -103,7 +103,7 @@ export const dungeons = [
         entry: { x: 3, y: 0 },
         exits: { pit: [{ x: 3, y: 5 }, { x: 4, y: 5 }] },
         // The lookout on its ledge above the door.
-        figures: [{ sprite: 'goblin-warrior', pos: { x: 5, y: 4 }, name: 'a goblin lookout', goneOn: ['warren_lookout_talked'], fallenOn: ['warren_lookout_killed'] }],
+        figures: [{ sprite: 'goblin-warrior', pos: { x: 5, y: 4 }, name: 'a goblin lookout', goneOn: ['warren_lookout_talked'], fallenOn: ['warren_lookout_killed', 'warren_lookout_spared'] }],
       },
       { id: 'pit', name: 'The pit passage', rows: [5, 11], entry: { x: 3, y: 6 }, exits: { larder: [{ x: 2, y: 11 }, { x: 3, y: 11 }] } },
       { id: 'larder', name: 'The larder', rows: [11, 16], entry: { x: 3, y: 12 }, exits: { hall: [{ x: 3, y: 16 }, { x: 4, y: 16 }] } },

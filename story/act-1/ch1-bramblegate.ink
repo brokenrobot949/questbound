@@ -193,6 +193,10 @@ You've barely stepped back into the square when a girl of about fourteen plants 
     "Because I know goblins," she says. "They've squabbled over our hens for years. They never took anybody. Not once."
 * [Tell her to go home and leave it to you]
     "Home's where it happened," she says flatly, and for a moment she looks every bit of fourteen. Then the jaw comes back. "Just find him."
+* {can_cast("druidcraft")} [Coax the crushed flower on her cloak back into bloom #spell:druidcraft]
+    ~ cast("druidcraft")
+    There's a marigold pinned to her cloak, crushed and brown at the edges. You touch it and whisper, and it uncurls, gold as butter. Lark stares at it. "Da grows those by the millrace," she says, very quietly. Then the jaw comes back. "Just find him."
+    ~ set_flag("lark_flower")
 
 - She's gone before you can say anything else, darting off between the market stalls.
 ~ set_flag("met_lark")

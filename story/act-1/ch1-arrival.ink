@@ -2,7 +2,8 @@
 //
 // Rain at dusk. The gate is barred, and Warden Tamsin Pike won't open it till dawn. Every way
 // in works out: talk, bluster or a lie (each a check), a soldier's token, a pilgrim's right of
-// sanctuary, a climb over the wall, a cantrip, or simply waiting. Failing or waiting means a
+// sanctuary, a climb over the wall, a cantrip (Light, Prestidigitation, Thaumaturgy), Charm
+// Person (Pike saves; she remembers it later), or simply waiting. Failing or waiting means a
 // night under the eaves, and pale lights on the barrow hills (flag saw_barrow_light).
 
 === ch1_arrival ===
@@ -51,12 +52,25 @@ Past her shoulder you can see warm windows and smoke curling from an inn chimney
     -> sanctuary
 * {has_background("criminal")} [Find a dark stretch of wall and climb it #check:athletics:15]
     -> climb
-* {has_spell("light")} [Show her you're no barrow-thing #spell:light]
+* {can_cast("light")} [Show her you're no barrow-thing #spell:light]
+    ~ cast("light")
     You touch the clasp of your cloak and speak a word. It blazes with clean white light, bright enough to show the warden your face, your empty hands and nothing of the barrow about you.
     -> cantrip_trick
-* {has_spell("prestidigitation")} [Make her lantern flame dance #spell:prestidigitation]
+* {can_cast("prestidigitation")} [Make her lantern flame dance #spell:prestidigitation]
+    ~ cast("prestidigitation")
     You flick your fingers at the lantern. Its flame stretches, curtsies, and spins into a tiny dancing figure that bows to the warden before it settles back down.
     -> cantrip_trick
+* {can_cast("thaumaturgy")} [Speak with a voice like the temple bell #spell:thaumaturgy]
+    ~ cast("thaumaturgy")
+    You let the old words settle on your tongue, and when you speak, your voice booms off the wall like a struck bell. The lantern flame leaps with every word, and the gate's iron bands hum.
+    -> gate_opens_grudging
+* {can_cast("charm-person")} [Charm the warden #spell:charm-person]
+    You meet her eyes through the rain, say something warm and ordinary, and let the spell ride in on the words.
+    { cast_on("charm-person", "Warden Pike", "wisdom", 1):
+        -> gate_charmed
+    - else:
+        -> gate_feels_the_spell
+    }
 * [Wait out the night under the gatehouse eaves]
     -> night_at_the_gate
 
@@ -118,6 +132,20 @@ You go up and over like it's an old habit, which it is, and drop into a dark all
 Halfway up, a stone shifts under your boot and you land in the ditch with a splash that echoes off the wall. A lantern bobs towards you along the parapet.
 
 "Thought so," says the warden, peering down. "Dry corner under the eaves. Don't make me tell the captain."
+-> night_at_the_gate
+
+= gate_charmed
+// Charm Person lasts an hour, and when it ends she knows she was charmed (charmed_pike).
+~ set_flag("warden_opened_gate")
+~ set_flag("charmed_pike")
+~ add_deed("Charmed Warden Pike into opening the north gate after sundown. She'll know, when it wears off.")
+The warden's frown melts into a smile, as if you were an old friend come home. "Well, why didn't you say it was you?" She hauls the bar aside herself. "Get in out of the wet. Mind the step."
+
+In an hour the charm will fade, and she'll know exactly what you did. But that's an hour away, and the inn is right there.
+-> into_town
+
+= gate_feels_the_spell
+Something flickers behind the warden's eyes, and her hand goes to her cudgel. "Was that a spell? At my gate?" She leans out over the parapet and glares at you. "There's a dry corner under the eaves. Keep your fingers still in it."
 -> night_at_the_gate
 
 = cantrip_trick

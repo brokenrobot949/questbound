@@ -2,7 +2,8 @@
 //
 // A short walk south to the old quarry. A starving Wolf is tearing at a dead goblin in the
 // road. Fight it (a Low fight), calm it (Animal Handling), scare it off (Intimidation, or a
-// cantrip), or throw it some food. Every way past it is worth the same XP. Then the body:
+// cantrip), ask it to move along (Speak with Animals), or throw it some food. Every way past
+// it is worth the same XP. Then the body:
 // the long gouges down its back were made by human fingers, with grave dirt in them.
 // Losing the fight is Fate's Mercy: Odda Brasswick finds you and carts you home.
 
@@ -37,13 +38,23 @@ The wolf lifts its head and looks at you. Its lips peel back from red teeth, but
         The wolf flinches, then lowers its head and growls right back. Hunger is louder than you are.
         -> forced_fight
     }
-* {has_spell("fire-bolt")} [Scorch the road at its feet #spell:fire-bolt]
+* {can_cast("fire-bolt")} [Scorch the road at its feet #spell:fire-bolt]
+    ~ cast("fire-bolt")
     A mote of fire cracks against the road between the wolf's paws and bursts into sparks. Every wild thing knows fire. The wolf yelps, wheels, and is gone into the bracken.
     ~ add_deed("Scared a starving wolf off the quarry road with a flash of fire.")
     -> wolf_gone
-* {has_spell("minor-illusion")} [Conjure the roar of something bigger #spell:minor-illusion]
+* {can_cast("minor-illusion")} [Conjure the roar of something bigger #spell:minor-illusion]
+    ~ cast("minor-illusion")
     From the bracken behind the wolf comes a roar: deep, close, and very large. The wolf doesn't wait to see what made it. It's gone up the slope in three long bounds.
     ~ add_deed("Fooled a starving wolf off the quarry road with the roar of a beast that wasn't there.")
+    -> wolf_gone
+* {can_cast("speak-with-animals")} [Ask the wolf, in its own tongue, what it's doing here #spell:speak-with-animals]
+    ~ cast("speak-with-animals")
+    The spell takes its time. The wolf watches you work it, and when it settles, its growl comes to you as words: short, hungry words, most of them about meat.
+    "Deer gone from the hills. Dead things walk where the deer walked. They smell like the ground." It noses the goblin. "This one ran from the stone place, and fell. Mine now."
+    You ask it, politely, to eat somewhere else. It thinks about that for a long moment, then drags its meal into the bracken, grumbling about deer.
+    ~ quest_note("missing-miller", "A wolf on the quarry road says the deer are gone from the hills: dead things walk there now, smelling of the ground.")
+    ~ add_deed("Asked a starving wolf on the quarry road to move along, in its own tongue. It did.")
     -> wolf_gone
 * {has_item("rations") || has_item("dungeoneers-pack")} [Throw it some of your food]
     { has_item("rations"):
@@ -117,8 +128,9 @@ The goblin lies on its back in the cart ruts. It carried nothing: no sack, no fl
         Wolf tracks, goblin tracks and your own boots, all trampled together in the ruts.
     }
     -> body_search
-* {has_spell("detect-magic")} [Search it for magic #spell:detect-magic]
-    You read the ritual from your spellbook, slowly, and let the spell settle over the road. Most of the goblin is just a dead goblin. But the gouges on its back glow, faintly and sickly, with the cold aura of necromancy.
+* {can_cast("detect-magic")} [Search it for magic #spell:detect-magic]
+    ~ cast("detect-magic")
+    You work the spell slowly, and let it settle over the road. Most of the goblin is just a dead goblin. But the gouges on its back glow, faintly and sickly, with the cold aura of necromancy.
     Dead hands, then. Hands that something made move.
     ~ set_flag("saw_necromancy")
     -> body_search

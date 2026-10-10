@@ -8,6 +8,9 @@
 // talk, single combat, or a hopeless fight with the whole band all end in the same place:
 // the way down to the lower warren, where the dead are digging.
 // Losing a fight here, or dying in the pit, is Fate's Mercy: you wake tied up before Nettle.
+// Spells: Fog Cloud past the lookout, Spare the Dying for a beaten lookout (Nettle hears),
+// Mage Hand on the pit, Comprehend Languages to read the warning marks, and Dancing Lights
+// for the goblin child.
 
 === ch1_warren ===
 { has_flag("mill_goblins_talked"):
@@ -36,6 +39,11 @@
         "Talk," the lookout sneers, "with arrows." It draws.
         -> lookout_fight
     }
+* {can_cast("fog-cloud")} [Fill the quarry with fog, and walk in under it #spell:fog-cloud]
+    ~ cast("fog-cloud")
+    A bank of thick grey fog boils up out of the rubble and swallows the quarry floor. Up on its ledge, the lookout swears, squints, and shouts at the fog to go away. It doesn't. You walk straight through it to the door.
+    ~ set_flag("warren_sneaked_in")
+    -> past_lookout
 * [Rush the lookout #combat:warren-lookout]
     -> lookout_fought
 
@@ -51,12 +59,23 @@ The lookout scrambles down from its ledge and bobs its head at you, nervous and 
 
 = lookout_fought
 { combat_won():
-    The lookout tumbles off its ledge and lies still among the rubble. Its screams echo into the warren and die away. Nobody answers them.
-    ~ set_flag("warren_lookout_killed")
-    -> into_the_warren
+    The lookout tumbles off its ledge and lies among the rubble, breathing in small, wet gasps. Its screams echo into the warren and die away. Nobody answers them.
+    -> lookout_down
 - else:
     -> captured
 }
+
+= lookout_down
+* {can_cast("spare-the-dying")} [Keep it from dying #spell:spare-the-dying]
+    ~ cast("spare-the-dying")
+    You kneel and lay a hand on its narrow chest, and will its heart to keep on beating. The gasping slows, then steadies. It'll live, and wake with a headache and a story.
+    ~ set_flag("warren_lookout_spared")
+    ~ add_deed("Beat the goblin lookout at Brackenhollow, then kept it from dying.")
+    -> into_the_warren
+* [Go on into the warren]
+    Behind you, the gasping stops.
+    ~ set_flag("warren_lookout_killed")
+    -> into_the_warren
 
 = past_lookout
 // Getting past the lookout without a fight is worth the same as the fight.
@@ -81,7 +100,8 @@ The warren's door is a crack in the cliff, shored up with old quarry timbers. Be
         Nothing seems wrong, right up until it is.
         -> pit_fall
     }
-* {has_spell("mage-hand")} [Send a Mage Hand ahead to test the floor #spell:mage-hand]
+* {can_cast("mage-hand")} [Send a Mage Hand ahead to test the floor #spell:mage-hand]
+    ~ cast("mage-hand")
     A spectral hand floats ahead of you, patting the floor like a blind man's cane. Ten feet on, a square of floor tips under its touch and swings down on a hidden hinge.
     -> pit_found
 * [Hurry on before anything else notices you]
@@ -118,6 +138,16 @@ These traps weren't dug to keep you out. They were dug to keep something in.
 ~ set_flag("traps_face_inward")
 ~ quest_note("missing-miller", "The goblins' traps face inward. Whatever they fear is coming up from below their warren.")
 ~ give_xp(25)
+-> pit_onward
+
+= pit_onward
+* {can_cast("comprehend-languages")} [Read the warning marks #spell:comprehend-languages]
+    ~ cast("comprehend-languages")
+    You sit by the pit for a few quiet minutes, working the spell, until the scratches swim and settle into sense. They're warnings, written in a hurry by small hands: SING-DEAD COME UP. KEEP THEM DOWN.
+    Under that, scratched deeper than the rest: MOTHER SAYS NOBODY GOES BELOW.
+    ~ set_flag("read_goblin_marks")
+    ~ quest_note("missing-miller", "The goblins' warning marks read: 'Sing-dead come up. Keep them down.' Their Mother forbids anyone to go below.")
+    -> pit_onward
 * [Go on, deeper #go:larder]
     -> larder
 
@@ -143,6 +173,13 @@ Behind the sacks, something sniffles. A goblin child, no bigger than a cat, is w
     You drag it out by the scruff. It shrieks, bites your thumb, and wriggles free, and is off up the passage wailing for Mother before you can ask a thing.
     ~ set_flag("larder_child_scared")
     -> larder_on
+* {can_cast("dancing-lights")} [Send little lights dancing for it #spell:dancing-lights]
+    ~ cast("dancing-lights")
+    Four soft lights wink into being and bob through the gloom like fireflies. The child's arms come down. It reaches for one, misses, and lets out a squeak of a giggle.
+    "Dead things came up," it whispers, watching the lights. "Through the floor, in the deep. Big people singing behind them. Mother says the singers make them walk." Then it squirms past you and is gone up the passage, a light still bobbing after it.
+    ~ set_flag("larder_child_spared")
+    ~ quest_note("missing-miller", "A goblin child says dead things came up through the floor of the deep warren, with singers behind them.")
+    -> larder_on
 * [Leave it be]
     You leave the child to its hiding place. Its eyes follow you all the way across the room.
     -> larder_on
@@ -165,6 +202,8 @@ Nobody moves. Nobody breathes.
     "You killed my people," Nettle says. Her voice is very quiet. "You'd better have something to say."
 - has_flag("larder_child_scared"):
     "You frightened my grandbabby," Nettle says. "That was stupid. Say something less stupid."
+- has_flag("warren_lookout_spared"):
+    "You beat my lookout, then sat with him so he didn't die," Nettle says. "Strange thing to do. Say why."
 - has_flag("larder_child_spared") || has_flag("mill_goblins_talked"):
     "They say you're soft," Nettle says, and leans forward. "Are you soft?"
 - else:
@@ -173,7 +212,7 @@ Nobody moves. Nobody breathes.
 -> hall_talk
 
 = hall_talk
-~ temp friendly = (has_flag("larder_child_spared") || has_flag("mill_goblins_talked") || has_flag("warren_lookout_talked")) and not (has_flag("mill_goblins_fought") || has_flag("warren_lookout_killed") || has_flag("larder_child_scared"))
+~ temp friendly = (has_flag("larder_child_spared") || has_flag("mill_goblins_talked") || has_flag("warren_lookout_talked") || has_flag("warren_lookout_spared")) and not (has_flag("mill_goblins_fought") || has_flag("warren_lookout_killed") || has_flag("larder_child_scared"))
 * {friendly} [Tell her you're here for the miller, not for her people #check:persuasion:10]
     -> plead(10)
 * {not friendly} [Tell her you're here for the miller, not for her people #check:persuasion:15]
