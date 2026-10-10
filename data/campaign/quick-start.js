@@ -1,5 +1,5 @@
 // Quick Start heroes (original): ready-made characters for players who want to begin right
-// away, one per class in this build (Rogue and Cleric heroes join when those classes do).
+// away, one per class in this build (a Rogue joins when that class does).
 // Only choices are stored; the sheet works out every number from them and the rules data.
 // Safe to edit, as long as the choices stay legal: tests/rules.html checks every hero here.
 
@@ -84,6 +84,52 @@ export const quickStartHeroes = [
       hitPointRolls: [],
       armorId: null,
       shield: false,
+    },
+    source: 'original',
+  },
+  {
+    id: 'posy',
+    summary: 'A halfling priest who patches up strangers on the road, and puts the fear of the gods into the dead.',
+    character: {
+      name: 'Posy Hearthstone',
+      level: 1,
+      classId: 'cleric',
+      subclassId: null, // chosen at level 3
+      speciesId: 'halfling',
+      size: 'small',
+      speciesChoice: null,
+      spellcastingAbility: null,
+      backgroundId: 'acolyte',
+
+      // The Cleric's suggested Standard Array, then the Acolyte's +2 Wisdom and +1 Charisma.
+      abilityScoreMethod: 'standard-array',
+      baseAbilityScores: { strength: 14, dexterity: 8, constitution: 13, intelligence: 10, wisdom: 15, charisma: 12 },
+      backgroundIncreases: { wisdom: 2, charisma: 1 },
+
+      classSkills: ['medicine', 'persuasion'], // the Acolyte already gives Insight and Religion
+      speciesSkills: [],
+      featSkills: [],
+      originFeat: null,
+      // Thaumaturge: one extra cantrip (Light), and her Wisdom added to Religion and Arcana.
+      classChoices: { divineOrder: 'thaumaturge' },
+
+      drive: 'faith',
+      bond: { type: 'mentor', name: 'Mother Wenna Brightwater' },
+      startingEquipment: { class: 'A', background: 'A' }, // chain shirt, Shield, mace, Holy Symbol
+      // Four cantrips (three, plus Thaumaturge's), and four level 1 spells prepared from the
+      // Cleric list. The Acolyte's Magic Initiate (Cleric) adds two more cantrips and Healing
+      // Word, free once per Long Rest.
+      spells: {
+        cantrips: ['guidance', 'sacred-flame', 'thaumaturgy', 'light'],
+        spellbook: [], // a Cleric has none
+        prepared: ['bless', 'cure-wounds', 'guiding-bolt', 'sanctuary'],
+      },
+      magicInitiate: [{ source: 'background', list: 'cleric', ability: 'wisdom', cantrips: ['spare-the-dying', 'mending'], spell: 'healing-word' }],
+      look: { skin: 'tan', hairStyle: 'tousled', hairColor: 'brown', beard: false, outfit: 'white', accent: 'yellow', headgear: 'none' },
+
+      hitPointRolls: [],
+      armorId: 'chain-shirt',
+      shield: true,
     },
     source: 'original',
   },

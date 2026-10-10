@@ -1,10 +1,12 @@
 // A hero's spells: which they know, where each comes from, and which they can cast now.
 //
 // Stored on the character (choices only):
-//   spells         for a class with Spellcasting (the Wizard), else null:
+//   spells         for a class with Spellcasting (the Wizard, the Cleric), else null:
 //                  { cantrips: [ids], spellbook: [ids], prepared: [ids] }
-//                  The spellbook holds level 1+ spells; prepared ones come from the spellbook
-//                  and can be changed after a Long Rest.
+//                  A Wizard's spellbook holds level 1+ spells, and prepared ones come from it.
+//                  A Cleric has no spellbook (it stays empty): prepared spells come straight
+//                  from the Cleric list. Either can change them after a Long Rest. A Cleric
+//                  subclass's domain spells are always prepared, on top of these.
 //   magicInitiate  one entry per Magic Initiate feat (from the background, or the Human's
 //                  Versatile trait): { source: 'background' | 'species', list: 'cleric' |
 //                  'druid' | 'wizard', ability, cantrips: [two ids], spell: id }
@@ -12,7 +14,7 @@
 // no choices beyond the spellcasting ability.
 
 import { spells } from '../../../data/srd/spells.js';
-import { abilityModifierOf, findAbility, findBackground, findClass, findFeat, findSpecies, proficiencyBonus, speciesOption } from './sheet.js';
+import { abilityModifierOf, divineOrderOf, findAbility, findBackground, findClass, findFeat, findSpecies, proficiencyBonus, speciesOption, subclassOf } from './sheet.js';
 
 export const findSpell = (id) => spells.find((s) => s.id === id) || null;
 
@@ -36,16 +38,69 @@ export function highestSpellLevel(character) {
   return row ? row.slots.length : 0;
 }
 
-// How many cantrips, spellbook spells and prepared spells the class gives at this level.
+// How many cantrips, spellbook spells and prepared spells the class gives at this level (a
+// Thaumaturge Cleric knows one more cantrip; a class without a spellbook has 0 there).
 export function classSpellCounts(character) {
   const cls = findClass(character.classId);
   const row = classRow(character);
   if (!row) return null;
+  const book = cls.spellcasting.spellbook;
+  const order = divineOrderOf(character);
   return {
-    cantrips: row.cantrips,
-    spellbook: cls.spellcasting.spellbookAtLevel1 + cls.spellcasting.spellbookPerLevel * (character.level - 1),
+    cantrips: row.cantrips + ((order && order.extraCantrips) || 0),
+    spellbook: book ? book.atLevel1 + book.perLevel * (character.level - 1) : 0,
     prepared: row.preparedSpells,
   };
+}
+
+// True for a class that prepares spells straight from its spell list (the Cleric), rather
+// than from a spellbook (the Wizard).
+export function preparesFromList(character) {
+  const cls = findClass(character.classId);
+  return Boolean(cls && cls.spellcasting && cls.spellcasting.preparesFrom === 'list');
+}
+
+// The spells a Cleric's subclass always has prepared at their level (Life Domain: Aid, Bless,
+// Cure Wounds and Lesser Restoration from level 3). Ids; empty for anyone else.
+export function domainSpells(character) {
+  const sub = character.subclassId ? subclassOf(character) : null;
+  if (!sub || !sub.domainSpells) return [];
+  return sub.domainSpells.filter((row) => row.level <= character.level).flatMap((row) => row.spells);
+}
+
+// The spells the hero can choose to prepare (a Wizard: from their spellbook; a Cleric: from
+// the Cleric list, of levels they have slots for), how many, and which are prepared now:
+// { count, from: [ids], chosen: [ids] }, or null for a hero without the Spellcasting feature.
+// Spells they always have prepared (domain spells, Magic Initiate's, a species') aren't
+// offered again.
+export function preparePicks(character) {
+  const counts = classSpellCounts(character);
+  if (!counts || !character.spells) return null;
+  const cls = findClass(character.classId);
+  const elsewhere = new Set([...domainSpells(character), ...(character.magicInitiate || []).map((entry) => entry.spell)]);
+  const fromSpecies = speciesSpells(character);
+  for (const { id } of (fromSpecies && fromSpecies.always) || []) elsewhere.add(id);
+  let from;
+  if (preparesFromList(character)) {
+    from = [];
+    for (let level = 1; level <= highestSpellLevel(character); level++) from.push(...spellsOnList(cls.id, level).map((s) => s.id));
+  } else {
+    from = [...character.spells.spellbook];
+  }
+  return { count: counts.prepared, from: from.filter((id) => !elsewhere.has(id)), chosen: character.spells.prepared };
+}
+
+// Prepares a spell, or unprepares it if it's prepared (after a Long Rest; see sheet-panel).
+// Returns the new character; the old one isn't changed.
+export function togglePrepared(character, spellId) {
+  const picks = preparePicks(character);
+  if (!picks) throw new Error('This hero doesn’t prepare spells.');
+  const chosen = picks.chosen.includes(spellId) ? picks.chosen.filter((id) => id !== spellId) : null;
+  if (!chosen) {
+    if (!picks.from.includes(spellId)) throw new Error(`You can’t prepare ${spellId}.`);
+    if (picks.chosen.length >= picks.count) throw new Error(`You can prepare ${picks.count} spells; unprepare one first.`);
+  }
+  return { ...character, spells: { ...character.spells, prepared: chosen || [...picks.chosen, spellId] } };
 }
 
 // The Magic Initiate feats the character has, and which spell list each is tied to
@@ -91,13 +146,14 @@ export function spellGroups(character) {
   const groups = [];
   const cls = findClass(character.classId);
   if (cls && cls.spellcasting && character.spells) {
+    const sub = subclassOf(character);
     groups.push({
       label: cls.name,
       ability: cls.spellcasting.ability,
       cantrips: character.spells.cantrips.map(findSpell),
       prepared: character.spells.prepared.map(findSpell),
       spellbook: character.spells.spellbook.map(findSpell),
-      always: [],
+      always: domainSpells(character).map((id) => ({ spell: findSpell(id), note: `always prepared (${sub.name})`, freeUses: 0 })),
     });
   }
   for (const entry of character.magicInitiate || []) {
@@ -150,10 +206,11 @@ export function spellAbility(character, spellId) {
 }
 
 // True if casting the spell with a higher slot does more in the game: more damage or healing
-// dice, darts, rays or Temporary Hit Points. (Extra creatures wait for companions.)
+// dice, darts, rays, Temporary Hit Points, Hit Points (Aid) or foes to target (Bane). (Extra
+// friends to target wait for companions.)
 export function upcastHelps(spell) {
   const c = spell.combat || {};
-  return Boolean(c.upcast || c.darts || c.rays || c.upcastTempHp);
+  return Boolean(c.upcast || c.darts || c.rays || c.upcastTempHp || c.upcastHp || c.upcastTargets);
 }
 
 // Dice grown for a higher slot: upcastDice('2d8', '2d8', 1) is '4d8'.
@@ -202,7 +259,7 @@ export function spellProblems(character) {
   if (cls && cls.spellcasting) {
     const book = character.spells;
     const ok = book && ['cantrips', 'spellbook', 'prepared'].every((k) => Array.isArray(book[k]));
-    need(ok, `A ${cls.name} needs cantrips, a spellbook and prepared spells.`);
+    need(ok, `A ${cls.name} needs cantrips and prepared spells${cls.spellcasting.spellbook ? ', and a spellbook' : ''}.`);
     if (ok) {
       const counts = classSpellCounts(character);
       const top = highestSpellLevel(character);
@@ -212,9 +269,14 @@ export function spellProblems(character) {
       };
       need(book.cantrips.length <= counts.cantrips && distinct(book.cantrips), `A ${cls.name} knows up to ${counts.cantrips} different cantrips.`);
       need(book.cantrips.every((id) => onList(id, (l) => l === 0)), `Cantrips must be ${cls.name} cantrips.`);
-      need(distinct(book.spellbook) && book.spellbook.every((id) => onList(id, (l) => l >= 1 && l <= top)), `The spellbook holds ${cls.name} spells of level 1 to ${top}.`);
       need(book.prepared.length <= counts.prepared && distinct(book.prepared), `A ${cls.name} prepares up to ${counts.prepared} spells.`);
-      need(book.prepared.every((id) => book.spellbook.includes(id)), 'Prepared spells must come from the spellbook.');
+      if (cls.spellcasting.spellbook) {
+        need(distinct(book.spellbook) && book.spellbook.every((id) => onList(id, (l) => l >= 1 && l <= top)), `The spellbook holds ${cls.name} spells of level 1 to ${top}.`);
+        need(book.prepared.every((id) => book.spellbook.includes(id)), 'Prepared spells must come from the spellbook.');
+      } else {
+        need(book.spellbook.length === 0, `A ${cls.name} has no spellbook.`);
+        need(book.prepared.every((id) => onList(id, (l) => l >= 1 && l <= top)), `Prepared spells must be ${cls.name} spells of level 1 to ${top}.`);
+      }
     }
   } else {
     need(!character.spells, `A ${cls ? cls.name : 'hero'} has no Spellcasting feature.`);

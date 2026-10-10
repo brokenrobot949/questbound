@@ -9,8 +9,8 @@
 // the way down to the lower warren, where the dead are digging.
 // Losing a fight here, or dying in the pit, is Fate's Mercy: you wake tied up before Nettle.
 // Spells: Fog Cloud past the lookout, Spare the Dying for a beaten lookout (Nettle hears),
-// Mage Hand on the pit, Comprehend Languages to read the warning marks, and Dancing Lights
-// for the goblin child.
+// Mage Hand on the pit, Comprehend Languages to read the warning marks, Dancing Lights for
+// the goblin child, and Purify Food and Drink on the larder's spoiled flour (Nettle notices).
 
 === ch1_warren ===
 { has_flag("mill_goblins_talked"):
@@ -156,7 +156,7 @@ These traps weren't dug to keep you out. They were dug to keep something in.
 = larder
 The passage opens into a low chamber that smells of flour and old cheese. Shelves cut into the rock stand empty. The only food left is a heap of sacks against the wall, and every one is stamped DUNN'S MILL. #room:brackenhollow/larder #location:Brackenhollow warren, the larder
 
-The goblins took the miller's flour, then. Nothing in here suggests they took the miller.
+The goblins took the miller's flour, then. Nothing in here suggests they took the miller. The sacks nearest the back wall have gone grey and sour, as if something dead dragged itself past them.
 ~ quest_note("missing-miller", "Dunn's flour is in the goblins' larder, but there's no sign they ever had the miller himself.")
 ~ give_xp(50)
 
@@ -185,6 +185,11 @@ Behind the sacks, something sniffles. A goblin child, no bigger than a cat, is w
     -> larder_on
 
 = larder_on
+* {can_cast("purify-food-and-drink")} [Take the rot out of the spoiled flour #spell:purify-food-and-drink]
+    ~ cast("purify-food-and-drink")
+    You murmur over the grey sacks, and the rot lifts out of the flour like mist off a pond. It's clean and white again, and smells of the mill.
+    ~ set_flag("larder_purified")
+    -> larder_on
 * [Follow the passage towards the voices #go:hall]
     -> hall
 
@@ -315,6 +320,7 @@ Garrick Dunn.
 
 = deal_made
 You shake. Her hand is small and dry, and her grip could crack walnuts.
+{ has_flag("larder_purified"): "And somebody took the rot out of my flour," Nettle adds, sniffing at you. "Smells like the mill again. Hm. Good." #speaker:nettle}
 ~ set_flag("goblins_spared")
 ~ start_quest("goblin-bargain")
 ~ set_objective("Clear the dead out of Brackenhollow's lower warren, as you promised Nettle.")

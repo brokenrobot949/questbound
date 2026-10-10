@@ -13,15 +13,16 @@
 //     spellbook     Wizard: the new spells copied into the spellbook (two each level)
 //     savant        Evoker level 3: two free Evocation spells for the spellbook (Evocation
 //                   Savant; its one extra spell at each new level of spell slots starts at 5)
-//     prepared      Wizard: spells added to the prepared list, up to the new number
+//     prepared      Wizard and Cleric: spells added to the prepared list, up to the new
+//                   number (a Wizard's from the spellbook, a Cleric's from the Cleric list)
 //   }
 
 import { advancement } from '../../../data/srd/advancement.js';
 import { dmNotes } from '../../../data/campaign/dm-voice.js';
 import { rollDie } from '../rules/dice.js';
 import { abilityModifierOf, findClass, skillProficiency, subclassOf } from './sheet.js';
-import { classSpellCounts, findSpell, highestSpellLevel, speciesSpells, spellsOnList } from './spells.js';
-import { maxHp } from './resources.js';
+import { classSpellCounts, domainSpells, findSpell, highestSpellLevel, preparePicks, speciesSpells, spellsOnList } from './spells.js';
+import { aidBonus, maxHp } from './resources.js';
 import { validateCharacter } from './validate.js';
 import { addDeed } from '../story/journal.js';
 
@@ -66,10 +67,12 @@ export function heroAfter(game) {
   if (draft.subclassId) hero.subclassId = draft.subclassId;
   if (draft.scholarSkill) hero.classChoices = { ...hero.classChoices, scholarSkill: draft.scholarSkill };
   if (hero.spells) {
+    // A domain spell the Cleric had prepared is now always prepared, and frees its place.
+    const domain = domainSpells(hero);
     hero.spells = {
       ...hero.spells,
       spellbook: [...hero.spells.spellbook, ...draft.spellbook, ...draft.savant],
-      prepared: [...hero.spells.prepared, ...draft.prepared],
+      prepared: [...hero.spells.prepared, ...draft.prepared].filter((id) => !domain.includes(id)),
     };
   }
   return hero;
@@ -136,28 +139,36 @@ export function levelUpPlan(game) {
   }
 
   if (cls.spellcasting && before.spells) {
-    // Spells the hero already has another way (species, Magic Initiate) aren't offered again,
-    // as in character creation.
-    const elsewhere = [
-      ...(speciesSpells(after) ? speciesSpells(after).always.map((a) => a.id) : []),
-      ...(before.magicInitiate || []).map((entry) => entry.spell),
-    ];
-    const inBook = before.spells.spellbook;
-    const top = highestSpellLevel(after);
-    const wizardSpells = (maxLevel) => {
-      const ids = [];
-      for (let level = 1; level <= maxLevel; level++) ids.push(...spellsOnList(cls.id, level).map((s) => s.id));
-      return ids.filter((id) => !inBook.includes(id) && !elsewhere.includes(id));
-    };
-    plan.spellbook = { count: cls.spellcasting.spellbookPerLevel, from: wizardSpells(top).filter((id) => !draft.savant.includes(id)) };
-    if (features.some((f) => f.id === 'evocation-savant')) {
-      plan.savant = {
-        count: 2,
-        from: wizardSpells(2).filter((id) => findSpell(id).school === 'Evocation' && !draft.spellbook.includes(id)),
+    let preparable;
+    if (cls.spellcasting.spellbook) {
+      // Spells the hero already has another way (species, Magic Initiate) aren't offered
+      // again, as in character creation.
+      const elsewhere = [
+        ...(speciesSpells(after) ? speciesSpells(after).always.map((a) => a.id) : []),
+        ...(before.magicInitiate || []).map((entry) => entry.spell),
+      ];
+      const inBook = before.spells.spellbook;
+      const top = highestSpellLevel(after);
+      const wizardSpells = (maxLevel) => {
+        const ids = [];
+        for (let level = 1; level <= maxLevel; level++) ids.push(...spellsOnList(cls.id, level).map((s) => s.id));
+        return ids.filter((id) => !inBook.includes(id) && !elsewhere.includes(id));
       };
+      plan.spellbook = { count: cls.spellcasting.spellbook.perLevel, from: wizardSpells(top).filter((id) => !draft.savant.includes(id)) };
+      if (features.some((f) => f.id === 'evocation-savant')) {
+        plan.savant = {
+          count: 2,
+          from: wizardSpells(2).filter((id) => findSpell(id).school === 'Evocation' && !draft.spellbook.includes(id)),
+        };
+      }
+      preparable = [...inBook, ...draft.spellbook, ...draft.savant].filter((id) => !before.spells.prepared.includes(id));
+    } else {
+      // A Cleric prepares from the whole Cleric list, of the levels they now have slots for
+      // (and not the domain spells they always have prepared).
+      preparable = preparePicks({ ...after, spells: { ...after.spells, prepared: before.spells.prepared } }).from.filter((id) => !before.spells.prepared.includes(id));
     }
-    const preparable = [...inBook, ...draft.spellbook, ...draft.savant].filter((id) => !before.spells.prepared.includes(id));
-    const more = classSpellCounts(after).prepared - before.spells.prepared.length;
+    const kept = before.spells.prepared.filter((id) => !domainSpells(after).includes(id));
+    const more = classSpellCounts(after).prepared - kept.length;
     if (more > 0) plan.prepared = { count: Math.min(more, preparable.length), from: preparable };
     plan.slots = { before: [...cls.levels[before.level - 1].slots], after: [...row.slots] };
   }
@@ -205,6 +216,9 @@ export function chooseSubclass(game, subclassId) {
   draft.prepared = draft.prepared.filter((id) => !draft.savant.includes(id));
   draft.savant = [];
   draft.subclassId = subclassId;
+  // A Cleric's domain spells are always prepared, so they needn't be picked as well.
+  const domain = domainSpells(heroAfter(game));
+  draft.prepared = draft.prepared.filter((id) => !domain.includes(id));
 }
 
 export function chooseScholarSkill(game, skillId) {
@@ -240,7 +254,7 @@ export function finishLevelUp(game) {
   if (issues.length) throw new Error(`That level-up breaks the rules: ${issues[0]}`);
   const hpGained = maxHp(hero) - maxHp(game.character);
   game.character = hero;
-  game.hp = Math.min(maxHp(hero), Math.max(0, game.hp) + hpGained);
+  game.hp = Math.min(maxHp(hero) + aidBonus(game), Math.max(0, game.hp) + hpGained);
   game.levelUp = null;
   addDeed(game, dmNotes.levelUpDeed.replace('{level}', hero.level));
   return { level: hero.level, hpGained };
@@ -263,13 +277,14 @@ export function lowerLevel(game, level) {
     const counts = classSpellCounts(hero);
     const top = highestSpellLevel(hero);
     const spellbook = hero.spells.spellbook.filter((id) => findSpell(id).level <= top).slice(0, counts.spellbook);
-    const prepared = hero.spells.prepared.filter((id) => spellbook.includes(id)).slice(0, counts.prepared);
+    const fromList = spellbook.length === 0 && counts.spellbook === 0; // a Cleric
+    const prepared = hero.spells.prepared.filter((id) => (fromList ? findSpell(id).level <= top : spellbook.includes(id))).slice(0, counts.prepared);
     hero.spells = { ...hero.spells, spellbook, prepared };
   }
   game.character = hero;
   game.xp = xpForLevel(level);
   game.levelUp = null;
-  game.hp = Math.min(game.hp, maxHp(hero));
+  game.hp = Math.min(game.hp, maxHp(hero) + aidBonus(game));
   game.slotsUsed = [];
 }
 

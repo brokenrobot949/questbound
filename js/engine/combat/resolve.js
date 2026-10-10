@@ -35,7 +35,7 @@ import {
 } from './battle.js';
 import { parseDice } from './attacks.js';
 import { squaresBetween } from './grid.js';
-import { maxHp } from '../character/resources.js';
+import { heroMaxHp } from '../character/resources.js';
 import { xpBudgetPerCharacter } from '../../../data/srd/encounter-budget.js';
 
 // Hero turns Resolve plays before it gives up and hands the fight back.
@@ -48,7 +48,7 @@ export function resolveLimit(level) {
 }
 
 const monstersXp = (battle) => enemies(battle).reduce((sum, c) => sum + findMonster(c.monsterId).xp, 0);
-const belowHalf = (game) => game.hp * 2 < maxHp(game.character);
+const belowHalf = (game) => game.hp * 2 < heroMaxHp(game);
 
 // True if Resolve can be offered now: the hero's turn, a fight well under their strength
 // that isn't played by hand, a weapon or cantrip to fight with, and at least half their Hit

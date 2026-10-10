@@ -3,7 +3,8 @@
 //
 //   game.hp           current Hit Points (the maximum comes from the sheet)
 //   game.slotsUsed    spell slots spent, by spell level: [level 1, level 2, …]
-//   game.featureUses  uses spent of limited features, e.g. { 'second-wind': 1, 'action-surge': 1 }
+//   game.featureUses  uses spent of limited features, e.g. { 'second-wind': 1, 'action-surge': 1,
+//                     'channel-divinity': 1 }
 //   game.xp           experience points
 //   game.tempHp       Temporary Hit Points (see character/spell-effects.js)
 //   game.activeSpells spells on the hero that last a while, e.g. Mage Armor
@@ -17,6 +18,16 @@ export function maxHp(character) {
   return maxHitPoints(character).value;
 }
 
+// Hit Points the spells on the hero add to their maximum (Aid), while they last.
+export function aidBonus(game) {
+  return (game.activeSpells || []).reduce((sum, spell) => sum + (spell.hpBonus || 0), 0);
+}
+
+// The hero's Hit Point maximum right now: the sheet's, plus Aid while it lasts.
+export function heroMaxHp(game) {
+  return maxHp(game.character) + aidBonus(game);
+}
+
 // A hero who has just arrived: full Hit Points, nothing spent.
 export function freshResources(character) {
   return { hp: maxHp(character), slotsUsed: [], featureUses: {}, xp: 0, tempHp: 0, activeSpells: [] };
@@ -24,7 +35,7 @@ export function freshResources(character) {
 
 export function heal(game, amount) {
   const before = game.hp;
-  game.hp = Math.min(maxHp(game.character), game.hp + Math.max(0, amount));
+  game.hp = Math.min(heroMaxHp(game), game.hp + Math.max(0, amount));
   return game.hp - before;
 }
 
@@ -59,6 +70,7 @@ export function featureUsesMax(character, featureId) {
   const row = cls.levels[Math.min(character.level, cls.levels.length) - 1];
   if (featureId === 'second-wind') return row.secondWindUses || 0;
   if (featureId === 'action-surge') return row.actionSurgeUses || 0;
+  if (featureId === 'channel-divinity') return row.channelDivinity || 0;
   return 0;
 }
 

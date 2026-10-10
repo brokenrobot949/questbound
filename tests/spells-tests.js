@@ -490,6 +490,7 @@ const acolyteFighter = {
 const WAITING = {
   knock: 'Chapter 2: freeing Fen from the stocks (a level 2 spell, so not before level 3)',
   invisibility: 'Chapter 2: sneaking into the Choir camp at Cairnfield (level 2)',
+  'lesser-restoration': 'Chapter 2: Lark Paralyzed by a Ghoul in the mill tunnel (level 2: a Life Cleric has it from level 3)',
   guidance: 'works on every ability check in a scene instead',
 };
 

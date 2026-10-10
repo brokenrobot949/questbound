@@ -105,7 +105,8 @@ export function validateCharacter(character) {
     need(speciesSkills.length === 0, `A ${sp.name} doesn't choose a skill.`);
   }
 
-  // Feats: the Human's Origin feat, Skilled's skills, the Fighter's Fighting Style.
+  // Feats: the Human's Origin feat, Skilled's skills, the Fighter's Fighting Style; and the
+  // Cleric's Divine Order.
   const originFeat = character.originFeat ? findFeat(character.originFeat) : null;
   if (sp.originFeat) {
     need(originFeat && originFeat.category === 'origin', 'Choose an Origin feat.');
@@ -120,6 +121,9 @@ export function validateCharacter(character) {
   if (character.classId === 'fighter') {
     const style = findFeat(choices.fightingStyle);
     need(style && style.category === 'fighting-style', 'Choose a Fighting Style.');
+  }
+  if (cls.divineOrders) {
+    need(cls.divineOrders.some((o) => o.id === choices.divineOrder), 'Choose a Divine Order.');
   }
   if (character.classId === 'wizard' && character.level >= 2) {
     const ok = cls.scholarSkills.includes(choices.scholarSkill) && classSkills.concat(bg.skills, speciesSkills, featSkills).includes(choices.scholarSkill);

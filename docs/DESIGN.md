@@ -181,11 +181,39 @@ A setting to be asked instead can come later, alongside the Shield spell's react
 
 The free rules include one subclass per class, such as Champion, Thief, Life Domain and Evoker. Original subclasses can be added later.
 
+**The Cleric (Phase 2, levels 1–3 so far)**
+
+- **The basics:** Wisdom spellcasting, d8 Hit Dice, Wisdom and Charisma saves, two skills from History, Insight, Medicine, Persuasion or Religion, Simple weapons, Light and Medium armour and Shields. Kit A is a chain shirt, Shield, mace, Holy Symbol and Priest's Pack with 7 GP; kit B is 110 GP.
+- **Divine Order** (chosen on the Class step): a **Protector** gains Martial weapons and Heavy armour; a **Thaumaturge** knows a fourth cantrip and adds their Wisdom modifier (at least +1) to Arcana and Religion checks, shown in the roll.
+- **Spells:** three cantrips, and prepared spells straight from the whole Cleric list (no spellbook): four at level 1, five at level 2, six at level 3 (when level 2 spells open up). The Cleric list in the game is the curated one: the cantrips and spells already in the data, growing with each slice.
+- **Channel Divinity** (level 2; two uses, back after a Long Rest; a Short Rest would give one back once Short Rests arrive): its own group of buttons in a fight.
+  - **Divine Spark:** 1d8 + Wisdom, either Radiant damage to a foe within 30 feet (Constitution save for half) or healing for you. (The Necrotic option comes when a foe resists Radiant.)
+  - **Turn Undead:** every Undead within 30 feet makes a Wisdom save or is Turned for a minute: Frightened and Incapacitated, it spends its turns moving as far from you as it can. Damage ends it, and so does your dropping to 0 Hit Points. The button is greyed out with no Undead in reach.
+- **Life Domain** (level 3, the SRD's subclass):
+  - **Disciple of Life:** a healing spell cast with a slot heals 2 + the slot's level more (not Magic Initiate's free cast).
+  - **Life Domain spells:** Aid, Bless, Cure Wounds and Lesser Restoration are always prepared, on top of the six. A domain spell you'd already prepared frees its place at the level-up.
+  - **Preserve Life** (Channel Divinity): heals you, if you're Bloodied, by up to five times your Cleric level, but no higher than half your Hit Points.
+- **Aid:** your Hit Point maximum and current Hit Points rise by 5 (10 with a level 3 slot) until your next Long Rest. Cast it from the Sheet or in a fight.
+- **Lesser Restoration** is waiting for its scene: a level 2 spell, so not before level 3. In Chapter 2, a Ghoul's claws leave Lark Paralyzed in the mill tunnel, and it frees her.
+- **More of the Cleric list** (the Wizard can take Blindness/Deafness too):
+  - **Shield of Faith** (Bonus Action, Concentration): +2 AC.
+  - **Inflict Wounds** (touch): 2d10 Necrotic, half on a Constitution save; +1d10 per slot level above 1.
+  - **Command:** a Wisdom save, or on its next turn the foe Grovels: it falls Prone and does nothing else. (The other commands, Approach, Drop, Flee and Halt, are for scenes.)
+  - **Bane** (Concentration): the nearest three foes within 30 feet make a Charisma save, or subtract 1d4 from their attack rolls and saves, shown in each roll. A higher slot adds a target. (Choosing which foes comes later; the battle screen names who it will catch before you cast.)
+  - **Blindness/Deafness:** a Constitution save, or the foe is Blinded for a minute: its attacks have Disadvantage, attacks against it have Advantage, and it can't make Opportunity Attacks. It saves again at the end of each of its turns. (Deafened does nothing in a fight yet.)
+  - **Spiritual Weapon** (Bonus Action, Concentration): a spectral mace appears beside a foe within 60 feet and makes a melee spell attack (1d8 + Wisdom, Force). On later turns, as a Bonus Action and with no slot, it moves up to 20 feet and strikes again. It's drawn on the grid.
+  - **Prayer of Healing** takes 10 minutes, so it's cast from the Sheet only: 2d8 Hit Points (no Wisdom bonus), once until your next Long Rest.
+  - **Purify Food and Drink** (a Ritual) cleans the spoiled flour in the goblins' larder, and Nettle notices.
+  - **Not yet:** Protection from Evil and Good, because it uses up a flask of Holy Water (25 GP) each time, and Holy Water arrives with shops. The Resistance cantrip and the rest of the level 2 list come later.
+- **Posy Hearthstone** is the Quick Start Cleric: a halfling Acolyte and Thaumaturge, with Healing Word from the Acolyte's Magic Initiate.
+
+**Preparing spells after a Long Rest** (the Wizard and the Cleric): a Long Rest in the story ends with a DM note, and until your next story choice the Sheet's **Prepared spells** lets you swap spells in and out, up to your number. A Wizard chooses from their spellbook, a Cleric from the Cleric list.
+
 **Spells**
 
 The free rules hold over 300 spells, and each needs either combat code or a story use. Launch ships a curated set of about 60 Cleric and Wizard spells across spell levels 1–9, growing with each phase. Utility spells such as Detect Magic, Speak with Dead and Knock double as keys that unlock choice cards in scenes. Concentration and ritual casting work as written.
 
-Phase 1 ships 44 spells (16 cantrips, 22 level 1, 6 level 2): enough choice for a Wizard of levels 1–3, for Magic Initiate on the Cleric, Druid or Wizard list, and every spell a species grants by character level 3. In a scene, a choice that needs a spell is shown only to heroes who can cast it: a known cantrip, a prepared or always-prepared spell, or a ritual in a Wizard's spellbook.
+Phase 1 ships 44 spells (16 cantrips, 22 level 1, 6 level 2): enough choice for a Wizard of levels 1–3, for Magic Initiate on the Cleric, Druid or Wizard list, and every spell a species grants by character level 3. Phase 2 adds the Cleric's own (so far Aid, Bane, Blindness/Deafness, Command, Inflict Wounds, Lesser Restoration, Prayer of Healing, Purify Food and Drink, Shield of Faith and Spiritual Weapon: 54 in all). In a scene, a choice that needs a spell is shown only to heroes who can cast it: a known cantrip, a prepared or always-prepared spell, or a ritual in a Wizard's spellbook.
 
 How spells work in the game so far:
 
@@ -600,7 +628,7 @@ Rules content is typed into `data/srd/` from the SRD 5.2.1 document, one phase a
 **Saves**
 
 - Three save slots in the browser's IndexedDB storage, which holds far more than localStorage. Settings stay in localStorage. Every key is prefixed with `questbound:`.
-- Autosave after every choice and every combat turn. The dice generator's state is saved too, so reloading can't reroll. While you hold Heroic Inspiration, the save also keeps the moment before your last choice or attack, so a reroll still works after the game is closed (save version 14).
+- Autosave after every choice and every combat turn. The dice generator's state is saved too, so reloading can't reroll. While you hold Heroic Inspiration, the save also keeps the moment before your last choice or attack, so a reroll still works after the game is closed (save version 14). It also notes when a Wizard or Cleric has just rested and can change their prepared spells (version 15).
 - Every save has a version number and a migration path.
 - Export and import as a downloadable file or a copyable text code, with a backup reminder every 10 sessions.
 

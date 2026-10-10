@@ -140,8 +140,8 @@ export function showLevelUp({ container, game, onSave, onDone }) {
     return box;
   }
 
-  // Spell slots, then the Wizard's new spells: Evocation Savant's, the spellbook's and the
-  // newly prepared ones.
+  // Spell slots, then the new spells: Evocation Savant's and the spellbook's for a Wizard, and
+  // the newly prepared ones (a Cleric's straight from the Cleric list).
   function spellsSections(plan, draft) {
     const slotText = (slots) => slots.map((n, i) => `${n} level ${i + 1}`).join(' and ');
     const changed = slotText(plan.slots.after) !== slotText(plan.slots.before);
@@ -168,10 +168,12 @@ export function showLevelUp({ container, game, onSave, onDone }) {
       pickBox('Evocation Savant', 'Two Wizard spells from the Evocation school, of level 1 or 2, copied into your spellbook for free.', 'savant', plan.savant);
     }
     const top = plan.slots.after.length;
-    pickBox('New spellbook spells', `Copy ${plan.spellbook.count} Wizard spells of level ${top === 1 ? '1' : `1 to ${top}`} into your spellbook.`, 'spellbook', plan.spellbook);
+    const levels = top === 1 ? '1' : `1 to ${top}`;
+    if (plan.spellbook) pickBox('New spellbook spells', `Copy ${plan.spellbook.count} Wizard spells of level ${levels} into your spellbook.`, 'spellbook', plan.spellbook);
     if (plan.prepared) {
       const already = game.character.spells.prepared.map((id) => findSpell(id).name).join(', ');
-      pickBox('Prepared spells', `You can prepare ${plan.prepared.count} more (you have ${already} ready).`, 'prepared', plan.prepared, false);
+      const what = plan.spellbook ? `${plan.prepared.count} more` : `${plan.prepared.count} more ${plan.className} spells of level ${levels}`;
+      pickBox('Prepared spells', `You can prepare ${what} (you have ${already} ready).`, 'prepared', plan.prepared, !plan.spellbook);
     }
     return nodes;
   }

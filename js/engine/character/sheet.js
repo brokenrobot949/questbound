@@ -9,7 +9,8 @@
 //   backgroundId, backgroundIncreases ({ ability: 2, other: 1 } or three abilities at 1)
 //   abilityScoreMethod ('standard-array', 'point-buy', 'random' or 'manual'), baseAbilityScores
 //   classSkills, speciesSkills, featSkills (skills picked from each source)
-//   originFeat (the Human's Versatile feat), classChoices ({ fightingStyle, scholarSkill })
+//   originFeat (the Human's Versatile feat), classChoices ({ fightingStyle, scholarSkill,
+//   divineOrder })
 //   drive (an id from data/campaign/drives.js), bond ({ type, name }: who the hero left behind)
 //   startingEquipment ({ class: 'A', background: 'B' }: the kit options taken at creation)
 //   spells, magicInitiate (spell choices; see spells.js)
@@ -66,6 +67,27 @@ export function speciesOption(character) {
 export function subclassOf(character) {
   const cls = classOf(character);
   return cls.subclasses.find((s) => s.id === character.subclassId) || null;
+}
+
+// A Cleric's Divine Order (Protector or Thaumaturge), or null.
+export function divineOrderOf(character) {
+  const cls = findClass(character.classId);
+  const id = (character.classChoices || {}).divineOrder;
+  return (cls && cls.divineOrders && cls.divineOrders.find((o) => o.id === id)) || null;
+}
+
+// The kinds of weapon the character is proficient with ('simple', 'martial'): their class's,
+// plus a Protector's Martial weapons.
+export function weaponProficiencies(character) {
+  const order = divineOrderOf(character);
+  return [...new Set([...classOf(character).weaponProficiencies, ...((order && order.weaponProficiencies) || [])])];
+}
+
+// The armour the character is trained with ('light', 'medium', 'heavy', 'shield'): their
+// class's, plus a Protector's Heavy armor.
+export function armorTraining(character) {
+  const order = divineOrderOf(character);
+  return [...new Set([...classOf(character).armorTraining, ...((order && order.armorTraining) || [])])];
 }
 
 // The class's numbers for the character's level (the highest level in the data, if beyond it).
@@ -161,6 +183,13 @@ export function checkModifiers(character, testId) {
       modifiers.push({ label: 'Proficiency', value: bonus, source: `Proficient in ${skill.name} (${from}); +${bonus} at level ${character.level}` });
     } else if (proficiency.level === 'expertise') {
       modifiers.push({ label: 'Expertise', value: bonus * 2, source: `Expertise in ${skill.name} (${from}); twice the +${bonus} at level ${character.level}` });
+    }
+    // A Thaumaturge Cleric adds their Wisdom modifier (at least +1) to Arcana and Religion.
+    const order = divineOrderOf(character);
+    if (order && order.checkBonus && order.checkBonus.skills.includes(skill.id)) {
+      const { ability: from, minimum } = order.checkBonus;
+      const value = Math.max(minimum, abilityModifierOf(character, from));
+      modifiers.push({ label: order.name, value, source: `Divine Order (${order.name}): your ${findAbility(from).name} modifier, at least +${minimum}` });
     }
   }
 
@@ -311,7 +340,7 @@ export function spellcasting(character) {
     cantrips: row.cantrips,
     preparedSpells: row.preparedSpells,
     slots: [...row.slots], // per spell level, starting at level 1
-    spellbookSize: cls.spellcasting.spellbookAtLevel1 + cls.spellcasting.spellbookPerLevel * (character.level - 1),
+    spellbookSize: cls.spellcasting.spellbook ? cls.spellcasting.spellbook.atLevel1 + cls.spellcasting.spellbook.perLevel * (character.level - 1) : 0,
   };
 }
 
@@ -331,6 +360,8 @@ export function characterFeatures(character) {
   for (const row of cls.levels.filter((r) => r.level <= character.level)) {
     for (const id of row.features) list.push({ ...cls.features[id], level: row.level, source: cls.name });
   }
+  const order = divineOrderOf(character);
+  if (order) list.push({ name: `Divine Order: ${order.name}`, text: order.summary, level: 1, source: cls.name });
   const sub = subclassOf(character);
   if (sub) {
     for (const row of sub.levels.filter((r) => r.level <= character.level)) {

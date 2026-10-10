@@ -24,7 +24,7 @@ import { canResolve, resolveFight } from '../combat/resolve.js';
 import { key } from '../combat/grid.js';
 import { directionTowards } from '../combat/areas.js';
 import { heroSprite } from '../character/look.js';
-import { featureUsesLeft, featureUsesMax, maxHp, slotsLeft } from '../character/resources.js';
+import { featureUsesLeft, featureUsesMax, heroMaxHp, slotsLeft } from '../character/resources.js';
 import { getSetting } from '../save/settings.js';
 import { sprites } from '../../../data/campaign/sprites.js';
 import { blit, drawCell, drawTile, frameSquare, loadArt, pixelScale, sizeCanvas, spriteImage, TILE } from './tile-art.js';
@@ -52,6 +52,8 @@ const TELEPORT_WASH = ['rgba(180, 140, 230, 0.35)', 'rgba(180, 140, 230, 0.9)'];
 // Tints under a creature with a condition, and words for the turn order.
 const CONDITION_TINTS = {
   paralyzed: 'rgba(180, 140, 230, 0.45)',
+  turned: 'rgba(250, 235, 180, 0.45)', // Turn Undead
+  blinded: 'rgba(30, 30, 50, 0.5)', // Blindness/Deafness
   poisoned: 'rgba(110, 200, 90, 0.4)',
   outlined: 'rgba(225, 100, 240, 0.45)', // Faerie Fire
   guided: 'rgba(250, 230, 130, 0.5)', // Guiding Bolt
@@ -62,6 +64,10 @@ const CONDITION_WORDS = [
   ['asleep', 'Asleep'],
   ['drowsy', 'Drowsy'],
   ['paralyzed', 'Paralyzed'],
+  ['turned', 'Turned'],
+  ['blinded', 'Blinded'],
+  ['grovel', 'Commanded'],
+  ['baned', 'Baned'],
   ['poisoned', 'Poisoned'],
   ['outlined', 'Outlined'],
   ['guided', 'Glowing'],
@@ -150,7 +156,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       if (fight.teleportSquares(game, chosen.id).some((s) => s.x === pos.x && s.y === pos.y)) act(() => fight.heroTeleport(game, chosen.id, pos));
       return;
     }
-    if (aiming === 'self') return;
+    if (aiming === 'self' || aiming === 'nearest') return;
     const foe = fight.enemies(game.battle).find((c) => c.hp > 0 && c.pos.x === pos.x && c.pos.y === pos.y);
     if (foe && chosen) return act(() => fight.heroAttack(game, chosen.id, foe.id));
     if (!foe && fight.heroReachable(game).has(key(pos))) act(() => fight.heroMove(game, pos));
@@ -375,7 +381,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
 
     header.replaceChildren(
       el('span', 'battle-round', `Round ${scene.round}`),
-      el('span', 'battle-hp', `HP ${hero.hp}/${maxHp(game.character)}${hero.temp ? ` +${hero.temp}` : ''}`),
+      el('span', 'battle-hp', `HP ${hero.hp}/${heroMaxHp(game)}${hero.temp ? ` +${hero.temp}` : ''}`),
     );
     const heroConditions = hero.conditions || [];
     const notes = [];
@@ -383,6 +389,8 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     if (heroConditions.includes('blessed')) notes.push('Blessed: +1d4 to attacks and saves');
     if (heroConditions.includes('sanctuary')) notes.push('Sanctuary: foes must save to attack you');
     if (heroConditions.includes('shield')) notes.push('Shield up: +5 AC');
+    if (heroConditions.includes('shield-of-faith')) notes.push('Shield of Faith: +2 AC');
+    if (scene.weapon) notes.push('Spiritual Weapon: strikes as a Bonus Action');
     if (heroConditions.includes('outlined')) notes.push('Outlined: attacks on you have Advantage');
     if (heroConditions.includes('dodging')) notes.push('Dodging');
     if (hero.temp) notes.push(`${hero.temp} Temporary Hit Points`);
@@ -484,6 +492,17 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       if (chosen && chosen.source === 'spell' && !chosen.bonusAction) controls.append(aimPanel(chosen, options));
     }
 
+    // A Cleric's Channel Divinity: Divine Spark, Turn Undead and Preserve Life, while a use is
+    // left. Each is an action.
+    const channels = options.filter((o) => o.source === 'channel');
+    if (channels.length) {
+      const left = `${featureUsesLeft(game, 'channel-divinity')} of ${featureUsesMax(game.character, 'channel-divinity')} left`;
+      const group = actionGroup(turn.action ? `Channel Divinity (action used · ${left})` : `Channel Divinity (${left})`);
+      for (const option of channels) group.list.append(choiceCard(option));
+      controls.append(group.group);
+      if (chosen && chosen.source === 'channel') controls.append(aimPanel(chosen, options));
+    }
+
     // Standing up from Prone uses movement, not an action.
     if (prone) {
       const movement = actionGroup('Movement');
@@ -546,6 +565,8 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     const name = spellName(option);
     if (option.targeting === 'direction') return `${name}: tap the grid on the side you want it to go. The orange squares are what it covers.`;
     if (option.targeting === 'point') return `${name}: tap the square to centre it on, up to ${option.range[1]} feet away. The orange squares are what it covers.`;
+    if (option.how === 'turn') return `${name}: every Undead within 30 feet of you.`;
+    if (option.targeting === 'nearest') return `${name}: the nearest ${option.targets} foes within ${option.range[1]} feet.`;
     if (option.targeting === 'self') return `${name}: on yourself.`;
     if (option.targeting === 'square') return `${name}: tap a purple square to step there.`;
     return `${name}: choose a foe. Tap it on the grid, or below.`;
@@ -597,6 +618,12 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       box.append(cast);
     } else if (targeting === 'self') {
       box.append(actionCard(`Cast ${spellName(chosen)}`, '', () => act(() => fight.heroCastSelf(game, chosen.id)), 'is-primary'));
+    } else if (targeting === 'nearest') {
+      const targets = fight.nearestTargets(game, chosen);
+      const what = targets.length ? `On ${targets.map((c) => c.name).join(', ')}` : `No foes within ${chosen.range[1]} feet`;
+      const cast = actionCard(`Cast ${spellName(chosen)}`, what, () => act(() => fight.heroCastMulti(game, chosen.id)), 'is-primary');
+      cast.disabled = !targets.length;
+      box.append(cast);
     }
     return box;
   }
@@ -695,7 +722,10 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     const up = scene.heroState === 'up';
     const heroAt = at(hero);
     blit(ctx, heroFrames[up ? frame : 0], 0, 0, heroAt.x, heroAt.y, size, { alpha: up ? 1 : 0.5, lying: !up || hero.prone });
-    drawHealthBar(ctx, heroAt, hero.hp / maxHp(game.character), size, scale);
+    drawHealthBar(ctx, heroAt, hero.hp / heroMaxHp(game), size, scale);
+
+    // Spiritual Weapon, hovering where it last struck.
+    if (scene.weapon) drawPixels(ctx, SPECTRAL_WEAPON, scene.weapon, size, scale);
 
     // Sleepers snore; whoever an aimed area would catch is framed in orange.
     for (const unit of scene.units) {
@@ -777,6 +807,41 @@ function washSquare(ctx, pos, size, scale, [fill, edge]) {
   ctx.strokeStyle = edge;
   ctx.fillRect(pos.x * size + inset, pos.y * size + inset, size - 2 * inset, size - 2 * inset);
   ctx.strokeRect(pos.x * size + inset + scale / 2, pos.y * size + inset + scale / 2, size - 2 * inset - scale, size - 2 * inset - scale);
+}
+
+// Spiritual Weapon: a spectral mace of light, drawn a pixel at a time over its square.
+const SPECTRAL_WEAPON = {
+  rows: [
+    '................',
+    '..........LLL...',
+    '.........LWWWL..',
+    '.........LWWWL..',
+    '.........LWWWL..',
+    '..........LWL...',
+    '.........LWL....',
+    '........LWL.....',
+    '.......LWL......',
+    '......LWL.......',
+    '.....LGL........',
+    '....LGL.........',
+    '...LGL..........',
+    '..LGL...........',
+    '...L............',
+    '................',
+  ],
+  colors: { L: 'rgba(150, 200, 255, 0.85)', W: '#f4f8ff', G: '#e8c860' },
+};
+
+// Draws a little picture (rows of colour letters, '.' see-through) over a square.
+function drawPixels(ctx, { rows, colors }, pos, size, scale) {
+  const pixel = size / rows.length;
+  rows.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) {
+      if (row[x] === '.') continue;
+      ctx.fillStyle = colors[row[x]];
+      ctx.fillRect(pos.x * size + x * pixel, pos.y * size + y * pixel, pixel, pixel);
+    }
+  });
 }
 
 // A little word in the top corner of a square ("Zz" over a sleeper).

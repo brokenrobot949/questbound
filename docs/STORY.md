@@ -258,11 +258,12 @@ Fate's Mercy costs XP along the way, so a hero who lost fights may still be leve
 - **The quarry mouth:** Fog Cloud lets you walk in under the lookout's nose.
 - **A beaten lookout:** Spare the Dying keeps it alive (`warren_lookout_spared`). Nettle greets you differently, and with nobody killed she counts you as gentle (Persuasion DC 10).
 - **The pit passage:** Mage Hand finds the pit. Comprehend Languages reads the warning marks: "Sing-dead come up. Keep them down." (`read_goblin_marks`).
-- **The larder:** Dancing Lights soothes the goblin child as well as kindness does (`larder_child_spared`).
+- **The larder:** Dancing Lights soothes the goblin child as well as kindness does (`larder_child_spared`). Purify Food and Drink, as a Ritual, takes the rot out of the flour sacks the dead dragged past (`larder_purified`), and Nettle notices when you shake on the bargain.
 - **The breach:** Disguise Self (a grey robe, a hymnal) walks you right up to the singing acolyte for a surprise attack. If you catch him, Charm Person (he saves) is a third way to make him talk.
 - **The hymnal:** its map is torn across. Mending shows the road north past the Old Ford to Cairnfield, ringed twice in red (`hymnal_mended`), which points to Chapter 2.
 - **Guidance** adds 1d4 to every ability check in a scene, cast just before.
-- **Waiting for Chapter 2:** Knock and Invisibility are level 2 spells, so a hero first has them at level 3, at the end of this chapter (see Chapter 2).
+- **Waiting for Chapter 2:** Knock, Invisibility and Lesser Restoration are level 2 spells, so a hero first has them at level 3, at the end of this chapter (see Chapter 2). The same goes for a Life Cleric's Aid, which works on the Sheet and in fights from then on.
+- **A Cleric's Turn Undead** (from level 2) works on the lower warren's zombies and the skeleton at the breach.
 
 **Chapter 1 side content** (Phase 2):
 - **Too Many Cats** (side quest): the inn's cats keep vanishing. A Stirge nest in the loft. Funny, short, and a good first loot.
@@ -272,6 +273,7 @@ Fate's Mercy costs XP along the way, so a hero who lost fights may still be leve
 ## Chapter 2 · The Barrow Road (levels 3 → 4, about 2 hours)
 
 1. **The miller's missing daughter.** *(The side-quest example from DESIGN.md, now part of the main line.)* At dawn Lark went down the mill tunnel with a lantern and her father's hatchet, and the dead have dug it clear. A short delve (4 rooms): Ghouls in the old ossuary, and Lark cornered on a ledge. You rescue her. She becomes a recurring face, and wants to be your apprentice.
+   - A Ghoul's claws have left Lark Paralyzed. Lesser Restoration (a Life Cleric has it from level 3) frees her at once; otherwise you carry her out, and the Ghouls follow.
 2. **Odda Brasswick arrives.** A dwarf priest sent by her order's mother-house to look into the walking dead: brusque, kind, and always brewing tea. She helps with the rescue and joins. *(Companion.)*
 3. **Fen in the stocks.** A halfling pickpocket, caught with the reeve's purse. Bounty hunters arrive (a Bandit Captain and two Bandits): "Dead or alive. The Choir pays double for dead."
    - Fen begs: "I know where they're taking your miller. I used to sing with them."

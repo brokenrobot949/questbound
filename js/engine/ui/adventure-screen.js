@@ -12,7 +12,7 @@ import { continueAfterBattle, currentDungeon, currentTime, makeChoice, revealRol
 import { findRoom } from '../world/dungeons.js';
 import { findEncounter } from '../combat/battle.js';
 import { showDungeonMap } from './dungeon-map.js';
-import { maxHp } from '../character/resources.js';
+import { heroMaxHp } from '../character/resources.js';
 import { levelUpReady } from '../character/level-up.js';
 import { showBattle } from './battle-screen.js';
 import { showLevelUp } from './level-up-screen.js';
@@ -70,7 +70,7 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
   // (+7) is Temporary Hit Points.
   const updateStatus = () => {
     const time = currentTime(game);
-    const hp = `HP ${game.hp}/${maxHp(game.character)}${game.tempHp ? ` (+${game.tempHp})` : ''}`;
+    const hp = `HP ${game.hp}/${heroMaxHp(game)}${game.tempHp ? ` (+${game.tempHp})` : ''}`;
     const parts = [`Day ${game.day}`, time, hp, moneyText(game.money), game.inspiration ? '★ Inspiration' : null];
     status.textContent = parts.filter(Boolean).join(' · ');
   };

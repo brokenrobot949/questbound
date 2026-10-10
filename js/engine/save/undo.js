@@ -38,6 +38,7 @@ export const PLAY_FIELDS = [
   'session',
   'page',
   'rollLog',
+  'canPrepare',
   'pending',
 ];
 

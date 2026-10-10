@@ -4,7 +4,7 @@
 
 import { parseDice } from '../combat/attacks.js';
 import { findAbility } from '../character/sheet.js';
-import { healingFor } from '../character/spell-effects.js';
+import { discipleOfLife, healingFor } from '../character/spell-effects.js';
 import { signedNumber } from './roll-format.js';
 
 const MINUS = '−';
@@ -39,6 +39,8 @@ export function attackSummary(option, { slotsLeft = null } = {}) {
   if (option.how === 'self') parts.push(selfText(option));
   else if (option.how === 'heal') parts.push(...healText(option.heal));
   else if (option.how === 'ward') parts.push(WARDS[option.effect](option));
+  else if (option.how === 'turn') parts.push(`each Undead within 30 ft makes a Wis save against DC ${option.saveDc} or is Turned: it flees and can’t act for a minute, or until it takes damage`);
+  else if (option.how === 'preserve') parts.push(`if you’re Bloodied, regain up to ${option.amount} Hit Points, but no more than half your maximum`);
   else if (option.how === 'teleport') parts.push(`teleport up to ${option.range[1]} ft to a square you can see`);
   else if (option.how === 'darts') {
     parts.push(`${option.darts} darts that never miss`, `${damageDice(option.damage)} each`, `${averageText(averageDamage(option.damage) * option.darts)} on average`);
@@ -57,6 +59,7 @@ export function attackSummary(option, { slotsLeft = null } = {}) {
   if (option.heavyDisadvantage) parts.push('Disadvantage: too heavy for you');
   if (option.concentration) parts.push('Concentration');
   if (option.freeCast) parts.push('free: once per Long Rest');
+  if (option.featureUse === 'channel-divinity') parts.push('uses Channel Divinity');
   if (option.slotLevel) {
     const left = slotsLeft ? ` (${slotsLeft(option.slotLevel)} left)` : '';
     parts.push(`uses a level ${option.slotLevel} slot${left}`);
@@ -68,41 +71,59 @@ export function attackSummary(option, { slotsLeft = null } = {}) {
 export function selfSpellText(spell, character) {
   const combat = spell.combat;
   if (combat.kind === 'heal') {
-    const [what, average] = healText(healingFor(character, spell.id));
-    return `${what} (${average})`;
+    const parts = healText({ ...healingFor(character, spell.id), extra: discipleOfLife(character, spell.level) });
+    const average = parts.pop();
+    const slow = combat.outOfFight ? `; it takes ${spell.castingTime}` : '';
+    const once = combat.oncePerLongRest ? ', and heals you once until your next Long Rest' : '';
+    return `${parts.join(', ')} (${average})${slow}${once}`;
   }
-  return selfText({ self: combat.self, baseAc: combat.baseAc, lasts: combat.lasts, speedBonus: combat.speed, tempHp: combat.tempHp });
+  return selfText({ self: combat.self, baseAc: combat.baseAc, lasts: combat.lasts, speedBonus: combat.speed, tempHp: combat.tempHp, hpBonus: combat.hpBonus });
 }
 
-// "regain 2d8 + 3 Hit Points", "12 on average": what a healing spell gives back.
+// "regain 2d8 + 3 Hit Points", ("+4 with a slot (Disciple of Life)"), "12 on average": what
+// a healing spell gives back.
 function healText(heal) {
-  const average = averageText(Math.max(0, averageDamage(heal)));
+  const average = averageText(Math.max(0, averageDamage(heal)) + (heal.extra || 0));
   const bonus = heal.bonus ? ` ${heal.bonus < 0 ? MINUS : '+'} ${Math.abs(heal.bonus)}` : '';
-  return [`regain ${heal.dice}${bonus} Hit Points`, `${average} on average`];
+  const extra = heal.extra ? `+${heal.extra} with a slot (Disciple of Life)` : null;
+  return [`regain ${heal.dice}${bonus} Hit Points`, extra, `${average} on average`].filter(Boolean);
 }
 
 // What a ward on yourself does for the fight.
 const WARDS = {
   blessed: () => '+1d4 to your attack rolls and saving throws',
   sanctuary: (option) => `foes make a Wis save against DC ${option.saveDc} to attack you; ends if you attack or cast a spell`,
+  'shield-of-faith': () => '+2 to your AC',
 };
 
-// What a spell on yourself does: Mage Armor, False Life, Longstrider.
+// What a spell on yourself does: Mage Armor, False Life, Longstrider, Aid.
 function selfText(option) {
   const lasts = option.lasts === 'hour' ? 'for about an hour' : 'until your next Long Rest';
   if (option.self === 'mage-armor') return `your AC becomes ${option.baseAc} + Dex ${lasts}`;
   if (option.self === 'longstrider') return `your Speed +${option.speedBonus} ft ${lasts}`;
+  if (option.self === 'aid') return `your Hit Point maximum and Hit Points +${option.hpBonus} ${lasts}`;
   const temp = option.tempHp;
   const average = averageText(averageDamage({ dice: temp.dice, bonus: temp.bonus }));
   return `gain ${temp.dice} + ${temp.bonus} Temporary Hit Points (${average} on average)`;
 }
 
 // What a failed save does, for spells that leave a condition.
-const CONDITIONS = { drowsy: 'drowsy, then asleep', paralyzed: 'Paralyzed', outlined: 'outlined: attacks against it have Advantage' };
+const CONDITIONS = {
+  drowsy: 'drowsy, then asleep',
+  paralyzed: 'Paralyzed',
+  outlined: 'outlined: attacks against it have Advantage',
+  grovel: 'Grovel: on its next turn it falls Prone and does nothing else',
+  blinded: 'Blinded: its attacks have Disadvantage, attacks on it Advantage; it saves again each turn',
+  baned: '−1d4 on their attack rolls and saves',
+};
 
 // "melee", "range 80/320 ft", "thrown 20/60 ft", "range 120 ft", "15-ft cone from you",
 // "10-ft-radius sphere within 60 ft", "a Humanoid within 60 ft"
 function reachText(option) {
+  if (option.touch) return 'touch';
+  if (option.how === 'multi') return `the nearest ${option.targets} foes within ${option.range[1]} ft`;
+  if (option.how === 'spirit') return `appears beside a foe within ${option.range[1] - 5} ft, then strikes again each turn as a Bonus Action`;
+  if (option.how === 'spirit-strike') return 'moves up to 20 ft to a foe and strikes';
   if (option.area) {
     const { shape, size } = option.area;
     if (shape === 'sphere') return `${size}-ft-radius sphere within ${option.range[1]} ft`;

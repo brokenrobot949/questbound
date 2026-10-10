@@ -24,8 +24,10 @@
 //                  dungeon (the dungeon room the hero is in and the rooms explored, or null;
 //                  see world/dungeons.js), objective (the hero's aim, or null) and session
 //                  (this session's starting point; see story/sessions.js), page, rollLog,
-//                  and undo (the moment before the last choice or attack, kept while the hero
+//                  undo (the moment before the last choice or attack, kept while the hero
 //                  holds Heroic Inspiration so a failed roll can be rerolled; see save/undo.js)
+//                  and canPrepare (true straight after a Long Rest, until the next story
+//                  choice: a Wizard or Cleric can change their prepared spells on the Sheet)
 
 import { createRng, Rng } from '../rules/rng.js';
 import { currentDungeon, currentLocation, currentTime, runPage } from '../story/story-runner.js';
@@ -40,7 +42,7 @@ import { migrations } from './migrations.js';
 import { validateCharacter } from '../character/validate.js';
 import { undoOk } from './undo.js';
 
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 15;
 
 // runtime: { story, game } — the compiled story, and whichever game is being played.
 
@@ -74,6 +76,7 @@ export function newGame(runtime, { slot, seed, character, rngState = null, now =
     page: null,
     rollLog: [],
     undo: null,
+    canPrepare: false,
     pending: [],
     notice: null,
   };
@@ -121,6 +124,7 @@ export function gameToSave(game, now = new Date()) {
       page: game.page,
       rollLog: game.rollLog,
       undo: game.undo || null,
+      canPrepare: Boolean(game.canPrepare),
     }),
   };
 }
@@ -162,6 +166,7 @@ export function loadGame(runtime, record) {
     page: save.game.page,
     rollLog: save.game.rollLog,
     undo: save.game.undo || null,
+    canPrepare: save.game.canPrepare,
     lastPlayed: save.savedAt, // when this save was last played, for the recap (not saved again)
     pending: [],
     notice: null,
@@ -229,6 +234,7 @@ export function validateSave(save) {
     if (!pageOk) problems.push('current page');
     if (!Array.isArray(game.rollLog)) problems.push('roll log');
     if (!undoOk(game.undo)) problems.push('undo point');
+    if (typeof game.canPrepare !== 'boolean') problems.push('preparing spells');
   }
 
   if (problems.length > 0) {

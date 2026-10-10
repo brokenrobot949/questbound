@@ -5,7 +5,7 @@
 import { d20Test } from '../rules/d20-test.js';
 import { rollDice } from '../rules/dice.js';
 import { resistances } from './sheet.js';
-import { maxHp } from './resources.js';
+import { heroMaxHp } from './resources.js';
 import { soakDamage } from './spell-effects.js';
 
 // The hero takes damage, e.g. takeDamage(game, '1d6', 'bludgeoning') for a fall. Resistance
@@ -27,7 +27,7 @@ export function takeDamage(game, dice, type, { onDamage = () => {}, onDying = ()
   game.hp = Math.max(0, game.hp - rest);
   if (game.hp > 0) return { rolls, total, taken, outcome: 'up' };
   // Damage left over that equals your Hit Point maximum kills outright.
-  if (overflow >= maxHp(game.character)) return { rolls, total, taken, outcome: 'dead' };
+  if (overflow >= heroMaxHp(game)) return { rolls, total, taken, outcome: 'dead' };
   onDying();
   return { rolls, total, taken, outcome: dyingAlone(game) };
 }

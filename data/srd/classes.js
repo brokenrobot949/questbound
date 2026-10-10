@@ -1,9 +1,18 @@
-// Classes (SRD 5.2.1). Only what the current phase needs: the Fighter and the Wizard at
-// levels 1–3. More classes and levels are added as each phase needs them.
+// Classes (SRD 5.2.1). Only what the current phase needs: the Fighter, the Wizard and the
+// Cleric at levels 1–3. More classes and levels are added as each phase needs them.
 //
 // Numbers per level are in `levels` (index 0 is level 1). Feature text is in `features`.
 // Item ids in starting equipment match the equipment data (armour is in data/srd/armor.js;
 // weapons and gear arrive with combat).
+//
+// spellcasting: the class's Spellcasting feature.
+//   ability       the spellcasting ability
+//   spellbook     the Wizard: { atLevel1, perLevel } spells in the spellbook; prepared spells
+//                 come from the book
+//   preparesFrom  'list' for the Cleric: prepared spells come straight from the class's
+//                 whole spell list (of levels it has slots for)
+// Per level: cantrips, preparedSpells, slots (per spell level, starting with level 1), and
+// uses of limited features (secondWindUses, actionSurgeUses, channelDivinity).
 
 export const classes = [
   {
@@ -133,8 +142,9 @@ export const classes = [
     standardArray: { strength: 8, dexterity: 12, constitution: 13, intelligence: 15, wisdom: 14, charisma: 10 },
     spellcasting: {
       ability: 'intelligence',
-      spellbookAtLevel1: 6, // level 1 Wizard spells in the starting spellbook
-      spellbookPerLevel: 2, // spells added each Wizard level after 1
+      // atLevel1: level 1 Wizard spells in the starting spellbook; perLevel: spells added
+      // each Wizard level after 1
+      spellbook: { atLevel1: 6, perLevel: 2 },
     },
     // slots: spell slots per spell level, starting with level 1 spells.
     levels: [
@@ -180,6 +190,109 @@ export const classes = [
           'potent-cantrip': {
             name: 'Potent Cantrip',
             text: "Your damaging cantrips affect even creatures that avoid the brunt of the effect. When you cast a cantrip at a creature and you miss with the attack roll or the target succeeds on a saving throw against the cantrip, the target takes half the cantrip's damage (if any) but suffers no additional effect from the cantrip.",
+          },
+        },
+        source: 'SRD 5.2.1',
+      },
+    ],
+    source: 'SRD 5.2.1',
+  },
+
+  {
+    id: 'cleric',
+    name: 'Cleric',
+    primaryAbilities: ['wisdom'],
+    hitDie: 8,
+    hitPointsAtLevel1: 8,
+    hitPointsPerLevel: 5,
+    savingThrows: ['wisdom', 'charisma'],
+    skillChoices: {
+      count: 2,
+      from: ['history', 'insight', 'medicine', 'persuasion', 'religion'],
+    },
+    weaponProficiencies: ['simple'],
+    armorTraining: ['light', 'medium', 'shield'],
+    startingEquipment: [
+      {
+        option: 'A',
+        items: [
+          { id: 'chain-shirt', quantity: 1 },
+          { id: 'shield', quantity: 1 },
+          { id: 'mace', quantity: 1 },
+          { id: 'holy-symbol', quantity: 1 }, // the Cleric's Spellcasting Focus
+          { id: 'priests-pack', quantity: 1 },
+        ],
+        gold: 7,
+      },
+      { option: 'B', items: [], gold: 110 },
+    ],
+    standardArray: { strength: 14, dexterity: 8, constitution: 13, intelligence: 10, wisdom: 15, charisma: 12 },
+    spellcasting: { ability: 'wisdom', preparesFrom: 'list' },
+    // channelDivinity: uses of Channel Divinity (it arrives at level 2).
+    levels: [
+      { level: 1, features: ['spellcasting', 'divine-order'], cantrips: 3, preparedSpells: 4, slots: [2] },
+      { level: 2, features: ['channel-divinity'], cantrips: 3, preparedSpells: 5, slots: [3], channelDivinity: 2 },
+      { level: 3, features: ['cleric-subclass'], cantrips: 3, preparedSpells: 6, slots: [4, 2], channelDivinity: 2 },
+    ],
+    features: {
+      spellcasting: {
+        name: 'Spellcasting',
+        text: 'Wisdom is your spellcasting ability. You know three Cleric cantrips; Guidance, Sacred Flame and Thaumaturgy are recommended. You prepare level 1+ spells straight from the Cleric spell list (four at level 1, one more at each of levels 2 and 3), choosing only spells of levels you have slots for, and can change the list whenever you finish a Long Rest. You regain all expended spell slots when you finish a Long Rest. You can use a Holy Symbol as a Spellcasting Focus.',
+      },
+      'divine-order': {
+        name: 'Divine Order',
+        text: 'You have dedicated yourself to one of the following sacred roles of your choice. Protector: trained for battle, you gain proficiency with Martial weapons and training with Heavy armor. Thaumaturge: you know one extra cantrip from the Cleric spell list, and your mystical connection to the divine gives you a bonus to your Intelligence (Arcana or Religion) checks equal to your Wisdom modifier (minimum of +1).',
+      },
+      'channel-divinity': {
+        name: 'Channel Divinity',
+        text: 'You can channel divine energy directly from the Outer Planes to fuel magical effects, and you use this feature twice; you regain one use when you finish a Short Rest and all of them when you finish a Long Rest. If an effect requires a saving throw, the DC is your Cleric spell save DC. Divine Spark: as a Magic action, you point your Holy Symbol at another creature you can see within 30 feet of yourself and roll 1d8 + your Wisdom modifier. You either restore that many Hit Points to the creature, or it makes a Constitution saving throw, taking Necrotic or Radiant damage (your choice) equal to the total on a failed save, or half as much on a success. Turn Undead: as a Magic action, you present your Holy Symbol and censure Undead creatures. Each Undead of your choice within 30 feet of you makes a Wisdom saving throw. On a failed save, it has the Frightened and Incapacitated conditions for 1 minute, and tries to move as far from you as it can on its turns. This ends early on a creature if it takes any damage, if you have the Incapacitated condition, or if you die.',
+      },
+      'cleric-subclass': {
+        name: 'Cleric Subclass',
+        text: 'You gain a Cleric subclass of your choice. A subclass is a specialization that grants you features at certain Cleric levels. For the rest of your career, you gain each of your subclass’s features that are of your Cleric level or lower.',
+      },
+    },
+    // The roles the Divine Order feature offers at level 1 (classChoices.divineOrder).
+    //   weaponProficiencies, armorTraining   added to the class's own
+    //   extraCantrips                        added to the cantrips the class knows
+    //   checkBonus                           { skills, ability, minimum }: added to those checks
+    divineOrders: [
+      {
+        id: 'protector',
+        name: 'Protector',
+        summary: 'Trained for battle: Martial weapons and Heavy armor.',
+        weaponProficiencies: ['martial'],
+        armorTraining: ['heavy'],
+      },
+      {
+        id: 'thaumaturge',
+        name: 'Thaumaturge',
+        summary: 'One extra cantrip, and your Wisdom modifier (at least +1) added to Arcana and Religion checks.',
+        extraCantrips: 1,
+        checkBonus: { skills: ['arcana', 'religion'], ability: 'wisdom', minimum: 1 },
+      },
+    ],
+    subclasses: [
+      {
+        id: 'life',
+        name: 'Life Domain',
+        summary: 'Soothe the hurts of the world.',
+        levels: [{ level: 3, features: ['disciple-of-life', 'life-domain-spells', 'preserve-life'] }],
+        // Spells always prepared from this Cleric level on (they don't count against the
+        // number of spells you prepare).
+        domainSpells: [{ level: 3, spells: ['aid', 'bless', 'cure-wounds', 'lesser-restoration'] }],
+        features: {
+          'disciple-of-life': {
+            name: 'Disciple of Life',
+            text: 'When a spell you cast with a spell slot restores Hit Points to a creature, that creature regains additional Hit Points on the turn you cast the spell. The additional Hit Points equal 2 plus the spell slot’s level.',
+          },
+          'life-domain-spells': {
+            name: 'Life Domain Spells',
+            text: 'Your connection to this divine domain ensures you always have certain spells ready. From Cleric level 3 you always have Aid, Bless, Cure Wounds and Lesser Restoration prepared.',
+          },
+          'preserve-life': {
+            name: 'Preserve Life',
+            text: 'As a Magic action, you present your Holy Symbol and expend a use of your Channel Divinity to evoke healing energy that can restore a number of Hit Points equal to five times your Cleric level. Choose Bloodied creatures within 30 feet of yourself (which can include you), and divide those Hit Points among them. This feature can restore a creature to no more than half its Hit Point maximum.',
           },
         },
         source: 'SRD 5.2.1',

@@ -14,13 +14,15 @@ import { drives } from '../../../data/campaign/drives.js';
 import { bonds } from '../../../data/campaign/bonds.js';
 import { nameTables } from '../../../data/campaign/names.js';
 import { rollDice } from '../rules/dice.js';
-import { findBackground, findClass, findFeat, findSpecies } from './sheet.js';
+import { armorTraining, divineOrderOf, findBackground, findClass, findFeat, findSpecies } from './sheet.js';
 import { validateCharacter } from './validate.js';
 import {
   classSpellCounts,
   highestSpellLevel,
   magicInitiateLists,
   magicInitiateSources,
+  preparePicks,
+  preparesFromList,
   speciesSpells,
   spellsOnList,
   SPELLCASTING_ABILITIES,
@@ -96,6 +98,18 @@ export function chooseFightingStyle(draft, featId) {
   if (!feat || feat.category !== 'fighting-style') throw new Error(`Not a Fighting Style: ${featId}`);
   const next = copy(draft);
   next.classChoices = { ...next.classChoices, fightingStyle: featId };
+  return next;
+}
+
+// The Cleric's Divine Order: 'protector' or 'thaumaturge'. Leaving Thaumaturge gives back its
+// extra cantrip (the last one picked goes).
+export function chooseDivineOrder(draft, orderId) {
+  const cls = findClass(draft.classId);
+  if (!cls || !(cls.divineOrders || []).some((o) => o.id === orderId)) throw new Error(`Not a Divine Order: ${orderId}`);
+  const next = copy(draft);
+  next.classChoices = { ...next.classChoices, divineOrder: orderId };
+  const counts = classSpellCounts(next);
+  if (next.spells && next.spells.cantrips.length > counts.cantrips) next.spells.cantrips = next.spells.cantrips.slice(0, counts.cantrips);
   return next;
 }
 
@@ -374,6 +388,7 @@ export function spellTakenBy(draft, spellId, where) {
   if (draft.spells) {
     if (draft.spells.cantrips.includes(spellId)) holders.push('class-cantrips');
     if (draft.spells.spellbook.includes(spellId)) holders.push('class-spellbook');
+    if (preparesFromList(draft) && draft.spells.prepared.includes(spellId)) holders.push('class-prepared');
   }
   for (const entry of draft.magicInitiate) {
     if (entry.cantrips.includes(spellId) || entry.spell === spellId) holders.push(`initiate-${entry.source}`);
@@ -381,19 +396,21 @@ export function spellTakenBy(draft, spellId, where) {
   return holders.find((holder) => holder !== where) || null;
 }
 
-// The class's picks: which is 'cantrips', 'spellbook' or 'prepared'.
-// Returns { count, from: [ids], chosen: [ids] }, or null for a class without Spellcasting.
+// The class's picks: which is 'cantrips', 'spellbook' or 'prepared'. Returns { count, from:
+// [ids], chosen: [ids] }, or null for a class without Spellcasting (or, for 'spellbook', a
+// class without a spellbook: the Cleric prepares straight from the Cleric list).
 export function classSpellPicks(draft, which) {
   const cls = findClass(draft.classId);
   if (!cls || !cls.spellcasting || !draft.spells) return null;
   const counts = classSpellCounts(draft);
   if (which === 'cantrips') return { count: counts.cantrips, from: spellsOnList(cls.id, 0).map((s) => s.id), chosen: draft.spells.cantrips };
   if (which === 'spellbook') {
+    if (preparesFromList(draft)) return null;
     const from = [];
     for (let level = 1; level <= highestSpellLevel(draft); level++) from.push(...spellsOnList(cls.id, level).map((s) => s.id));
     return { count: counts.spellbook, from, chosen: draft.spells.spellbook };
   }
-  if (which === 'prepared') return { count: counts.prepared, from: draft.spells.spellbook, chosen: draft.spells.prepared };
+  if (which === 'prepared') return preparePicks(draft);
   throw new Error(`Unknown class spell pick: ${which}`);
 }
 
@@ -408,7 +425,9 @@ export function toggleClassSpell(draft, which, spellId) {
     if (which === 'spellbook') next.spells.prepared = next.spells.prepared.filter((id) => id !== spellId);
     return next;
   }
-  const where = which === 'prepared' ? null : `class-${which}`;
+  // A Wizard prepares from their own spellbook; a Cleric's prepared spells can clash with a
+  // spell they have another way (Magic Initiate's, say).
+  const where = which !== 'prepared' ? `class-${which}` : preparesFromList(draft) ? 'class-prepared' : null;
   if (!picks.from.includes(spellId) || picks.chosen.length >= picks.count || (where && spellTakenBy(draft, spellId, where))) return draft;
   next.spells[which] = [...picks.chosen, spellId];
   return next;
@@ -561,13 +580,13 @@ export function startingKit(draft) {
 export function kitArmor(draft) {
   const cls = findClass(draft.classId);
   if (!cls) return null;
-  const worn = startingKit(draft).items.find(({ item }) => item.category === 'armor' && cls.armorTraining.includes(item.armorCategory));
+  const worn = startingKit(draft).items.find(({ item }) => item.category === 'armor' && armorTraining(draft).includes(item.armorCategory));
   return worn ? worn.item.id : null;
 }
 
 export function kitShield(draft) {
   const cls = findClass(draft.classId);
-  return Boolean(cls && cls.armorTraining.includes('shield') && startingKit(draft).items.some(({ item }) => item.category === 'shield'));
+  return Boolean(cls && armorTraining(draft).includes('shield') && startingKit(draft).items.some(({ item }) => item.category === 'shield'));
 }
 
 // ---- Getting each step ready, and what each step still needs ----
@@ -601,6 +620,7 @@ export function stepProblems(draft, step) {
   if (step === 'class') {
     need(cls, 'Choose a class.');
     if (cls && cls.id === 'fighter') need(draft.classChoices.fightingStyle, 'Choose a Fighting Style.');
+    if (cls && cls.divineOrders) need(divineOrderOf(draft), 'Choose a Divine Order.');
   } else if (step === 'background') {
     need(background, 'Choose a background.');
   } else if (step === 'species') {
@@ -630,6 +650,7 @@ export function stepProblems(draft, step) {
     }
   } else if (step === 'spells') {
     const what = { cantrips: `${cls ? cls.name : ''} cantrips`, spellbook: 'spells for your spellbook', prepared: 'spells to prepare' };
+    // (A Cleric has no spellbook: classSpellPicks gives null for it, so it's skipped.)
     for (const which of ['cantrips', 'spellbook', 'prepared']) {
       const picks = classSpellPicks(draft, which);
       if (picks) need(picks.chosen.length === picks.count, `Choose ${picks.count} ${what[which]} (${picks.chosen.length} chosen).`);

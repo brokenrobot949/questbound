@@ -79,8 +79,8 @@ export const clothColors = [
 // Hats and hoods by class. 'none' is always allowed.
 export const headgear = [
   { id: 'none', name: 'None', classes: null },
-  { id: 'helmet', name: 'Horned helmet', classes: ['fighter'] },
-  { id: 'hood', name: 'Hood', classes: ['wizard'] },
+  { id: 'helmet', name: 'Horned helmet', classes: ['fighter', 'cleric'] },
+  { id: 'hood', name: 'Hood', classes: ['wizard', 'cleric'] },
 ];
 
 // Armour colours: highlight, main, shade, dark. Worn armour changes the hero's colours.
@@ -147,4 +147,5 @@ export const dragonbornSkins = {
 export const classLooks = {
   fighter: { outfit: 'red', accent: 'brown', headgear: 'none' },
   wizard: { outfit: 'blue', accent: 'red', headgear: 'none' },
+  cleric: { outfit: 'white', accent: 'yellow', headgear: 'none' },
 };

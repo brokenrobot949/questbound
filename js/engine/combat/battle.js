@@ -19,9 +19,12 @@
 //                creature stands up; the spell conditions 'drowsy', 'asleep', 'paralyzed'
 //                and 'outlined' (see "Spell conditions" below), which last while the hero
 //                concentrates (concentration true), the first three carrying the DC of the
-//                save that ends them; and the hero's wards (see "Wards" below): 'blessed'
+//                save that ends them; the hero's wards (see "Wards" below): 'blessed'
 //                (concentration) and 'sanctuary' (with the DC foes save against, until the
-//                start of the hero's turn in untilRound)
+//                start of the hero's turn in untilRound), 'shield-of-faith' (concentration) and
+//                'spiritual-weapon' (concentration; pos: the square the spectral weapon is in,
+//                damage and modifiers: its attack); and 'turned' (Turn Undead) and 'blinded'
+//                (Blindness/Deafness), until the start of the creature's turn in untilRound
 //   concentration  the spell the hero is concentrating on: { spellId, name }, or null
 //   reactionsUsed  ids that have used their reaction since their last turn
 //   heroState    'up', 'down' (0 Hit Points, making death saves), 'stable' or 'dead'
@@ -45,7 +48,7 @@ import { monsters } from '../../../data/srd/monsters.js';
 import { d20Test, retarget, startD20Count, stopD20Count } from '../rules/d20-test.js';
 import { rollDice, rollDie } from '../rules/dice.js';
 import { armorClass, findAbility, findClass, hasFeature, initiative as heroInitiative, savingThrow, speed as heroSpeed } from '../character/sheet.js';
-import { heal, featureUsesLeft, maxHp, slotsLeft, spendFeature, spendSlot } from '../character/resources.js';
+import { heal, featureUsesLeft, heroMaxHp, slotsLeft, spendFeature, spendSlot } from '../character/resources.js';
 import { activeSpellIds, castSelfSpell, soakDamage } from '../character/spell-effects.js';
 import { canCastSpell, findSpell, freeCastKey, freeCastsLeft } from '../character/spells.js';
 import { spellSaveDc } from '../character/casting.js';
@@ -116,8 +119,17 @@ export const isProne = (battle, id) => hasEffect(battle, id, 'prone');
 //   'outlined'   Faerie Fire: attack rolls against it have Advantage
 //   'guided'     Guiding Bolt: the next attack roll against it has Advantage (the roll uses
 //                it up), until the end of the caster's next turn
+//   'turned'     Turn Undead (a Cleric's Channel Divinity): Frightened and Incapacitated for
+//                a minute, moving as far from the hero as it can on its turns. Damage ends it,
+//                and so does the hero dropping to 0 Hit Points.
+//   'grovel'     Command: on its next turn it falls Prone, and its turn ends
+//   'blinded'    Blindness/Deafness: its attack rolls have Disadvantage and attacks against it
+//                Advantage, and it can't make Opportunity Attacks (it can't see you go). A
+//                Constitution save at the end of each of its turns ends it; so does a minute.
+//   'baned'      Bane: it subtracts 1d4 from its attack rolls and saving throws, while the hero
+//                concentrates
 // An Incapacitated singer can't sing (it can't speak), so the hymn stops.
-const INCAPACITATING = ['drowsy', 'asleep', 'paralyzed'];
+const INCAPACITATING = ['drowsy', 'asleep', 'paralyzed', 'turned'];
 export const isIncapacitated = (battle, id) => battle.effects.some((e) => e.target === id && INCAPACITATING.includes(e.kind));
 const isHelpless = (battle, id) => hasEffect(battle, id, 'asleep') || hasEffect(battle, id, 'paralyzed');
 const autoFails = (battle, c, abilityId) => c.side === 'enemy' && isHelpless(battle, c.id) && ['strength', 'dexterity'].includes(abilityId);
@@ -130,7 +142,7 @@ const autoFails = (battle, c, abilityId) => c.side === 'enemy' && isHelpless(bat
 //                damage, or after a minute (10 rounds).
 
 // Conditions on a creature, for the battle screen: e.g. ['asleep', 'poisoned'].
-const SHOWN = ['drowsy', 'asleep', 'paralyzed', 'poisoned', 'outlined', 'guided', 'shield', 'dodging', 'blessed', 'sanctuary'];
+const SHOWN = ['drowsy', 'asleep', 'paralyzed', 'turned', 'blinded', 'grovel', 'baned', 'poisoned', 'outlined', 'guided', 'shield', 'shield-of-faith', 'dodging', 'blessed', 'sanctuary'];
 export function conditionsOf(battle, id) {
   return SHOWN.filter((kind) => hasEffect(battle, id, kind));
 }
@@ -138,7 +150,20 @@ export function conditionsOf(battle, id) {
 // Can this creature take a reaction now (an Opportunity Attack, Redirect Attack)?
 function canReact(game, c) {
   const battle = game.battle;
-  return upright(game, c) && !isIncapacitated(battle, c.id) && !battle.reactionsUsed.includes(c.id) && !hasEffect(battle, c.id, 'no-reactions');
+  const sees = !hasEffect(battle, c.id, 'blinded');
+  return upright(game, c) && sees && !isIncapacitated(battle, c.id) && !battle.reactionsUsed.includes(c.id) && !hasEffect(battle, c.id, 'no-reactions');
+}
+
+// A foe's saving throw, through the one d20 function, with Bane's −1d4 if it's Baned.
+function foeSave(game, c, abilityId, dc, advantage = []) {
+  return monsterSave(game.rng, findMonster(c.monsterId), abilityId, dc, advantage, baneOf(game, c));
+}
+
+// Bane: the modifier a Baned foe subtracts from its attack rolls and saves (one, or none).
+function baneOf(game, c) {
+  if (c.side !== 'enemy' || !hasEffect(game.battle, c.id, 'baned')) return [];
+  const roll = rollDie(game.rng, 4);
+  return [{ label: 'Bane', value: -roll, source: `Bane: −1d4 (${roll})` }];
 }
 
 // Reactions the game takes for the hero: Shield, cast when it would turn a hit into a miss,
@@ -211,6 +236,7 @@ export function battleScene(game) {
     actor: battle.order.length ? battle.order[battle.turn] : null,
     heroState: battle.heroState,
     concentration: battle.concentration ? battle.concentration.name : null,
+    weapon: spiritualWeapon(battle) ? { ...spiritualWeapon(battle).pos } : null,
     units: battle.combatants.map((c) => ({
       id: c.id,
       pos: { ...c.pos },
@@ -317,6 +343,16 @@ function beginTurn(game) {
     battle.effects.splice(battle.effects.indexOf(ward), 1);
     log(game, 'Your Sanctuary fades: its minute is up.');
   }
+  const turned = battle.effects.find((e) => e.target === c.id && e.kind === 'turned');
+  if (turned && battle.round >= turned.untilRound) {
+    battle.effects.splice(battle.effects.indexOf(turned), 1);
+    log(game, `${c.name} shakes off Turn Undead: its minute is up.`);
+  }
+  const blind = battle.effects.find((e) => e.target === c.id && e.kind === 'blinded');
+  if (blind && battle.round >= blind.untilRound) {
+    battle.effects.splice(battle.effects.indexOf(blind), 1);
+    log(game, `${c.name} can see again: the minute is up.`);
+  }
   if (c.side === 'hero' && battle.heroState === 'down') deathSave(game);
 }
 
@@ -374,7 +410,7 @@ function hymnHurt(game, singer, taken) {
     return;
   }
   const dc = Math.max(10, Math.floor(taken / 2));
-  const save = monsterSave(game.rng, findMonster(singer.monsterId), 'constitution', dc);
+  const save = foeSave(game, singer, 'constitution', dc);
   if (save.success) {
     log(game, `${singer.name} winces, but keeps singing.`, { roll: save });
   } else {
@@ -541,6 +577,8 @@ function attackConditions(game, attacker, target, option) {
   if (hasEffect(battle, target.id, 'paralyzed')) advantage.push(`${is(target)} Paralyzed`);
   if (hasEffect(battle, target.id, 'outlined')) advantage.push(`${is(target)} outlined by Faerie Fire`);
   if (hasEffect(battle, target.id, 'guided')) advantage.push(`${is(target)} lit by Guiding Bolt`);
+  if (hasEffect(battle, target.id, 'blinded')) advantage.push(`${is(target)} Blinded`);
+  if (hasEffect(battle, attacker.id, 'blinded')) disadvantage.push(`${is(attacker)} Blinded`);
   if (hasEffect(battle, attacker.id, 'poisoned')) disadvantage.push(`${is(attacker)} Poisoned`);
   if (isProne(battle, attacker.id)) disadvantage.push(`${is(attacker)} Prone`);
   if (isProne(battle, target.id)) {
@@ -555,17 +593,52 @@ function attackConditions(game, attacker, target, option) {
   return { advantage, disadvantage };
 }
 
+// Within reach or range: from the attacker, or from option.origin (Spiritual Weapon's square).
 export function inRange(attacker, target, option) {
-  const feet = feetBetween(attacker.pos, target.pos);
+  const feet = feetBetween(option.origin || attacker.pos, target.pos);
   if (option.how === 'melee') return feet <= option.reach;
   return feet <= option.range[1];
 }
 
-// Armor Class, with Mage Armor and the Shield spell for the hero.
+// Armor Class, with Mage Armor, the Shield spell and Shield of Faith for the hero.
 function acOf(game, c) {
   if (c.side !== 'hero') return findMonster(c.monsterId).ac;
   const shield = hasEffect(game.battle, 'hero', 'shield') ? findSpell('shield').combat.acBonus : 0;
-  return armorClass(game.character, activeSpellIds(game)).value + shield;
+  const faith = hasEffect(game.battle, 'hero', 'shield-of-faith') ? findSpell('shield-of-faith').combat.acBonus : 0;
+  return armorClass(game.character, activeSpellIds(game)).value + shield + faith;
+}
+
+// ---- Spiritual Weapon ----
+
+const spiritualWeapon = (battle) => battle.effects.find((e) => e.kind === 'spiritual-weapon') || null;
+
+// Where the spectral weapon goes to strike a foe: a free square beside it, the one nearest
+// `from` (the hero when it's summoned, its old square when it moves). Over the foe if none.
+function weaponSquare(game, target, from) {
+  const battle = game.battle;
+  const map = battleMap(battle);
+  const occupied = (pos) => battle.combatants.some((c) => c.pos.x === pos.x && c.pos.y === pos.y && (c.side === 'hero' || c.hp > 0));
+  const free = STEPS_AROUND.map(([dx, dy]) => ({ x: target.pos.x + dx, y: target.pos.y + dy })).filter((pos) => isStandable(map, pos) && !occupied(pos));
+  free.sort((a, b) => squaresBetween(a, from) - squaresBetween(b, from));
+  return free[0] || { ...target.pos };
+}
+
+// Casting Spiritual Weapon puts it beside the foe; striking with it later moves it there.
+// Either way it makes a melee spell attack from its square. Returns { critical }.
+function spiritStrike(game, option, target) {
+  const battle = game.battle;
+  const hero = heroCombatant(battle);
+  let weapon = spiritualWeapon(battle);
+  const pos = weaponSquare(game, target, weapon ? weapon.pos : hero.pos);
+  if (!weapon) {
+    weapon = { kind: 'spiritual-weapon', target: 'hero', endsOn: null, concentration: true, pos, damage: option.damage, modifiers: option.modifiers };
+    battle.effects.push(weapon);
+    log(game, `You cast Spiritual Weapon: a spectral mace of light flickers into being beside ${target.name}.`);
+  } else {
+    weapon.pos = pos;
+    log(game, `Your Spiritual Weapon sweeps across to ${target.name}.`);
+  }
+  return performAttack(game, { ...hero, pos }, target, { ...option, how: 'melee', reach: 5, origin: null, name: 'Spiritual Weapon' });
 }
 
 // Why a spell can't be aimed at this creature (Hold Person needs a Humanoid), or null.
@@ -583,15 +656,22 @@ export function attackPreview(game, optionId, targetId) {
   const target = combatantById(battle, targetId);
   const hero = heroCombatant(battle);
   if (!option || !target || (option.targeting && option.targeting !== 'foe')) return null;
-  const { advantage, disadvantage } = attackConditions(game, hero, target, option);
+  // Spiritual Weapon strikes from the square beside the foe that it would move to.
+  const spirit = option.how === 'spirit' || option.how === 'spirit-strike';
+  const weapon = spiritualWeapon(battle);
+  const striker = spirit ? { ...hero, pos: weaponSquare(game, target, weapon ? weapon.pos : hero.pos) } : hero;
+  const { advantage, disadvantage } = attackConditions(game, striker, target, option);
   const mode = advantage.length && !disadvantage.length ? 'advantage' : disadvantage.length && !advantage.length ? 'disadvantage' : 'normal';
   const bonus = option.modifiers.reduce((s, m) => s + m.value, 0);
   const preview = { option, target, inRange: inRange(hero, target, option), advantage, disadvantage, mode, invalid: null };
   if (option.how === 'save') {
     preview.invalid = wrongTarget(option, target);
     if (preview.invalid) preview.inRange = false;
+    // A Baned foe subtracts 1d4: the chance is the average over its four faces.
     const save = findMonster(target.monsterId).saves[option.saveAbility] || 0;
-    preview.chance = autoFails(battle, target, option.saveAbility) ? 1 : 1 - Math.min(1, Math.max(0, (21 - (option.saveDc - save)) / 20));
+    const fails = (bonus) => 1 - Math.min(1, Math.max(0, (21 - (option.saveDc - bonus)) / 20));
+    const baned = hasEffect(battle, target.id, 'baned');
+    preview.chance = autoFails(battle, target, option.saveAbility) ? 1 : baned ? [1, 2, 3, 4].reduce((sum, d4) => sum + fails(save - d4), 0) / 4 : fails(save);
     preview.describe = `${target.name} makes a ${findAbility(option.saveAbility).name} save against DC ${option.saveDc}`;
   } else if (option.how === 'darts') {
     preview.chance = 1;
@@ -631,7 +711,8 @@ export function heroAttack(game, optionId, targetId, { reroll = null } = {}) {
   try {
     useAction(game, option);
     if (option.concentration) startConcentration(game, option);
-    ({ critical } = performAttack(game, hero, target, option));
+    const spirit = option.how === 'spirit' || option.how === 'spirit-strike';
+    ({ critical } = spirit ? spiritStrike(game, option, target) : performAttack(game, hero, target, option));
     if (option.concentration) tidyConcentration(game);
     checkEnd(game);
   } finally {
@@ -691,27 +772,35 @@ function performAttack(game, attacker, target, option) {
   if (option.how === 'save') {
     // The Unconscious and the Paralyzed fail Strength and Dexterity saves without a roll.
     const helpless = autoFails(battle, target, option.saveAbility);
-    const save = helpless ? null : monsterSave(game.rng, findMonster(target.monsterId), option.saveAbility, option.saveDc, hasEffect(battle, target.id, 'dodging') ? ['Dodging'] : []);
+    const save = helpless ? null : foeSave(game, target, option.saveAbility, option.saveDc, hasEffect(battle, target.id, 'dodging') ? ['Dodging'] : []);
     const fails = helpless ? `${whom} can't move to save itself` : `${whom} fails the save`;
+    const cast = option.source === 'channel' ? 'channel' : 'cast'; // Divine Spark isn't a spell
     if (option.condition) {
       if (save && save.success) {
-        log(game, `${who} cast ${option.name} at ${whom}, who resists it.`, { roll: save });
+        log(game, `${who} ${cast} ${option.name} at ${whom}, who resists it.`, { roll: save });
         return { critical: false };
       }
-      log(game, `${who} cast ${option.name}: ${fails}.`, { roll: save });
+      log(game, `${who} ${cast} ${option.name}: ${fails}.`, { roll: save });
       applyCondition(game, target, option.condition, { concentration: option.concentration, dc: option.saveDc });
       return { critical: false };
     }
     if (save && save.success && option.potent) {
-      halfDamage(game, target, option, `${who} cast ${option.name} at ${whom}, who saves`, save);
+      halfDamage(game, target, option, `${who} ${cast} ${option.name} at ${whom}, who saves`, save);
+      return { critical: false };
+    }
+    if (save && save.success && option.halfOnSave) {
+      const damage = rollDamage(game.rng, option.damage);
+      const half = Math.floor(damage.total / 2);
+      log(game, `${who} ${cast} ${option.name} at ${whom}, who makes the save: ${damageText(damage, option.damage.dice)} damage, halved to ${half}.`, { roll: save });
+      applyDamage(game, target, half, { type: damage.type });
       return { critical: false };
     }
     if (save && save.success) {
-      log(game, `${who} cast ${option.name} at ${whom}, who shrugs it off.`, { roll: save });
+      log(game, `${who} ${cast} ${option.name} at ${whom}, who shrugs it off.`, { roll: save });
       return { critical: false };
     }
     const damage = rollDamage(game.rng, option.damage);
-    log(game, `${who} cast ${option.name}: ${fails} and takes ${damageText(damage, option.damage.dice)} damage.`, { roll: save });
+    log(game, `${who} ${cast} ${option.name}: ${fails} and takes ${damageText(damage, option.damage.dice)} damage.`, { roll: save });
     applyDamage(game, target, damage.total, { type: damage.type });
     return { critical: false };
   }
@@ -719,7 +808,7 @@ function performAttack(game, attacker, target, option) {
   // Sanctuary: a foe must make a Wisdom save to attack the hero, or the attack is lost.
   const ward = target.side === 'hero' && !you ? battle.effects.find((e) => e.target === 'hero' && e.kind === 'sanctuary') : null;
   if (ward) {
-    const save = monsterSave(game.rng, findMonster(attacker.monsterId), 'wisdom', ward.dc);
+    const save = foeSave(game, attacker, 'wisdom', ward.dc);
     if (!save.success) {
       log(game, `${attacker.name} goes for you with its ${option.name}, then falters: Sanctuary turns it aside.`, { roll: save });
       return { critical: false };
@@ -732,7 +821,8 @@ function performAttack(game, attacker, target, option) {
   if (redirected !== target) return performAttack(game, attacker, redirected, option);
 
   const { advantage, disadvantage } = attackConditions(game, attacker, target, option);
-  const blessed = you ? blessing(game) : [];
+  // Bless adds 1d4 to the hero's roll; Bane takes 1d4 off a Baned foe's.
+  const blessed = you ? blessing(game) : baneOf(game, attacker);
   const rolled = blessed.length ? { ...option, modifiers: [...option.modifiers, ...blessed] } : option;
   let roll = attackRoll(game.rng, rolled, acOf(game, target), advantage, disadvantage);
   if (you) roll.yours = true; // the hero's own roll, which Heroic Inspiration can reroll
@@ -868,7 +958,7 @@ function takeHit(game, target, amount, { type, critical = false, plus = null }) 
     // Undead Fortitude: a Constitution save (DC 5 + the damage) to stay up at 1 Hit Point,
     // unless the damage is Radiant or from a Critical Hit.
     if (taken >= target.hp && (monster.traits || []).includes('undead-fortitude') && type !== 'radiant' && !critical) {
-      const save = monsterSave(game.rng, monster, 'constitution', 5 + taken);
+      const save = foeSave(game, target, 'constitution', 5 + taken);
       if (save.success) {
         target.hp = 1;
         log(game, `${target.name} should fall, but doesn't: Undead Fortitude leaves it at 1 Hit Point.`, { roll: save });
@@ -880,8 +970,12 @@ function takeHit(game, target, amount, { type, critical = false, plus = null }) 
     target.hp = Math.max(0, target.hp - taken);
     if (target.hp === 0) log(game, `${target.name} falls.`);
     if (taken > 0) hymnHurt(game, target, taken);
-    // Damage ends Sleep on a creature.
+    // Damage ends Sleep on a creature, and Turn Undead.
     if (taken > 0 && target.hp > 0) wake(game, target, `${target.name} wakes with a start.`);
+    if (taken > 0 && target.hp > 0 && hasEffect(battle, target.id, 'turned')) {
+      battle.effects = battle.effects.filter((e) => !(e.target === target.id && e.kind === 'turned'));
+      log(game, `The pain breaks Turn Undead’s hold on ${target.name}.`);
+    }
     return;
   }
   const resisted = heroResistances(game.character);
@@ -895,19 +989,23 @@ function takeHit(game, target, amount, { type, critical = false, plus = null }) 
     game.hp = Math.max(0, game.hp - rest);
     if (game.hp === 0) {
       // Damage left over that equals your Hit Point maximum kills outright.
-      if (overflow >= maxHp(game.character)) return heroDies(game, 'The blow is too much.');
+      if (overflow >= heroMaxHp(game)) return heroDies(game, 'The blow is too much.');
       battle.heroState = 'down';
       battle.deathSaves = { successes: 0, failures: 0 };
       knockProne(game, target); // the Unconscious condition includes Prone
       log(game, 'You drop to 0 Hit Points and fall Unconscious.');
       if (battle.concentration) endConcentration(game, `Your concentration breaks: ${battle.concentration.name} ends.`);
+      if (battle.effects.some((e) => e.kind === 'turned')) {
+        battle.effects = battle.effects.filter((e) => e.kind !== 'turned');
+        log(game, 'With you down, the Undead you turned are free of it.');
+      }
       return;
     }
     if (taken > 0 && battle.concentration) concentrationCheck(game, taken);
     return;
   }
   // Damage while at 0 Hit Points: a failed death save (two for a Critical Hit).
-  if (taken >= maxHp(game.character)) return heroDies(game, 'The blow is too much.');
+  if (taken >= heroMaxHp(game)) return heroDies(game, 'The blow is too much.');
   battle.deathSaves.failures += critical ? 2 : 1;
   battle.heroState = 'down';
   log(game, `You take damage while down: ${critical ? 'two death save failures' : 'a death save failure'}.`);
@@ -1000,7 +1098,10 @@ function useAction(game, option, { slotAlreadySpent = false } = {}) {
   if (option.bonusAction) turn.bonus = true;
   else turn.action = true;
   turn.athleteMove = 0;
-  breakSanctuary(game, option.source === 'spell' ? 'you cast a spell' : 'you attack');
+  // Sanctuary ends with an attack, a spell or damage dealt: Turn Undead and healing are none.
+  const why = { spell: 'you cast a spell', weapon: 'you attack', channel: 'you deal damage' }[option.source];
+  if (option.source !== 'channel' || option.damage) breakSanctuary(game, why);
+  if (option.featureUse) spendFeature(game, option.featureUse);
   if (option.freeCast && !slotAlreadySpent) game.featureUses[option.freeCast] = (game.featureUses[option.freeCast] || 0) + 1;
   if (option.slotLevel) {
     if (!slotAlreadySpent) spendSlot(game, option.slotLevel);
@@ -1011,7 +1112,10 @@ function useAction(game, option, { slotAlreadySpent = false } = {}) {
 // Why a spell on the hero would do nothing now (healing at full Hit Points, a ward already
 // up), or null.
 function optionProblem(game, option) {
-  if (option.how === 'heal' && game.hp >= maxHp(game.character)) return 'You’re at full Hit Points.';
+  if (option.how === 'heal' && game.hp >= heroMaxHp(game)) return 'You’re at full Hit Points.';
+  if (option.how === 'turn' && !undeadInReach(game).length) return 'No Undead within 30 feet.';
+  if (option.how === 'multi' && !nearestTargets(game, option).length) return `No foes within ${option.range[1]} feet.`;
+  if (option.how === 'preserve' && game.hp >= Math.floor(heroMaxHp(game) / 2)) return 'Preserve Life heals only up to half your Hit Points, and you’re there already.';
   if (option.how === 'ward' && hasEffect(game.battle, 'hero', option.effect)) return `${findSpell(option.spellId).name} is already on you.`;
   return null;
 }
@@ -1106,6 +1210,13 @@ function applyCondition(game, target, kind, extra = {}) {
   if (kind === 'outlined') {
     log(game, target.side === 'hero' ? 'Violet light outlines you: attacks against you have Advantage.' : `Violet light outlines ${target.name}: attacks against it have Advantage.`);
   }
+  if (kind === 'grovel') log(game, `${target.name} will throw itself down and grovel on its next turn.`);
+  if (kind === 'blinded') {
+    const blind = battle.effects.find((e) => e.target === target.id && e.kind === 'blinded');
+    if (!blind.untilRound) blind.untilRound = battle.round + 10;
+    log(game, `${target.name} is Blinded: its attacks have Disadvantage, and attacks against it Advantage.`);
+  }
+  if (kind === 'baned') log(game, `${target.name} is Baned: it subtracts 1d4 from its attack rolls and saves.`);
   if (INCAPACITATING.includes(kind)) silenceSinger(game, target);
   return true;
 }
@@ -1135,9 +1246,19 @@ function endOfTurn(game, c) {
   const battle = game.battle;
   battle.effects = battle.effects.filter((e) => !(e.endsAt === 'end' && e.endsOn === c.id && e.fromRound < battle.round));
   if (c.side !== 'enemy' || c.hp <= 0) return;
-  const monster = findMonster(c.monsterId);
+  // Blindness/Deafness: a Constitution save at the end of each of its turns.
+  const blind = battle.effects.find((e) => e.target === c.id && e.kind === 'blinded');
+  if (blind) {
+    const save = foeSave(game, c, 'constitution', blind.dc);
+    if (save.success) {
+      battle.effects.splice(battle.effects.indexOf(blind), 1);
+      log(game, `${c.name} blinks, and can see again.`, { roll: save });
+    } else {
+      log(game, `${c.name} is still blind.`, { roll: save });
+    }
+  }
   for (const effect of battle.effects.filter((e) => e.target === c.id && (e.kind === 'drowsy' || e.kind === 'paralyzed'))) {
-    const save = monsterSave(game.rng, monster, 'wisdom', effect.dc);
+    const save = foeSave(game, c, 'wisdom', effect.dc);
     if (effect.kind === 'drowsy' && save.success) {
       battle.effects.splice(battle.effects.indexOf(effect), 1);
       log(game, `${c.name} shakes off the drowsiness.`, { roll: save });
@@ -1191,7 +1312,7 @@ function hellishRebuke(game, attacker) {
   battle.reactionsUsed.push('hero');
   const damage = rollDamage(game.rng, spell.combat.damage);
   const dodging = hasEffect(battle, attacker.id, 'dodging') ? ['Dodging'] : [];
-  const save = monsterSave(game.rng, findMonster(attacker.monsterId), 'dexterity', spellSaveDc(game.character, spell.id), dodging);
+  const save = foeSave(game, attacker, 'dexterity', spellSaveDc(game.character, spell.id), dodging);
   const amount = save.success ? Math.floor(damage.total / 2) : damage.total;
   const halved = save.success ? `, halved to ${amount} by its Dexterity save` : '';
   log(game, `Hellish Rebuke! (your reaction, its free cast) Green flames engulf ${attacker.name}: ${damageText(damage, spell.combat.damage.dice)} damage${halved}.`, { roll: save });
@@ -1289,7 +1410,7 @@ function areaDamage(game, c, option, damage, hero) {
   const dodging = option.saveAbility === 'dexterity' && hasEffect(battle, c.id, 'dodging') ? ['Dodging'] : [];
   let save = null;
   if (you) save = heroSave(game, option.saveAbility, option.saveDc, option.name);
-  else if (!helpless) save = monsterSave(game.rng, findMonster(c.monsterId), option.saveAbility, option.saveDc, dodging);
+  else if (!helpless) save = foeSave(game, c, option.saveAbility, option.saveDc, dodging);
   const saved = Boolean(save && save.success);
   const amount = saved ? (option.halfOnSave ? Math.floor(damage.total / 2) : 0) : damage.total;
   const s = you ? '' : 's';
@@ -1313,7 +1434,7 @@ function areaCondition(game, c, option) {
   const dodging = option.saveAbility === 'dexterity' && hasEffect(battle, c.id, 'dodging') ? ['Dodging'] : [];
   let save = null;
   if (you) save = heroSave(game, option.saveAbility, option.saveDc, option.name);
-  else if (!helpless) save = monsterSave(game.rng, findMonster(c.monsterId), option.saveAbility, option.saveDc, dodging);
+  else if (!helpless) save = foeSave(game, c, option.saveAbility, option.saveDc, dodging);
   const who = you ? 'You' : c.name;
   const s = you ? '' : 's';
   if (save && save.success) {
@@ -1332,7 +1453,7 @@ function putToSleep(game, c, option) {
     log(game, `${c.name} never sleeps, and the spell slides off it.`);
     return;
   }
-  const save = monsterSave(game.rng, monster, 'wisdom', option.saveDc);
+  const save = foeSave(game, c, 'wisdom', option.saveDc);
   if (save.success) {
     log(game, `${c.name} blinks the drowsiness away.`, { roll: save });
     return;
@@ -1377,12 +1498,107 @@ export function heroCastSelf(game, optionId) {
   checkCanAct(game, option);
   const problem = optionProblem(game, option);
   if (problem) throw new Error(problem);
+  if (option.source === 'channel') return channelOnYourself(game, option);
   if (option.how === 'ward') return castWard(game, option);
   const faster = option.speedBonus && !activeSpellIds(game).includes(option.spellId);
   const text = castSelfSpell(game, option.spellId, option.freeCast ? 'free' : option.slotLevel);
   useAction(game, option, { slotAlreadySpent: true });
   if (faster) battle.turnState.movementLeft += option.speedBonus; // quicker this very turn
   log(game, `You cast ${text}`);
+}
+
+// ---- Channel Divinity (Cleric) ----
+// Rules: SRD 5.2.1, the Cleric's Channel Divinity and the Life Domain's Preserve Life. Each is
+// a Magic action and spends a use (useAction). Divine Spark at a foe is a 'save' option, so
+// heroAttack handles it; these three happen where the hero stands.
+
+// Undead foes still standing within 30 feet of the hero: who Turn Undead reaches.
+function undeadInReach(game) {
+  const hero = heroCombatant(game.battle);
+  return enemies(game.battle).filter((c) => c.hp > 0 && !c.escaped && findMonster(c.monsterId).type.startsWith('Undead') && feetBetween(hero.pos, c.pos) <= 30);
+}
+
+function channelOnYourself(game, option) {
+  const battle = game.battle;
+  useAction(game, option);
+  if (option.how === 'heal') {
+    // Divine Spark, turned to healing: 1d8 + the Wisdom modifier.
+    const roll = rollDie(game.rng, 8);
+    const { bonus } = option.heal;
+    const total = Math.max(0, roll + bonus);
+    const gained = heal(game, total);
+    log(game, `You channel Divine Spark: 1d8 (${roll}) ${bonus < 0 ? '−' : '+'} ${Math.abs(bonus)} = ${total}. You regain ${gained} Hit Point${gained === 1 ? '' : 's'}.`);
+  } else if (option.how === 'preserve') {
+    // Up to five times the Cleric level, but no higher than half the Hit Point maximum.
+    const half = Math.floor(heroMaxHp(game) / 2);
+    const gained = heal(game, Math.min(option.amount, half - game.hp));
+    log(game, `You channel Preserve Life: up to ${option.amount} Hit Points of healing light for the Bloodied. You regain ${gained}, up to half your Hit Points.`);
+  } else if (option.how === 'turn') {
+    log(game, 'You raise your holy symbol and channel Turn Undead.');
+    for (const c of undeadInReach(game)) {
+      const save = foeSave(game, c, 'wisdom', option.saveDc);
+      if (save.success) {
+        log(game, `${c.name} stands its ground.`, { roll: save });
+        continue;
+      }
+      battle.effects = battle.effects.filter((e) => !(e.target === c.id && e.kind === 'turned'));
+      battle.effects.push({ kind: 'turned', target: c.id, endsOn: null, untilRound: battle.round + 10 });
+      log(game, `${c.name} is Turned: Frightened and Incapacitated, it will flee from you for a minute, or until it takes damage.`, { roll: save });
+    }
+  } else {
+    throw new Error(`Unknown Channel Divinity: ${option.id}`);
+  }
+}
+
+// A Turned creature's turn: no actions, just as far from the hero as its movement takes it.
+function fleeFromHero(game, c) {
+  const battle = game.battle;
+  const hero = heroCombatant(battle);
+  const reach = reachableSquares(battleMap(battle), c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling: isProne(battle, c.id) });
+  const far = [...reach.values()].sort((a, b) => squaresBetween(b.pos, hero.pos) - squaresBetween(a.pos, hero.pos) || a.cost - b.cost)[0];
+  if (!far || squaresBetween(far.pos, hero.pos) <= squaresBetween(c.pos, hero.pos)) {
+    log(game, `${c.name} cowers from your holy symbol, with nowhere farther to go.`);
+    return;
+  }
+  log(game, `${c.name} flees from your holy symbol.`);
+  moveAlong(game, c, far.path);
+  checkEnd(game);
+}
+
+// ---- Bane: the nearest foes in range ----
+
+// The foes a 'multi' spell takes: the nearest ones standing within its range, up to its
+// number of targets.
+export function nearestTargets(game, option) {
+  const hero = heroCombatant(game.battle);
+  const inReach = enemies(game.battle).filter((c) => c.hp > 0 && !c.escaped && feetBetween(hero.pos, c.pos) <= option.range[1]);
+  return inReach.sort((a, b) => squaresBetween(hero.pos, a.pos) - squaresBetween(hero.pos, b.pos)).slice(0, option.targets);
+}
+
+// Casts Bane on them: each makes its save, or takes the spell's condition.
+export function heroCastMulti(game, optionId) {
+  requireHeroTurn(game);
+  const option = heroAttackOptions(game).find((o) => o.id === optionId);
+  if (!option || option.targeting !== 'nearest') throw new Error(`You can't cast ${optionId} that way right now.`);
+  checkCanAct(game, option);
+  const problem = optionProblem(game, option);
+  if (problem) throw new Error(problem);
+  const targets = nearestTargets(game, option);
+  useAction(game, option);
+  if (option.concentration) startConcentration(game, option);
+  log(game, `You cast ${option.name.replace(/ \((free|level \d+ slot)\)$/, '')} on ${targets.map((c) => c.name).join(', ')}.`);
+  const ability = findAbility(option.saveAbility).name;
+  for (const c of targets) {
+    const save = foeSave(game, c, option.saveAbility, option.saveDc);
+    if (save.success) {
+      log(game, `${c.name} makes the ${ability} save.`, { roll: save });
+      continue;
+    }
+    log(game, `${c.name} fails the ${ability} save.`, { roll: save });
+    applyCondition(game, c, option.condition, { concentration: option.concentration });
+  }
+  if (option.concentration) tidyConcentration(game);
+  checkEnd(game);
 }
 
 // Bless (Concentration) or Sanctuary (a minute: 10 rounds), on the hero for the fight.
@@ -1396,6 +1612,9 @@ function castWard(game, option) {
   } else if (option.effect === 'sanctuary') {
     battle.effects.push({ kind: 'sanctuary', target: 'hero', endsOn: null, dc: option.saveDc, untilRound: battle.round + 10 });
     log(game, `You cast ${findSpell(option.spellId).name}: a foe must make a DC ${option.saveDc} Wisdom save to attack you. It ends if you attack, cast a spell or deal damage.`);
+  } else if (option.effect === 'shield-of-faith') {
+    battle.effects.push({ kind: 'shield-of-faith', target: 'hero', endsOn: null, concentration: true });
+    log(game, `You cast ${findSpell(option.spellId).name}: a shimmering field surrounds you, +2 to your AC while you concentrate.`);
   } else {
     throw new Error(`Unknown ward: ${option.effect}`);
   }
@@ -1499,6 +1718,18 @@ function enemyTurn(game, c) {
   const monster = findMonster(c.monsterId);
   const hero = heroCombatant(battle);
   const encounter = findEncounter(battle.encounterId);
+  // Commanded to grovel: it falls Prone, and its turn ends (unless it can't act anyway).
+  const grovel = battle.effects.find((e) => e.target === c.id && e.kind === 'grovel');
+  if (grovel) {
+    battle.effects.splice(battle.effects.indexOf(grovel), 1);
+    if (!isIncapacitated(battle, c.id)) {
+      knockProne(game, c);
+      log(game, `${c.name} obeys your command: it throws itself flat on the ground and grovels.`);
+      return;
+    }
+  }
+  // Turned: it can't act, and moves as far from the hero as it can.
+  if (hasEffect(battle, c.id, 'turned')) return fleeFromHero(game, c);
   // Asleep, drowsy or held by Hold Person: no actions at all.
   if (isIncapacitated(battle, c.id)) {
     if (hasEffect(battle, c.id, 'asleep')) log(game, `${c.name} is fast asleep.`);

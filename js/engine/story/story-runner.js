@@ -73,6 +73,7 @@ export function listScenes(story) {
 export function jumpTo(game, path) {
   settleSeen(game);
   game.undo = null;
+  game.canPrepare = false;
   game.battle = null;
   game.pending.length = 0;
   game.story.ChoosePathString(path);
@@ -128,6 +129,7 @@ function lastSeen(game, type, start) {
 export function makeChoice(game, choice, { reroll = null } = {}) {
   const expected = parseTags(choice.tags).check;
   takeUndoPoint(game, 'choice', { choice: { index: choice.index, text: choice.text } });
+  game.canPrepare = false; // the story moves on: prepared spells are set until the next Long Rest
   startD20Count(reroll);
   let page;
   try {
@@ -148,6 +150,7 @@ export function startFight(game, choice) {
   if (!encounterId) throw new Error('That choice does not start a fight');
   settleSeen(game);
   game.undo = null;
+  game.canPrepare = false;
   return startBattle(game, encounterId, choice.index, { surprise });
 }
 
@@ -166,6 +169,7 @@ export function continueAfterBattle(game) {
 export function restartStory(game) {
   settleSeen(game);
   game.undo = null;
+  game.canPrepare = false;
   game.story.ResetState();
   return runPage(game);
 }

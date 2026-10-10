@@ -9,7 +9,7 @@
 
 import { abilityCheck } from '../rules/ability-check.js';
 import { d20Test } from '../rules/d20-test.js';
-import { canCastSpell, findSpell } from '../character/spells.js';
+import { canCastSpell, findSpell, preparePicks } from '../character/spells.js';
 import { castCostText, castInScene, guidanceModifiers, sceneCastCost, spellSaveDc } from '../character/casting.js';
 import { findAbility } from '../character/sheet.js';
 import { addItem, buyItem, canAfford, COPPER_PER, findItem, hasItem, moneyText, removeItem } from '../character/inventory.js';
@@ -141,6 +141,11 @@ export function bindExternals(story, runtime) {
       if (game.character.speciesId === 'human' && !game.inspiration) {
         game.inspiration = true;
         note(game, dmNotes.inspirationFromRest);
+      }
+      // A Wizard or Cleric can change their prepared spells, until the story moves on.
+      if (preparePicks(game.character)) {
+        game.canPrepare = true;
+        note(game, dmNotes.prepareAfterRest);
       }
       game.pending.push({ type: 'stop' }); // the page ends with "a good place to stop"
     },

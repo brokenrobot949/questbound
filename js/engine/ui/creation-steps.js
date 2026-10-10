@@ -124,7 +124,26 @@ export function classStep(ctx) {
     );
     nodes.push(styles);
   }
-  if (cls.spellcasting) nodes.push(note('You choose your cantrips and spellbook after your skills.'));
+  if (cls.divineOrders) {
+    const orders = section('Divine Order', 'Choose the sacred role you’re dedicated to.');
+    orders.append(
+      optionList(
+        cls.divineOrders.map((order) =>
+          optionCard({
+            key: `order-${order.id}`,
+            title: order.name,
+            lines: [order.summary],
+            selected: draft.classChoices.divineOrder === order.id,
+            onSelect: () => ctx.set(creation.chooseDivineOrder(ctx.draft, order.id)),
+          }),
+        ),
+      ),
+    );
+    nodes.push(orders);
+  }
+  if (cls.spellcasting) {
+    nodes.push(note(cls.spellcasting.spellbook ? 'You choose your cantrips and spellbook after your skills.' : 'You choose your cantrips and prepared spells after your skills.'));
+  }
   return nodes;
 }
 
@@ -501,6 +520,7 @@ const TAKEN_TEXT = {
   species: 'from your species',
   'class-cantrips': 'already a class cantrip',
   'class-spellbook': 'already in your spellbook',
+  'class-prepared': 'already prepared',
   'initiate-background': 'already from Magic Initiate',
   'initiate-species': 'already from Magic Initiate',
 };
@@ -525,15 +545,23 @@ export function spellsStep(ctx) {
   }
 
   if (creation.classSpellPicks(draft, 'cantrips')) {
+    // A Wizard prepares from their spellbook; a Cleric has none, and prepares straight from
+    // the Cleric list.
+    const book = Boolean(creation.classSpellPicks(draft, 'spellbook'));
     const hints = {
       cantrips: (p) => `Choose ${p.count}: ${p.chosen.length} chosen. You can cast cantrips as often as you like.`,
       spellbook: (p) => `Choose ${p.count} level 1 spells to copy into your spellbook: ${p.chosen.length} chosen.`,
-      prepared: (p) => `Choose ${p.count} spellbook spells to have ready: ${p.chosen.length} chosen. You can change them after a Long Rest, and cast rituals from your spellbook without preparing them.`,
+      prepared: (p) =>
+        book
+          ? `Choose ${p.count} spellbook spells to have ready: ${p.chosen.length} chosen. You can change them after a Long Rest, and cast rituals from your spellbook without preparing them.`
+          : `Choose ${p.count} level 1 ${cls.name} spells to have ready: ${p.chosen.length} chosen. You can change them after every Long Rest, from the whole ${cls.name} list.`,
     };
     const titles = { cantrips: `${cls.name} cantrips`, spellbook: 'Your spellbook', prepared: 'Prepared spells' };
     for (const which of ['cantrips', 'spellbook', 'prepared']) {
       const picks = creation.classSpellPicks(draft, which);
+      if (!picks) continue;
       const box = section(titles[which], hints[which](picks));
+      const where = which !== 'prepared' ? `class-${which}` : book ? null : 'class-prepared';
       if (which === 'prepared' && picks.from.length === 0) {
         box.append(note('Choose your spellbook spells first.'));
       } else {
@@ -543,9 +571,9 @@ export function spellsStep(ctx) {
             ids: picks.from,
             chosen: picks.chosen,
             full: picks.chosen.length >= picks.count,
-            taken: (id) => (which === 'prepared' ? null : takenText(draft, id, `class-${which}`)),
+            taken: (id) => (where ? takenText(draft, id, where) : null),
             onToggle: (id) => ctx.set(creation.toggleClassSpell(ctx.draft, which, id)),
-            details: which !== 'prepared',
+            details: which !== 'prepared' || !book,
           }),
         );
       }

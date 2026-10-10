@@ -1,7 +1,10 @@
 // Spells (SRD 5.2.1). A curated set that grows with each phase (docs/DESIGN.md, "Spells").
 // Phase 1 has the Wizard's choices for levels 1–3 (cantrips, level 1 and level 2 spells),
-// the Cleric and Wizard spells that Magic Initiate offers, and every spell a species gives
-// by character level 3.
+// the Cleric, Druid and Wizard spells that Magic Initiate offers, and every spell a species
+// gives by character level 3. Phase 2 adds the Cleric's own spells: the Life Domain's (Aid,
+// Lesser Restoration), then a first set of the Cleric list (Bane, Command, Inflict Wounds,
+// Purify Food and Drink, Shield of Faith, Blindness/Deafness, Prayer of Healing, Spiritual
+// Weapon).
 //
 //   level         0 for a cantrip
 //   lists         the class spell lists the spell is on
@@ -16,6 +19,11 @@
 //            'darts'     Magic Missile: automatic hits
 //            'rays'      Scorching Ray: a ranged spell attack for each ray
 //            'area'      every creature in an area makes a saving throw (see area below)
+//            'multi'     several foes make a saving throw: the nearest `targets` foes within
+//                        range (Bane), plus upcastTargets more for each slot level above
+//            'spirit'    Spiritual Weapon: a spectral weapon appears beside a foe within range
+//                        and makes a melee spell attack; on later turns, as a Bonus Action, it
+//                        moves up to 20 feet and attacks again
 //            'self'      a spell on yourself; it can be cast from the Sheet between fights too
 //            'heal'      you regain Hit Points (heal dice, plus your spellcasting ability
 //                        modifier); it can be cast from the Sheet between fights too
@@ -30,7 +38,11 @@
 //   the fights, they're cast on you.
 //   attack   'melee' or 'ranged';  save: the ability the target saves with
 //   range    in feet (0 for an area that starts from you);  damage: { dice, bonus, type }
-//   heal     { dice }: the Hit Points a 'heal' spell gives back, before the modifier
+//   heal     { dice, noModifier }: the Hit Points a 'heal' spell gives back, before the
+//            spellcasting modifier (noModifier: Prayer of Healing adds none)
+//   outOfFight  a spell too slow for a fight (Prayer of Healing's 10 minutes): Sheet only
+//   oncePerLongRest  a creature can benefit from it once until it finishes a Long Rest
+//   touch    a spell you cast by touch (range 5)
 //   upcast   dice added to the damage (or healing) for each slot level above the spell's own
 //   darts, rays  how many at the spell's own level; one more for each slot level above it
 //   scales   a cantrip whose dice grow at character levels 5, 11 and 17
@@ -47,14 +59,22 @@
 //   condition what a failed save does: 'drowsy' (Sleep: Incapacitated until the end of its
 //            next turn, then a second save or Unconscious), 'paralyzed' (Hold Person: a
 //            new save at the end of each of its turns ends it) or 'outlined' (Faerie Fire:
-//            attack rolls against it have Advantage)
+//            attack rolls against it have Advantage), 'grovel' (Command: on its next turn it
+//            falls Prone and ends its turn), 'blinded' (Blindness/Deafness: its attacks have
+//            Disadvantage and attacks on it Advantage, for a minute, with a new save at the end
+//            of each of its turns) or 'baned' (Bane: it subtracts 1d4 from its attack rolls and
+//            saving throws while you concentrate)
 //   creatureType  only creatures of this type can be chosen ('Humanoid')
 //   bonusAction   cast as a Bonus Action instead of an action
 //   self     for 'self' spells: 'mage-armor' (AC 13 + Dex while unarmoured), 'false-life'
-//            (tempHp dice, plus upcastTempHp more for each slot level above 1) or
-//            'longstrider' (speed: extra feet); lasts: 'long-rest' (until your next Long
-//            Rest) or 'hour' (until the time of day moves on, or a rest)
-//   acBonus  for Shield: the bonus to AC until the start of your next turn
+//            (tempHp dice, plus upcastTempHp more for each slot level above 1),
+//            'longstrider' (speed: extra feet) or 'aid' (hpBonus: your Hit Point maximum
+//            and current Hit Points rise by that much, plus upcastHp more for each slot level
+//            above 2); lasts: 'long-rest' (until your next Long Rest) or 'hour' (until the
+//            time of day moves on, or a rest)
+//   acBonus  for Shield: the bonus to AC until the start of your next turn; for Shield of
+//            Faith ('ward', effect 'shield-of-faith'): the bonus while you concentrate
+//   damage.addModifier  add your spellcasting ability modifier to the damage (Spiritual Weapon)
 // Concentration spells use the spell's own concentration flag. Spells without combat
 // can't be cast in a fight yet; they unlock choices in scenes instead.
 // A higher spell slot is offered only for a spell it improves (more dice, darts, rays or
@@ -318,6 +338,23 @@ export const spells = [
 
   // ---- Level 1 ----
   {
+    id: 'bane',
+    combat: { kind: 'multi', save: 'charisma', range: 30, targets: 3, upcastTargets: 1, condition: 'baned' },
+    name: 'Bane',
+    level: 1,
+    school: 'Enchantment',
+    lists: ['bard', 'cleric', 'warlock'],
+    castingTime: 'Action',
+    ritual: false,
+    range: '30 feet',
+    components: 'V, S, M (a drop of blood)',
+    duration: 'Concentration, up to 1 minute',
+    concentration: true,
+    text: 'Up to three creatures of your choice that you can see within range must each make a Charisma saving throw. Whenever a target that fails this save makes an attack roll or a saving throw before the spell ends, the target must subtract 1d4 from the attack roll or save.',
+    upgrade: 'You can target one additional creature for each spell slot level above 1.',
+    source: 'SRD 5.2.1',
+  },
+  {
     id: 'bless',
     combat: { kind: 'ward', effect: 'blessed', range: 30 },
     name: 'Bless',
@@ -365,6 +402,23 @@ export const spells = [
     concentration: false,
     text: 'One Humanoid you can see within range makes a Wisdom saving throw. It does so with Advantage if you or your allies are fighting it. On a failed save, the target has the Charmed condition until the spell ends or until you or your allies damage it. The Charmed creature is Friendly to you. When the spell ends, the target knows it was Charmed by you.',
     upgrade: 'You can target one additional creature for each spell slot level above 1.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'command',
+    combat: { kind: 'save', save: 'wisdom', range: 60, condition: 'grovel' },
+    name: 'Command',
+    level: 1,
+    school: 'Enchantment',
+    lists: ['bard', 'cleric', 'paladin'],
+    castingTime: 'Action',
+    ritual: false,
+    range: '60 feet',
+    components: 'V',
+    duration: 'Instantaneous',
+    concentration: false,
+    text: 'You speak a one-word command to a creature you can see within range. The target must succeed on a Wisdom saving throw or follow the command on its next turn. Choose the command from these options:\n\nApproach. The target moves toward you by the shortest and most direct route, ending its turn if it moves within 5 feet of you.\n\nDrop. The target drops whatever it is holding and then ends its turn.\n\nFlee. The target spends its turn moving away from you by the fastest available means.\n\nGrovel. The target has the Prone condition and then ends its turn.\n\nHalt. On its turn, the target doesn’t move and takes no action or Bonus Action.',
+    upgrade: 'You can affect one additional creature for each spell slot level above 1.',
     source: 'SRD 5.2.1',
   },
   {
@@ -530,6 +584,23 @@ export const spells = [
     source: 'SRD 5.2.1',
   },
   {
+    id: 'inflict-wounds',
+    combat: { kind: 'save', save: 'constitution', range: 5, touch: true, damage: { dice: '2d10', type: 'necrotic' }, upcast: '1d10', halfOnSave: true },
+    name: 'Inflict Wounds',
+    level: 1,
+    school: 'Necromancy',
+    lists: ['cleric'],
+    castingTime: 'Action',
+    ritual: false,
+    range: 'Touch',
+    components: 'V, S',
+    duration: 'Instantaneous',
+    concentration: false,
+    text: 'A creature you touch makes a Constitution saving throw, taking 2d10 Necrotic damage on a failed save or half as much damage on a successful one.',
+    upgrade: 'The damage increases by 1d10 for each spell slot level above 1.',
+    source: 'SRD 5.2.1',
+  },
+  {
     id: 'longstrider',
     combat: { kind: 'self', self: 'longstrider', speed: 10, lasts: 'hour' },
     name: 'Longstrider',
@@ -580,6 +651,21 @@ export const spells = [
     source: 'SRD 5.2.1',
   },
   {
+    id: 'purify-food-and-drink',
+    name: 'Purify Food and Drink',
+    level: 1,
+    school: 'Transmutation',
+    lists: ['cleric', 'druid', 'paladin'],
+    castingTime: 'Action',
+    ritual: true,
+    range: '10 feet',
+    components: 'V, S',
+    duration: 'Instantaneous',
+    concentration: false,
+    text: 'You remove poison and rot from nonmagical food and drink in a 5-foot-radius Sphere centered on a point within range.',
+    source: 'SRD 5.2.1',
+  },
+  {
     id: 'ray-of-sickness',
     combat: { kind: 'attack', attack: 'ranged', range: 60, damage: { dice: '2d8', type: 'poison' }, upcast: '1d8', rider: 'poisoned' },
     name: 'Ray of Sickness',
@@ -610,6 +696,22 @@ export const spells = [
     duration: '1 minute',
     concentration: false,
     text: 'You ward a creature within range. Until the spell ends, any creature who targets the warded creature with an attack roll or a damaging spell must succeed on a Wisdom saving throw or either choose a new target or lose the attack or spell. This spell doesn’t protect the warded creature from areas of effect. The spell ends if the warded creature makes an attack roll, casts a spell, or deals damage.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'shield-of-faith',
+    combat: { kind: 'ward', effect: 'shield-of-faith', range: 60, bonusAction: true, acBonus: 2 },
+    name: 'Shield of Faith',
+    level: 1,
+    school: 'Abjuration',
+    lists: ['cleric', 'paladin'],
+    castingTime: 'Bonus Action',
+    ritual: false,
+    range: '60 feet',
+    components: 'V, S, M (a prayer scroll)',
+    duration: 'Concentration, up to 10 minutes',
+    concentration: true,
+    text: 'A shimmering field surrounds a creature of your choice within range, granting it a +2 bonus to AC for the duration.',
     source: 'SRD 5.2.1',
   },
   {
@@ -679,6 +781,40 @@ export const spells = [
 
   // ---- Level 2 ----
   {
+    id: 'aid',
+    combat: { kind: 'self', self: 'aid', hpBonus: 5, upcastHp: 5, lasts: 'long-rest' },
+    name: 'Aid',
+    level: 2,
+    school: 'Abjuration',
+    lists: ['bard', 'cleric', 'druid', 'paladin', 'ranger'],
+    castingTime: 'Action',
+    ritual: false,
+    range: '30 feet',
+    components: 'V, S, M (a strip of white cloth)',
+    duration: '8 hours',
+    concentration: false,
+    text: 'Choose up to three creatures within range. Each target’s Hit Point maximum and current Hit Points increase by 5 for the duration.',
+    upgrade: 'Each target’s Hit Points increase by an additional 5 for each spell slot level above 2.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'blindness-deafness',
+    combat: { kind: 'save', save: 'constitution', range: 120, condition: 'blinded' },
+    name: 'Blindness/Deafness',
+    level: 2,
+    school: 'Transmutation',
+    lists: ['bard', 'cleric', 'sorcerer', 'wizard'],
+    castingTime: 'Action',
+    ritual: false,
+    range: '120 feet',
+    components: 'V',
+    duration: '1 minute',
+    concentration: false,
+    text: 'One creature that you can see within range must succeed on a Constitution saving throw, or it has the Blinded or Deafened condition (your choice) for the duration. At the end of each of its turns, the target repeats the save, ending the spell on itself on a success.',
+    upgrade: 'You can target one additional creature for each spell slot level above 2.',
+    source: 'SRD 5.2.1',
+  },
+  {
     id: 'hold-person',
     combat: { kind: 'save', range: 60, save: 'wisdom', condition: 'paralyzed', creatureType: 'Humanoid' },
     name: 'Hold Person',
@@ -727,6 +863,21 @@ export const spells = [
     source: 'SRD 5.2.1',
   },
   {
+    id: 'lesser-restoration',
+    name: 'Lesser Restoration',
+    level: 2,
+    school: 'Abjuration',
+    lists: ['bard', 'cleric', 'druid', 'paladin', 'ranger'],
+    castingTime: 'Bonus Action',
+    ritual: false,
+    range: 'Touch',
+    components: 'V, S',
+    duration: 'Instantaneous',
+    concentration: false,
+    text: 'You touch a creature and end one condition on it: Blinded, Deafened, Paralyzed, or Poisoned.',
+    source: 'SRD 5.2.1',
+  },
+  {
     id: 'misty-step',
     combat: { kind: 'teleport', range: 30, bonusAction: true },
     name: 'Misty Step',
@@ -740,6 +891,23 @@ export const spells = [
     duration: 'Instantaneous',
     concentration: false,
     text: 'Briefly surrounded by silvery mist, you teleport up to 30 feet to an unoccupied space you can see.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'prayer-of-healing',
+    combat: { kind: 'heal', heal: { dice: '2d8', noModifier: true }, upcast: '1d8', outOfFight: true, oncePerLongRest: true },
+    name: 'Prayer of Healing',
+    level: 2,
+    school: 'Abjuration',
+    lists: ['cleric', 'paladin'],
+    castingTime: '10 minutes',
+    ritual: false,
+    range: '30 feet',
+    components: 'V',
+    duration: 'Instantaneous',
+    concentration: false,
+    text: 'Up to five creatures of your choice who remain within range for the spell’s entire casting gain the benefits of a Short Rest and also regain 2d8 Hit Points. A creature can’t be affected by this spell again until that creature finishes a Long Rest.',
+    upgrade: 'The healing increases by 1d8 for each spell slot level above 2.',
     source: 'SRD 5.2.1',
   },
   {
@@ -757,6 +925,23 @@ export const spells = [
     concentration: false,
     text: 'You hurl three fiery rays. You can hurl them at one target within range or at several. Make a ranged spell attack for each ray. On a hit, the target takes 2d6 Fire damage.',
     upgrade: 'You create one additional ray for each spell slot level above 2.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'spiritual-weapon',
+    combat: { kind: 'spirit', range: 60, bonusAction: true, damage: { dice: '1d8', type: 'force', addModifier: true }, upcast: '1d8' },
+    name: 'Spiritual Weapon',
+    level: 2,
+    school: 'Evocation',
+    lists: ['cleric'],
+    castingTime: 'Bonus Action',
+    ritual: false,
+    range: '60 feet',
+    components: 'V, S',
+    duration: 'Concentration, up to 1 minute',
+    concentration: true,
+    text: 'You create a floating, spectral force that resembles a weapon of your choice and lasts for the duration. The force appears within range in a space of your choice, and you can immediately make one melee spell attack against one creature within 5 feet of the force. On a hit, the target takes Force damage equal to 1d8 plus your spellcasting ability modifier.\n\nAs a Bonus Action on your later turns, you can move the force up to 20 feet and repeat the attack against a creature within 5 feet of it.',
+    upgrade: 'The damage increases by 1d8 for every slot level above 2.',
     source: 'SRD 5.2.1',
   },
   {

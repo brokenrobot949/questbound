@@ -1,6 +1,6 @@
 // Equipment (SRD 5.2.1), other than armour (see armor.js). Only what the current phase needs:
-// the items in the Fighter, Wizard and background starting kits, and what Bramblegate's
-// market sells. The full tables arrive with shops.
+// the items in the Fighter, Wizard, Cleric and background starting kits, and what
+// Bramblegate's market sells. The full tables arrive with shops.
 //
 //   category   'weapon', 'ammunition', 'tool', 'pack', 'gear' or 'potion'
 //   text       what the item does, shown on the character sheet
@@ -19,6 +19,7 @@
 export const equipment = [
   // Weapons
   { id: 'dagger', name: 'Dagger', category: 'weapon', weaponType: 'simple-melee', damage: { dice: '1d4', type: 'piercing' }, range: [20, 60], properties: ['finesse', 'light', 'thrown'], mastery: 'nick', weight: 1, cost: { gp: 2 }, source: 'SRD 5.2.1' },
+  { id: 'mace', name: 'Mace', category: 'weapon', weaponType: 'simple-melee', damage: { dice: '1d6', type: 'bludgeoning' }, properties: [], mastery: 'sap', weight: 4, cost: { gp: 5 }, source: 'SRD 5.2.1' },
   { id: 'javelin', name: 'Javelin', category: 'weapon', weaponType: 'simple-melee', damage: { dice: '1d6', type: 'piercing' }, range: [30, 120], properties: ['thrown'], mastery: 'slow', weight: 2, cost: { sp: 5 }, source: 'SRD 5.2.1' },
   { id: 'quarterstaff', name: 'Quarterstaff', category: 'weapon', weaponType: 'simple-melee', damage: { dice: '1d6', type: 'bludgeoning' }, versatile: '1d8', properties: ['versatile'], mastery: 'topple', weight: 4, cost: { sp: 2 }, source: 'SRD 5.2.1' },
   { id: 'spear', name: 'Spear', category: 'weapon', weaponType: 'simple-melee', damage: { dice: '1d6', type: 'piercing' }, versatile: '1d8', range: [20, 60], properties: ['thrown', 'versatile'], mastery: 'sap', weight: 3, cost: { gp: 1 }, source: 'SRD 5.2.1' },
@@ -46,6 +47,15 @@ export const equipment = [
     weight: 55,
     cost: { gp: 12 },
     contents: 'Backpack, Caltrops, Crowbar, 2 Flasks of Oil, 10 days of Rations, Rope, Tinderbox, 10 Torches, and Waterskin',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'priests-pack',
+    name: 'Priest’s Pack',
+    category: 'pack',
+    weight: 29,
+    cost: { gp: 33 },
+    contents: 'Backpack, Blanket, Holy Water, Lamp, 7 days of Rations, Robe, and Tinderbox',
     source: 'SRD 5.2.1',
   },
   {

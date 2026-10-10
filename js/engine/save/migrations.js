@@ -187,4 +187,8 @@ export const migrations = {
   // Version 14 keeps the moment before the last choice or attack, so Heroic Inspiration can
   // reroll a failed roll. Older saves have none: the next choice makes one.
   13: (save) => ({ ...save, version: 14, game: { ...save.game, undo: null } }),
+
+  // Version 15 notes when a Wizard or Cleric has just finished a Long Rest and can change
+  // their prepared spells. An older save hasn't just rested: the next Long Rest opens it.
+  14: (save) => ({ ...save, version: 15, game: { ...save.game, canPrepare: false } }),
 };
