@@ -189,22 +189,22 @@ The free rules include one subclass per class, such as Champion, Thief, Life Dom
 - **Divine Order** (chosen on the Class step): a **Protector** gains Martial weapons and Heavy armour; a **Thaumaturge** knows a fourth cantrip and adds their Wisdom modifier (at least +1) to Arcana and Religion checks, shown in the roll.
 - **Spells:** three cantrips, and prepared spells straight from the whole Cleric list (no spellbook): four at level 1, five at level 2, six at level 3 (when level 2 spells open up). The Cleric list in the game is the curated one: the cantrips and spells already in the data, growing with each slice.
 - **Channel Divinity** (level 2; two uses, back after a Long Rest; a Short Rest would give one back once Short Rests arrive): its own group of buttons in a fight.
-  - **Divine Spark:** 1d8 + Wisdom, either Radiant damage to a foe within 30 feet (Constitution save for half) or healing for you. (The Necrotic option comes when a foe resists Radiant.)
+  - **Divine Spark:** 1d8 + Wisdom, either Radiant damage to a foe within 30 feet (Constitution save for half) or healing for a companion within 30 feet. The SRD says "another creature", so it never heals the Cleric, and a Cleric alone can only use it to hurt. (The Necrotic option comes when a foe resists Radiant.)
   - **Turn Undead:** every Undead within 30 feet makes a Wisdom save or is Turned for a minute: Frightened and Incapacitated, it spends its turns moving as far from you as it can. Damage ends it, and so does your dropping to 0 Hit Points. The button is greyed out with no Undead in reach.
 - **Life Domain** (level 3, the SRD's subclass):
   - **Disciple of Life:** a healing spell cast with a slot heals 2 + the slot's level more (not Magic Initiate's free cast).
   - **Life Domain spells:** Aid, Bless, Cure Wounds and Lesser Restoration are always prepared, on top of the six. A domain spell you'd already prepared frees its place at the level-up.
-  - **Preserve Life** (Channel Divinity): heals you, if you're Bloodied, by up to five times your Cleric level, but no higher than half your Hit Points.
-- **Aid:** your Hit Point maximum and current Hit Points rise by 5 (10 with a level 3 slot) until your next Long Rest. Cast it from the Sheet or in a fight.
+  - **Preserve Life** (Channel Divinity): up to five times your Cleric level in Hit Points, shared among the Bloodied of your party within 30 feet (you included), none above half their Hit Points. The game shares it out for you: the fallen first, then the most hurt, each up to half before the next.
+- **Aid:** the Hit Point maximum and current Hit Points of you and your companions within 30 feet rise by 5 (10 with a level 3 slot) until your next Long Rest. A companion at 0 Hit Points comes to. Cast it from the Sheet or in a fight.
 - **Lesser Restoration** is waiting for its scene: a level 2 spell, so not before level 3. In Chapter 2, a Ghoul's claws leave Lark Paralyzed in the mill tunnel, and it frees her.
 - **More of the Cleric list** (the Wizard can take Blindness/Deafness too):
-  - **Shield of Faith** (Bonus Action, Concentration): +2 AC.
+  - **Shield of Faith** (Bonus Action, Concentration): +2 AC for you or a friend within 60 feet.
   - **Inflict Wounds** (touch): 2d10 Necrotic, half on a Constitution save; +1d10 per slot level above 1.
   - **Command:** a Wisdom save, or on its next turn the foe Grovels: it falls Prone and does nothing else. (The other commands, Approach, Drop, Flee and Halt, are for scenes.)
   - **Bane** (Concentration): the nearest three foes within 30 feet make a Charisma save, or subtract 1d4 from their attack rolls and saves, shown in each roll. A higher slot adds a target. (Choosing which foes comes later; the battle screen names who it will catch before you cast.)
   - **Blindness/Deafness:** a Constitution save, or the foe is Blinded for a minute: its attacks have Disadvantage, attacks against it have Advantage, and it can't make Opportunity Attacks. It saves again at the end of each of its turns. (Deafened does nothing in a fight yet.)
   - **Spiritual Weapon** (Bonus Action, Concentration): a spectral mace appears beside a foe within 60 feet and makes a melee spell attack (1d8 + Wisdom, Force). On later turns, as a Bonus Action and with no slot, it moves up to 20 feet and strikes again. It's drawn on the grid.
-  - **Prayer of Healing** takes 10 minutes, so it's cast from the Sheet only: 2d8 Hit Points (no Wisdom bonus), once until your next Long Rest.
+  - **Prayer of Healing** takes 10 minutes, so it's cast from the Sheet only: one roll of 2d8 (no Wisdom bonus), and everyone in the party who's hurt regains that much, each once until their next Long Rest.
   - **Purify Food and Drink** (a Ritual) cleans the spoiled flour in the goblins' larder, and Nettle notices.
   - **Not yet:** Protection from Evil and Good, because it uses up a flask of Holy Water (25 GP) each time, and Holy Water arrives with shops. The Resistance cantrip and the rest of the level 2 list come later.
 - **Posy Hearthstone** is the Quick Start Cleric: a halfling Acolyte and Thaumaturge, with Healing Word from the Acolyte's Magic Initiate.
@@ -232,21 +232,23 @@ Phase 1 ships 44 spells (16 cantrips, 22 level 1, 6 level 2): enough choice for 
 
 How spells work in the game so far:
 
-- **In a fight**, every spell has a button under **Spells** (or **Bonus Action**) that says what it does. Choose one, pick the spell slot to use (a higher slot adds dice, darts or rays), then aim it. A higher slot is only offered when it does more: the extra creatures that Hold Person, Bless or Longstrider can take wait for companions, so those use your lowest slot left.
+- **In a fight**, every spell has a button under **Spells** (or **Bonus Action**) that says what it does. Choose one, pick the spell slot to use (a higher slot adds dice, darts or rays), then aim it. A higher slot is only offered when it does more. Bless and Aid already take three creatures and the party is never more than three, so a higher slot's extra creature has nobody to take it. The extra creatures Hold Person and Longstrider can take come later, so those use your lowest slot left.
 - **Spell attacks and single targets:** Fire Bolt, Ray of Frost, Shocking Grasp, Chill Touch, Poison Spray, Magic Missile, Scorching Ray, Ray of Sickness (Poisoned until the end of your next turn), and Hold Person (Paralyzed; Humanoids only, so not goblins, who are Fey).
 - **Area spells:** Burning Hands (a 15-foot Cone), Thunderwave (a 15-foot Cube that pushes foes 10 feet) and Shatter (a 10-foot-radius Sphere up to 60 feet away, which catches you too if you're inside it). Damage is rolled once for everyone; each makes the save, and a save takes half. The grid shows the area in orange before you cast. It starts aimed at the most foes it can catch without you, and you tap the grid to aim it elsewhere.
 - **Areas on the grid:** a Cone is 1, 3 and 3 squares ahead (7 squares on a diagonal too), a Cube a block beside you, and a Sphere every square within its radius, counted like movement. Walls block an area.
 - **Sleep:** a 5-foot-radius Sphere of foes, who make a Wisdom save or grow drowsy (no actions). At the end of their next turn they save again or fall asleep (Unconscious and Prone). Damage wakes a sleeper, and so does an awake friend shaking it. The dead never sleep.
-- **Concentration:** Sleep and Hold Person last while you concentrate, one spell at a time. Taking damage means a Constitution save (DC 10 or half the damage) or the spell ends. Dropping to 0 Hit Points or the fight ending also ends it. The battle screen shows what you're concentrating on.
+- **Concentration:** Sleep and Hold Person last while you concentrate, one spell at a time. Taking damage means a Constitution save (DC 10 or half the damage) or the spell ends. Dropping to 0 Hit Points or the fight ending also ends it. The battle screen shows what you're concentrating on. Each caster holds their own: your Shield of Faith and Odda's Bless can both run, damage to Odda means her own save, and if she falls only her spell ends. The status line shows what Odda is concentrating on.
+- **Spare the Dying:** with companions, a hero who knows it can cast it in a fight on a friend at 0 Hit Points within 15 feet (30 from level 5), who becomes Stable. Alone, it isn't offered: there's nobody to spare.
 - **The helpless:** the Unconscious and Paralyzed fail Strength and Dexterity saves, attacks against them have Advantage, and a hit from within 5 feet is a Critical Hit. A singer who can't speak can't sing, so Sleep or Hold Person on the Choir's acolyte stops the hymn.
 - **Shield** is a reaction the game casts for you, with your lowest slot, whenever an attack would hit you and +5 AC would make it miss. It's never cast when it wouldn't help. **Cast Shield by itself** in Settings turns this off, to save your slots. (Asking each time can come later.)
 - **Misty Step:** a Bonus Action teleport to an empty square you can see within 30 feet (shown in purple), with no Opportunity Attacks. You can spend only one spell slot a turn, so after Misty Step your action can only be a cantrip.
-- **On yourself:** Mage Armor (AC 13 + Dex until your next Long Rest, without armour), False Life (Temporary Hit Points, lost first and gone after a Long Rest) and Longstrider (+10 feet of Speed for about an hour, which ends when the story's time of day moves on). Cast them from the Sheet's **Cast a spell on yourself** between fights, or as an action in one.
+- **Lasting spells:** Mage Armor (AC 13 + Dex until your next Long Rest, for someone without armour), False Life (Temporary Hit Points, lost first and gone after a Long Rest; on you only) and Longstrider (+10 feet of Speed for about an hour, which ends when the story's time of day moves on). Mage Armor and Longstrider go on you or a friend you touch. Cast them from the Sheet's **Cast a spell** between fights, or as an action in one.
+- **Spells and potions on friends** (see "Your spells and potions on your companions" under Companions): healing spells, wards, Aid, Divine Spark's healing, Preserve Life and Potions of Healing all reach your companions as the rules say.
 - **Free casts:** a spell from Magic Initiate (Juniper's Thunderwave) or a species can be cast once per Long Rest without a slot, as the 2024 rules allow. The button offers that first.
-- **The Cleric and Druid spells Magic Initiate gives** (a Fighter with the Acolyte background, or a Human whose Versatile feat is Magic Initiate, can have them). Until companions join the fights, the ones that can help a friend go on you:
-  - **Cure Wounds** (an action, 2d8 + your spellcasting modifier) and **Healing Word** (a Bonus Action, 2d4 + the modifier) heal you, in a fight or from the Sheet between fights. A higher slot adds 2d8 or 2d4. They're greyed out at full Hit Points.
-  - **Bless:** +1d4 to your attack rolls and saving throws while you concentrate, shown in each roll.
-  - **Sanctuary** (a Bonus Action): a foe that attacks you must first make a Wisdom save against your spell save DC, or its attack is lost. It ends when you attack, cast a spell or deal damage, or after a minute (10 rounds). The game never casts Shield or Hellish Rebuke for you while it's up.
+- **The Cleric and Druid spells Magic Initiate gives** (a Fighter with the Acolyte background, or a Human whose Versatile feat is Magic Initiate, can have them). Alone, the ones that help go on you; with companions, on whoever you choose:
+  - **Cure Wounds** (an action, by touch, 2d8 + your spellcasting modifier) and **Healing Word** (a Bonus Action, 60 feet, 2d4 + the modifier) heal you or a friend, in a fight or from the Sheet between fights. A higher slot adds 2d8 or 2d4. They're greyed out when nobody in reach is hurt.
+  - **Bless:** +1d4 to attack rolls and saving throws while you concentrate, for you and your companions within 30 feet, shown in each roll.
+  - **Sanctuary** (a Bonus Action, 30 feet): a foe that attacks the warded one must first make a Wisdom save against your spell save DC, or its attack is lost. It ends when they attack, cast a spell or deal damage, or after a minute (10 rounds). The game never casts Shield or Hellish Rebuke for you while it's on you.
   - **Guiding Bolt:** a ranged spell attack for 4d6 radiant; the next attack roll against the target before the end of your next turn has Advantage. Radiant damage gets past a zombie's Undead Fortitude.
   - **Faerie Fire:** a 20-foot Cube (a 4 × 4 block) within 60 feet. Each creature in it makes a Dexterity save or is outlined in violet light, and attacks against it have Advantage while you concentrate. It catches you too if you're inside, so the suggested aim never does.
 - **Hellish Rebuke** (a Tiefling of the Infernal legacy, from level 3) is a reaction the game casts for you with its free use, the first time a foe within 60 feet hurts you: the foe makes a Dexterity save against 2d10 fire damage, half on a success. It never spends your spell slots. **Cast Hellish Rebuke by itself** in Settings turns this off.
@@ -353,7 +355,14 @@ Initiative, attack rolls against AC, critical hits, damage types and resistances
 
 - Walls block sight and attacks (Total Cover): nobody can attack through one. Obstacles (sacks, barrels, trees, boulders, the goblin onlookers) block sight but not attacks. Cover's +2 or +5 to AC comes later. The fights so far have no walls inside the arena, so this changes none of them.
 - **Hide** is an action for anyone, and a Bonus Action with a Rogue's Cunning Action. It works only out of every foe's sight: a DC 15 Dexterity (Stealth) check. On your turn, blue squares show where you'd be out of every foe's sight. The Hide button is greyed out while a foe can see you, and it says who.
-- **Hidden** (the Invisible condition): your attacks have Advantage, attacks against you have Disadvantage, and you provoke no Opportunity Attacks. You stay hidden until you make an attack roll or cast a spell, or a foe finds you. Each foe's turn, it moves to where it can see your square, then takes the Search action: Wisdom (Perception) against your Stealth total. So a foe spends its turn looking for you instead of attacking. You're drawn faint, and the turn order says "Hidden".
+- **Hidden** (the Invisible condition): your attacks have Advantage, attacks against you have Disadvantage, and you provoke no Opportunity Attacks. You stay hidden until you make an attack roll or cast a spell, or a foe finds you. A foe with nobody it can see to fight moves to where it can see your square, then takes the Search action: Wisdom (Perception) against your Stealth total. So a foe spends its turn looking for you instead of attacking. You're drawn faint, and the turn order says "Hidden". Fen can hide too (see Companions), by the same rules.
+
+**The Help action** (SRD 5.2.1)
+
+- With companions in the fight, **Help** sits under Other actions. It lists the foes beside you and the fallen friends beside you; tap one there or on the grid.
+- **Distract a foe:** the next attack roll one of your friends makes against it has Advantage, until the start of your next turn. It sets up Fen's Sneak Attack. The turn order shows the foe as "Distracted".
+- **First aid:** a DC 10 Wisdom (Medicine) check makes a friend at 0 Hit Points Stable.
+- Greyed out, with the reason, when nobody is beside you.
 - **Noisy armour:** armour marked for Stealth Disadvantage (Chain Mail, Scale Mail and the like) gives Disadvantage on every Stealth check, in fights and scenes.
 
 **Enemy behaviour**
@@ -512,15 +521,24 @@ You play one character, but up to two companions can travel with you, chosen fro
 - **Joining and leaving:** a scene adds or removes a companion (`join_party`, `leave_party`), and the DM says so. Chapter 2 is where Odda and Fen join. Until it's written, debug mode can add or remove them.
 - **Levels:** they're always your level. Their big picks are set for now: Odda takes the Life Domain at level 3, Fen the Thief. Each later level takes the fixed Hit Points, and their Hit Points rise when yours do.
 - **The Party section of the Sheet** shows each companion's portrait, Hit Points, likes and dislikes, full sheet and **tactic**:
-  - **Aggressive:** goes after the foe they'd hurt most.
-  - **Defensive:** stays within 10 feet of you and fights what comes near, or Dodges.
-  - **Support:** heals first, then fights from beside you. This is Odda's to start with; Fen starts Aggressive.
-  - **Hold:** doesn't move, and fights only what they can reach from there.
+  - **Aggressive:** goes after the foe they'd hurt most. Odda opens a real fight with Spiritual Weapon (from level 3), or Bless before then.
+  - **Defensive:** stays within 10 feet of you and fights what comes near, or Dodges. Odda opens a real fight with Shield of Faith on you.
+  - **Support:** heals first, then fights from beside you. Odda opens a real fight with Bless. This is Odda's to start with; Fen starts Aggressive.
+  - **Hold:** doesn't move, and fights only what they can reach from there. Odda opens a real fight with Bless.
 - **In a fight:**
   - They start on the free squares nearest you, roll their own Initiative and take their own turns.
   - Whatever the tactic, they first help anyone at 0 Hit Points, you first. They use a healing spell if they have one (Odda's Healing Word, then Cure Wounds), or else Spare the Dying, or the Help action's DC 10 Medicine check to stabilise.
-  - So far they spend spell slots only on healing; they attack with weapons and cantrips (Odda's Sacred Flame).
-  - They don't yet cast Concentration spells or use Bonus Action features such as Cunning Action. Fen does take the Nick extra attack with his dagger.
+  - **Odda's Concentration spells:** in a real fight she opens with her tactic's spell (above) and keeps it going, casting it again on a later turn if it ends.
+    - A real fight is one whose foes still standing are worth at least a Low fight for the party: SRD 5.2.1's XP budget per character at your level, times the party's number. At level 1, a party of three needs 150 XP of foes (Chapter 1's three zombies, not the mill's two goblins); at level 2, 300.
+    - She casts one only if she'd still have a spell slot left for healing afterwards.
+    - Bless needs two of the party in range. Shield of Faith goes on you while you're on your feet (Bless if it can't).
+    - While her Spiritual Weapon lasts, it strikes each turn as a Bonus Action, without a slot.
+  - Otherwise they spend spell slots only on healing; they attack with weapons and cantrips (Odda's Sacred Flame).
+  - **Fen's Cunning Action** (from level 2):
+    - Aggressive, with no foe he can attack this turn, he Dashes to reach one.
+    - After attacking, he Hides if he can get out of every foe's sight where he stands, or by moving without leaving a foe's reach: his next attack then has Advantage, and Sneak Attack. Foes find him as they find you.
+    - Otherwise, Bloodied with a foe beside him, he Disengages and steps back, as far from foes as he can.
+  - Fen takes the Nick extra attack with his dagger.
   - Fen's Sneak Attack counts you or Odda standing beside his target, as the rule says, and your Sneak Attack counts them.
 - **Foes** go after the nearest of the party on their feet, the most wounded of equals. Nobody attacks someone who's down, and a hidden hero has to be found first.
 - **When you fall**, the fight goes on while a companion stands. You make death saves, and they try to get you back up. The fight is lost only if you die, or you're stable at 0 Hit Points with no companion left standing; then Fate's Mercy happens as before. After a win, anyone at 0 Hit Points comes to with 1.
@@ -528,9 +546,18 @@ You play one character, but up to two companions can travel with you, chosen fro
 - **Long Rests** bring them back to full, as they do you.
 - **Approval:** each companion keeps a score. Scenes raise or lower it with `approve(id, change)` when you do something they like or dislike (their likes and dislikes are in the data and on the Sheet). The score isn't shown to the player; debug mode shows it.
 - **Not yet:**
-  - Your own spells and potions on a companion (healing, Bless).
+  - Odda's other spells in a fight (Guiding Bolt, Command, Sanctuary), and companions using the Help action.
   - Controlling their turns yourself.
   - Camp scenes, the Lone Wolf setting, and sizing fights for the party. Chapter 1's fights are built for one hero, and companions arrive in Chapter 2.
+
+**Your spells and potions on your companions (Phase 2)**
+
+- **Aiming at a friend in a fight:** a spell that helps one creature (Cure Wounds, Healing Word, Sanctuary, Shield of Faith, Mage Armor, Longstrider, Divine Spark's healing) lists the party under it, you first: each button says how they are ("7 of 10 Hit Points") or why it can't go on them ("Fen isn't beside you", "Odda is at full Hit Points"), greyed out. You can tap them on the grid instead; whoever it can reach is framed in green. Alone, there's no list: the spell has a Cast button, as before.
+- **Range and sight:** a touch spell (Cure Wounds, Mage Armor, Longstrider) reaches a friend beside you; the rest go as far as their range. A wall in the way blocks any of them. A companion at 0 Hit Points can be healed, and comes to (still Prone).
+- **Spells for the whole party:** Bless and Aid take you and every companion within 30 feet at once (up to three, which is the whole party); their Cast button names who. Preserve Life shares its Hit Points among the Bloodied, as the Cleric section says.
+- **Wards on a friend:** Bless adds 1d4 to a companion's attack rolls and saving throws too, death saves included. Sanctuary on a companion makes foes save to attack them, and ends when they attack or cast a spell (healing too, as the rule says), so it suits a friend who's Dodging or about to be. Shield of Faith gives them +2 AC. The turn order shows each ward on whoever has it. Your Concentration holds every Concentration ward you cast, and if you drop to 0 Hit Points they all end; a companion who dies loses theirs.
+- **Potion of Healing:** with companions, the Bonus Action is **Potion of Healing**, which lists the party: drink it yourself, or give it to a friend beside you (SRD 5.2.1: administer it to a creature within 5 feet), even one at 0 Hit Points, who comes to. Alone, it's **Drink a Potion of Healing**, as before. It's greyed out at full Hit Points.
+- **Between fights**, the Sheet's **Cast a spell** (**Cast a spell on yourself** when you're alone) has a chip for each of the party under a spell for one creature, showing their Hit Points for healing; the most hurt is picked to start with, and anyone it wouldn't help is greyed out. A spell for the whole party (Aid, Prayer of Healing) says who it reaches. The Party section shows the spells on each companion, and Longstrider's hour ends for them as it does for you.
 
 **Lone Wolf**
 

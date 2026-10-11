@@ -9,10 +9,20 @@
 // first): a healing spell if they have one, or else Spare the Dying, or the Help action's
 // Medicine check (DC 10) to stabilise them. Support also heals anyone Bloodied (at half
 // their Hit Points or fewer).
-// So far companions spend spell slots only on healing (attacks are weapons and cantrips), and
-// don't cast Concentration spells or use Bonus Action features such as Cunning Action. Every
-// move goes through the fight's own rules (combat/battle.js), so it's logged and saved like
-// any other turn.
+// A spellcaster (Odda) opens a real fight with a Concentration spell, chosen by tactic (the
+// tactic's concentrate list): a fight whose foes still standing are worth at least a Low
+// fight for the party (realFight), and only if they'd still have a spell slot left for
+// healing afterwards. Bless goes on the party (two of them at least, in range), Shield of
+// Faith on the hero, Spiritual Weapon beside the foe it would hurt most; while the weapon
+// lasts, it strikes each turn as a Bonus Action. If the spell ends, they cast it again on a
+// later turn, the same way. Otherwise their spell slots go on healing, and they attack with
+// weapons and cantrips.
+// A Rogue (Fen, from level 2) uses Cunning Action: Dash to reach a foe they couldn't
+// otherwise attack this turn (Aggressive), then, after attacking, Hide if they can get out of
+// every foe's sight without leaving a foe's reach, or else, Bloodied with a foe beside them,
+// Disengage and step back.
+// Every move goes through the fight's own rules (combat/battle.js), so it's logged and saved
+// like any other turn.
 
 import {
   addLogLine,
@@ -20,15 +30,23 @@ import {
   clearShot,
   companionAttack,
   companionCantUse,
+  companionCastOn,
+  companionDash,
+  companionDisengage,
   companionDodge,
   companionHeal,
+  companionHide,
+  companionHideProblem,
   companionMedicine,
   companionMove,
   companionOptions,
   companionReach,
   companionSpareTheDying,
   companionStandUp,
+  concentrationOf,
   enemies,
+  findMonster,
+  friendProblem,
   heroCombatant,
   hpOf,
   inRange,
@@ -36,14 +54,18 @@ import {
   isIncapacitated,
   maxHpOf,
   partyCombatants,
+  partyTargets,
   stateOf,
   upright,
   actorGame,
 } from './battle.js';
 import { parseDice } from './attacks.js';
 import { feetBetween, isAdjacent, squaresBetween } from './grid.js';
-import { memberOf } from '../character/party.js';
+import { findTactic, memberOf } from '../character/party.js';
 import { canCastSpell, findSpell } from '../character/spells.js';
+import { slotsLeft } from '../character/resources.js';
+import { hasFeature } from '../character/sheet.js';
+import { xpBudgetPerCharacter } from '../../../data/srd/encounter-budget.js';
 
 // The squares from the hero a Defensive or Support companion keeps within (10 feet).
 const STAY_NEAR = 2;
@@ -56,13 +78,18 @@ export function companionTurn(game, c) {
     return;
   }
   const tactic = memberOf(game, c.id).tactic;
+  const able = () => !battle.outcome && upright(game, c);
   rescue(game, c) || (tactic === 'support' && patchUp(game, c));
-  if (!battle.outcome && upright(game, c)) fight(game, c, tactic);
+  if (able()) concentrate(game, c, tactic);
+  if (able()) weaponStrike(game, c);
+  if (able()) fight(game, c, tactic);
+  if (able()) slipAway(game, c, tactic);
 }
 
 // ---- Helping the fallen and the hurt ----
 
 const actionFree = (game) => !game.battle.turnState.action;
+const bonusFree = (game) => !game.battle.turnState.bonus;
 
 // The path to a square within `feet` of a spot (beside it, for 5 feet), the cheapest one, or
 // null if there's none this turn. An empty path: already there.
@@ -128,6 +155,72 @@ function patchUp(game, c) {
   return hurt.some((target) => healSomeone(game, c, target));
 }
 
+// ---- Concentration spells (a spellcaster such as Odda) ----
+
+// True if the foes still standing are worth at least a Low fight for the party: SRD 5.2.1,
+// "XP Budget per Character" at the hero's level, times the party's number (the dead don't
+// count). A fight worth a spell slot.
+export function realFight(game) {
+  const battle = game.battle;
+  const row = xpBudgetPerCharacter.find((r) => r.level === game.character.level) || xpBudgetPerCharacter[0];
+  const party = partyCombatants(battle).filter((p) => stateOf(battle, p) !== 'dead').length;
+  const xp = enemies(battle)
+    .filter((e) => e.hp > 0 && !e.escaped)
+    .reduce((sum, e) => sum + findMonster(e.monsterId).xp, 0);
+  return xp >= row.low * party;
+}
+
+// True if casting this leaves the caster at least one spell slot for healing.
+function keepsASlot(view, option) {
+  if (!option.slotLevel) return true;
+  let left = 0;
+  for (let level = 1; level <= 9; level++) left += slotsLeft(view, level);
+  return left - 1 >= 1;
+}
+
+// Opens a real fight with the tactic's Concentration spell, the first that can be cast and do
+// some good, with the lowest slot. True if the companion cast one.
+function concentrate(game, c, tactic) {
+  const battle = game.battle;
+  const wanted = (findTactic(tactic) || {}).concentrate || [];
+  if (!wanted.length || concentrationOf(battle, c) || !realFight(game)) return false;
+  const view = actorGame(game, c);
+  for (const spellId of wanted) {
+    const option = companionOptions(game, c)
+      .filter((o) => o.spellId === spellId && !companionCantUse(game, c, o) && keepsASlot(view, o))
+      .sort((a, b) => (a.slotLevel || 0) - (b.slotLevel || 0))[0];
+    if (!option) continue;
+    if (option.how === 'spirit') {
+      // Spiritual Weapon: beside the foe it would hurt most.
+      const best = bestFromHere(game, c, [option]);
+      if (!best) continue;
+      companionAttack(game, c, option.id, best.foe.id);
+      return true;
+    }
+    if (option.targeting === 'party') {
+      // Bless: worth a slot with two of the party in range at least.
+      if (partyTargets(game, option, c).length < 2) continue;
+      companionCastOn(game, c, option.id);
+      return true;
+    }
+    // Shield of Faith: on the hero, on their feet and in range.
+    const hero = heroCombatant(battle);
+    if (!upright(game, hero) || friendProblem(game, option, hero, c)) continue;
+    companionCastOn(game, c, option.id, hero.id);
+    return true;
+  }
+  return false;
+}
+
+// While their Spiritual Weapon lasts: a Bonus Action strike at the foe it would hurt most
+// within its reach (it moves up to 20 feet first).
+function weaponStrike(game, c) {
+  const strike = companionOptions(game, c).find((o) => o.id === 'spiritual-weapon-strike');
+  if (!strike || companionCantUse(game, c, strike)) return;
+  const best = bestFromHere(game, c, [strike]);
+  if (best) companionAttack(game, c, strike.id, best.foe.id);
+}
+
 // ---- Fighting ----
 
 function averageOf(damage) {
@@ -164,27 +257,44 @@ function bestFromHere(game, c, options) {
   return ready.sort((a, b) => b.value - a.value)[0] || null;
 }
 
+// The square (that the tactic allows) with the best attack from it, the cheapest of equals,
+// within the companion's movement left this turn: { pos, cost, path }, or null.
+function attackSpot(game, c, options, allowed) {
+  const weighed = weighUp(game, c, options);
+  let spot = null;
+  let spotValue = 0;
+  for (const step of companionReach(game, c).values()) {
+    if (step.cost === 0 || !allowed(step.pos)) continue;
+    for (const { option, foe, value } of weighed) {
+      if (!value || !inRange({ pos: step.pos }, foe, option) || !clearShot(game, step.pos, foe.pos)) continue;
+      if (value > spotValue || (value === spotValue && step.cost < spot.cost)) {
+        spot = step;
+        spotValue = value;
+      }
+    }
+  }
+  return spot;
+}
+
+// Where the tactic lets the companion stand: Defensive and Support stay within 10 feet of the
+// hero.
+const allowedFor = (game, tactic) => (pos) => (tactic === 'defensive' || tactic === 'support' ? squaresBetween(pos, heroCombatant(game.battle).pos) <= STAY_NEAR : true);
+
+const canCunning = (game, c) => hasFeature(actorGame(game, c).character, 'cunning-action') && bonusFree(game);
+
 function fight(game, c, tactic) {
   const battle = game.battle;
   const hero = heroCombatant(battle);
-  const allowed = (pos) => (tactic === 'defensive' || tactic === 'support' ? squaresBetween(pos, hero.pos) <= STAY_NEAR : true);
+  const allowed = allowedFor(game, tactic);
   const options = attacks(game, c);
   let best = actionFree(game) ? bestFromHere(game, c, options) : null;
   if (!best && actionFree(game) && tactic !== 'hold') {
-    // Somewhere to attack from: the square (that the tactic allows) with the best attack, the
-    // cheapest of equals.
-    const weighed = weighUp(game, c, options);
-    let spot = null;
-    let spotValue = 0;
-    for (const step of companionReach(game, c).values()) {
-      if (step.cost === 0 || !allowed(step.pos)) continue;
-      for (const { option, foe, value } of weighed) {
-        if (!value || !inRange({ pos: step.pos }, foe, option) || !clearShot(game, step.pos, foe.pos)) continue;
-        if (value > spotValue || (value === spotValue && step.cost < spot.cost)) {
-          spot = step;
-          spotValue = value;
-        }
-      }
+    // Somewhere to attack from. An Aggressive Rogue Dashes (Cunning Action) to reach a foe
+    // they couldn't otherwise attack this turn.
+    let spot = attackSpot(game, c, options, allowed);
+    if (!spot && tactic === 'aggressive' && canCunning(game, c) && options.length) {
+      companionDash(game, c);
+      spot = attackSpot(game, c, options, allowed);
     }
     if (!spot) spot = closerStep(game, c, tactic, hero);
     if (spot) companionMove(game, c, spot.path);
@@ -217,4 +327,32 @@ function closerStep(game, c, tactic, hero) {
   if (tactic === 'hold' || squaresBetween(c.pos, hero.pos) <= STAY_NEAR) return null;
   const closer = steps.filter((s) => squaresBetween(s.pos, hero.pos) < squaresBetween(c.pos, hero.pos));
   return closer.sort((a, b) => squaresBetween(a.pos, hero.pos) - squaresBetween(b.pos, hero.pos) || a.cost - b.cost)[0] || null;
+}
+
+// ---- Cunning Action, after attacking (a Rogue such as Fen) ----
+
+// Hide if they can get out of every foe's sight (where they stand, or a square they can reach
+// without leaving a foe's reach); otherwise, Bloodied with a foe beside them, Disengage and
+// step back, as far from foes as they can.
+function slipAway(game, c, tactic) {
+  const battle = game.battle;
+  if (!canCunning(game, c)) return;
+  const allowed = allowedFor(game, tactic);
+  const foes = enemies(battle).filter((e) => e.hp > 0 && !e.escaped);
+  if (!foes.length) return;
+  const foeBeside = foes.some((e) => isAdjacent(e.pos, c.pos));
+  const moves = foeBeside || tactic === 'hold' ? [] : [...companionReach(game, c).values()].filter((s) => s.cost > 0 && allowed(s.pos));
+  const hiding = [{ pos: c.pos, cost: 0, path: [] }, ...moves].filter((s) => !companionHideProblem(game, c, s.pos)).sort((a, b) => a.cost - b.cost)[0];
+  if (hiding) {
+    if (hiding.path.length) companionMove(game, c, hiding.path);
+    if (!battle.outcome && upright(game, c) && !companionHideProblem(game, c)) companionHide(game, c);
+    return;
+  }
+  const bloodied = hpOf(game, c) * 2 <= maxHpOf(game, c);
+  if (!foeBeside || !bloodied || tactic === 'hold') return;
+  const gap = (pos) => Math.min(...foes.map((f) => squaresBetween(pos, f.pos)));
+  const away = [...companionReach(game, c).values()].filter((s) => s.cost > 0 && allowed(s.pos) && gap(s.pos) > 1).sort((a, b) => gap(b.pos) - gap(a.pos) || a.cost - b.cost)[0];
+  if (!away) return;
+  companionDisengage(game, c);
+  companionMove(game, c, away.path);
 }

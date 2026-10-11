@@ -108,9 +108,26 @@ export const companions = [
 ];
 
 // How companions fight (the Party section of the Sheet lets the player choose).
+//   concentrate  the Concentration spells a spellcaster opens a real fight with (one that's
+//                worth at least a Low fight for the party), the first they can cast: Bless
+//                goes on the party, Shield of Faith on the hero, Spiritual Weapon beside a foe
+//                (combat/companion-ai.js)
+//   spellNote    what that means, shown on the Sheet under a companion who casts spells
 export const tactics = [
-  { id: 'aggressive', name: 'Aggressive', summary: 'Goes after the foe they can hurt most.' },
-  { id: 'defensive', name: 'Defensive', summary: 'Stays close to you and fights whatever comes near.' },
-  { id: 'support', name: 'Support', summary: 'Heals and helps first, and fights from beside you.' },
-  { id: 'hold', name: 'Hold', summary: 'Stays put, and fights only what they can reach from there.' },
+  {
+    id: 'aggressive',
+    name: 'Aggressive',
+    summary: 'Goes after the foe they can hurt most.',
+    spellNote: 'Opens a real fight with Spiritual Weapon (Bless until they know it).',
+    concentrate: ['spiritual-weapon', 'bless'],
+  },
+  {
+    id: 'defensive',
+    name: 'Defensive',
+    summary: 'Stays close to you and fights whatever comes near.',
+    spellNote: 'Opens a real fight with Shield of Faith on you.',
+    concentrate: ['shield-of-faith', 'bless'],
+  },
+  { id: 'support', name: 'Support', summary: 'Heals and helps first, and fights from beside you.', spellNote: 'Opens a real fight with Bless.', concentrate: ['bless'] },
+  { id: 'hold', name: 'Hold', summary: 'Stays put, and fights only what they can reach from there.', spellNote: 'Opens a real fight with Bless.', concentrate: ['bless'] },
 ];

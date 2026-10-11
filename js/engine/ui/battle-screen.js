@@ -7,8 +7,14 @@
 // chance to hit first. Spells have a button each: choose one, pick the spell slot to use (or
 // a free cast), then aim it. An area spell shows the squares it would cover in orange (it
 // starts aimed at the most foes it can catch without you); tap the grid to aim it elsewhere,
-// then Cast. Misty Step lights the squares it can reach in purple. A spell on yourself
-// (Mage Armor, healing, Bless, Sanctuary) has a Cast button. Other actions, Bonus Actions and
+// then Cast. Misty Step lights the squares it can reach in purple. A spell that helps
+// (healing, Mage Armor, Sanctuary) has a Cast button when you're alone; with companions it
+// lists the party (you first) to choose who it goes on, greying out whoever it can't reach or
+// wouldn't help, and you can tap them on the grid instead (framed in green). A spell for the
+// whole party in range (Bless, Aid) says who it will catch. A Potion of Healing works the same
+// way: drink it, or give it to a friend beside you. With companions, Help (under Other
+// actions) lists the foes beside you to distract and the fallen friends beside you to give
+// first aid; tap one there or on the grid. Other actions, Bonus Actions and
 // End Turn sit under the spells. After an attack of yours misses, a hero with Heroic
 // Inspiration gets a Reroll button at the top, until they do anything else. A fight well
 // under your strength offers Resolve, which plays it out at once (combat/resolve.js).
@@ -46,6 +52,8 @@ const PACE = {
 
 const DAMAGE_COLOR = '#ff8a7a';
 const HEALING_COLOR = '#7fd99a';
+// The frame round whoever a spell that helps can go on.
+const FRIEND_FRAME = '#7fd99a';
 
 // Washes over squares on the grid: an area spell's reach, and where Misty Step can go.
 const AREA_WASH = ['rgba(240, 140, 60, 0.35)', 'rgba(240, 140, 60, 0.9)'];
@@ -79,6 +87,8 @@ const CONDITION_WORDS = [
   ['hidden', 'Hidden'],
   ['blessed', 'Blessed'],
   ['sanctuary', 'Sanctuary'],
+  ['shield-of-faith', 'Shield of Faith'],
+  ['helped', 'Distracted'],
 ];
 
 // How someone in the party is doing at 0 Hit Points, in the turn order and the status line.
@@ -106,7 +116,9 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // option: the attack or spell chosen, waiting to be aimed; aim: where an area spell is aimed
-  // ({ direction } or { at }). replaying: lines are playing out, and scene is what the grid
+  // ({ direction } or { at }); potion: a Potion of Healing chosen, waiting for whom to give it
+  // to (with companions); help: the Help action chosen, waiting for whom to help with.
+  // replaying: lines are playing out, and scene is what the grid
   // shows meanwhile (null: the fight as it stands). walkers: creatures part-way between
   // squares. popups: damage and healing numbers over creatures. flash: squares a spell just
   // covered. caption: the line playing now; lastCaption: the last thing that happened, shown
@@ -114,6 +126,8 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
   const view = {
     option: null,
     aim: null,
+    potion: false,
+    help: false,
     flash: null,
     replaying: false,
     skip: false,
@@ -174,7 +188,27 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       if (fight.teleportSquares(game, chosen.id).some((s) => s.x === pos.x && s.y === pos.y)) act(() => fight.heroTeleport(game, chosen.id, pos));
       return;
     }
-    if (aiming === 'self' || aiming === 'nearest') return;
+    // A spell that helps, or a potion: tap the friend it's for.
+    // Help: tap a foe beside you, or a fallen friend.
+    if (view.help) {
+      const choice = fight.helpTargets(game).find(({ c }) => c.pos.x === pos.x && c.pos.y === pos.y);
+      if (!choice) return;
+      if (choice.problem) {
+        help.textContent = choice.problem;
+        return;
+      }
+      return act(() => fight.heroHelp(game, choice.c.id));
+    }
+    if (aiming === 'friend' || view.potion) {
+      const friend = fight.friendTargets(game, view.potion ? 'potion' : chosen.id).find(({ c }) => c.pos.x === pos.x && c.pos.y === pos.y);
+      if (!friend) return;
+      if (friend.problem) {
+        help.textContent = friend.problem;
+        return;
+      }
+      return act(() => (view.potion ? fight.heroDrinkPotion(game, friend.c.id) : fight.heroCastOn(game, chosen.id, friend.c.id)));
+    }
+    if (aiming === 'self' || aiming === 'nearest' || aiming === 'party') return;
     const foe = fight.enemies(game.battle).find((c) => c.hp > 0 && c.pos.x === pos.x && c.pos.y === pos.y);
     if (foe && chosen) return act(() => fight.heroAttack(game, chosen.id, foe.id));
     if (!foe && fight.heroReachable(game).has(key(pos))) act(() => fight.heroMove(game, pos));
@@ -235,6 +269,8 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     }
     view.option = null;
     view.aim = null;
+    view.potion = false;
+    view.help = false;
     onSave(game);
     await replay(before, { instant });
     render();
@@ -408,13 +444,14 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       const unit = scene.units.find((u) => u.id === c.id);
       const max = fight.maxHpOf(game, c);
       notes.push(unit.state === 'up' ? `${c.name} ${unit.hp}/${max}` : `${c.name} ${STATE_WORDS[unit.state]}`);
+      if (unit.concentrating) notes.push(`${c.name} concentrating on ${unit.concentrating}`);
     }
     if (scene.concentration) notes.push(`Concentrating on ${scene.concentration}`);
     if (heroConditions.includes('blessed')) notes.push('Blessed: +1d4 to attacks and saves');
     if (heroConditions.includes('sanctuary')) notes.push('Sanctuary: foes must save to attack you');
     if (heroConditions.includes('shield')) notes.push('Shield up: +5 AC');
     if (heroConditions.includes('shield-of-faith')) notes.push('Shield of Faith: +2 AC');
-    if (scene.weapon) notes.push('Spiritual Weapon: strikes as a Bonus Action');
+    if ((scene.weapons || []).some((w) => w.by === 'hero')) notes.push('Spiritual Weapon: strikes as a Bonus Action');
     if (heroConditions.includes('outlined')) notes.push('Outlined: attacks on you have Advantage');
     if (heroConditions.includes('dodging')) notes.push('Dodging');
     if (hero.temp) notes.push(`${hero.temp} Temporary Hit Points`);
@@ -473,7 +510,11 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     if (!chosen) view.option = null;
     help.textContent = chosen
       ? aimHelp(chosen)
-      : turn.athleteMove
+      : view.help
+        ? 'Help: distract a foe beside you, so a friend’s next attack on it has Advantage, or give a fallen friend beside you first aid. Tap them on the grid, or below.'
+        : view.potion
+        ? 'Potion of Healing: drink it, or give it to a friend beside you. Tap them on the grid, or below.'
+        : turn.athleteMove
         ? `Remarkable Athlete: tap a gold square to move up to ${turn.athleteMove} feet without provoking Opportunity Attacks, or carry on.`
         : prone
           ? `You're Prone: your attacks have Disadvantage, and foes beside you have Advantage. Stand up for ${fight.heroStandCost(game)} feet of movement, or crawl (${turn.movementLeft} feet left, each square costs double).`
@@ -494,6 +535,8 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       const card = actionCard(spellName(option), summary(option), () => {
         view.option = pressed ? null : option.id;
         view.aim = !pressed && option.area ? fight.suggestAim(game, option.id) : null;
+        view.potion = false;
+        view.help = false;
         render();
       });
       card.setAttribute('aria-pressed', String(pressed));
@@ -553,6 +596,21 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       other.list.append(card);
     }
     other.list.append(hideCard({ bonus: false }));
+    // With companions: Help, to set up a friend's attack or give a fallen friend first aid.
+    if (company()) {
+      const why = fight.heroHelpProblem(game);
+      const card = actionCard('Help', 'Distract a foe beside you: a friend’s next attack on it has Advantage. Or first aid for a fallen friend beside you (DC 10 Medicine)', () => {
+        view.help = !view.help;
+        view.option = null;
+        view.aim = null;
+        view.potion = false;
+        render();
+      });
+      card.setAttribute('aria-pressed', String(view.help));
+      card.disabled = Boolean(why);
+      if (why) card.title = why;
+      other.list.append(card);
+    }
     // Fighters from level 2: Action Surge, once the turn's action is used.
     const surges = featureUsesMax(game.character, 'action-surge');
     if (surges) {
@@ -562,6 +620,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       other.list.append(surge);
     }
     controls.append(other.group);
+    if (view.help && !turn.action) controls.append(helpPanel());
 
     const bonuses = fight.heroBonusActions(game);
     const bonusSpells = firstOfEach(options.filter((o) => o.source === 'spell' && o.bonusAction));
@@ -574,9 +633,27 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
         bonus.list.append(disabledIf(turn.bonus, actionCard('Second Wind', what, () => act(() => fight.heroSecondWind(game)))));
       }
       if (bonuses.includes('potion')) {
+        // Alone, drink it straight away; with companions, choose who it's for.
         const potions = game.inventory.find((e) => e.id === 'potion-of-healing').quantity;
-        const what = `Regain 2d4 + 2 Hit Points (7 on average) · ${potions} in your pack`;
-        bonus.list.append(disabledIf(turn.bonus, actionCard('Drink a Potion of Healing', what, () => act(() => fight.heroDrinkPotion(game)))));
+        const company = fight.companionCombatants(battle).length > 0;
+        if (company) {
+          const what = `2d4 + 2 Hit Points (7 on average): drink it, or give it to a friend beside you · ${potions} in your pack`;
+          const card = actionCard('Potion of Healing', what, () => {
+            view.potion = !view.potion;
+            view.option = null;
+            view.aim = null;
+            view.help = false;
+            render();
+          });
+          card.setAttribute('aria-pressed', String(view.potion));
+          bonus.list.append(disabledIf(turn.bonus, card));
+        } else {
+          const what = `Regain 2d4 + 2 Hit Points (7 on average) · ${potions} in your pack`;
+          const card = actionCard('Drink a Potion of Healing', what, () => act(() => fight.heroDrinkPotion(game)));
+          const why = turn.bonus ? null : fight.friendTargets(game, 'potion')[0].problem;
+          if (why) card.title = why;
+          bonus.list.append(disabledIf(turn.bonus || Boolean(why), card));
+        }
       }
       // A Rogue's Cunning Action (level 2) and Steady Aim (level 3).
       if (bonuses.includes('cunning-action')) {
@@ -593,6 +670,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       for (const option of [...bonusWeapons, ...bonusSpells]) bonus.list.append(choiceCard(option));
       controls.append(bonus.group);
       if (chosen && chosen.bonusAction) controls.append(aimPanel(chosen, options));
+      if (view.potion && !turn.bonus) controls.append(potionPanel());
     }
 
     // A fight well under your strength can be played out at once.
@@ -628,7 +706,10 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     if (option.targeting === 'point') return `${name}: tap the square to centre it on, up to ${option.range[1]} feet away. The orange squares are what it covers.`;
     if (option.how === 'turn') return `${name}: every Undead within 30 feet of you.`;
     if (option.targeting === 'nearest') return `${name}: the nearest ${option.targets} foes within ${option.range[1]} feet.`;
-    if (option.targeting === 'self') return `${name}: on yourself.`;
+    if (option.targeting === 'self' || ((option.targeting === 'friend' || option.targeting === 'party') && !company())) return `${name}: on yourself.`;
+    if (option.how === 'preserve') return `${name}: the Bloodied of your party within ${option.range[1]} feet, you included.`;
+    if (option.targeting === 'party') return `${name}: you and your companions within ${option.range[1]} feet.`;
+    if (option.targeting === 'friend') return `${name}: choose who. Tap them on the grid, or below.`;
     if (option.targeting === 'square') return `${name}: tap a purple square to step there.`;
     return `${name}: choose a foe. Tap it on the grid, or below.`;
   }
@@ -678,8 +759,18 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       const cast = actionCard(`Cast ${spellName(chosen)}`, what, () => act(() => fight.heroCastArea(game, chosen.id, view.aim)), 'is-primary');
       cast.disabled = !area;
       box.append(cast);
-    } else if (targeting === 'self') {
+    } else if (targeting === 'self' || ((targeting === 'friend' || targeting === 'party') && !company())) {
       box.append(actionCard(`Cast ${spellName(chosen)}`, '', () => act(() => fight.heroCastSelf(game, chosen.id)), 'is-primary'));
+    } else if (targeting === 'friend') {
+      box.append(friendList(`Who for ${spellName(chosen)}?`, fight.friendTargets(game, chosen.id), (c) => act(() => fight.heroCastOn(game, chosen.id, c.id))));
+    } else if (targeting === 'party') {
+      const caught = fight.partyTargets(game, chosen);
+      const missed = fight.friendTargets(game, chosen.id).filter(({ c }) => !caught.includes(c));
+      const what = caught.length ? `On ${caught.map((c) => (fight.isHero(c) ? 'you' : c.name)).join(', ')}` : 'Nobody it can help is in range';
+      const cast = actionCard(`Cast ${spellName(chosen)}`, what, () => act(() => fight.heroCastSelf(game, chosen.id)), 'is-primary');
+      cast.disabled = !caught.length;
+      box.append(cast);
+      for (const { problem } of missed) if (problem) box.append(el('p', 'battle-help', problem));
     } else if (targeting === 'nearest') {
       const targets = fight.nearestTargets(game, chosen);
       const what = targets.length ? `On ${targets.map((c) => c.name).join(', ')}` : `No foes within ${chosen.range[1]} feet`;
@@ -687,6 +778,48 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       cast.disabled = !targets.length;
       box.append(cast);
     }
+    return box;
+  }
+
+  // True if the hero has companions in this fight (alive or not).
+  function company() {
+    return fight.companionCombatants(game.battle).length > 0;
+  }
+
+  // A list of the party to choose from: a button for each, saying how they are (Hit Points),
+  // greyed out with the reason when the spell or potion can't go on them.
+  function friendList(label, friends, onPick) {
+    const group = actionGroup(label);
+    for (const { c, problem } of friends) {
+      const unit = fight.battleScene(game).units.find((u) => u.id === c.id);
+      const max = fight.maxHpOf(game, c);
+      const state = unit.state === 'up' ? `${unit.hp} of ${max} Hit Points` : `${STATE_WORDS[unit.state]} at 0 Hit Points`;
+      const card = actionCard(fight.isHero(c) ? 'You' : c.name, problem || state, () => onPick(c));
+      card.disabled = Boolean(problem);
+      group.list.append(card);
+    }
+    return group.group;
+  }
+
+  // Under Help: the foes beside you to distract, and the fallen friends beside you to patch up.
+  function helpPanel() {
+    const box = el('div', 'battle-aim');
+    const group = actionGroup('Help whom?');
+    const medicine = signedNumber(skillBonus(game.character, 'medicine').value);
+    for (const { c, kind, problem } of fight.helpTargets(game)) {
+      const what = problem || (kind === 'distract' ? 'Distract it: a friend’s next attack on it has Advantage' : `First aid: DC 10 Medicine (you have ${medicine}) to make them Stable`);
+      const card = actionCard(fight.isHero(c) ? 'You' : c.name, what, () => act(() => fight.heroHelp(game, c.id)));
+      card.disabled = Boolean(problem);
+      group.list.append(card);
+    }
+    box.append(group.group);
+    return box;
+  }
+
+  // Under the Potion of Healing: who drinks it.
+  function potionPanel() {
+    const box = el('div', 'battle-aim');
+    box.append(friendList('Who drinks it?', fight.friendTargets(game, 'potion'), (c) => act(() => fight.heroDrinkPotion(game, c.id))));
     return box;
   }
 
@@ -730,7 +863,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     // Where the hero can move. A pale wash with a bright edge, so it shows on wood and stone
     // alike; gold squares are a free move (Remarkable Athlete).
     // Blue squares are out of every foe's sight: somewhere to Hide.
-    if (fight.isHeroTurn(game) && !view.replaying && !view.option) {
+    if (fight.isHeroTurn(game) && !view.replaying && !view.option && !view.potion && !view.help) {
       for (const step of fight.heroReachable(game).values()) {
         if (step.cost === 0) continue;
         const unseen = !fight.foesWatching(game, step.pos).length;
@@ -752,6 +885,13 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     }
     for (const pos of (aimed && aimed.squares) || view.flash || []) washSquare(ctx, pos, size, scale, AREA_WASH);
     if (chosen && chosen.targeting === 'square') for (const pos of fight.teleportSquares(game, chosen.id)) washSquare(ctx, pos, size, scale, TELEPORT_WASH);
+    // Who a spell that helps (or a potion) can go on, or who a party spell will catch.
+    const helping = !view.replaying && fight.isHeroTurn(game) && fight.companionCombatants(battle).length > 0;
+    let friends = [];
+    if (helping && view.potion) friends = fight.friendTargets(game, 'potion').filter((f) => !f.problem).map((f) => f.c);
+    else if (helping && chosen && chosen.targeting === 'friend') friends = fight.friendTargets(game, chosen.id).filter((f) => !f.problem).map((f) => f.c);
+    else if (helping && chosen && chosen.targeting === 'party') friends = fight.partyTargets(game, chosen);
+    else if (helping && view.help) friends = fight.helpTargets(game).filter((h) => !h.problem).map((h) => h.c);
 
     // Tints under creatures held, poisoned, outlined, glowing, shielded or in Sanctuary.
     for (const unit of scene.units) {
@@ -772,7 +912,9 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       const unit = scene.units.find((u) => u.id === c.id);
       const pos = at(unit);
       const standing = unit.state === 'up';
-      blit(ctx, companionFrames(c)[standing ? frame : 0], 0, 0, pos.x, pos.y, size, { alpha: standing ? 1 : unit.state === 'dead' ? 0.3 : 0.5, lying: !standing || unit.prone });
+      // A hidden companion is drawn faint, as a hidden hero is.
+      const hiddenAlpha = (unit.conditions || []).includes('hidden') ? 0.55 : 1;
+      blit(ctx, companionFrames(c)[standing ? frame : 0], 0, 0, pos.x, pos.y, size, { alpha: standing ? hiddenAlpha : unit.state === 'dead' ? 0.3 : 0.5, lying: !standing || unit.prone });
       if (unit.state !== 'dead') drawHealthBar(ctx, pos, unit.hp / fight.maxHpOf(game, c), size, scale);
     }
     for (const unit of foes) {
@@ -799,7 +941,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     drawHealthBar(ctx, heroAt, hero.hp / heroMaxHp(game), size, scale);
 
     // Spiritual Weapon, hovering where it last struck.
-    if (scene.weapon) drawPixels(ctx, SPECTRAL_WEAPON, scene.weapon, size, scale);
+    for (const weapon of scene.weapons || []) drawPixels(ctx, SPECTRAL_WEAPON, weapon.pos, size, scale);
 
     // Sleepers snore; whoever an aimed area would catch is framed in orange.
     for (const unit of scene.units) {
@@ -809,6 +951,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       }
     }
     if (aimed) for (const c of aimed.caught) frameSquare(ctx, c.pos, size, scale, AREA_WASH[1]);
+    for (const c of friends) frameSquare(ctx, at(scene.units.find((u) => u.id === c.id)), size, scale, FRIEND_FRAME);
 
     // Whose turn it is.
     const actor = scene.units.find((u) => u.id === scene.actor);

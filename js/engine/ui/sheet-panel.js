@@ -1,17 +1,18 @@
 // The Sheet tab during play: the hero's sheet (every number taps open to show its maths),
 // plus what changes in play: Heroic Inspiration, coins and the pack, the armour worn and
 // every attack the hero has (with the numbers the fight uses), the spells on the hero, and
-// buttons to cast Mage Armor, False Life, Longstrider, Aid, Cure Wounds or Healing Word
-// between fights. A Wizard or Cleric who has just finished a Long Rest can change their
-// prepared spells here, until the story moves on.
+// buttons to cast Mage Armor, False Life, Longstrider, Aid, Cure Wounds, Healing Word or
+// Prayer of Healing between fights, on the hero or their companions. A Wizard or Cleric who
+// has just finished a Long Rest can change their prepared spells here, until the story moves
+// on.
 
 import { findBond, findDrive } from '../character/creation.js';
 import { findItem, itemText, moneyText } from '../character/inventory.js';
 import { armorClass, describeCharacter, findArmor, findMastery, findWeapon, masteredWeapons } from '../character/sheet.js';
 import { heroAttackOptions } from '../combat/attacks.js';
 import { shield } from '../../../data/srd/armor.js';
-import { attackSummary, selfSpellText } from './attack-text.js';
-import { activeSpellIds, castSelfSpell, lastsText, selfSpellsToCast } from '../character/spell-effects.js';
+import { attackSummary, sheetSpellText } from './attack-text.js';
+import { activeSpellIds, castFromSheet, lastsText, namesText, sheetSpells } from '../character/spell-effects.js';
 import { findSpell, preparePicks, togglePrepared } from '../character/spells.js';
 import { actionButton } from './backup-panels.js';
 import { featureUsesLeft, featureUsesMax, heroMaxHp, slotsAt, slotsLeft } from '../character/resources.js';
@@ -64,10 +65,15 @@ export function sheetPanel(game, { onCast = () => {}, note = null } = {}) {
     panel.replaceWith(sheetPanel(game, { onCast }));
   });
   if (preparing) panel.append(preparing);
-  const casting = castBlock(game, note, (text) => {
-    onCast(game);
-    panel.replaceWith(sheetPanel(game, { onCast, note: text }));
-  });
+  const casting = castBlock(
+    game,
+    note,
+    (text) => {
+      onCast(game);
+      panel.replaceWith(sheetPanel(game, { onCast, note: text }));
+    },
+    () => panel.replaceWith(sheetPanel(game, { onCast, note })),
+  );
   if (casting) panel.append(casting);
   panel.append(gearBlock(game));
 
@@ -159,6 +165,7 @@ function partyBlock(game, onChange) {
     who.append(el('p', 'sheet-line', `${character.name} · ${describeCharacter(character)}`));
     const hp = member.fallen ? 'Fallen: they can be raised at a temple, or by a spell' : `Hit Points: ${member.hp} of ${memberMaxHp(game, member)}`;
     who.append(el('p', 'sheet-line', hp));
+    for (const { id, lasts } of member.activeSpells || []) who.append(el('p', 'sheet-line', `On ${character.name.split(' ')[0]}: ${findSpell(id).name}, ${lastsText(lasts)}`));
     who.append(el('p', 'section-hint', companion.summary));
     who.append(el('p', 'section-hint', `Likes ${companion.likes.join(', ')}. Dislikes ${companion.dislikes.join(', ')}.`));
     row.append(portrait(heroSprite(character), { scale: 3, label: character.name }), who);
@@ -179,7 +186,9 @@ function partyBlock(game, onChange) {
         `How ${character.name} fights`,
       ),
     );
-    block.append(el('p', 'section-hint', findTactic(member.tactic).summary));
+    // A spellcaster's tactic also says which Concentration spell they open a real fight with.
+    const tactic = findTactic(member.tactic);
+    block.append(el('p', 'section-hint', character.spells ? `${tactic.summary} ${tactic.spellNote}` : tactic.summary));
     const sheet = el('details', 'expandable');
     sheet.append(el('summary', '', `${character.name.split(' ')[0]}’s sheet`), heroSheet(character, { spellsOn: (member.activeSpells || []).map((s) => s.id) }));
     block.append(sheet);
@@ -225,14 +234,21 @@ function prepareBlock(game, onChange) {
   return block;
 }
 
-// Spells the hero casts on themselves between fights, before trouble starts or after it: a
-// button for each way they can cast it (a free cast, or each spell slot level they have left
-// that makes a difference). onCast(text) after one.
-function castBlock(game, note, onCast) {
-  const choices = selfSpellsToCast(game);
+// Who each spell on the Sheet is for, as chosen with its chips (spell id → 'hero' or a
+// companion's id). Kept while the game is open; a choice that no longer fits falls back.
+const chosenTargets = new Map();
+
+// Spells the hero casts between fights, before trouble starts or after it: a button for each
+// way they can cast it (a free cast, or each spell slot level they have left that makes a
+// difference). With companions, a spell for one creature has a chip for each of the party to
+// choose who it's for (the most hurt first, for healing), and a spell for the whole party says
+// who it will reach. onCast(text) after a cast; refresh() after choosing someone.
+function castBlock(game, note, onCast, refresh) {
+  const choices = sheetSpells(game);
   if (choices.length === 0) return null;
+  const company = (game.party || []).some((m) => !m.fallen);
   const block = el('section', 'sheet-block');
-  block.append(el('h3', 'section-heading', 'Cast a spell on yourself'));
+  block.append(el('h3', 'section-heading', company ? 'Cast a spell' : 'Cast a spell on yourself'));
   if (note) block.append(el('p', 'dm-note', note));
   if (game.battle) {
     block.append(el('p', 'section-hint', 'In a fight, cast your spells from the battle screen.'));
@@ -240,21 +256,57 @@ function castBlock(game, note, onCast) {
   }
   const healing = choices.some(({ spell }) => spell.combat.kind === 'heal');
   const guarding = choices.some(({ spell }) => spell.combat.kind !== 'heal');
-  const when = healing && guarding ? 'Guard yourself before trouble starts, and heal after it.' : healing ? 'Heal yourself after a fight.' : 'Best cast before trouble starts.';
+  const you = company ? 'your party' : 'yourself';
+  const when = healing && guarding ? `Guard ${you} before trouble starts, and heal after it.` : healing ? `Heal ${you} after a fight.` : 'Best cast before trouble starts.';
   block.append(el('p', 'section-hint', `${when} Each cast uses a spell slot, or a free cast if you have one.`));
-  for (const { spell, slots, problem } of choices) {
+  for (const { spell, aim, slots, problem, targets } of choices) {
     const row = el('div', 'sheet-cast');
-    row.append(el('p', 'sheet-line', `${spell.name}: ${selfSpellText(spell, game.character)}`));
+    row.append(el('p', 'sheet-line', `${spell.name}: ${sheetSpellText(spell, game.character, { company })}`));
     if (problem) row.append(el('p', 'section-hint', problem));
+    let target = 'hero';
+    if (aim === 'friend' && targets.length > 1 && slots.length) {
+      target = targetFor(spell, targets);
+      row.append(
+        chipRow(
+          targets.map((t) =>
+            chip({
+              key: `cast-${spell.id}-${t.id}`,
+              label: spell.combat.kind === 'heal' ? `${t.you ? 'You' : t.name} ${t.hp}/${t.maxHp}` : t.you ? 'You' : t.name,
+              selected: t.id === target,
+              disabled: Boolean(t.problem),
+              onToggle: () => {
+                chosenTargets.set(spell.id, t.id);
+                refresh();
+              },
+            }),
+          ),
+          `Who ${spell.name} is for`,
+        ),
+      );
+    } else if (aim === 'party' && targets.length > 1 && slots.length) {
+      const reached = targets.filter((t) => !t.problem).map((t) => t.name);
+      row.append(el('p', 'section-hint', `It reaches ${namesText(reached)}.`));
+    }
     const buttons = el('div', 'slot-actions');
     for (const slot of slots) {
       const label = slot === 'free' ? 'Cast it free (once per Long Rest)' : `Cast (level ${slot} slot)`;
-      buttons.append(actionButton(label, () => onCast(`You cast ${castSelfSpell(game, spell.id, slot)}`)));
+      buttons.append(actionButton(label, () => onCast(`You cast ${castFromSheet(game, spell.id, slot, target)}`)));
     }
     if (slots.length) row.append(buttons);
     block.append(row);
   }
   return block;
+}
+
+// Who a spell for one creature is for: the one chosen with its chips, if it still helps them;
+// otherwise, for healing, the most hurt of the party (you first of equals), and for the rest,
+// you if it helps you, or else the first it does.
+function targetFor(spell, targets) {
+  const fits = targets.filter((t) => !t.problem);
+  const chosen = fits.find((t) => t.id === chosenTargets.get(spell.id));
+  if (chosen) return chosen.id;
+  if (spell.combat.kind === 'heal') return [...fits].sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0].id;
+  return fits[0].id;
 }
 
 // Why a weapon in the pack can't be used just now.

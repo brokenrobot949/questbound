@@ -12,7 +12,7 @@ import { heroAttackOptions } from '../js/engine/combat/attacks.js';
 import * as fight from '../js/engine/combat/battle.js';
 import { startingInventory } from '../js/engine/character/inventory.js';
 import { freshResources, longRestRecovery, maxHp } from '../js/engine/character/resources.js';
-import { activeSpellIds, castSelfSpell, selfSpellProblem, selfSpellsToCast, timePasses } from '../js/engine/character/spell-effects.js';
+import { activeSpellIds, castFromSheet, sheetSpellProblem, sheetSpells, timePasses } from '../js/engine/character/spell-effects.js';
 import { freeCastKey } from '../js/engine/character/spells.js';
 import { takeDamage } from '../js/engine/character/hazards.js';
 import { armorClass, speed } from '../js/engine/character/sheet.js';
@@ -24,6 +24,7 @@ import { jumpTo, makeChoice } from '../js/engine/story/story-runner.js';
 import { newGame } from '../js/engine/save/save-format.js';
 import { spells } from '../data/srd/spells.js';
 import { quickStartHeroes } from '../data/campaign/quick-start.js';
+import { companionCharacter, joinParty, memberOf } from '../js/engine/character/party.js';
 
 const wren = quickStartHeroes.find((h) => h.id === 'wren').character;
 const juniper = quickStartHeroes.find((h) => h.id === 'juniper').character;
@@ -279,9 +280,9 @@ test('Free casts: Magic Initiate’s Thunderwave once per Long Rest without a sl
 
 test('Mage Armor: AC 13 + Dex until a Long Rest, and only without armour', () => {
   const game = gameFor(caster);
-  castSelfSpell(game, 'mage-armor', 1);
+  castFromSheet(game, 'mage-armor', 1);
   assertEqual([armorClass(caster, activeSpellIds(game)).value, game.slotsUsed[0]], [14, 1]);
-  assertTrue(selfSpellProblem(gameFor({ ...caster, armorId: 'leather-armor' }), 'mage-armor', 1).includes('armour'));
+  assertTrue(sheetSpellProblem(gameFor({ ...caster, armorId: 'leather-armor' }), 'mage-armor', 1).includes('armour'));
   longRestRecovery(game);
   assertEqual(game.activeSpells, []);
 });
@@ -289,8 +290,8 @@ test('Mage Armor: AC 13 + Dex until a Long Rest, and only without armour', () =>
 test('False Life: Temporary Hit Points that don’t stack, and soak damage first, even from a trap', () => {
   const game = gameFor(caster);
   game.rng = scriptedRng([4, 4, 1, 1, 5]);
-  castSelfSpell(game, 'false-life', 1); // 2d4 (4, 4) + 4 = 12
-  castSelfSpell(game, 'false-life', 1); // 2d4 (1, 1) + 4 = 6: keep the 12
+  castFromSheet(game, 'false-life', 1); // 2d4 (4, 4) + 4 = 12
+  castFromSheet(game, 'false-life', 1); // 2d4 (1, 1) + 4 = 6: keep the 12
   assertEqual(game.tempHp, 12);
   const full = game.hp;
   takeDamage(game, '1d6', 'bludgeoning'); // 5
@@ -301,7 +302,7 @@ test('False Life: Temporary Hit Points that don’t stack, and soak damage first
 test('Longstrider: Speed +10 feet, until the time of day moves on; in a fight, faster that very turn', () => {
   const game = gameFor(caster);
   const before = speed(caster).value;
-  castSelfSpell(game, 'longstrider', 1);
+  castFromSheet(game, 'longstrider', 1);
   assertEqual(speed(caster, activeSpellIds(game)).value, before + 10);
   assertEqual(timePasses(game), ['Longstrider']);
   assertEqual(activeSpellIds(game), []);
@@ -310,6 +311,19 @@ test('Longstrider: Speed +10 feet, until the time of day moves on; in a fight, f
   const left = battling.battle.turnState.movementLeft;
   fight.heroCastSelf(battling, 'spell-longstrider');
   assertEqual(battling.battle.turnState.movementLeft, left + 10);
+});
+
+test('Longstrider on a companion from the Sheet, until the hour is up; Mage Armor needs someone unarmoured', () => {
+  const game = gameFor(caster);
+  joinParty(game, 'odda');
+  joinParty(game, 'fen');
+  assertEqual(sheetSpellProblem(game, 'mage-armor', 1, 'odda'), 'Odda is wearing armour.');
+  assertEqual(sheetSpellProblem(game, 'false-life', 1, 'fen'), 'False Life only works on you.');
+  const before = speed(companionCharacter('fen', 3)).value;
+  assertEqual(castFromSheet(game, 'longstrider', 1, 'fen'), `Longstrider: Fen's Speed is now ${before + 10} feet, for about an hour.`);
+  assertEqual(sheetSpellProblem(game, 'longstrider', 1, 'fen'), 'Longstrider is already on Fen.');
+  assertEqual(timePasses(game), ['Longstrider on Fen']);
+  assertEqual(memberOf(game, 'fen').activeSpells, []);
 });
 
 test('Spell buttons say what each spell does', () => {
@@ -352,16 +366,16 @@ const lastRoll = (game, kind) => game.battle.log.filter((e) => e.roll && e.roll.
 test('Cure Wounds: 2d8 + your spellcasting modifier from the Sheet; a higher slot heals more, a full one can’t', () => {
   const game = gameFor(clericWizard('cure-wounds'));
   game.hp = 5;
-  assertEqual(selfSpellsToCast(game).find((c) => c.spell.id === 'cure-wounds').slots, ['free', 1, 2]);
-  assertEqual(selfSpellsToCast(game).find((c) => c.spell.id === 'mage-armor').slots, [1], 'a higher slot does nothing more for Mage Armor');
+  assertEqual(sheetSpells(game).find((c) => c.spell.id === 'cure-wounds').slots, ['free', 1, 2]);
+  assertEqual(sheetSpells(game).find((c) => c.spell.id === 'mage-armor').slots, [1], 'a higher slot does nothing more for Mage Armor');
   game.rng = scriptedRng([3, 5]);
-  assertEqual(castSelfSpell(game, 'cure-wounds', 'free'), 'Cure Wounds: 2d8 (3, 5) + 2 = 10. You regain 10 Hit Points.');
+  assertEqual(castFromSheet(game, 'cure-wounds', 'free'), 'Cure Wounds: 2d8 (3, 5) + 2 = 10. You regain 10 Hit Points.');
   game.rng = scriptedRng([8, 8, 8, 8]);
-  assertTrue(castSelfSpell(game, 'cure-wounds', 2).startsWith('Cure Wounds: 4d8 (8, 8, 8, 8) + 2 = 34. You regain 5'), 'up to the maximum');
+  assertTrue(castFromSheet(game, 'cure-wounds', 2).startsWith('Cure Wounds: 4d8 (8, 8, 8, 8) + 2 = 34. You regain 5'), 'up to the maximum');
   assertEqual([game.hp, game.slotsUsed[1]], [maxHp(game.character), 1]);
-  assertTrue(selfSpellProblem(game, 'cure-wounds', 1).includes('full Hit Points'));
+  assertTrue(sheetSpellProblem(game, 'cure-wounds', 1).includes('full Hit Points'));
   const fighter = gameFor(initiate('cure-wounds'));
-  const why = () => selfSpellsToCast(fighter).find((c) => c.spell.id === 'cure-wounds').problem;
+  const why = () => sheetSpells(fighter).find((c) => c.spell.id === 'cure-wounds').problem;
   assertTrue(why().includes('full Hit Points'), `a Fighter has no slots, but that's not why: ${why()}`);
   fighter.featureUses[freeCastKey('cure-wounds')] = 1;
   fighter.hp = 1;

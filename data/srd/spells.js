@@ -24,18 +24,24 @@
 //            'spirit'    Spiritual Weapon: a spectral weapon appears beside a foe within range
 //                        and makes a melee spell attack; on later turns, as a Bonus Action, it
 //                        moves up to 20 feet and attacks again
-//            'self'      a spell on yourself; it can be cast from the Sheet between fights too
-//            'heal'      you regain Hit Points (heal dice, plus your spellcasting ability
-//                        modifier); it can be cast from the Sheet between fights too
-//            'ward'      a spell on yourself for the rest of the fight: effect 'blessed'
-//                        (Bless: +1d4 to your attack rolls and saving throws) or 'sanctuary'
-//                        (a foe must make a Wisdom save to attack you)
+//            'self'      a lasting spell (Mage Armor, Aid); it can be cast from the Sheet
+//                        between fights too
+//            'heal'      the target regains Hit Points (heal dice, plus your spellcasting
+//                        ability modifier); it can be cast from the Sheet between fights too
+//            'ward'      a spell for the rest of the fight: effect 'blessed' (Bless: +1d4 to
+//                        attack rolls and saving throws), 'sanctuary' (a foe must make a Wisdom
+//                        save to attack the warded creature) or 'shield-of-faith' (+2 AC)
+//            'stabilise' Spare the Dying: a friend at 0 Hit Points becomes Stable (offered
+//                        only with companions; rangeScales: the range doubles at character
+//                        levels 5, 11 and 17)
 //            'teleport'  Misty Step: to a square you can see within range
 //            'reaction'  the game casts it for you (see Settings): Shield when it would turn a
 //                        hit into a miss, Hellish Rebuke (trigger 'damaged') when a creature
 //                        within range hurts you
-//   Bless, Healing Word and the rest can touch other creatures too; until companions join
-//   the fights, they're cast on you.
+//   targets  for 'self', 'heal' and 'ward' spells: who they go on. None: only you (False
+//            Life). 1: you or one companion within range (Cure Wounds, Sanctuary). More: you
+//            and your companions within range, up to that many (Bless, Aid; the party is
+//            never more than three, so a higher slot's extra creature has nobody to take it)
 //   attack   'melee' or 'ranged';  save: the ability the target saves with
 //   range    in feet (0 for an area that starts from you);  damage: { dice, bonus, type }
 //   heal     { dice, noModifier }: the Hit Points a 'heal' spell gives back, before the
@@ -77,8 +83,9 @@
 //   damage.addModifier  add your spellcasting ability modifier to the damage (Spiritual Weapon)
 // Concentration spells use the spell's own concentration flag. Spells without combat
 // can't be cast in a fight yet; they unlock choices in scenes instead.
-// A higher spell slot is offered only for a spell it improves (more dice, darts, rays or
-// Temporary Hit Points); the extra creatures some spells take wait for companions.
+// A higher spell slot is offered only for a spell it improves (more dice, darts, rays,
+// Temporary Hit Points or foes); the extra creatures Hold Person and Longstrider take come
+// later.
 
 export const spells = [
   // ---- Cantrips ----
@@ -306,6 +313,7 @@ export const spells = [
   },
   {
     id: 'spare-the-dying',
+    combat: { kind: 'stabilise', range: 15, targets: 1, rangeScales: true },
     name: 'Spare the Dying',
     level: 0,
     school: 'Necromancy',
@@ -356,7 +364,7 @@ export const spells = [
   },
   {
     id: 'bless',
-    combat: { kind: 'ward', effect: 'blessed', range: 30 },
+    combat: { kind: 'ward', effect: 'blessed', range: 30, targets: 3 },
     name: 'Bless',
     level: 1,
     school: 'Enchantment',
@@ -438,7 +446,7 @@ export const spells = [
   },
   {
     id: 'cure-wounds',
-    combat: { kind: 'heal', range: 5, heal: { dice: '2d8' }, upcast: '2d8' },
+    combat: { kind: 'heal', range: 5, targets: 1, heal: { dice: '2d8' }, upcast: '2d8' },
     name: 'Cure Wounds',
     level: 1,
     school: 'Abjuration',
@@ -551,7 +559,7 @@ export const spells = [
   },
   {
     id: 'healing-word',
-    combat: { kind: 'heal', range: 60, heal: { dice: '2d4' }, upcast: '2d4', bonusAction: true },
+    combat: { kind: 'heal', range: 60, targets: 1, heal: { dice: '2d4' }, upcast: '2d4', bonusAction: true },
     name: 'Healing Word',
     level: 1,
     school: 'Abjuration',
@@ -602,7 +610,7 @@ export const spells = [
   },
   {
     id: 'longstrider',
-    combat: { kind: 'self', self: 'longstrider', speed: 10, lasts: 'hour' },
+    combat: { kind: 'self', self: 'longstrider', range: 5, targets: 1, speed: 10, lasts: 'hour' },
     name: 'Longstrider',
     level: 1,
     school: 'Transmutation',
@@ -619,7 +627,7 @@ export const spells = [
   },
   {
     id: 'mage-armor',
-    combat: { kind: 'self', self: 'mage-armor', baseAc: 13, lasts: 'long-rest' },
+    combat: { kind: 'self', self: 'mage-armor', range: 5, targets: 1, baseAc: 13, lasts: 'long-rest' },
     name: 'Mage Armor',
     level: 1,
     school: 'Abjuration',
@@ -684,7 +692,7 @@ export const spells = [
   },
   {
     id: 'sanctuary',
-    combat: { kind: 'ward', effect: 'sanctuary', range: 30, save: 'wisdom', bonusAction: true },
+    combat: { kind: 'ward', effect: 'sanctuary', range: 30, targets: 1, save: 'wisdom', bonusAction: true },
     name: 'Sanctuary',
     level: 1,
     school: 'Abjuration',
@@ -700,7 +708,7 @@ export const spells = [
   },
   {
     id: 'shield-of-faith',
-    combat: { kind: 'ward', effect: 'shield-of-faith', range: 60, bonusAction: true, acBonus: 2 },
+    combat: { kind: 'ward', effect: 'shield-of-faith', range: 60, targets: 1, bonusAction: true, acBonus: 2 },
     name: 'Shield of Faith',
     level: 1,
     school: 'Abjuration',
@@ -782,7 +790,7 @@ export const spells = [
   // ---- Level 2 ----
   {
     id: 'aid',
-    combat: { kind: 'self', self: 'aid', hpBonus: 5, upcastHp: 5, lasts: 'long-rest' },
+    combat: { kind: 'self', self: 'aid', range: 30, targets: 3, hpBonus: 5, upcastHp: 5, lasts: 'long-rest' },
     name: 'Aid',
     level: 2,
     school: 'Abjuration',
@@ -895,7 +903,7 @@ export const spells = [
   },
   {
     id: 'prayer-of-healing',
-    combat: { kind: 'heal', heal: { dice: '2d8', noModifier: true }, upcast: '1d8', outOfFight: true, oncePerLongRest: true },
+    combat: { kind: 'heal', range: 30, targets: 5, heal: { dice: '2d8', noModifier: true }, upcast: '1d8', outOfFight: true, oncePerLongRest: true },
     name: 'Prayer of Healing',
     level: 2,
     school: 'Abjuration',

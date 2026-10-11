@@ -20,26 +20,33 @@
 // (bonusAction otherwise).
 // Spells also carry: spellId, spellLevel, concentration, bonusAction, and how they're aimed,
 // targeting: 'foe' (choose a creature), 'direction' (an area that starts from you: Burning
-// Hands), 'point' (an area centred on a square within range: Shatter), 'self', 'square'
-// (Misty Step) or 'nearest' (Bane: the nearest `targets` foes in range); and from the spell's
-// data, area, halfOnSave, push, condition, foesOnly, touch, targets,
-// creatureType, self, tempHp, hpBonus (Aid), speedBonus, effect (a 'ward' spell's: 'blessed'
-// or 'sanctuary') and heal ({ dice, bonus, extra }: a healing spell's dice, spellcasting
-// modifier, and Disciple of Life's extra Hit Points) (see data/srd/spells.js).
+// Hands), 'point' (an area centred on a square within range: Shatter), 'self' (only you:
+// False Life), 'friend' (you or one companion within range: Cure Wounds, Sanctuary), 'party'
+// (you and your companions within range: Bless, Aid), 'square' (Misty Step) or 'nearest'
+// (Bane: the nearest `targets` foes in range); and from the spell's data, area, halfOnSave,
+// push, condition, foesOnly, touch, targets, creatureType, self, tempHp, hpBonus (Aid),
+// speedBonus, effect (a 'ward' spell's: 'blessed', 'sanctuary' or 'shield-of-faith') and heal
+// ({ dice, bonus, extra }: a healing spell's dice, spellcasting modifier, and Disciple of
+// Life's extra Hit Points) (see data/srd/spells.js).
+// company: the hero has companions with them who can fight, so the words on the buttons talk
+// about friends too (a hero alone sees "your AC", as before companions).
 // Spiritual Weapon: casting it ('spirit') puts a spectral weapon beside a foe within 60 feet
 // and strikes; while it lasts, 'spirit-strike' (a Bonus Action, no slot) moves it up to 20
 // feet to another foe and strikes again. origin: where the weapon is, which range counts from.
 // Channel Divinity (a Cleric's, source 'channel') carries featureUse: 'channel-divinity', the
 // use it spends. Divine Spark is a 'save' aimed at a foe (Radiant, half on a save) or a 'heal'
-// on you; Turn Undead is 'turn' and Preserve Life 'preserve', both from where you stand.
+// on a companion (notYou: the SRD says another creature, so only with company); Turn Undead
+// is 'turn', from where you stand, and Preserve Life 'preserve', on the Bloodied of the party
+// within 30 feet ('party').
 
 import { d20Test } from '../rules/d20-test.js';
 import { rollDice } from '../rules/dice.js';
 import { abilityModifierOf, characterFeats, findAbility, hasFeature, masteryFor, proficiencyBonus, proficientWithWeapon, abilityScore, resistances, sneakAttackDice } from '../character/sheet.js';
 import { findItem } from '../character/inventory.js';
-import { freeCastKey, freeCastsLeft, spellGroups, spellNumbers, upcastDice, upcastHelps } from '../character/spells.js';
+import { freeCastKey, freeCastsLeft, spellAim, spellGroups, spellNumbers, upcastDice, upcastHelps } from '../character/spells.js';
 import { discipleOfLife } from '../character/spell-effects.js';
 import { featureUsesLeft, slotsLeft } from '../character/resources.js';
+import { fightingMembers } from '../character/party.js';
 
 // The highest spell slot level there is.
 const TOP_SLOT = 9;
@@ -73,6 +80,8 @@ export function heroAttackOptions(game) {
   const criticalOn = hasFeature(character, 'improved-critical') ? 19 : 20;
   const potent = hasFeature(character, 'potent-cantrip');
   const sneak = sneakAttackDice(character);
+  // Companions with the hero (not when this is a companion's own list: game.actorId).
+  const company = !game.actorId && fightingMembers(game).length > 0;
 
   // The Light property: after attacking with a Light weapon this turn (with the Attack
   // action), one extra attack with a different Light weapon (see lightExtra).
@@ -163,10 +172,13 @@ export function heroAttackOptions(game) {
       if (!spell || !spell.combat || options.some((o) => o.spellId === spell.id)) continue;
       const c = spell.combat;
       if (c.kind === 'reaction' || c.outOfFight) continue; // (Prayer of Healing takes 10 minutes)
-      if (c.self === 'mage-armor' && character.armorId) continue; // only for the unarmoured
-      if (c.lasts && (game.activeSpells || []).some((s) => s.id === spell.id)) continue; // already on the hero
+      // A hero alone: Mage Armor is only for the unarmoured, and a lasting spell already on
+      // them has nobody else to go on. (With companions, the aim list says who can take it.)
+      if (!company && c.self === 'mage-armor' && character.armorId) continue;
+      if (!company && c.lasts && (game.activeSpells || []).some((s) => s.id === spell.id)) continue;
+      if (!company && c.kind === 'stabilise') continue; // Spare the Dying: for a fallen friend
       const modifiers = numbers.attackBonus.parts.map((p) => ({ ...p, source: `${group.label} spellcasting` }));
-      const made = { modifiers, saveDc: numbers.saveDc.value, level: character.level, potent, abilityMod: abilityModifierOf(character, group.ability) };
+      const made = { modifiers, saveDc: numbers.saveDc.value, level: character.level, potent, abilityMod: abilityModifierOf(character, group.ability), company };
       if (spell.level > 0 && freeCastsLeft(game, spell.id) > 0) {
         options.push({ ...spellOption(spell, null, 0, made), id: `spell-${spell.id}-free`, name: `${spell.name} (free)`, freeCast: freeCastKey(spell.id) });
       }
@@ -181,7 +193,7 @@ export function heroAttackOptions(game) {
       }
     }
   }
-  options.push(...channelOptions(game));
+  options.push(...channelOptions(game, company));
   const strike = spiritStrikeOption(game);
   if (strike) options.push(strike);
   return options;
@@ -202,9 +214,10 @@ function lightExtra(game) {
 
 // Spiritual Weapon, while it lasts in a fight: a Bonus Action to move it up to 20 feet and
 // strike a foe within 5 feet of it (so, within 25 feet of where it is). No slot: the spell is
-// already cast. Null if there's no weapon.
+// already cast. Null if this caster (the hero, or a companion: game.actorId) has no weapon.
 function spiritStrikeOption(game) {
-  const weapon = game.battle && game.battle.effects.find((e) => e.kind === 'spiritual-weapon');
+  const caster = game.actorId || 'hero';
+  const weapon = game.battle && game.battle.effects.find((e) => e.kind === 'spiritual-weapon' && e.target === caster);
   if (!weapon) return null;
   return {
     id: 'spiritual-weapon-strike',
@@ -229,9 +242,9 @@ function spiritStrikeOption(game) {
 }
 
 // Channel Divinity (Cleric level 2, SRD 5.2.1), while a use is left: Divine Spark (1d8 + Wis,
-// at a foe within 30 feet or to heal you), Turn Undead, and the Life Domain's Preserve Life.
-// The save DC is the Cleric's spell save DC.
-function channelOptions(game) {
+// at a foe within 30 feet, or to heal another creature: a companion, so only with company),
+// Turn Undead, and the Life Domain's Preserve Life. The save DC is the Cleric's spell save DC.
+function channelOptions(game, company) {
   const { character } = game;
   if (!hasFeature(character, 'channel-divinity') || featureUsesLeft(game, 'channel-divinity') < 1) return [];
   const wis = abilityModifierOf(character, 'wisdom');
@@ -254,23 +267,24 @@ function channelOptions(game) {
     condition: null,
     creatureType: null,
   };
-  const list = [
-    { ...base, id: 'channel-divine-spark', name: 'Divine Spark', how: 'save', targeting: 'foe', saveAbility: 'constitution', damage: { dice: '1d8', bonus: wis, type: 'radiant' }, halfOnSave: true },
-    { ...base, id: 'channel-divine-spark-heal', name: 'Divine Spark (heal)', how: 'heal', targeting: 'self', heal: { dice: '1d8', bonus: wis, extra: 0 } },
-    { ...base, id: 'channel-turn-undead', name: 'Turn Undead', how: 'turn', targeting: 'self', saveAbility: 'wisdom' },
-  ];
-  if (hasFeature(character, 'preserve-life')) list.push({ ...base, id: 'channel-preserve-life', name: 'Preserve Life', how: 'preserve', targeting: 'self', amount: 5 * character.level });
+  const list = [{ ...base, id: 'channel-divine-spark', name: 'Divine Spark', how: 'save', targeting: 'foe', saveAbility: 'constitution', damage: { dice: '1d8', bonus: wis, type: 'radiant' }, halfOnSave: true }];
+  if (company) list.push({ ...base, id: 'channel-divine-spark-heal', name: 'Divine Spark (heal)', how: 'heal', targeting: 'friend', notYou: true, company, heal: { dice: '1d8', bonus: wis, extra: 0 } });
+  list.push({ ...base, id: 'channel-turn-undead', name: 'Turn Undead', how: 'turn', targeting: 'self', saveAbility: 'wisdom' });
+  if (hasFeature(character, 'preserve-life')) list.push({ ...base, id: 'channel-preserve-life', name: 'Preserve Life', how: 'preserve', targeting: 'party', company, amount: 5 * character.level });
   return list;
 }
 
-// How each kind of spell is aimed (see the option fields above). Healing and wards go on you
-// until companions join the fights.
-const TARGETING = { attack: 'foe', save: 'foe', darts: 'foe', rays: 'foe', self: 'self', heal: 'self', ward: 'self', teleport: 'square', multi: 'nearest', spirit: 'foe' };
+// How each kind of spell is aimed (see the option fields above). Spells that help ('self',
+// 'heal' and 'ward') are aimed as their data says (spells.js spellAim).
+const TARGETING = { attack: 'foe', save: 'foe', darts: 'foe', rays: 'foe', teleport: 'square', multi: 'nearest', spirit: 'foe' };
 
-function spellOption(spell, slot, above, { modifiers, saveDc, level, potent, abilityMod }) {
+function spellOption(spell, slot, above, { modifiers, saveDc, level, potent, abilityMod, company }) {
   const c = spell.combat;
   const melee = c.kind === 'attack' && c.attack === 'melee';
-  const onYou = TARGETING[c.kind] === 'self';
+  const helps = spellAim(spell); // 'self', 'friend' or 'party' for a spell that helps
+  const onYou = helps === 'self';
+  // Spare the Dying's range doubles at character levels 5, 11 and 17.
+  const reach = c.rangeScales ? c.range * (level >= 17 ? 8 : level >= 11 ? 4 : level >= 5 ? 2 : 1) : c.range;
   return {
     id: above ? `spell-${spell.id}-${slot}` : `spell-${spell.id}`,
     name: above ? `${spell.name} (level ${slot} slot)` : spell.name,
@@ -279,12 +293,14 @@ function spellOption(spell, slot, above, { modifiers, saveDc, level, potent, abi
     spellLevel: spell.level,
     slotLevel: slot,
     how: c.kind === 'attack' ? c.attack : c.kind,
-    targeting: c.kind === 'area' ? (c.range ? 'point' : 'direction') : TARGETING[c.kind],
+    targeting: c.kind === 'area' ? (c.range ? 'point' : 'direction') : helps || TARGETING[c.kind],
+    company,
     bonusAction: Boolean(c.bonusAction),
     concentration: Boolean(spell.concentration),
     reach: melee ? c.range : null,
-    // Spiritual Weapon appears within its range, beside the foe it strikes.
-    range: melee || onYou ? null : c.kind === 'spirit' ? [c.range + 5, c.range + 5] : [c.range, c.range],
+    // Spiritual Weapon appears within its range, beside the foe it strikes. A spell that
+    // helps reaches friends within its range (5 feet: by touch).
+    range: melee || onYou ? null : c.kind === 'spirit' ? [c.range + 5, c.range + 5] : [reach, reach],
     modifiers,
     damage: c.damage ? { dice: spellDice(spell, level, above), bonus: (c.damage.bonus || 0) + (c.damage.addModifier ? abilityMod : 0), type: c.damage.type } : null,
     touch: Boolean(c.touch),

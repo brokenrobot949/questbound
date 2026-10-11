@@ -426,7 +426,7 @@ test('Companions: foes go after the nearest of the party; Fen gets Sneak Attack 
 test('Companions: with the hero down, Odda heals them back up and the fight goes on', () => {
   // Wren starts at 0 Hit Points; her death save is a 10.
   const game = partyFight({ after: [10], setUp: (g) => (g.hp = 0) });
-  assertTrue(said(game, 'Odda casts Healing Word (free) on you'), game.battle.log.map((e) => e.text).join(' / '));
+  assertTrue(said(game, 'Odda casts Healing Word on you'), game.battle.log.map((e) => e.text).join(' / '));
   assertEqual([game.battle.heroState, game.hp > 0, fight.isHeroTurn(game) || Boolean(game.battle.outcome)], ['up', true, true]);
 });
 

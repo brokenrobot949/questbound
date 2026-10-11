@@ -205,9 +205,21 @@ export function spellAbility(character, spellId) {
   return null;
 }
 
+// Who a spell that helps goes on (a 'self', 'heal', 'ward' or 'stabilise' spell): 'self' (only
+// the caster: False Life), 'friend' (the caster or one companion within range: Cure Wounds,
+// Sanctuary, Spare the Dying) or 'party' (the caster and companions within range, up to its
+// targets: Bless, Aid). From the spell's data (targets); null for any other spell.
+export function spellAim(spell) {
+  const c = spell.combat;
+  if (!c || !['self', 'heal', 'ward', 'stabilise'].includes(c.kind)) return null;
+  if (!c.targets) return 'self';
+  return c.targets > 1 ? 'party' : 'friend';
+}
+
 // True if casting the spell with a higher slot does more in the game: more damage or healing
-// dice, darts, rays, Temporary Hit Points, Hit Points (Aid) or foes to target (Bane). (Extra
-// friends to target wait for companions.)
+// dice, darts, rays, Temporary Hit Points, Hit Points (Aid) or foes to target (Bane). (Bless
+// and Aid take three creatures, and the party is never more than three, so a higher slot's
+// extra creature has nobody to take it. Hold Person's and Longstrider's come later.)
 export function upcastHelps(spell) {
   const c = spell.combat || {};
   return Boolean(c.upcast || c.darts || c.rays || c.upcastTempHp || c.upcastHp || c.upcastTargets);

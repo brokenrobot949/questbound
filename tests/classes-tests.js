@@ -12,7 +12,7 @@ import { heroAttackOptions, rollDamage } from '../js/engine/combat/attacks.js';
 import { squaresBetween } from '../js/engine/combat/grid.js';
 import { armorClass, armorTraining, checkModifiers, climbSpeed, maxHitPoints, proficientWithWeapon, sneakAttackDice, spellcasting, weaponProficiencies } from '../js/engine/character/sheet.js';
 import { canCastSpell, classSpellCounts, domainSpells, preparePicks, togglePrepared } from '../js/engine/character/spells.js';
-import { castSelfSpell, selfSpellProblem } from '../js/engine/character/spell-effects.js';
+import { castFromSheet, sheetSpellProblem, sheetSpells } from '../js/engine/character/spell-effects.js';
 import { validateCharacter } from '../js/engine/character/validate.js';
 import { freshResources, heroMaxHp, longRestRecovery, slotsAt } from '../js/engine/character/resources.js';
 import { startingInventory } from '../js/engine/character/inventory.js';
@@ -24,6 +24,7 @@ import { gameToSave, newGame } from '../js/engine/save/save-format.js';
 import { attackSummary } from '../js/engine/ui/attack-text.js';
 import { quickStartHeroes } from '../data/campaign/quick-start.js';
 import { approve, companionCharacter, joinParty, leaveParty, memberMaxHp, memberOf, partyLevelUp, partyLongRest, partyProblems, setTactic } from '../js/engine/character/party.js';
+import { companionTurn, realFight } from '../js/engine/combat/companion-ai.js';
 
 // Posy Hearthstone, the Quick Start Cleric: a halfling Acolyte, Thaumaturge, Wisdom 17 (+3, so
 // spell save DC 13 and spell attack +5), Constitution 13 (+1), chain shirt and Shield.
@@ -44,9 +45,13 @@ function gameFor(character, xp = 0, seed = 'classes') {
   return { character: structuredClone(character), rng: createRng(seed), ...startingInventory(character), ...freshResources(character), xp, day: 1, journal: newJournal(), battle: null, lastBattle: null, levelUp: null };
 }
 
-// A fight with the hero going first: Initiative is a 20 for the hero and a 1 for every foe.
-function fightWith(character, encounterId, seed = 'cleric-fight') {
+// A fight with the hero going first: Initiative is a 20 for the hero and a 1 for everyone
+// else. party: companions with the hero (in the mill, Odda starts at (2, 1) and Fen at (4, 1),
+// beside the hero at (3, 1)); setUp(game) runs before the fight starts.
+function fightWith(character, encounterId, seed = 'cleric-fight', { party = [], setUp = () => {} } = {}) {
   const game = gameFor(character, 0, seed);
+  for (const id of party) joinParty(game, id);
+  setUp(game);
   game.rng = scriptedRng([20, 1, 1, 1, 1, 1, 1, 1]);
   fight.startBattle(game, encounterId, 0);
   game.rng = createRng(seed);
@@ -124,7 +129,7 @@ test('Level-up: one more spell from the list each level; at 3, level 2 spells an
 
 // ---- Channel Divinity ----
 
-test('Channel Divinity: two uses from level 2; Divine Spark at a foe (half on a Con save) or to heal', () => {
+test('Channel Divinity: two uses from level 2; Divine Spark at a foe (half on a Con save)', () => {
   assertTrue(!heroAttackOptions(fightWith(posy, 'mill-scavengers')).some((o) => o.source === 'channel'), 'not at level 1');
   const game = fightWith(posy2, 'mill-scavengers');
   const goblin = fight.enemies(game.battle)[0];
@@ -135,10 +140,8 @@ test('Channel Divinity: two uses from level 2; Divine Spark at a foe (half on a 
   assertTrue(said(game, 'You channel Divine Spark at Goblin Minion 1, who makes the save') && said(game, 'halved to'));
   assertEqual(game.featureUses['channel-divinity'], 1);
   fight.endHeroTurn(game);
-  game.hp = 2;
-  game.rng = scriptedRng([5]);
-  fight.heroCastSelf(game, 'channel-divine-spark-heal');
-  assertEqual(game.hp, 10, '1d8 (5) + 3');
+  assertTrue(!heroAttackOptions(game).some((o) => o.id === 'channel-divine-spark-heal'), 'it heals another creature, so alone it can only hurt');
+  fight.heroAttack(game, 'channel-divine-spark', goblin.id);
   assertTrue(!heroAttackOptions(game).some((o) => o.source === 'channel'), 'both uses spent');
   longRestRecovery(game);
   assertEqual(game.featureUses['channel-divinity'] || 0, 0, 'back after a Long Rest');
@@ -177,7 +180,7 @@ test('Preserve Life (Life Domain): heals a Bloodied Cleric, up to half their Hit
 
 test('Aid: the Hit Point maximum and current Hit Points rise by 5 until a Long Rest', () => {
   const game = gameFor(posy3);
-  assertEqual(castSelfSpell(game, 'aid', 2), 'Aid: your Hit Point maximum and current Hit Points rise by 5, until your next Long Rest.');
+  assertEqual(castFromSheet(game, 'aid', 2), 'Aid: your Hit Point maximum and current Hit Points rise by 5, until your next Long Rest.');
   assertEqual([game.hp, heroMaxHp(game)], [26, 26]);
   longRestRecovery(game);
   assertEqual([game.hp, heroMaxHp(game)], [21, 21]);
@@ -187,9 +190,9 @@ test('Disciple of Life: healing from a spell slot heals 2 + the slot level more;
   const game = gameFor(posy3);
   game.hp = 5;
   game.rng = scriptedRng([4, 4, 1, 1]);
-  assertEqual(castSelfSpell(game, 'cure-wounds', 1), 'Cure Wounds: 2d8 (4, 4) + 3 + 3 (Disciple of Life) = 14. You regain 14 Hit Points.');
+  assertEqual(castFromSheet(game, 'cure-wounds', 1), 'Cure Wounds: 2d8 (4, 4) + 3 + 3 (Disciple of Life) = 14. You regain 14 Hit Points.');
   game.hp = 5;
-  assertTrue(castSelfSpell(game, 'healing-word', 'free').startsWith('Healing Word: 2d4 (1, 1) + 3 = 5.'), 'Magic Initiate’s free cast uses no slot');
+  assertTrue(castFromSheet(game, 'healing-word', 'free').startsWith('Healing Word: 2d4 (1, 1) + 3 = 5.'), 'Magic Initiate’s free cast uses no slot');
   const cure = heroAttackOptions(gameFor(posy3)).find((o) => o.id === 'spell-cure-wounds');
   assertTrue(attackSummary(cure).join(' · ').includes('+3 with a slot (Disciple of Life)'));
 });
@@ -281,7 +284,7 @@ test('Spiritual Weapon: a Bonus Action strike beside a foe, then more strikes on
   far.pos = { x: 6, y: 6 };
   fight.heroAttack(game, 'spell-spiritual-weapon', far.id);
   const scene = fight.battleScene(game);
-  assertEqual([game.battle.turnState.bonus, game.slotsUsed[1], game.battle.concentration.name, squaresBetween(scene.weapon, far.pos)], [true, 1, 'Spiritual Weapon', 1]);
+  assertEqual([game.battle.turnState.bonus, game.slotsUsed[1], game.battle.concentration.name, squaresBetween(scene.weapons[0].pos, far.pos)], [true, 1, 'Spiritual Weapon', 1]);
   assertTrue(said(game, 'spectral mace of light'));
   assertTrue(!heroAttackOptions(game).some((o) => o.id === 'spiritual-weapon-strike') || fight.heroCantUse(game, 'spiritual-weapon-strike') !== null, 'one Bonus Action a turn');
   fight.endHeroTurn(game);
@@ -290,7 +293,7 @@ test('Spiritual Weapon: a Bonus Action strike beside a foe, then more strikes on
   assertTrue(attackSummary(strike).join(' · ').startsWith('Bonus Action · +5 to hit · 1d8 + 3 force'), attackSummary(strike).join(' · '));
   const foe = [near, far].find((c) => c.hp > 0 && fight.attackPreview(game, strike.id, c.id).inRange);
   fight.heroAttack(game, strike.id, foe.id);
-  assertEqual([game.slotsUsed[1], squaresBetween(fight.battleScene(game).weapon, foe.pos)], [1, 1], 'no new slot; it moved beside the foe');
+  assertEqual([game.slotsUsed[1], squaresBetween(fight.battleScene(game).weapons[0].pos, foe.pos)], [1, 1], 'no new slot; it moved beside the foe');
 });
 
 test('Prayer of Healing: 10 minutes, so from the Sheet only; 2d8 with no Wisdom, once per Long Rest', () => {
@@ -298,13 +301,13 @@ test('Prayer of Healing: 10 minutes, so from the Sheet only; 2d8 with no Wisdom,
   const game = gameFor(posyWeapon);
   game.hp = 3;
   game.rng = scriptedRng([2, 3]);
-  assertEqual(castSelfSpell(game, 'prayer-of-healing', 2), 'Prayer of Healing: 2d8 (2, 3) + 4 (Disciple of Life) = 9. You regain 9 Hit Points.');
-  assertTrue(castSelfSpellProblem(game).includes('since your last Long Rest'));
+  assertEqual(castFromSheet(game, 'prayer-of-healing', 2), 'Prayer of Healing: 2d8 (2, 3) + 4 (Disciple of Life) = 9. You regain 9 Hit Points.');
+  assertTrue(prayerProblem(game).includes('since your last Long Rest'));
   longRestRecovery(game);
   game.hp = 3;
-  assertEqual(castSelfSpellProblem(game), null, 'a Long Rest lets it heal her again');
+  assertEqual(prayerProblem(game), null, 'a Long Rest lets it heal her again');
 });
-const castSelfSpellProblem = (game) => selfSpellProblem(game, 'prayer-of-healing', 2);
+const prayerProblem = (game) => sheetSpellProblem(game, 'prayer-of-healing', 2);
 
 // ---- Preparing spells after a Long Rest ----
 
@@ -504,6 +507,318 @@ test('Party: up to two companions join with full Hit Points and their kit; rests
   assertEqual(partyProblems(game.party), []);
   leaveParty(game, 'fen');
   assertEqual(game.party.map((m) => m.id), ['odda']);
+});
+
+// ---- Companions II: the hero's spells and potions on friends ----
+
+// Posy at level 3 with Shield of Faith and Sanctuary prepared, for wards on friends.
+const posyWards = { ...posy3, spells: { ...posy3.spells, prepared: ['shield-of-faith', 'sanctuary', 'detect-magic', 'hold-person'] } };
+const posyWith = (party, setUp, seed = 'friends') => fightWith(posy3, 'mill-scavengers', seed, { party, setUp });
+
+test('Healing a friend: Cure Wounds by touch, Healing Word at range; a fallen companion comes to', () => {
+  const game = posyWith(['odda', 'fen'], (g) => (memberOf(g, 'fen').hp = 0));
+  const odda = fight.combatantById(game.battle, 'odda');
+  const fen = fight.combatantById(game.battle, 'fen');
+  assertEqual(fen.state, 'down');
+  const cure = heroAttackOptions(game).find((o) => o.id === 'spell-cure-wounds');
+  assertEqual([cure.targeting, attackSummary(cure).join(' · ')], ['friend', 'regain 2d8 + 3 Hit Points · +3 with a slot (Disciple of Life) · 15 on average · touch: you or a friend beside you · uses a level 1 slot']);
+  odda.pos = { x: 3, y: 5 }; // 20 feet away
+  memberOf(game, 'odda').hp = 5;
+  const targets = fight.friendTargets(game, 'spell-cure-wounds').map((t) => [t.c.id, t.problem]);
+  assertEqual(targets, [['hero', 'You’re at full Hit Points.'], ['odda', 'Odda isn’t beside you.'], ['fen', null]]);
+  assertThrows(() => fight.heroCastOn(game, 'spell-cure-wounds', 'odda'), 'by touch: Odda is too far');
+  game.rng = scriptedRng([4, 4]);
+  fight.heroCastOn(game, 'spell-cure-wounds', 'fen');
+  assertEqual([fen.state, memberOf(game, 'fen').hp, game.slotsUsed[0]], ['up', 14, 1]);
+  assertTrue(said(game, 'You cast Cure Wounds on Fen: 2d8 (4, 4) + 3 + 3 (Disciple of Life) = 14. Fen regains 14 Hit Points, and comes to.'), game.battle.log.map((e) => e.text).join(' / '));
+  // Healing Word reaches 60 feet, as a Bonus Action with Magic Initiate's free cast.
+  game.rng = scriptedRng([2, 3]);
+  fight.heroCastOn(game, 'spell-healing-word-free', 'odda');
+  assertEqual([memberOf(game, 'odda').hp, game.battle.turnState.bonus], [13, true], '2d4 (2, 3) + 3');
+});
+
+test('Divine Spark heals another creature: a companion within 30 feet, never the Cleric', () => {
+  const game = fightWith(posy2, 'mill-scavengers', 'spark', { party: ['odda'] });
+  game.hp = 2;
+  memberOf(game, 'odda').hp = 3;
+  const spark = heroAttackOptions(game).find((o) => o.id === 'channel-divine-spark-heal');
+  assertTrue(attackSummary(spark).join(' · ').includes('a friend within 30 ft'), attackSummary(spark).join(' · '));
+  assertThrows(() => fight.heroCastOn(game, 'channel-divine-spark-heal', 'hero'), 'not on Posy herself');
+  game.rng = scriptedRng([5]);
+  fight.heroCastOn(game, 'channel-divine-spark-heal', 'odda');
+  assertEqual([memberOf(game, 'odda').hp, game.hp, game.featureUses['channel-divinity']], [11, 2, 1], '1d8 (5) + 3');
+  assertTrue(said(game, 'You channel Divine Spark on Odda: 1d8 (5) + 3 = 8. Odda regains 8 Hit Points.'));
+});
+
+test('Bless with companions: the party within 30 feet; a Blessed companion adds 1d4 to attacks and death saves', () => {
+  const game = posyWith(['odda', 'fen'], () => {}, 'bless-party');
+  const [goblin, other] = fight.enemies(game.battle);
+  goblin.pos = { x: 5, y: 2 }; // beside Fen
+  goblin.hp = 40;
+  other.hp = 0;
+  const bless = heroAttackOptions(game).find((o) => o.id === 'spell-bless');
+  assertEqual(attackSummary(bless).join(' · '), '+1d4 to attack rolls and saving throws · you and friends within 30 ft · Concentration · uses a level 1 slot');
+  assertEqual([fight.partyTargets(game, bless).map((c) => c.id), heroAttackOptions(game).filter((o) => o.spellId === 'bless').length], [['hero', 'odda', 'fen'], 1], 'one slot level only: a higher slot would add nobody');
+  fight.heroCastSelf(game, 'spell-bless');
+  assertTrue(['hero', 'odda', 'fen'].every((id) => fight.conditionsOf(game.battle, id).includes('blessed')) && said(game, 'You cast Bless on yourself, Odda and Fen'));
+  fight.endHeroTurn(game);
+  const fenSwings = game.battle.log.filter((e) => e.roll && e.roll.kind === 'attack' && e.text.startsWith('Fen'));
+  assertTrue(fenSwings.length > 0 && fenSwings.every((e) => e.roll.modifiers.some((m) => m.label === 'Bless')), game.battle.log.map((e) => e.text).join(' / '));
+
+  // Odda, down at 0 Hit Points and Blessed, adds 1d4 to her death save.
+  const down = posyWith(['odda'], (g) => (memberOf(g, 'odda').hp = 0), 'bless-down');
+  fight.heroCastSelf(down, 'spell-bless');
+  fight.endHeroTurn(down);
+  const save = down.battle.log.find((e) => e.roll && e.roll.label === "Odda's death saving throw");
+  assertTrue(save && save.roll.modifiers.some((m) => m.label === 'Bless'), down.battle.log.map((e) => e.text).join(' / '));
+});
+
+test('Wards on a friend: Shield of Faith gives Fen +2 AC; Sanctuary makes foes save to attack Odda, until Odda attacks', () => {
+  const game = fightWith(posyWards, 'mill-scavengers', 'wards', { party: ['odda', 'fen'] });
+  const [goblin, other] = fight.enemies(game.battle);
+  other.hp = 0;
+  goblin.hp = 40;
+  goblin.pos = { x: 5, y: 2 }; // beside Fen
+  fight.heroCastOn(game, 'spell-shield-of-faith', 'fen');
+  assertTrue(fight.conditionsOf(game.battle, 'fen').includes('shield-of-faith') && game.battle.concentration.name === 'Shield of Faith');
+  assertTrue(said(game, 'You cast Shield of Faith on Fen: a shimmering field surrounds Fen, +2 to AC while you concentrate.'));
+  assertTrue(fight.friendTargets(game, 'spell-shield-of-faith').find((t) => t.c.id === 'fen').problem.includes('already on Fen'));
+  game.battle.order = ['hero', goblin.id, 'odda', 'fen', other.id];
+  forceNextD20(10); // the goblin's Dagger
+  fight.endHeroTurn(game);
+  const stab = game.battle.log.find((e) => e.roll && e.roll.kind === 'attack' && e.text.startsWith('Goblin Minion 1'));
+  assertEqual(stab.roll.target, { type: 'AC', value: armorClass(companionCharacter('fen', 3)).value + 2 });
+
+  const warded = fightWith(posyWards, 'mill-scavengers', 'sanctuary', { party: ['odda', 'fen'] });
+  const [near, gone] = fight.enemies(warded.battle);
+  gone.hp = 0;
+  near.hp = 40;
+  near.pos = { x: 1, y: 2 }; // beside Odda, the nearest of the party
+  fight.heroCastOn(warded, 'spell-sanctuary', 'odda');
+  assertTrue(fight.conditionsOf(warded.battle, 'odda').includes('sanctuary'));
+  warded.battle.order = ['hero', near.id, 'odda', 'fen', gone.id];
+  forceNextD20(1); // the goblin's Wisdom save
+  fight.endHeroTurn(warded);
+  assertTrue(said(warded, 'goes for Odda with its') && said(warded, 'Sanctuary turns it aside'), warded.battle.log.map((e) => e.text).join(' / '));
+  assertTrue(said(warded, 'The Sanctuary on Odda ends: Odda'), 'Odda fights back, and it ends');
+});
+
+test('Potion of Healing: a Bonus Action to drink, or to give a friend beside you, who comes to', () => {
+  const game = posyWith(['odda', 'fen'], (g) => {
+    memberOf(g, 'fen').hp = 0;
+    g.inventory.push({ id: 'potion-of-healing', quantity: 2 });
+  });
+  const fen = fight.combatantById(game.battle, 'fen');
+  fight.combatantById(game.battle, 'odda').pos = { x: 3, y: 5 };
+  memberOf(game, 'odda').hp = 4;
+  const targets = fight.friendTargets(game, 'potion').map((t) => [t.c.id, t.problem]);
+  assertEqual(targets, [['hero', 'You’re at full Hit Points.'], ['odda', 'Odda isn’t beside you.'], ['fen', null]]);
+  game.rng = scriptedRng([3, 1]);
+  fight.heroDrinkPotion(game, 'fen');
+  assertEqual([fen.state, memberOf(game, 'fen').hp, game.battle.turnState.bonus, game.inventory.find((e) => e.id === 'potion-of-healing').quantity], ['up', 6, true, 1]);
+  assertTrue(said(game, 'You give Fen a Potion of Healing: 2d4 (3, 1) + 2 = 6. Fen regains 6 Hit Points, and comes to.'));
+  assertThrows(() => fight.heroDrinkPotion(game, 'fen'), 'one Bonus Action a turn');
+});
+
+test('Aid lifts the whole party in a fight; Preserve Life shares its healing among the Bloodied, the fallen first', () => {
+  const game = posyWith(['odda', 'fen'], () => {}, 'aid');
+  const odda = fight.combatantById(game.battle, 'odda');
+  const fenHp = memberOf(game, 'fen').hp;
+  fight.heroCastSelf(game, 'spell-aid');
+  assertEqual([game.hp, heroMaxHp(game), memberOf(game, 'odda').hp, memberMaxHp(game, memberOf(game, 'odda')), memberOf(game, 'fen').hp], [26, 26, 29, 29, fenHp + 5]);
+  assertTrue(said(game, 'You cast Aid on yourself, Odda and Fen: Hit Point maximums and current Hit Points rise by 5'));
+  // A new turn: Preserve Life (15 Hit Points at level 3) for Posy (3 of 26) and Odda (fallen).
+  Object.assign(game.battle.turnState, { action: false, slotSpent: false });
+  game.hp = 3;
+  memberOf(game, 'odda').hp = 0;
+  odda.state = 'down';
+  odda.deathSaves = { successes: 0, failures: 0 };
+  fight.heroCastSelf(game, 'channel-preserve-life');
+  assertEqual([memberOf(game, 'odda').hp, odda.state, game.hp], [14, 'up', 4], 'Odda first, up to half of 29; the 1 left goes to Posy');
+});
+
+test('Sheet: healing a companion between fights; Aid and Prayer of Healing reach the whole party', () => {
+  const game = gameFor(posyWeapon);
+  joinParty(game, 'odda');
+  joinParty(game, 'fen');
+  const odda = memberOf(game, 'odda');
+  const fen = memberOf(game, 'fen');
+  odda.hp = 4;
+  const cure = sheetSpells(game).find((c) => c.spell.id === 'cure-wounds');
+  assertEqual(cure.targets.map((t) => [t.id, t.problem]), [['hero', 'You’re at full Hit Points.'], ['odda', null], ['fen', 'Fen is at full Hit Points.']]);
+  assertEqual(cure.slots, [1, 2], 'someone is hurt, so it can be cast');
+  game.rng = scriptedRng([2, 2]);
+  assertEqual(castFromSheet(game, 'cure-wounds', 1, 'odda'), 'Cure Wounds: 2d8 (2, 2) + 3 + 3 (Disciple of Life) = 10. Odda regains 10 Hit Points.');
+  // Prayer of Healing: one roll, and each of the party who's hurt regains it.
+  game.hp = 5;
+  fen.hp = 5;
+  game.rng = scriptedRng([3, 4]);
+  assertEqual(castFromSheet(game, 'prayer-of-healing', 2), 'Prayer of Healing: 2d8 (3, 4) + 4 (Disciple of Life) = 11 each. You regain 11 Hit Points; Odda regains 10 Hit Points; Fen regains 11 Hit Points.');
+  assertTrue(sheetSpellProblem(game, 'prayer-of-healing', 2).includes('since their last Long Rest'));
+  assertEqual(castFromSheet(game, 'aid', 2), 'Aid: the Hit Point maximum and current Hit Points of you, Odda and Fen rise by 5, until your next Long Rest.');
+  assertEqual([memberMaxHp(game, odda), odda.hp], [29, 29]);
+  partyLongRest(game);
+  assertEqual([memberMaxHp(game, odda), odda.activeSpells], [24, []], 'a Long Rest ends Aid');
+});
+
+// ---- Companions III: companions act more like heroes ----
+
+// Makes it someone's turn right now, fresh (movement: their feet to move this turn).
+function turnOf(game, id, movement = 30) {
+  const battle = game.battle;
+  battle.turn = battle.order.indexOf(id);
+  battle.turnState = { movementLeft: movement, action: false, bonus: false, disengaged: false, savageUsed: false, surged: false, athleteMove: 0, slotSpent: false, light: null, extraUsed: false, moved: false, steadyAim: false, aimed: false };
+}
+
+// Scripted dice first, then the seeded ones.
+function scriptedThen(faces, seed) {
+  const queue = [...faces];
+  const rest = createRng(seed);
+  return { nextInt: (n) => (queue.length ? queue.shift() - 1 : rest.nextInt(n)), getState: () => rest.getState() };
+}
+
+// A companion's whole turn, as the fight would play it.
+const playTurn = (game, id, movement) => {
+  turnOf(game, id, movement);
+  companionTurn(game, fight.combatantById(game.battle, id));
+};
+
+test('Concentration per caster: Odda holds Bless while Posy holds Shield of Faith; each saves for their own', () => {
+  const setUp = () => {
+    const game = fightWith(posyWards, 'mill-scavengers', 'two-casters', { party: ['odda'] });
+    const [goblin, other] = fight.enemies(game.battle);
+    other.hp = 0;
+    goblin.hp = 40;
+    goblin.pos = { x: 1, y: 2 }; // beside Odda (2, 1), the nearest of the party
+    const odda = fight.combatantById(game.battle, 'odda');
+    fight.heroCastOn(game, 'spell-shield-of-faith', 'hero');
+    turnOf(game, 'odda');
+    fight.companionCastOn(game, odda, 'spell-bless');
+    // Back to Posy, with the goblin next, then Odda.
+    game.battle.order = ['hero', goblin.id, 'odda', other.id];
+    turnOf(game, 'hero');
+    game.battle.turnState.bonus = true;
+    return { game, odda };
+  };
+  const { game, odda } = setUp();
+  assertEqual([fight.concentrationOf(game.battle, fight.heroCombatant(game.battle)).name, fight.concentrationOf(game.battle, odda).name], ['Shield of Faith', 'Bless']);
+  assertTrue(said(game, 'Odda casts Bless on you and Odda: while Odda concentrates'), game.battle.log.map((e) => e.text).join(' / '));
+  assertTrue(['hero', 'odda'].every((id) => fight.conditionsOf(game.battle, id).includes('blessed')));
+  forceNextD20(15); // the goblin's Dagger hits Odda
+  fight.endHeroTurn(game);
+  const save = game.battle.log.find((e) => e.roll && e.roll.label === "Concentration (Odda's Constitution save)");
+  assertTrue(save && save.roll.modifiers.some((m) => m.label === 'Bless'), 'her own save, with her own Bless');
+  assertEqual(fight.concentrationOf(game.battle, fight.heroCombatant(game.battle)).name, 'Shield of Faith', 'Posy keeps hers');
+
+  // Odda falls: her Bless ends, and Posy's Shield of Faith holds.
+  const falls = setUp();
+  memberOf(falls.game, 'odda').hp = 1;
+  forceNextD20(15);
+  fight.endHeroTurn(falls.game);
+  assertTrue(said(falls.game, "Odda's concentration breaks: Bless ends."), falls.game.battle.log.map((e) => e.text).join(' / '));
+  assertTrue(!fight.conditionsOf(falls.game.battle, 'hero').includes('blessed') && fight.conditionsOf(falls.game.battle, 'hero').includes('shield-of-faith'));
+});
+
+test('Odda in a real fight: Bless on Support, if she keeps a slot for healing; never in an easy fight', () => {
+  const easy = fightWith(posy, 'mill-scavengers', 'easy', { party: ['odda', 'fen'] });
+  const real = fightWith(posy, 'lower-dead', 'real', { party: ['odda', 'fen'] });
+  assertEqual([realFight(easy), realFight(real)], [false, true], 'level 1, a party of three: a Low fight is 150 XP; two goblins are 50, three zombies 150');
+  playTurn(easy, 'odda');
+  assertEqual(fight.concentrationOf(easy.battle, fight.combatantById(easy.battle, 'odda')), null, 'no slot spent on two goblins');
+  playTurn(real, 'odda');
+  assertTrue(said(real, 'Odda casts Bless on you, Odda and Fen'), real.battle.log.map((e) => e.text).join(' / '));
+  assertEqual([fight.concentrationOf(real.battle, fight.combatantById(real.battle, 'odda')).name, memberOf(real, 'odda').slotsUsed[0]], ['Bless', 1]);
+  assertEqual(fight.battleScene(real).units.find((u) => u.id === 'odda').concentrating, 'Bless', 'for the battle screen’s status line');
+
+  const lastSlot = fightWith(posy, 'lower-dead', 'last-slot', { party: ['odda', 'fen'], setUp: (g) => (memberOf(g, 'odda').slotsUsed = [1]) });
+  playTurn(lastSlot, 'odda');
+  assertEqual([fight.concentrationOf(lastSlot.battle, fight.combatantById(lastSlot.battle, 'odda')), memberOf(lastSlot, 'odda').slotsUsed[0]], [null, 1], 'her last slot stays for healing');
+});
+
+test('Odda by tactic: Defensive puts Shield of Faith on you; Aggressive (level 3) brings Spiritual Weapon, which strikes again next turn', () => {
+  const guard = fightWith(posy, 'lower-dead', 'guard', { party: ['odda'], setUp: (g) => setTactic(g, 'odda', 'defensive') });
+  playTurn(guard, 'odda');
+  assertTrue(said(guard, 'Odda casts Shield of Faith on you') && fight.conditionsOf(guard.battle, 'hero').includes('shield-of-faith'), guard.battle.log.map((e) => e.text).join(' / '));
+
+  const game = fightWith(posy3, 'nettle-band', 'weapon-ai', { party: ['odda'], setUp: (g) => setTactic(g, 'odda', 'aggressive') });
+  assertTrue(realFight(game), '400 XP against a Low budget of 300 for two level 3 characters');
+  playTurn(game, 'odda');
+  assertTrue(said(game, 'Odda casts Spiritual Weapon'), game.battle.log.map((e) => e.text).join(' / '));
+  assertEqual([fight.concentrationOf(game.battle, fight.combatantById(game.battle, 'odda')).name, memberOf(game, 'odda').slotsUsed[1], fight.battleScene(game).weapons.map((w) => w.by)], ['Spiritual Weapon', 1, ['odda']]);
+  playTurn(game, 'odda');
+  assertTrue(said(game, "Odda's Spiritual Weapon sweeps across"), game.battle.log.map((e) => e.text).join(' / '));
+  assertEqual(memberOf(game, 'odda').slotsUsed[1], 1, 'no new slot for the strike');
+});
+
+test('Fen’s Cunning Action: he shoots, then hides; hidden, his next attack has Advantage and Sneak Attack', () => {
+  const game = fightWith(posy2, 'mill-scavengers', 'fen-hide', { party: ['fen'] });
+  const [goblin, other] = fight.enemies(game.battle);
+  other.hp = 0;
+  goblin.hp = 40;
+  goblin.pos = { x: 3, y: 5 };
+  game.rng = scriptedThen([15, 3, 15], 'fen-hide'); // his Shortbow hits; then his Stealth: 15 + 7
+  playTurn(game, 'fen');
+  assertTrue(fight.conditionsOf(game.battle, 'fen').includes('hidden') && said(game, 'Fen slips out of sight'), game.battle.log.map((e) => e.text).join(' / '));
+  const preview = fight.attackPreview(game, 'shortbow-ranged', goblin.id, 'fen');
+  assertEqual([preview.advantage.includes('Fen is hidden'), preview.sneak], [true, '1d6']);
+  playTurn(game, 'fen');
+  assertTrue(said(game, 'Fen is no longer hidden: Fen attacks.'), game.battle.log.map((e) => e.text).join(' / '));
+});
+
+test('Fen’s Cunning Action: he Dashes to reach a foe; Bloodied beside one, he Disengages and steps back', () => {
+  const game = fightWith(posy2, 'mill-scavengers', 'fen-dash', { party: ['fen'] });
+  const [goblin, other] = fight.enemies(game.battle);
+  other.hp = 0;
+  goblin.hp = 40;
+  goblin.pos = { x: 4, y: 6 };
+  const fen = memberOf(game, 'fen');
+  fen.inventory = fen.inventory.filter((e) => !['shortbow', 'dagger', 'arrow'].includes(e.id)); // a Shortsword only
+  playTurn(game, 'fen', 15); // slowed: 15 feet won't reach
+  assertTrue(said(game, 'Cunning Action: Fen Dashes.') && isNextTo(game, 'fen', goblin), game.battle.log.map((e) => e.text).join(' / '));
+
+  const hurt = fightWith(posy2, 'mill-scavengers', 'fen-back', { party: ['fen'], setUp: (g) => (memberOf(g, 'fen').hp = 3) });
+  const [near, gone] = fight.enemies(hurt.battle);
+  gone.hp = 0;
+  near.hp = 40;
+  fight.combatantById(hurt.battle, 'fen').pos = { x: 4, y: 1 };
+  near.pos = { x: 5, y: 2 }; // beside Fen
+  playTurn(hurt, 'fen');
+  assertTrue(said(hurt, 'Fen Disengages') && !isNextTo(hurt, 'fen', near), hurt.battle.log.map((e) => e.text).join(' / '));
+});
+const isNextTo = (game, id, foe) => squaresBetween(fight.combatantById(game.battle, id).pos, foe.pos) === 1;
+
+test('Help: distract a foe beside you, so Fen’s next attack on it has Advantage; first aid for a fallen friend', () => {
+  const game = fightWith(posy2, 'mill-scavengers', 'help', { party: ['fen'] });
+  const [goblin, other] = fight.enemies(game.battle);
+  other.hp = 0;
+  goblin.hp = 40;
+  goblin.pos = { x: 3, y: 2 }; // beside Posy (3, 1) and Fen (4, 1)
+  assertEqual(fight.heroHelpProblem(game), null);
+  fight.heroHelp(game, goblin.id);
+  assertTrue(game.battle.turnState.action && fight.conditionsOf(game.battle, goblin.id).includes('helped'));
+  assertTrue(fight.attackPreview(game, 'shortsword-melee', goblin.id, 'fen').advantage.includes('You distract it (Help)'));
+  assertTrue(!fight.attackPreview(game, heroAttackOptions(game).find((o) => o.how === 'melee').id, goblin.id).advantage.includes('You distract it (Help)'), 'not for the helper');
+  playTurn(game, 'fen');
+  const swing = game.battle.log.find((e) => e.roll && e.roll.kind === 'attack' && e.text.startsWith('Fen'));
+  assertTrue(swing && swing.roll.advantage.includes('You distract it (Help)'), game.battle.log.map((e) => e.text).join(' / '));
+  assertTrue(!fight.conditionsOf(game.battle, goblin.id).includes('helped'), 'used up by that attack');
+
+  const aid = fightWith(posy2, 'mill-scavengers', 'first-aid', { party: ['fen'], setUp: (g) => (memberOf(g, 'fen').hp = 0) });
+  forceNextD20(15); // Medicine: 15 + 5
+  fight.heroHelp(aid, 'fen');
+  assertEqual(fight.combatantById(aid.battle, 'fen').state, 'stable');
+  assertTrue(said(aid, 'You give Fen first aid (Medicine): Fen is Stable.'));
+});
+
+test('Spare the Dying: with companions, the hero can cast it on a fallen friend within 15 feet', () => {
+  assertTrue(!heroAttackOptions(fightWith(posy, 'mill-scavengers')).some((o) => o.spellId === 'spare-the-dying'), 'alone, there is nobody to spare');
+  const game = fightWith(posy, 'mill-scavengers', 'spare', { party: ['fen'], setUp: (g) => (memberOf(g, 'fen').hp = 0) });
+  const fen = fight.combatantById(game.battle, 'fen');
+  fen.pos = { x: 3, y: 4 }; // 15 feet away
+  assertEqual(attackSummary(heroAttackOptions(game).find((o) => o.id === 'spell-spare-the-dying')).join(' · '), 'a friend at 0 Hit Points stops dying and is Stable · a friend within 15 ft');
+  fight.heroCastOn(game, 'spell-spare-the-dying', 'fen');
+  assertEqual(fen.state, 'stable');
+  assertTrue(said(game, 'You cast Spare the Dying on Fen: Fen stops bleeding, and is Stable.'));
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

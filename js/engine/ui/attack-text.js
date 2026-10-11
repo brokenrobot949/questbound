@@ -40,8 +40,10 @@ export function attackSummary(option, { slotsLeft = null } = {}) {
   else if (option.how === 'heal') parts.push(...healText(option.heal));
   else if (option.how === 'ward') parts.push(WARDS[option.effect](option));
   else if (option.how === 'turn') parts.push(`each Undead within 30 ft makes a Wis save against DC ${option.saveDc} or is Turned: it flees and can’t act for a minute, or until it takes damage`);
+  else if (option.how === 'preserve' && option.company) parts.push(`up to ${option.amount} Hit Points shared among the Bloodied, none above half their maximum`);
   else if (option.how === 'preserve') parts.push(`if you’re Bloodied, regain up to ${option.amount} Hit Points, but no more than half your maximum`);
   else if (option.how === 'teleport') parts.push(`teleport up to ${option.range[1]} ft to a square you can see`);
+  else if (option.how === 'stabilise') parts.push('a friend at 0 Hit Points stops dying and is Stable');
   else if (option.how === 'darts') {
     parts.push(`${option.darts} darts that never miss`, `${damageDice(option.damage)} each`, `${averageText(averageDamage(option.damage) * option.darts)} on average`);
   } else if (option.how === 'rays') {
@@ -53,7 +55,10 @@ export function attackSummary(option, { slotsLeft = null } = {}) {
     if (option.halfOnSave) parts.push('half on a save');
     if (option.push) parts.push(`pushed ${option.push} ft on a failed save`);
   }
-  if (option.targeting !== 'self' && option.how !== 'teleport') parts.push(reachText(option));
+  // Who a spell that helps can go on: with companions, say so (alone, it's always you).
+  const helps = option.targeting === 'friend' || option.targeting === 'party';
+  if (helps && option.company) parts.push(friendsText(option));
+  else if (!helps && option.targeting !== 'self' && option.how !== 'teleport') parts.push(reachText(option));
   if (option.rider) parts.push(RIDERS[option.rider]);
   if (option.sneakAttack) parts.push(`Sneak Attack +${option.sneakAttack} with Advantage, once a turn`);
   if (option.nick) parts.push('part of your Attack action (Nick)');
@@ -70,17 +75,18 @@ export function attackSummary(option, { slotsLeft = null } = {}) {
   return parts;
 }
 
-// What a spell you cast on yourself does, from its data (data/srd/spells.js), for the Sheet.
-export function selfSpellText(spell, character) {
+// What a spell cast from the Sheet does, from its data (data/srd/spells.js). company: the hero
+// has companions, who can take it too.
+export function sheetSpellText(spell, character, { company = false } = {}) {
   const combat = spell.combat;
   if (combat.kind === 'heal') {
     const parts = healText({ ...healingFor(character, spell.id), extra: discipleOfLife(character, spell.level) });
     const average = parts.pop();
     const slow = combat.outOfFight ? `; it takes ${spell.castingTime}` : '';
-    const once = combat.oncePerLongRest ? ', and heals you once until your next Long Rest' : '';
+    const once = combat.oncePerLongRest ? `, and heals ${company ? 'each of you' : 'you'} once until your next Long Rest` : '';
     return `${parts.join(', ')} (${average})${slow}${once}`;
   }
-  return selfText({ self: combat.self, baseAc: combat.baseAc, lasts: combat.lasts, speedBonus: combat.speed, tempHp: combat.tempHp, hpBonus: combat.hpBonus });
+  return selfText({ self: combat.self, baseAc: combat.baseAc, lasts: combat.lasts, speedBonus: combat.speed, tempHp: combat.tempHp, hpBonus: combat.hpBonus, company: company && Boolean(combat.targets) });
 }
 
 // "regain 2d8 + 3 Hit Points", ("+4 with a slot (Disciple of Life)"), "12 on average": what
@@ -92,19 +98,35 @@ function healText(heal) {
   return [`regain ${heal.dice}${bonus} Hit Points`, extra, `${average} on average`].filter(Boolean);
 }
 
-// What a ward on yourself does for the fight.
+// What a ward does for the fight: on you (a hero alone), or on whoever it goes on.
 const WARDS = {
-  blessed: () => '+1d4 to your attack rolls and saving throws',
-  sanctuary: (option) => `foes make a Wis save against DC ${option.saveDc} to attack you; ends if you attack or cast a spell`,
-  'shield-of-faith': () => '+2 to your AC',
+  blessed: (option) => (option.company ? '+1d4 to attack rolls and saving throws' : '+1d4 to your attack rolls and saving throws'),
+  sanctuary: (option) =>
+    option.company
+      ? `foes make a Wis save against DC ${option.saveDc} to attack the warded one; ends if they attack or cast a spell`
+      : `foes make a Wis save against DC ${option.saveDc} to attack you; ends if you attack or cast a spell`,
+  'shield-of-faith': (option) => (option.company ? '+2 to AC' : '+2 to your AC'),
 };
 
-// What a spell on yourself does: Mage Armor, False Life, Longstrider, Aid.
+// Who a spell that helps can go on, with companions: "you or a friend within 60 ft",
+// "touch: you or a friend beside you", "you and friends within 30 ft".
+function friendsText(option) {
+  const range = option.range ? option.range[1] : 5;
+  if (option.how === 'preserve') return `the Bloodied within ${range} ft, you included`;
+  if (option.targeting === 'party') return `you and friends within ${range} ft`;
+  if (option.notYou || option.how === 'stabilise') return `a friend within ${range} ft`;
+  return range <= 5 ? 'touch: you or a friend beside you' : `you or a friend within ${range} ft`;
+}
+
+// What a lasting spell does: Mage Armor, False Life, Longstrider, Aid. company: it can go on a
+// companion too.
 function selfText(option) {
   const lasts = option.lasts === 'hour' ? 'for about an hour' : 'until your next Long Rest';
-  if (option.self === 'mage-armor') return `your AC becomes ${option.baseAc} + Dex ${lasts}`;
-  if (option.self === 'longstrider') return `your Speed +${option.speedBonus} ft ${lasts}`;
-  if (option.self === 'aid') return `your Hit Point maximum and Hit Points +${option.hpBonus} ${lasts}`;
+  const your = option.company ? '' : 'your ';
+  const ac = option.company ? 'AC' : 'your AC';
+  if (option.self === 'mage-armor') return `${ac} becomes ${option.baseAc} + Dex ${lasts}${option.company ? ', without armour' : ''}`;
+  if (option.self === 'longstrider') return `${your}Speed +${option.speedBonus} ft ${lasts}`;
+  if (option.self === 'aid') return `${your}Hit Point maximum and Hit Points +${option.hpBonus} ${lasts}`;
   const temp = option.tempHp;
   const average = averageText(averageDamage({ dice: temp.dice, bonus: temp.bonus }));
   return `gain ${temp.dice} + ${temp.bonus} Temporary Hit Points (${average} on average)`;
