@@ -143,3 +143,10 @@ EXTERNAL lose_coins()
 
 // give_coins(gp): the hero is paid, in gold pieces, e.g. ~ give_coins(25)
 EXTERNAL give_coins(gp)
+
+// can_pay(gp): true if the hero has that much money, in gold pieces. pay(gp): they hand it
+// over (a fine, a bribe, a toll). Tag the choice with #pay so the card shows the price:
+//   * {can_pay(10)} [Pay his fine #pay:10]
+//       ~ pay(10)
+EXTERNAL can_pay(gp)
+EXTERNAL pay(gp)

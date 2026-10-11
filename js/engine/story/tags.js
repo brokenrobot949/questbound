@@ -7,6 +7,8 @@
 //                                 shows "Odda’s spell · …" and what it costs her
 //   #drive:wealth                 the choice fits that Drive; the card says so if it's the hero's
 //   #buy:torch                    the choice buys that item; the card shows the price
+//   #pay:10                       the choice pays that many gold pieces (a fine, a bribe);
+//                                 the card shows it
 //   #combat:mill-scavengers       the choice starts that fight; its content runs after it
 //   #surprise                     with #combat: the hero strikes first, unseen; the foes roll
 //                                 Initiative with Disadvantage
@@ -21,7 +23,7 @@
 //                                 people.js); their portrait and name show beside it
 
 export function parseTags(tags) {
-  const parsed = { check: null, spell: null, by: null, location: null, time: null, drive: null, buy: null, combat: null, surprise: false, go: null, room: null, speaker: null };
+  const parsed = { check: null, spell: null, by: null, location: null, time: null, drive: null, buy: null, pay: null, combat: null, surprise: false, go: null, room: null, speaker: null };
   for (const tag of tags || []) {
     const colon = tag.indexOf(':');
     const key = (colon < 0 ? tag : tag.slice(0, colon)).trim();
@@ -41,6 +43,8 @@ export function parseTags(tags) {
       parsed.drive = value;
     } else if (key === 'buy') {
       parsed.buy = value;
+    } else if (key === 'pay') {
+      parsed.pay = Number(value);
     } else if (key === 'combat') {
       parsed.combat = value;
     } else if (key === 'surprise') {

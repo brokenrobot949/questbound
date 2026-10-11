@@ -10,6 +10,7 @@ INCLUDE act-1/ch1-warren.ink
 INCLUDE act-1/ch1-warren-depths.ink
 INCLUDE act-1/ch1-return.ink
 INCLUDE act-1/ch2-millers-daughter.ink
+INCLUDE act-1/ch2-stocks.ink
 
 // Where play begins: Chapter 1, on the road to Bramblegate.
 -> ch1_arrival

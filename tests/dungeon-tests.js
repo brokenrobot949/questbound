@@ -18,9 +18,9 @@ import { encounters } from '../data/campaign/encounters.js';
 import { quickStartHeroes } from '../data/campaign/quick-start.js';
 import { loadStory } from '../js/engine/story/ink-loader.js';
 import { bindExternals } from '../js/engine/story/externals.js';
-import { continueAfterBattle, currentDungeon, currentLocation, jumpTo, makeChoice, revealRoll, startFight } from '../js/engine/story/story-runner.js';
+import { continueAfterBattle, currentDungeon, currentLocation, currentTime, jumpTo, makeChoice, revealRoll, startFight } from '../js/engine/story/story-runner.js';
 import { gameToSave, loadGame, newGame } from '../js/engine/save/save-format.js';
-import { encounterXp, partyBudget, ratingFor } from '../js/engine/combat/difficulty.js';
+import { encounterXp, fightRating, partyBudget, ratingFor } from '../js/engine/combat/difficulty.js';
 import { monsters } from '../data/srd/monsters.js';
 
 const wren = quickStartHeroes.find((h) => h.id === 'wren').character;
@@ -215,22 +215,22 @@ test('Bandit Captain: Parry turns a melee hit into a miss (+2 AC), once a round,
   };
   const { game, captain } = start();
   const preview = fight.attackPreview(game, 'greatsword-melee', captain.id);
-  assertTrue(preview.describe.includes('it can Parry'), preview.describe);
+  assertTrue(preview.describe.includes('Mercy Gaunt can Parry'), preview.describe);
   const bonus = preview.option.modifiers.reduce((sum, m) => sum + m.value, 0);
   forceNextD20(15 - bonus); // exactly 15: a hit on its AC 15, a miss against 17
   fight.heroAttack(game, 'greatsword-melee', captain.id);
-  assertTrue(said(game, 'Bandit Captain parries! (its reaction: AC 17 against this attack)') && said(game, 'You attack Bandit Captain with Greatsword, and miss'), logText(game));
+  assertTrue(said(game, 'Mercy Gaunt parries! (a reaction: AC 17 against this attack)') && said(game, 'You attack Mercy Gaunt with Greatsword, and miss'), logText(game));
   // Its reaction is spent until its next turn: Action Surge's swing lands.
   fight.heroActionSurge(game);
   forceNextD20(15 - bonus);
   fight.heroAttack(game, 'greatsword-melee', captain.id);
-  assertTrue(said(game, 'You hit Bandit Captain with Greatsword'), logText(game));
+  assertTrue(said(game, 'You hit Mercy Gaunt with Greatsword'), logText(game));
   assertEqual(game.battle.log.filter((e) => e.text.includes('parries')).length, 1);
 
   const crit = start();
   forceNextD20(20);
   fight.heroAttack(crit.game, 'greatsword-melee', crit.captain.id);
-  assertTrue(!said(crit.game, 'parries') && said(crit.game, 'Critical hit! You hit Bandit Captain'), logText(crit.game));
+  assertTrue(!said(crit.game, 'parries') && said(crit.game, 'Critical hit! You hit Mercy Gaunt'), logText(crit.game));
 });
 
 test('Bounty hunters: the Captain closes in and swings twice (a Light Crossbow, not a Pistol); the Bandits shoot', () => {
@@ -240,7 +240,7 @@ test('Bounty hunters: the Captain closes in and swings twice (a Light Crossbow, 
   const game = warrenFight('stocks-hunters', wren, 'hunters');
   game.hp = 60;
   fight.endHeroTurn(game);
-  const swings = game.battle.log.filter((e) => e.roll && e.roll.kind === 'attack' && e.text.includes('Bandit Captain') && e.text.includes('Scimitar'));
+  const swings = game.battle.log.filter((e) => e.roll && e.roll.kind === 'attack' && e.text.includes('Mercy Gaunt') && e.text.includes('Scimitar'));
   const shots = game.battle.log.filter((e) => e.roll && e.roll.kind === 'attack' && /^Bandit \d/.test(e.text) && e.text.includes('Light Crossbow'));
   assertEqual([swings.length, shots.length], [2, 2], logText(game));
 });
@@ -759,7 +759,9 @@ test('Chapter 2: after the ghouls, Odda frees Lark with her Lesser Restoration; 
   assertEqual(currentDungeon(game).room, null, 'out from under the mill');
   assertEqual(game.journal.quests.find((q) => q.id === 'millers-daughter').status, 'done');
   assertTrue(pageText(game).includes('Somebody has to keep you breathing') && game.objective.includes('with Odda beside you'));
-  assertEqual(game.story.currentChoices.length, 0, 'the end of this part of Chapter 2');
+  assertEqual(cards(game), ['Head out into the market square'], 'on to Fen in the stocks');
+  pick(game, 'Head out into the market square');
+  assertTrue(pageText(game).includes('I used to sing with them') && currentLocation(game) === 'Bramblegate, the market square');
 });
 
 test('Chapter 2: a Life Cleric can free Lark herself; without Lesser Restoration you carry her out, and a lie displeases Odda', async () => {
@@ -816,6 +818,240 @@ test('Chapter 2: if Odda dies in the ossuary, the scenes go on without her, and 
   assertTrue(!pageText(game).includes('Odda gives you a long look'));
   pick(game, 'Tell her she already is one');
   assertTrue(pageText(game).includes('lays her before the altar flame') && !pageText(game).includes('Somebody has to keep you breathing'));
+  assertEqual(cards(game), ['Head out into the market square'], 'on to Fen, without her');
+});
+
+// ---- Chapter 2: Fen in the stocks ----
+
+const rogue3 = { ...sorael, level: 3, subclassId: 'thief', hitPointRolls: [null, null] };
+const knockWizard = {
+  ...juniper,
+  level: 3,
+  subclassId: 'evoker',
+  hitPointRolls: [null, null],
+  spells: { ...juniper.spells, spellbook: [...juniper.spells.spellbook, 'knock'], prepared: [...juniper.spells.prepared, 'knock'] },
+};
+
+// The market square after Morwen's breakfast: a hero (a level 3 Champion unless given) with
+// Odda (unless odda is false) and 25 gold.
+async function atTheStocks(seed, { character = champion, flags = [], odda = true, gold = 25 } = {}) {
+  const game = await storyGame(seed, character);
+  game.flags.push(...flags);
+  game.money = gold * 100;
+  if (odda) joinParty(game, 'odda');
+  game.page = jumpTo(game, 'ch2_stocks');
+  return game;
+}
+
+// Hears Fen out; then the hunters ride in.
+const huntersArrive = (game) => pick(game, 'Decide what to do about him');
+
+// Settles the hunters' fight the shown choice starts: won, or lost.
+function settleHunters(game, won = true) {
+  const choice = game.story.currentChoices.find((c) => (c.tags || []).includes('combat:stocks-hunters'));
+  if (!choice) throw new Error(`No fight: ${cards(game).join(' / ')}`);
+  startFight(game, choice);
+  if (won) for (const foe of fight.enemies(game.battle)) foe.hp = 0;
+  else game.hp = 0;
+  game.battle.outcome = won ? 'victory' : 'defeat';
+  game.page = continueAfterBattle(game);
+}
+
+const fenIn = (game) => game.party.some((m) => m.id === 'fen');
+const missingMiller = (game) => game.journal.quests.find((q) => q.id === 'missing-miller').notes.map((n) => n.text).join(' ');
+// The end of the scene: the lead to Cairnfield, and the end of what's written of Chapter 2.
+const toCairnfield = (game) => game.flags.includes('heard_of_cairnfield') && game.objective.includes('Cairnfield') && missingMiller(game).includes('Cairnfield') && game.story.currentChoices.length === 0;
+
+test('Chapter 2: Fen begs from the stocks; questions don’t repeat; a Rogue who read the chalk marks knows the songbird', async () => {
+  const game = await atTheStocks('stocks-talk');
+  assertTrue(pageText(game).includes('I used to sing with them'));
+  assertEqual(cards(game), ['Ask who he is', 'Ask who he used to sing with', 'Watch his face while he talks', "Ask where they're taking the miller", 'Decide what to do about him'], 'no chalk marks: not a Rogue');
+  const said = pick(game, 'Ask who he is').beats.filter((b) => b.type === 'text');
+  assertEqual([said.length, said[0].speaker], [1, 'fen'], 'his answer, and no greeting after it');
+  assertTrue(!cards(game).includes('Ask who he is'), 'asked once');
+  forceNextD20(20);
+  pick(game, 'Watch his face');
+  revealAll(game);
+  assertTrue(game.flags.includes('fen_read_true'));
+
+  const rogue = await atTheStocks('stocks-rogue', { character: rogue3, flags: ['read_cant_marks'] });
+  pick(rogue, 'Tell him you read the chalk mark');
+  assertTrue(rogue.flags.includes('knew_fen_songbird') && pageText(rogue).includes("So you're one of us"));
+});
+
+test('Chapter 2: Mercy Gaunt’s hunters come for Fen, and every way out is offered, to the heroes who can take it', async () => {
+  const game = await atTheStocks('stocks-hunters', { flags: ['varrow_approves'] });
+  huntersArrive(game);
+  assertTrue(pageText(game).includes('The Choir pays double for dead') && pageText(game).includes('Choir money'), 'Gaunt, and Odda’s word on it');
+  assertEqual(game.page.beats.find((b) => b.type === 'text' && b.text.includes('Dead or alive')).speaker, 'gaunt');
+  assertEqual(cards(game), ['Pay his fine', 'Fetch Captain Varrow from the watch-house, and talk him round', "Tell Gaunt that if she wants him, she'll come through you", "Take Gaunt's ten gold, and walk on", "Leave him to it: he's a thief, and it's none of yours"], 'a Fighter has no picks and no Knock');
+  assertEqual(tagsOf(game).slice(0, 2), ['pay:10', 'check:persuasion:10 drive:justice'], 'Varrow liked how you dealt with the goblins');
+  assertEqual(tagsOf(game).slice(2, 4), ['drive:freedom', 'drive:wealth']);
+
+  const wary = await atTheStocks('stocks-wary', { flags: ['varrow_wary'], gold: 9 });
+  huntersArrive(wary);
+  assertTrue(!cards(wary).includes('Pay his fine'), 'nine gold won’t pay a ten gold fine');
+  assertTrue(tagsOf(wary).includes('check:persuasion:15 drive:justice'), 'he was wary of the goblin bargain');
+  const rogue = await atTheStocks('stocks-tools', { character: rogue3 });
+  huntersArrive(rogue);
+  assertTrue(tagsOf(rogue).includes('check:thieves-tools:13') && tagsOf(rogue).includes('check:persuasion:13 drive:justice'));
+  const wizard = await atTheStocks('stocks-wizard', { character: knockWizard });
+  huntersArrive(wizard);
+  assertTrue(tagsOf(wizard).includes('spell:knock') && !tagsOf(wizard).includes('check:thieves-tools:13'));
+});
+
+test('Chapter 2: paying Fen’s fine frees him by law; the hunters back off, and he joins with the lead to Cairnfield', async () => {
+  const game = await atTheStocks('stocks-fine');
+  huntersArrive(game);
+  const xp = game.xp;
+  pick(game, 'Pay his fine');
+  assertEqual(game.money, 1500, 'ten of the 25 gold');
+  assertTrue(notes(game).includes('You pay 10 GP.') && notes(game).some((n) => n.startsWith('Fen Underbough joins you')), notes(game).join(' / '));
+  assertEqual(game.party.map((m) => m.id), ['odda', 'fen']);
+  assertTrue(['fen_freed', 'hunters_backed_off'].every((f) => game.flags.includes(f)));
+  assertEqual(game.xp - xp, 500, 'the hunters’ XP, without a fight');
+  assertTrue(pageText(game).includes('water and wheels') && pageText(game).includes('Keep your hands where I can see them'));
+  assertTrue(toCairnfield(game) && missingMiller(game).includes('water and wheels'));
+});
+
+test('Chapter 2: talking Varrow round is a Justice moment; if he won’t, the other ways are still there', async () => {
+  const game = await atTheStocks('stocks-varrow-no', { flags: ['varrow_wary'] }); // Wren's Drive is Justice
+  huntersArrive(game);
+  game.inspiration = false;
+  forceNextD20(1);
+  pick(game, 'Fetch Captain Varrow');
+  revealAll(game);
+  assertTrue(game.inspiration, 'her Drive');
+  assertTrue(pageText(game).includes('He sits till sundown') && !fenIn(game));
+  assertTrue(!cards(game).some((t) => t.startsWith('Fetch Captain Varrow')) && cards(game).includes('Pay his fine'), 'asked once; the other ways are still there');
+
+  const agrees = await atTheStocks('stocks-varrow-yes', { flags: ['varrow_approves'] });
+  huntersArrive(agrees);
+  forceNextD20(20);
+  pick(agrees, 'Fetch Captain Varrow');
+  revealAll(agrees);
+  assertTrue(fenIn(agrees) && ['varrow_freed_fen', 'hunters_backed_off'].every((f) => agrees.flags.includes(f)) && toCairnfield(agrees));
+});
+
+test('Chapter 2: picking the padlock pleases Fen, but the hunters draw: face them down, or fight', async () => {
+  const fumble = await atTheStocks('stocks-fumble', { character: rogue3 });
+  huntersArrive(fumble);
+  forceNextD20(1);
+  pick(fumble, 'Pick the padlock');
+  revealAll(fumble);
+  assertTrue(!fenIn(fumble) && !cards(fumble).some((t) => t.startsWith('Pick the padlock')) && cards(fumble).includes('Pay his fine'), 'the watchman woke up');
+
+  const game = await atTheStocks('stocks-pick', { character: rogue3 });
+  huntersArrive(game);
+  forceNextD20(20);
+  pick(game, 'Pick the padlock');
+  revealAll(game);
+  assertTrue(fenIn(game) && game.flags.includes('picked_the_stocks'));
+  assertEqual(memberOf(game, 'fen').approval, 1, 'cleverness');
+  assertEqual(cards(game), ['Face them down', 'Fight them']);
+  assertEqual(tagsOf(game), ['check:intimidation:13', 'combat:stocks-hunters']);
+  const xp = game.xp;
+  forceNextD20(20);
+  pick(game, 'Face them down');
+  revealAll(game);
+  assertTrue(game.flags.includes('hunters_faced_down') && game.xp - xp === 500 && toCairnfield(game));
+});
+
+test('Chapter 2: Knock springs the padlock with a bang; if Gaunt won’t be stared down, it’s a fight', async () => {
+  const game = await atTheStocks('stocks-knock', { character: knockWizard });
+  huntersArrive(game);
+  pick(game, 'Knock the padlock open');
+  assertEqual(game.slotsUsed[1], 1, 'a level 2 slot');
+  assertTrue(notes(game).includes('You cast Knock, using a level 2 slot.') && fenIn(game) && game.flags.includes('knocked_the_stocks'));
+  forceNextD20(1);
+  pick(game, 'Face them down');
+  revealAll(game);
+  assertEqual(cards(game), ['Fight!']);
+  assertEqual(tagsOf(game), ['combat:stocks-hunters']);
+});
+
+test('Chapter 2: fighting for Fen frees him first, so he fights beside you; then you decide whether Gaunt hangs', async () => {
+  const game = await atTheStocks('stocks-fight');
+  huntersArrive(game);
+  pick(game, 'Tell Gaunt that if she wants him');
+  assertTrue(fenIn(game) && pageText(game).includes('Been at it since breakfast'));
+  assertEqual(cards(game), ['Fight!']);
+  assertEqual(fightRating(game, 'stocks-hunters').rating, 'Moderate', 'for the three of you');
+  startFight(game, game.story.currentChoices[0]);
+  const at = (id) => fight.combatantById(game.battle, id).pos;
+  assertEqual([at('hero'), at('odda'), at('fen')], [{ x: 3, y: 5 }, { x: 2, y: 4 }, { x: 3, y: 4 }], 'the party together, the hunters across the square');
+  assertEqual(fight.enemies(game.battle).map((c) => c.name), ['Mercy Gaunt', 'Bandit 1', 'Bandit 2']);
+  for (const foe of fight.enemies(game.battle)) foe.hp = 0;
+  game.battle.outcome = 'victory';
+  game.page = continueAfterBattle(game);
+  assertTrue(game.flags.includes('hunters_beaten') && pageText(game).includes("That's a hanging") && pageText(game).includes('Not even single'));
+  assertEqual(cards(game), ["Speak for her: there's been enough blood for one day", "Leave her to the captain's law"]);
+  pick(game, 'Speak for her');
+  assertEqual([memberOf(game, 'fen').approval, memberOf(game, 'odda').approval], [1, 1], 'sparing people; mercy');
+  assertTrue(game.flags.includes('gaunt_spared') && toCairnfield(game));
+
+  const rope = await atTheStocks('stocks-rope');
+  huntersArrive(rope);
+  pick(rope, 'Tell Gaunt that if she wants him');
+  settleHunters(rope);
+  pick(rope, 'Leave her to the captain');
+  assertEqual([memberOf(rope, 'fen').approval, memberOf(rope, 'odda').approval], [-1, 0], 'Fen hates a hanging');
+  assertTrue(rope.flags.includes('gaunt_hanged') && toCairnfield(rope));
+
+  const pair = await atTheStocks('stocks-pair', { odda: false });
+  huntersArrive(pair);
+  pick(pair, 'Tell Gaunt that if she wants him');
+  assertEqual(fightRating(pair, 'stocks-hunters').rating, 'High', 'just you and Fen');
+});
+
+test('Chapter 2: losing to the hunters is Fate’s Mercy: robbed, but they ran without Fen', async () => {
+  const game = await atTheStocks('stocks-mercy');
+  huntersArrive(game);
+  pick(game, 'Tell Gaunt that if she wants him');
+  memberOf(game, 'fen').hp = 0;
+  memberOf(game, 'odda').hp = 0;
+  settleHunters(game, false);
+  assertTrue(game.money === 0 && ['hunters_fled', 'stocks_fates_mercy'].every((f) => game.flags.includes(f)));
+  assertTrue(fenIn(game) && memberOf(game, 'fen').hp > 0 && pageText(game).includes('horse trough'), 'still with you, and rested');
+  assertEqual(currentLocation(game), 'Bramblegate, the Tallow and Thistle');
+  assertTrue(toCairnfield(game));
+});
+
+test('Chapter 2: if Fen dies fighting the hunters, the temple keeps him, and their writ points to Cairnfield', async () => {
+  const game = await atTheStocks('stocks-fen-dies');
+  huntersArrive(game);
+  pick(game, 'Tell Gaunt that if she wants him');
+  memberOf(game, 'fen').fallen = true;
+  settleHunters(game);
+  assertTrue(pageText(game).includes("he's gone") && game.flags.includes('fen_fell_at_the_stocks'));
+  pick(game, 'Speak for her');
+  assertTrue(!pageText(game).includes('card trick') && pageText(game).includes('laid before the altar flame') && pageText(game).includes('Deliver him, or proof of him'));
+  assertTrue(toCairnfield(game));
+});
+
+test('Chapter 2: selling Fen is a Wealth moment that Odda hates; Gaunt names Cairnfield, and he remembers your face', async () => {
+  const game = await atTheStocks('stocks-sold', { character: { ...champion, drive: 'wealth' } });
+  huntersArrive(game);
+  game.inspiration = false;
+  pick(game, "Take Gaunt's ten gold");
+  assertEqual(game.money, 3500);
+  assertTrue(game.inspiration && memberOf(game, 'odda').approval === -1 && !fenIn(game) && game.flags.includes('fen_sold'));
+  assertTrue(pageText(game).includes("I'll remember your face") && pageText(game).includes('floury fellow'));
+  assertEqual(currentTime(game), 'Dusk');
+  assertTrue(toCairnfield(game));
+});
+
+test('Chapter 2: leave Fen to the hunters, and the lead comes from Nettle’s goblins (for a favour) or from Varrow', async () => {
+  const goblins = await atTheStocks('stocks-left-goblins', { flags: ['goblins_at_mill'] });
+  huntersArrive(goblins);
+  pick(goblins, 'Leave him to it');
+  assertTrue(['fen_left_behind', 'owe_nettle'].every((f) => goblins.flags.includes(f)) && pageText(goblins).includes('now you owe her') && toCairnfield(goblins));
+
+  const alone = await atTheStocks('stocks-left-varrow', { odda: false });
+  huntersArrive(alone);
+  assertTrue(!pageText(alone).includes('Choir money'), 'no Odda, no word from her');
+  pick(alone, 'Leave him to it');
+  assertTrue(pageText(alone).includes("If your miller's anywhere, he's there") && !alone.flags.includes('owe_nettle') && toCairnfield(alone));
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

@@ -902,7 +902,7 @@ export function attackPreview(game, optionId, targetId, actorId = 'hero') {
     preview.sneak = option.sneakAttack && sneakAttackReason(game, hero, target, mode) ? option.sneakAttack : null;
     if (preview.sneak) preview.describe += ` · Sneak Attack +${preview.sneak} on a hit`;
     // Parry: its reaction can add 2 to its AC against a melee hit.
-    if ((option.how === 'melee' || spirit) && canParry(game, target)) preview.describe += ' · it can Parry (+2 AC against one melee hit)';
+    if ((option.how === 'melee' || spirit) && canParry(game, target)) preview.describe += ` · ${target.name} can Parry (+2 AC against one melee hit)`;
   }
   if (option.potent) preview.describe += ` · half damage even on a ${option.how === 'save' ? 'save' : 'miss'} (Potent Cantrip)`;
   // A wall in the way gives Total Cover. (Spiritual Weapon strikes from beside the foe.)
@@ -1117,7 +1117,7 @@ function parry(game, target, roll) {
   const ac = acOf(game, target) + 2;
   if (roll.total >= ac) return roll; // it would hit anyway: keep the reaction
   game.battle.reactionsUsed.push(target.id);
-  log(game, `${target.name} parries! (its reaction: AC ${ac} against this attack)`);
+  log(game, `${target.name} parries! (a reaction: AC ${ac} against this attack)`);
   return retarget(roll, ac);
 }
 

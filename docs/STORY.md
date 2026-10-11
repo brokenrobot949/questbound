@@ -263,7 +263,7 @@ Fate's Mercy costs XP along the way, so a hero who lost fights may still be leve
 - **The breach:** Disguise Self (a grey robe, a hymnal) walks you right up to the singing acolyte for a surprise attack. If you catch him, Charm Person (he saves) is a third way to make him talk.
 - **The hymnal:** its map is torn across. Mending shows the road north past the Old Ford to Cairnfield, ringed twice in red (`hymnal_mended`), which points to Chapter 2.
 - **Guidance** adds 1d4 to every ability check in a scene, cast just before.
-- **Waiting for Chapter 2:** Knock, Invisibility and Lesser Restoration are level 2 spells, so a hero first has them at level 3, at the end of this chapter (see Chapter 2). The same goes for a Life Cleric's Aid, which works on the Sheet and in fights from then on, and Lesser Restoration, which works in fights (against a Ghoul's paralysis) and frees Lark in Chapter 2.
+- **Waiting for Chapter 2:** Knock, Invisibility and Lesser Restoration are level 2 spells, so a hero first has them at level 3, at the end of this chapter (see Chapter 2). The same goes for a Life Cleric's Aid, which works on the Sheet and in fights from then on, and Lesser Restoration, which works in fights (against a Ghoul's paralysis) and frees Lark in Chapter 2. Knock opens Fen's stocks in Chapter 2; Invisibility still waits for the Choir's camp.
 - **A Cleric's Turn Undead** (from level 2) works on the lower warren's zombies and the skeleton at the breach.
 
 **Chapter 1 side content** (Phase 2):
@@ -276,9 +276,9 @@ Fate's Mercy costs XP along the way, so a hero who lost fights may still be leve
 **Fights ready for these scenes** (`data/campaign/encounters.js`; try them from debug mode's Practice fight). Chapter 2's fights are sized for the party the story expects, and the fight card rates each one for the party the player actually has.
 
 - `ossuary-ghouls`, **The Ghouls in the Ossuary** (beat 1): two Ghouls in the last room of the dungeon under Dunn's Mill; the party comes in by the doorway at the top, and Lark lies Paralyzed on a burial ledge in the far wall, out of the fight. Moderate for a level 3 hero and Odda (400 XP; Low 300, Moderate 450).
-- `stocks-hunters`, **Bounty Hunters at the Stocks** (beat 3): a Bandit Captain (with a crossbow: Caldmere has no guns) and two Bandits across the market square. Moderate for a level 3 party of three: choosing to fight for Fen frees him first, so he fights beside you and Odda (Rob, Oct 10, 2026).
+- `stocks-hunters`, **Bounty Hunters at the Stocks** (beat 3): Mercy Gaunt (a Bandit Captain, with a crossbow: Caldmere has no guns) and two Bandits across the market square. Moderate for a level 3 party of three: choosing to fight for Fen frees him first, so he fights beside you and Odda (Rob, Oct 10, 2026). For you and Fen alone, it's High.
 
-Beats 1 and 2 are written (`story/act-1/ch2-millers-daughter.ink`); the rest of the chapter is not yet.
+Beats 1 to 3 are written (`story/act-1/ch2-millers-daughter.ink` and `story/act-1/ch2-stocks.ink`); the rest of the chapter is not yet.
 
 1. **The miller's missing daughter.** *(The side-quest example from DESIGN.md, now part of the main line.)* The night before, Lark knocked to say the Choir is digging toward the Kings' Barrow; you told her you'd go at first light. In the morning Morwen can't find her: Lark has been sleeping in Morwen's back room since her father went, and she's gone, with his hatchet and Morwen's lantern. New quest: **The Miller's Daughter**. *(Promising Morwen you'll bring her back is a Kinship Drive moment.)*
    - **The delve under Dunn's Mill** (4 rooms on the dungeon map), with Odda (beat 2):
@@ -295,18 +295,33 @@ Beats 1 and 2 are written (`story/act-1/ch2-millers-daughter.ink`); the rest of 
    - **Losing the fight is Fate's Mercy:** you wake in the temple, robbed (your purse is down among the bones). Nettle's goblins brought you all in (if they're camped at the mill), to Warden Pike's horror; otherwise Captain Varrow's watch went down with torches. The ghouls fled into the dark (`ossuary_ghouls_fled`), and Lark is alive.
 2. **Odda Brasswick arrives.** A dwarf priest sent by her order's mother-house to look into the walking dead: brusque, kind, and always brewing tea. She's waiting at Dunn's Mill, having seen a girl with a lantern go into the cellar at first light, and she joins before the delve (`join_party("odda")`), whatever you say (Rob, Oct 10, 2026). She remembers you if she carted you home from the quarry road (`met_odda`). Over breakfast she says she'll stay with you, and drops a seed for beat 6: the Prior "keeps his ledgers locked and his face shut. In my experience, that means debts." *(Companion.)*
    - If Odda dies in the ossuary fight, the scenes go on without her, and the temple keeps her before the altar flame until she can be raised.
-3. **Fen in the stocks.** A halfling pickpocket, caught with the reeve's purse. Bounty hunters arrive (a Bandit Captain and two Bandits): "Dead or alive. The Choir pays double for dead."
+3. **Fen in the stocks.** *(Built: `ch2_stocks`, straight after Morwen's breakfast.)* That afternoon, a halfling sits in the stocks in the market square, caught with the reeve's purse. The slate says "One day, or ten gold" (Rob, Oct 11, 2026). Old Tibb the watchman dozes beside him.
    - Fen begs: "I know where they're taking your miller. I used to sing with them."
-   - A Rogue who read the thieves' chalk marks in Bramblegate (`read_cant_marks`) knows him at once: he's the songbird with the bounty on him.
-   - **Choices:**
-     - Free him: pick the lock (Thieves' Tools, or Knock it open, loudly), persuade Varrow, or pay his fine. He joins (`join_party("fen")`). *(Companion.)*
-     - Hand him over (a Wealth Drive moment).
-     - Fight the hunters (`stocks-hunters`: Moderate for three). Choosing to fight frees Fen first, and he fights beside you (Rob, Oct 10, 2026).
-   - Turning Fen away doesn't dead-end anything: Nettle's goblins or the hunters give up the same lead, at a price.
+   - **Talking to him** (the questions loop, and nothing is said twice): who he is; who he sang with (the Choir: two winters, until he worked out what the songs were for); Insight 12 to read him (`fen_read_true`: he's lying about the purse, not the Choir); and where the miller is ("Plank first, secrets after").
+   - A Rogue who read the thieves' chalk marks in Bramblegate (`read_cant_marks`) knows him at once, as the songbird with the bounty on him (`knew_fen_songbird`).
+   - **The hunters ride in:** **Mercy Gaunt** (a Bandit Captain) and two Bandits, with a writ under the Choir's grey seal. "Dead or alive. The Choir pays double for dead." He walks free at sundown, so they sit down to wait, and Gaunt offers you ten gold to walk on. Odda calls it "Choir money, buying a dead man in a town square."
+   - **Getting him out by law** (the hunters won't fight in front of the watch-house, so they ride off: `hunters_backed_off`):
+     - Pay his fine: 10 gold. A hero robbed by Fate's Mercy under the mill may not have it.
+     - Fetch Captain Varrow and talk him round, a Justice moment: Persuasion 10 if he approved of how you dealt with the goblins (`varrow_approves`), 15 if he was wary (`varrow_wary`). He releases Fen into the reeve's hire and tells Gaunt to be gone by sundown (`varrow_freed_fen`). If he won't, you try something else.
+   - **Getting him out against the law** (Old Tibb shouts, and Gaunt draws: "Now he's an escaped thief, and nobody minds what happens to those"):
+     - Pick the padlock: Thieves' Tools 13 (`picked_the_stocks`, Fen +1 for cleverness). A slip wakes Tibb, and you try something else.
+     - Knock: the lock springs with a bang the whole square hears (`knocked_the_stocks`).
+     - Then face them down (Intimidation 13: `hunters_faced_down`), or fight. A failed stare-down is a fight.
+   - **Fight for him**, a Freedom moment: "If you want him, you'll come through me." Fen springs the lock himself with a bent nail he's worked at since breakfast, joins, and fights beside you (`stocks-hunters`).
+   - **However Fen gets out, he joins** (`join_party("fen")` and `fen_freed`). *(Companion.)* Getting him clear of the hunters without a fight is worth their 500 XP; the fight gives its own.
+   - **After a won fight** (`hunters_beaten`), Varrow means to hang Gaunt for drawing steel in his square (Rob, Oct 11, 2026). Speak for her: she's jailed, stripped of her horses and coin, and run out of town (`gaunt_spared`, Fen +1 for sparing people, Odda +1 for mercy). Or leave her to the captain's law (`gaunt_hanged`, Fen −1: he hates hangings). Nothing is shown.
+   - **Losing the fight is Fate's Mercy:** you wake in the temple the next morning, robbed. The watch came running and the hunters ran, with your purse, but they dropped Fen in the horse trough first (`hunters_fled`, `stocks_fates_mercy`).
+   - **If Fen dies in the fight** (`fen_fell_at_the_stocks`), the temple keeps him before the altar flame until he can be raised, and the lead comes from Gaunt's torn writ: "Deliver him, or proof of him, to the Choir of Ash at Cairnfield."
+   - **Fen's lead,** over a pie at the Tallow and Thistle: the Choir's camp is at **Cairnfield**, past the Old Ford, among the opened barrows. They took Garrick because they need someone who knows water and wheels: something under the Kings' Barrow floods. (With `hymnal_mended`, it's the place ringed twice in red.) He comes along because the safest place in Caldmere is behind the people who kill Choir.
+   - **Selling him** (a Wealth Drive moment): take Gaunt's ten gold and walk on (`fen_sold`, Odda −1). Gaunt names Cairnfield, and says she saw a big floury fellow working the Choir's sluices there. Fen: "I'll remember your face."
+   - **Leaving him** to it (`fen_left_behind`): at sundown the hunters ride out with him over a saddle. Nettle's goblins bring the lead to the inn's back door if they're camped at the mill, and now you owe Mother Nettle a favour (`owe_nettle`); otherwise Varrow, at the bar, read it on the hunters' writ.
+   - **Sold or left behind, Fen escapes the hunters and turns up later, sour** (Rob, Oct 11, 2026): he can still join, with low approval. That's for the Old Ford (beat 5).
+   - Every way ends with `heard_of_cairnfield` and the aim "Take the barrow road north, past the Old Ford, to the Choir's camp at Cairnfield."
 4. **The Bond returns** *(the Act I slot; see the Bond table)*.
 5. **The Old Ford.** At night, the dead cross the ford carrying capstones from the barrows. The watch-post there is under siege (Zombies and a Ghoul; the objective is to keep three soldiers alive).
    - **Clue:** the dead are unsealing the old oath-graves one by one. Each was a ward.
    - Saving the soldiers raises Regency approval, and the Sibling Bond's letter came from this post.
+   - **If you sold Fen or left him in the stocks** (`fen_sold`, `fen_left_behind`), he turns up here, having slipped Gaunt's ropes on the road north, sour and footsore. He can still join, starting with low approval (Rob, Oct 11, 2026).
 6. **The temple's secret.** *(Odda's personal hook.)* Prior Crane's ledger shows a payment from "the Choir of Ash." He sold the temple's centuries-old map of the Kings' Barrow to clear the temple's debts, owed to Free League moneylenders.
    - **Choices:**
      - Expose him to the reeve (Justice).

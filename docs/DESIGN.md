@@ -66,7 +66,7 @@ How Heroic Inspiration works in the game so far (★ in the status line means yo
 
 Narration is short, vivid and second person: "You push the door. The smell reaches you first." The DM has a light personality and reacts to big moments: a natural 20 gets a flourish, a natural 1 gets a wry line. NPCs speak in their own voices with a pixel portrait.
 
-How portraits work so far: a line where someone speaks shows their portrait and name beside it, once for a run of lines by the same person. People are drawn with the same sprite builder as heroes (Warden Pike in her helmet and chain mail, Hob the gnome smith in his apron); goblins, the Choir and the wolf use their DawnLike sprites. The cast and their looks are in `data/campaign/people.js`. Lines the hero speaks have no portrait.
+How portraits work so far: a line where someone speaks shows their portrait and name beside it, once for a run of lines by the same person. People are drawn with the same sprite builder as heroes (Warden Pike in her helmet and chain mail, Hob the gnome smith in his apron); goblins, the Choir, the wolf and Mercy Gaunt's bounty hunters use their DawnLike sprites, the same ones they have on the battle grid. The cast and their looks are in `data/campaign/people.js`. Lines the hero speaks have no portrait.
 
 **Memory and reactivity**
 
@@ -255,7 +255,7 @@ How spells work in the game so far:
 - **In scenes:** a spell choice shows only to a hero who can cast it now, and its card says what it costs: "Spell · Light" for a cantrip, "· as a Ritual" (10 minutes longer, no slot), "· free" (Magic Initiate's once-per-Long-Rest cast), or "· level 1 slot". The scene takes the cheapest way, and a DM note says what was spent.
   - A Wizard can cast any Ritual in their spellbook, prepared or not; anyone else needs the ritual spell prepared.
   - A spell its target saves against, such as Charm Person on Warden Pike, rolls that save in the open. The die is the NPC's, so the colours flip: their success is your setback.
-  - STORY.md lists where each spell is useful in Chapter 1. Knock and Invisibility wait for Chapter 2, because a hero first has them at level 3.
+  - STORY.md lists where each spell is useful in Chapter 1. Level 2 spells wait for Chapter 2, because a hero first has them at level 3: Lesser Restoration frees Lark, Knock opens the stocks' padlock (with a bang the whole square hears), and Invisibility waits for the Choir's camp.
 - **Guidance:** a hero who knows it adds 1d4 to every ability check in a scene, shown in the roll's breakdown.
 - **Not yet in fights:** Charm Person, Fog Cloud and Invisibility. They work in scenes.
 
@@ -378,7 +378,8 @@ Initiative, attack rolls against AC, critical hits, damage types and resistances
 - **Lark's numbness is a story liberty** (Rob, Oct 10, 2026): in the ossuary, the Ghouls have clawed her so often that the numbness has built up and won't fade by itself for an hour, so Lesser Restoration (yours, or Odda's) frees her at once, or you carry her out. In fights, the Claw keeps the rule above.
 - **The Ghouls in the Ossuary** is the last room of the dungeon under Dunn's Mill. Lark lies on a burial ledge in the far wall, drawn on the grid; nobody can step there, and nobody fights her.
 - **Bandit** (CR 1/8, 25 XP): Scimitar or Light Crossbow; it shoots when it can.
-- **Bandit Captain** (CR 2, 450 XP): Multiattack, two attacks with Scimitar or Light Crossbow. **Parry** (its reaction): +2 AC against a melee hit, used only when that turns the hit into a miss, never against a Critical Hit. Your attack's description warns "it can Parry". The SRD's captain carries a Pistol; Caldmere has no firearms, so ours has a Light Crossbow (+5, range 80/320 ft, 1d8 + 3) instead (Rob, Oct 10, 2026).
+- **Bandit Captain** (CR 2, 450 XP): Multiattack, two attacks with Scimitar or Light Crossbow. **Parry** (its reaction): +2 AC against a melee hit, used only when that turns the hit into a miss, never against a Critical Hit. Your attack's description warns "Mercy Gaunt can Parry", naming whoever it is. The SRD's captain carries a Pistol; Caldmere has no firearms, so ours has a Light Crossbow (+5, range 80/320 ft, 1d8 + 3) instead (Rob, Oct 10, 2026).
+- **Bounty Hunters at the Stocks** is Bramblegate's market square: Mercy Gaunt (a Bandit Captain) and two Bandits at the top, by the stocks, and the party together near the bottom. Fen fights beside you, because choosing to fight frees him first.
 
 **Encounter design**
 
@@ -535,9 +536,9 @@ You play one character, but up to two companions can travel with you, chosen fro
 **How companions work so far (Phase 2)**
 
 - **Odda Brasswick** (dwarf Cleric, Acolyte, Protector) and **Fen Underbough** (halfling Rogue, Criminal) are full characters, built like heroes. Up to two travel with you.
-- **Joining and leaving:** a scene adds or removes a companion (`join_party`, `leave_party`), and the DM says so. Odda joins at Dunn's Mill at the start of Chapter 2, and goes down the ossuary with you (Rob, Oct 10, 2026). Fen joins at the stocks, later in Chapter 2 (not written yet). Debug mode can still add or remove either.
+- **Joining and leaving:** a scene adds or removes a companion (`join_party`, `leave_party`), and the DM says so. Odda joins at Dunn's Mill at the start of Chapter 2, and goes down the ossuary with you (Rob, Oct 10, 2026). Fen joins in Bramblegate's market square, the moment you get him out of the stocks (Chapter 2, beat 3). If you sell him to the bounty hunters or leave him to them, he escapes and turns up later, sour, and can still join, with low approval (Rob, Oct 11, 2026; that's the Old Ford's scene, not written yet). Debug mode can still add or remove either.
 - **Their spells in scenes:** a scene can ask a companion to cast a spell they have (`companion_can_cast`, `companion_cast`): Odda frees Lark with Lesser Restoration. The card says whose spell it is and what it costs them ("Odda's spell · Lesser Restoration · level 2 slot"), and it uses their slot, not yours.
-- **If a companion dies in a story fight,** the scene goes on without their lines (`companion_alive`). If Odda dies in the ossuary, the temple keeps her before the altar flame until she can be raised; raising the dead at a temple comes later, and debug mode's Raise works meanwhile.
+- **If a companion dies in a story fight,** the scene goes on without their lines (`companion_alive`). If Odda dies in the ossuary, or Fen in the fight at the stocks, the temple keeps them before the altar flame until they can be raised; raising the dead at a temple comes later, and debug mode's Raise works meanwhile.
 - **Levels:** they're always your level. Their big picks are set for now: Odda takes the Life Domain at level 3, Fen the Thief. Each later level takes the fixed Hit Points, and their Hit Points rise when yours do.
 - **The Party section of the Sheet** shows each companion's portrait, Hit Points, likes and dislikes, full sheet and **tactic**:
   - **Aggressive:** goes after the foe they'd hurt most. Odda opens a real fight with Spiritual Weapon (from level 3), or Bless before then.
@@ -565,7 +566,7 @@ You play one character, but up to two companions can travel with you, chosen fro
 - **When you fall**, the fight goes on while a companion stands. You make death saves, and they try to get you back up. The fight is lost only if you die, or you're stable at 0 Hit Points with no companion left standing; then Fate's Mercy happens as before. After a win, anyone at 0 Hit Points comes to with 1.
 - **Companions fall** and make death saves as you do. Three failures, or a blow of their whole Hit Point maximum, and they die. A fallen companion stays with you but doesn't fight until raised: at a temple or by a spell, once those exist. Debug mode can raise them for now.
 - **Long Rests** bring them back to full, as they do you.
-- **Approval:** each companion keeps a score. Scenes raise or lower it with `approve(id, change)` when you do something they like or dislike (their likes and dislikes are in the data and on the Sheet). The score isn't shown to the player; debug mode shows it. Odda's first moments, under Dunn's Mill: drawing the Ghouls off Lark (+1), robbing the opened coffins (−1), and telling Lark the truth about her father (+1) or a comforting lie (−1).
+- **Approval:** each companion keeps a score. Scenes raise or lower it with `approve(id, change)` when you do something they like or dislike (their likes and dislikes are in the data and on the Sheet). The score isn't shown to the player; debug mode shows it. Odda's first moments, under Dunn's Mill: drawing the Ghouls off Lark (+1), robbing the opened coffins (−1), and telling Lark the truth about her father (+1) or a comforting lie (−1). At the stocks: selling Fen to the bounty hunters (Odda −1), picking the stocks' padlock (Fen +1, for cleverness), and, after beating the hunters, speaking for their leader when Captain Varrow means to hang her (Fen +1 and Odda +1) or leaving her to the rope (Fen −1: he hates hangings).
 - **Not yet:**
   - Odda's other spells in a fight (Guiding Bolt, Command, Sanctuary), and companions using the Help action.
   - Controlling their turns yourself.

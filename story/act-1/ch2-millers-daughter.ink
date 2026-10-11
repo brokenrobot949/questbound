@@ -18,6 +18,7 @@
 // comforting lie -1).
 // Spells: Minor Illusion lures the ghouls away for a surprise attack; Lesser Restoration
 // frees Lark.
+// After Morwen's breakfast, the story goes on to Fen in the stocks (ch2-stocks.ink).
 
 === ch2_morning ===
 You sleep badly after that, and wake to grey light and rain on the shutters. Downstairs, the common room of the Tallow and Thistle smells of bacon. Morwen is standing at the foot of the stairs with a cup of tea gone cold in her hands. #location:Bramblegate, the Tallow and Thistle #time:Morning
@@ -354,11 +355,16 @@ Odda eats like someone who's been on the road a week, then sits back with a pot 
 "I came up here to find out why the dead won't lie down," she says. "Seems to me you're going the same way, and you're handy in a hole. So I'll come along, if it's all the same to you. Somebody has to keep you breathing." #speaker:odda
 
 "I'm lodging at the temple, for my sins," she adds. "Your Prior keeps his ledgers locked and his face shut. In my experience, that means debts." She sniffs her tea. "Not my business. Yet." #speaker:odda
-~ set_objective("Find out where the Choir took Garrick Dunn, with Odda beside you. (The rest of Chapter 2 is still being written.)")
--> END
+~ set_objective("Find out where the Choir took Garrick Dunn, with Odda beside you.")
+-> out_to_the_square
 
 // Odda died in the ossuary fight. She stays with the party, fallen, until she can be raised.
 = odda_lost
 Prior Crane takes Odda Brasswick in at the temple, and lays her before the altar flame. "She was one of ours," he says quietly. "We'll keep her here under the Flame until she can be brought back. It can be done, at a price, by priests stronger than me." #speaker:crane
-~ set_objective("Find out where the Choir took Garrick Dunn. (The rest of Chapter 2 is still being written.)")
--> END
+~ set_objective("Find out where the Choir took Garrick Dunn.")
+-> out_to_the_square
+
+// On to beat 3: Fen in the stocks (ch2-stocks.ink).
+= out_to_the_square
+* [Head out into the market square]
+    -> ch2_stocks

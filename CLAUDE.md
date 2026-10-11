@@ -8,7 +8,7 @@ Questbound is a single-player, tabletop-style fantasy RPG where the game acts as
 - After each change, explain in plain language what changed, how to see it working, and anything Rob needs to do.
 - If the design is unclear, or a technical limit would change the design, ask Rob instead of guessing.
 - When Rob changes a design decision, update `docs/DESIGN.md` so it stays the source of truth.
-- Build in the phases from `docs/DESIGN.md`, in small, testable slices. **Current phase: Phase 1 (Vertical slice).** Phase 0 is complete.
+- Build in the phases from `docs/DESIGN.md`, in small, testable slices. **Current phase: Phase 2 (Act I).** Phases 0 and 1 are complete. Update this line whenever work moves to a new phase.
 - Rob commits and pushes with GitHub Desktop. Do not run `git push` unless Rob asks.
 
 ## Hard constraints

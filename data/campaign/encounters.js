@@ -216,7 +216,8 @@ export const encounters = [
     whileHeroDown: '{name} crouches among the bones and gnaws at something you’d rather not see.',
     source: 'original',
   },
-  // Fen in the stocks: the bounty hunters come for him across the market square.
+  // Fen in the stocks: Mercy Gaunt's bounty hunters come for him across the market square.
+  // Choosing to fight frees Fen first (story/act-1/ch2-stocks.ink), so he starts beside you.
   {
     id: 'stocks-hunters',
     name: 'Bounty Hunters at the Stocks',
@@ -237,11 +238,11 @@ export const encounters = [
     },
     hero: { x: 3, y: 5 },
     monsters: [
-      { monster: 'bandit-captain', pos: { x: 4, y: 1 } },
+      { monster: 'bandit-captain', name: 'Mercy Gaunt', pos: { x: 4, y: 1 } },
       { monster: 'bandit', pos: { x: 1, y: 1 } },
       { monster: 'bandit', pos: { x: 6, y: 1 } },
     ],
-    whileHeroDown: '{name} turns back to the stocks, grinning.',
+    whileHeroDown: '{name} steps over you, and looks round for the halfling.',
     source: 'original',
   },
 ];

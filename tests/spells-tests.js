@@ -502,7 +502,6 @@ const acolyteFighter = {
 // Spells with no use in a fight yet that are waiting for scenes still to be written. Every
 // other spell without one must unlock a choice somewhere.
 const WAITING = {
-  knock: 'Chapter 2: freeing Fen from the stocks (a level 2 spell, so not before level 3)',
   invisibility: 'Chapter 2: sneaking into the Choir camp at Cairnfield (level 2)',
   guidance: 'works on every ability check in a scene instead',
 };

@@ -351,9 +351,26 @@ export function bindExternals(story, runtime) {
   story.BindExternalFunction(
     'give_coins',
     (gp) => {
-      if (!Number.isInteger(gp) || gp < 1) throw new Error(`give_coins needs a whole number of gold pieces, got ${gp}`);
-      runtime.game.money += gp * COPPER_PER.gp;
+      runtime.game.money += goldInCopper('give_coins', gp);
       note(runtime.game, dmNotes.coinsGained, { coins: moneyText(gp * COPPER_PER.gp) });
+    },
+    false,
+  );
+
+  // can_pay(gp): true if the hero has that many gold pieces' worth of money.
+  // pay(gp): they hand it over (a fine, a bribe, a toll), and the DM says so. Show the choice
+  // with can_pay and tag it #pay:gp, so the card shows the price, e.g.
+  //   * {can_pay(10)} [Pay his fine #pay:10]
+  //       ~ pay(10)
+  story.BindExternalFunction('can_pay', (gp) => runtime.game.money >= goldInCopper('can_pay', gp), false);
+  story.BindExternalFunction(
+    'pay',
+    (gp) => {
+      const { game } = runtime;
+      const copper = goldInCopper('pay', gp);
+      if (game.money < copper) throw new Error(`The hero can't pay ${gp} gold: check can_pay first`);
+      game.money -= copper;
+      note(game, dmNotes.coinsPaid, { coins: moneyText(copper) });
     },
     false,
   );
@@ -400,6 +417,12 @@ function aliveMember(game, id) {
 function note(game, template, values = {}) {
   const text = template.replace(/\{(\w+)\}/g, (_, key) => values[key] ?? '');
   game.pending.push({ type: 'note', text });
+}
+
+// A whole number of gold pieces from a scene, in copper; anything else is a story bug.
+function goldInCopper(name, gp) {
+  if (!Number.isInteger(gp) || gp < 1) throw new Error(`${name} needs a whole number of gold pieces, got ${gp}`);
+  return gp * COPPER_PER.gp;
 }
 
 function flagId(id) {

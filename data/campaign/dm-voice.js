@@ -40,6 +40,7 @@ export const dmNotes = {
   questFinished: 'Quest complete: {title}.',
   stoppingPoint: 'A good place to stop, if you need to: your game is saved, and the story will be right here.',
   coinsGained: 'You receive {coins}.',
+  coinsPaid: 'You pay {coins}.',
   itemGained: 'You now have: {item}.',
   itemBought: 'Bought: {item}, for {cost}.',
   itemGone: 'Gone from your pack: {item}.',

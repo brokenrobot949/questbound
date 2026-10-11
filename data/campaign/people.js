@@ -78,6 +78,15 @@ export const people = [
     source: 'original',
   },
   {
+    id: 'tibb',
+    name: 'Old Tibb', // the watchman who minds the stocks
+    species: 'human',
+    size: 'medium',
+    armor: 'leather-armor',
+    look: { skin: 'peach', hairStyle: 'bald', hairColor: 'white', beard: true, outfit: 'red', accent: 'grey', headgear: 'helmet' },
+    source: 'original',
+  },
+  {
     id: 'lark',
     name: 'Lark Dunn',
     species: 'human',
@@ -113,6 +122,10 @@ export const people = [
   { id: 'goblin-child', name: 'The goblin child', sprite: 'goblin-minion', source: 'original' },
   { id: 'goblin-warrior', name: 'A goblin warrior', sprite: 'goblin-warrior', source: 'original' },
   { id: 'acolyte', name: 'The Choir acolyte', sprite: 'cultist', source: 'original' },
+
+  // ---- The bounty hunters (Chapter 2): drawn as they are on the battle grid ----
+  { id: 'gaunt', name: 'Mercy Gaunt', sprite: 'bandit-captain', source: 'original' },
+  { id: 'hunter', name: 'A bounty hunter', sprite: 'bandit', source: 'original' },
 
   // ---- Beasts ----
   { id: 'wolf', name: 'The wolf', sprite: 'wolf', source: 'original' },
