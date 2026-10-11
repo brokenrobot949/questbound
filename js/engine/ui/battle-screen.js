@@ -12,7 +12,9 @@
 // lists the party (you first) to choose who it goes on, greying out whoever it can't reach or
 // wouldn't help, and you can tap them on the grid instead (framed in green). A spell for the
 // whole party in range (Bless, Aid) says who it will catch. A Potion of Healing works the same
-// way: drink it, or give it to a friend beside you. With companions, Help (under Other
+// way: drink it, or give it to a friend beside you. Allies who aren't in the party (the Old
+// Ford's soldiers, framed in pale blue) are in those lists for healing, a potion and Lesser
+// Restoration, after the party. With companions or allies, Help (under Other
 // actions) lists the foes beside you to distract and the fallen friends beside you to give
 // first aid; tap one there or on the grid. Other actions, Bonus Actions and
 // End Turn sit under the spells. After an attack of yours misses, a hero with Heroic
@@ -55,6 +57,8 @@ const DAMAGE_COLOR = '#ff8a7a';
 const HEALING_COLOR = '#7fd99a';
 // The frame round whoever a spell that helps can go on.
 const FRIEND_FRAME = '#7fd99a';
+// A faint frame round an ally who isn't in the party (the Old Ford's soldiers).
+const ALLY_FRAME = 'rgba(150, 190, 255, 0.55)';
 
 // Washes over squares on the grid: an area spell's reach, and where Misty Step can go.
 const AREA_WASH = ['rgba(240, 140, 60, 0.35)', 'rgba(240, 140, 60, 0.9)'];
@@ -645,8 +649,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       if (bonuses.includes('potion')) {
         // Alone, drink it straight away; with companions, choose who it's for.
         const potions = game.inventory.find((e) => e.id === 'potion-of-healing').quantity;
-        const company = fight.companionCombatants(battle).length > 0;
-        if (company) {
+        if (company()) {
           const what = `2d4 + 2 Hit Points (7 on average): drink it, or give it to a friend beside you · ${potions} in your pack`;
           const card = actionCard('Potion of Healing', what, () => {
             view.potion = !view.potion;
@@ -793,9 +796,10 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     return box;
   }
 
-  // True if the hero has companions in this fight (alive or not).
+  // True if the hero has companions in this fight (alive or not), or allies (the Old Ford's
+  // soldiers) to set up, heal or give a potion to.
   function company() {
-    return fight.companionCombatants(game.battle).length > 0;
+    return fight.companionCombatants(game.battle).length > 0 || fight.allyCombatants(game.battle).length > 0;
   }
 
   // A list of the party to choose from: a button for each, saying how they are (Hit Points, and
@@ -906,7 +910,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     for (const pos of (aimed && aimed.squares) || view.flash || []) washSquare(ctx, pos, size, scale, AREA_WASH);
     if (chosen && chosen.targeting === 'square') for (const pos of fight.teleportSquares(game, chosen.id)) washSquare(ctx, pos, size, scale, TELEPORT_WASH);
     // Who a spell that helps (or a potion) can go on, or who a party spell will catch.
-    const helping = !view.replaying && fight.isHeroTurn(game) && fight.companionCombatants(battle).length > 0;
+    const helping = !view.replaying && fight.isHeroTurn(game) && company();
     let friends = [];
     if (helping && view.potion) friends = fight.friendTargets(game, 'potion').filter((f) => !f.problem).map((f) => f.c);
     else if (helping && chosen && chosen.targeting === 'friend') friends = fight.friendTargets(game, chosen.id).filter((f) => !f.problem).map((f) => f.c);
@@ -925,8 +929,9 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     }
 
     // Creatures: the fallen first, so the standing are drawn on top. The fallen lie faded on
-    // their side; the Prone lie on their side.
-    const foes = scene.units.filter((u) => fight.combatantById(battle, u.id).side === 'enemy' && !u.escaped).sort((a, b) => (a.hp > 0) - (b.hp > 0));
+    // their side; the Prone lie on their side. Foes and allies (the Old Ford's soldiers) come
+    // from the DawnLike sheets; an ally has a pale frame, to tell friend from foe.
+    const foes = scene.units.filter((u) => !fight.isPartyMember(fight.combatantById(battle, u.id)) && !u.escaped).sort((a, b) => (a.hp > 0) - (b.hp > 0));
     // Companions: drawn as heroes are, faded and lying down at 0 Hit Points.
     for (const c of fight.companionCombatants(battle)) {
       const unit = scene.units.find((u) => u.id === c.id);
@@ -946,8 +951,9 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
         lying: !standing || unit.prone,
       });
       if (standing) drawHealthBar(ctx, pos, unit.hp / c.maxHp, size, scale);
+      if (standing && c.ally) frameSquare(ctx, pos, size, scale, ALLY_FRAME);
       // Who the chosen attack can reach.
-      if (view.option && standing && !view.replaying) {
+      if (view.option && standing && !view.replaying && c.side === 'enemy') {
         const preview = fight.attackPreview(game, view.option, unit.id);
         if (preview && preview.inRange) frameSquare(ctx, pos, size, scale, '#ff8a7a');
       }

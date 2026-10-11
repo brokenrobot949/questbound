@@ -1,13 +1,14 @@
 // The battle grid: squares 5 feet across, positions { x, y } from the top left.
 // Rules: SRD 5.2.1, "Combat on a Grid". Every square costs 5 feet to enter, diagonals included;
 // difficult terrain costs 10. You can move through an ally's square but not an enemy's, and
-// you can't end your move in anyone's square. Walls and obstacles can't be entered, and a
-// diagonal step can't cut across the corner of a wall. Crawling costs 5 feet more a square.
+// you can't end your move in anyone's square. Walls, obstacles and deep water can't be entered,
+// and a diagonal step can't cut across the corner of one. Crawling costs 5 feet more a square.
 
 export const SQUARE_FEET = 5;
 
 // A map from its rows of letters and a legend, e.g. legend['#'] = { terrain: 'wall' }.
-// Terrain: 'floor', 'wall', 'obstacle' (blocks movement, like a pile of sacks), 'difficult'.
+// Terrain: 'floor', 'wall', 'obstacle' (blocks movement, like a pile of sacks), 'difficult',
+// 'water' (deep water: nobody can wade in, but it blocks neither sight nor attacks).
 export function parseMap(rows, legend) {
   const height = rows.length;
   const width = rows[0].length;
@@ -29,7 +30,7 @@ export const samePos = (a, b) => a.x === b.x && a.y === b.y;
 
 export function isStandable(map, pos) {
   const cell = cellAt(map, pos);
-  return Boolean(cell && cell.terrain !== 'wall' && cell.terrain !== 'obstacle');
+  return Boolean(cell && cell.terrain !== 'wall' && cell.terrain !== 'obstacle' && cell.terrain !== 'water');
 }
 
 // What's in the way on a straight line from the middle of one square to the middle of

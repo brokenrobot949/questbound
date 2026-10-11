@@ -26,15 +26,24 @@ export function personSprite(person) {
   });
 }
 
+// The name under someone's portrait. The hero's Bond (a rival, say) goes by the name the
+// player gave them at creation (hero: the hero's character).
+export function speakerName(person, hero = null) {
+  const bond = hero && hero.bond;
+  if (person.bond && bond && bond.type === person.bond && bond.name) return bond.name;
+  return person.name;
+}
+
 // A line someone speaks: their portrait and name, then the paragraph. continued: the same
-// person spoke the paragraph before, so the portrait isn't repeated.
-export function speechBlock(text, speakerId, { continued = false } = {}) {
+// person spoke the paragraph before, so the portrait isn't repeated. hero: the hero's
+// character, for their Bond's name.
+export function speechBlock(text, speakerId, { continued = false, hero = null } = {}) {
   const person = findPerson(speakerId);
   const block = el('div', `speech${continued ? ' is-continued' : ''}`);
   const body = el('div', 'speech-body');
   if (!continued) {
     block.append(portraitOf(person));
-    body.append(el('p', 'speaker-name', person ? person.name : speakerId));
+    body.append(el('p', 'speaker-name', person ? speakerName(person, hero) : speakerId));
   }
   body.append(el('p', 'narration-text', text));
   block.append(body);

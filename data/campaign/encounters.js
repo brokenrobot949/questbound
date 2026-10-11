@@ -8,13 +8,22 @@
 //                the budget. The fight card itself rates the fight for the hero's party as it
 //                is when they choose it (combat/difficulty.js).
 //   map.rows     one letter per square; map.legend says what each letter is:
-//                  terrain 'floor', 'wall', 'obstacle' (blocks movement) or 'difficult'
-//                  (costs double to cross)
+//                  terrain 'floor', 'wall', 'obstacle' (blocks movement), 'difficult'
+//                  (costs double to cross) or 'water' (deep water: nobody can wade in, but it
+//                  blocks neither sight nor attacks)
 //                  tile / decor / wall: pictures from data/campaign/sprites.js
 //                or map: { dungeon, room }: the fight is in that room of a dungeon map
 //                (data/campaign/dungeons.js), and positions count from the room's top row
 //   hero         where the hero starts; monsters: each one and where it starts ({ x, y }),
 //                with a name if it has its own (Mother Nettle)
+//   allies       creatures who fight on the hero's side, played by the game: { id, monster,
+//                name, pos } (the Old Ford's soldiers, as Guards). They hold their ground, as a
+//                companion on Hold does, and the foes go for them too. They don't count
+//                towards the difficulty, and at 0 Hit Points they die. The story hears how
+//                many lived, and which (allies_standing() and ally_standing(id) in
+//                story/externals.ink)
+//   allyObjective  what the battle screen says about them: "Keep the watch alive" shows as
+//                "Keep the watch alive: 3 of 3 still standing."
 //   onlookers    figures who watch but don't fight: { decor, pos }, or someone from
 //                data/campaign/people.js: { person, pos, lying }. They stand in the way, and
 //                nobody fights them
@@ -46,6 +55,21 @@ const squareLegend = {
   s: { terrain: 'obstacle', tile: 'cobbles', decor: 'stocks' },
   b: { terrain: 'obstacle', tile: 'cobbles', decor: 'barrel' },
   x: { terrain: 'obstacle', tile: 'cobbles', decor: 'crates' },
+};
+
+// The Old Ford (Chapter 2): the barrow road crosses the river by a shallow ford (difficult
+// ground) between deep water. The watch-post's stone tower and a barricade of crates stand on
+// the north bank.
+const fordLegend = {
+  '#': { terrain: 'wall', wall: 'stone' },
+  ',': { terrain: 'floor', tile: 'grass' },
+  '.': { terrain: 'floor', tile: 'dirt' },
+  '"': { terrain: 'difficult', tile: 'grass', decor: 'bracken' },
+  T: { terrain: 'obstacle', tile: 'grass', decor: 'tree' },
+  o: { terrain: 'obstacle', tile: 'grass', decor: 'boulder' },
+  x: { terrain: 'obstacle', tile: 'grass', decor: 'crates' },
+  '~': { terrain: 'water', tile: 'deep-water' },
+  '=': { terrain: 'difficult', tile: 'ford' },
 };
 
 // The quarry road: a dirt road through grass, trees and bracken, up to the quarry's rock face.
@@ -243,6 +267,49 @@ export const encounters = [
       { monster: 'bandit', pos: { x: 6, y: 1 } },
     ],
     whileHeroDown: '{name} steps over you, and looks round for the halfling.',
+    source: 'original',
+  },
+  // The Old Ford at night: the dead come up out of the river at the watch-post. Its three
+  // soldiers fight beside the party (Guards, played by the game); the objective is to keep them
+  // alive. The party stands on the north bank, at the head of the ford.
+  {
+    id: 'ford-dead',
+    name: 'The Dead at the Old Ford',
+    difficulty: 'Moderate (a Ghoul and six Zombies are 500 XP; for a level 3 party of three, Low is 450 and Moderate 675. The watch’s three Guards fight beside you, and don’t count)',
+    sizedFor: { level: 3, party: 3 },
+    byHand: true,
+    map: {
+      rows: [
+        '##,..,TT',
+        '##,..,,T',
+        ',xx..xx,',
+        ',,,..,,,',
+        '~~====~~',
+        '~====~~~',
+        '~~====~~',
+        ',,,..,,"',
+        '",,..,o,',
+        'T,,..,,T',
+      ],
+      legend: fordLegend,
+    },
+    hero: { x: 3, y: 3 },
+    allies: [
+      { id: 'brannock', monster: 'guard', name: 'Sergeant Brannock', pos: { x: 4, y: 2 } },
+      { id: 'wat', monster: 'guard', name: 'Wat', pos: { x: 1, y: 3 } },
+      { id: 'nell', monster: 'guard', name: 'Nell', pos: { x: 6, y: 3 } },
+    ],
+    allyObjective: 'Keep the watch alive',
+    monsters: [
+      { monster: 'zombie', pos: { x: 2, y: 6 } },
+      { monster: 'zombie', pos: { x: 5, y: 6 } },
+      { monster: 'zombie', pos: { x: 1, y: 7 } },
+      { monster: 'zombie', pos: { x: 6, y: 7 } },
+      { monster: 'ghoul', pos: { x: 4, y: 8 } },
+      { monster: 'zombie', pos: { x: 3, y: 8 } },
+      { monster: 'zombie', pos: { x: 2, y: 9 } },
+    ],
+    whileHeroDown: '{name} turns north again, as if you were never there.',
     source: 'original',
   },
 ];

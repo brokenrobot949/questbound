@@ -10,6 +10,8 @@
 //     accent, headgear)
 //   Or drawn from the DawnLike sheets, for creatures:
 //     sprite   a sprite id from data/campaign/sprites.js (goblins, the Choir, a wolf)
+//   bond     for someone the hero names at creation (their Bond: 'rival', say): the portrait
+//            shows the name the player gave them, not this entry's name
 
 export const people = [
   // ---- Bramblegate ----
@@ -126,6 +128,33 @@ export const people = [
   // ---- The bounty hunters (Chapter 2): drawn as they are on the battle grid ----
   { id: 'gaunt', name: 'Mercy Gaunt', sprite: 'bandit-captain', source: 'original' },
   { id: 'hunter', name: 'A bounty hunter', sprite: 'bandit', source: 'original' },
+
+  // ---- The Old Ford (Chapter 2): the watch-post's soldiers, drawn as they are on the grid ----
+  { id: 'brannock', name: 'Sergeant Brannock', sprite: 'guard', source: 'original' },
+  { id: 'wat', name: 'Wat', sprite: 'guard', source: 'original' },
+  { id: 'nell', name: 'Nell', sprite: 'guard', source: 'original' },
+  {
+    id: 'penhallow',
+    name: 'Factor Penhallow', // the Free League's man, waiting out the dead at the Old Ford
+    species: 'human',
+    size: 'medium',
+    armor: null,
+    robe: true,
+    look: { skin: 'tan', hairStyle: 'cropped', hairColor: 'black', beard: true, outfit: 'black', accent: 'yellow', headgear: 'none' },
+    source: 'original',
+  },
+
+  // ---- The hero's Bond, when they turn up in person ----
+  {
+    id: 'rival',
+    name: 'Your rival',
+    bond: 'rival',
+    species: 'human',
+    size: 'medium',
+    armor: 'leather-armor',
+    look: { skin: 'peach', hairStyle: 'long', hairColor: 'black', beard: false, outfit: 'blue', accent: 'white', headgear: 'none' },
+    source: 'original',
+  },
 
   // ---- Beasts ----
   { id: 'wolf', name: 'The wolf', sprite: 'wolf', source: 'original' },

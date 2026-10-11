@@ -4,7 +4,7 @@
 import { test, assertEqual, assertTrue, assertThrows, scriptedRng, run } from './harness.js';
 import { createRng } from '../js/engine/rules/rng.js';
 import { forceNextD20 } from '../js/engine/rules/dice.js';
-import { lineBlock, parseMap, reachableSquares, squaresBetween, key } from '../js/engine/combat/grid.js';
+import { isStandable, lineBlock, parseMap, reachableSquares, squaresBetween, key } from '../js/engine/combat/grid.js';
 import { heroAttackOptions, hitChance, rollDamage } from '../js/engine/combat/attacks.js';
 import * as fight from '../js/engine/combat/battle.js';
 import { startingInventory } from '../js/engine/character/inventory.js';
@@ -70,6 +70,15 @@ test('Grid: walls block sight and attacks; obstacles block sight only; neighbour
   const map = parseMap(['.....', '..#..', '.....', '..o..', '.....'], { ...legend, o: { terrain: 'obstacle' } });
   assertEqual([lineBlock(map, { x: 0, y: 1 }, { x: 4, y: 1 }), lineBlock(map, { x: 0, y: 3 }, { x: 4, y: 3 }), lineBlock(map, { x: 0, y: 0 }, { x: 4, y: 0 })], ['wall', 'obstacle', null]);
   assertEqual(lineBlock(parseMap(['.#', '#.'], legend), { x: 0, y: 0 }, { x: 1, y: 1 }), null, 'diagonal neighbours, past a corner');
+});
+
+test('Grid: nobody can wade into deep water, but you can see and shoot across it', () => {
+  const map = parseMap(['.~.', '.~.', '...'], { ...legend, '~': { terrain: 'water' } });
+  assertTrue(!isStandable(map, { x: 1, y: 0 }) && isStandable(map, { x: 1, y: 2 }));
+  assertEqual(lineBlock(map, { x: 0, y: 0 }, { x: 2, y: 0 }), null, 'water blocks neither sight nor attacks');
+  const reach = reachableSquares(map, { x: 0, y: 0 }, 30);
+  assertTrue(!reach.has(key({ x: 1, y: 0 })) && !reach.has(key({ x: 1, y: 1 })), 'nobody wades in');
+  assertEqual(reach.get(key({ x: 2, y: 0 })).cost, 30, 'the long way round, by the bank');
 });
 
 // ---- Attack options and maths ----
@@ -961,6 +970,118 @@ test('Heroic Inspiration: not for a hit, and not once the hero has done somethin
   const step = [...fight.heroReachable(game).values()].find((s) => s.cost > 0);
   fight.heroMove(game, step.pos);
   assertEqual(attackToReroll(game), null);
+});
+
+// ---- Allies: the Old Ford's watch ----
+
+const champion3 = { ...wren, level: 3, subclassId: 'champion', hitPointRolls: [null, null] };
+
+// The Old Ford at night: a level 3 Wren, any companions, and the watch's three Guards. Wren
+// goes first; everyone else rolls a 1 for Initiative. Tests set the turn order by hand after.
+function fordFight({ party = [], seed = 'ford' } = {}) {
+  const game = { ...gameFor(champion3, seed), party: [] };
+  for (const id of party) joinParty(game, id);
+  game.rng = scriptedThen([20, ...Array(12).fill(1)], seed);
+  fight.startBattle(game, 'ford-dead', 0);
+  return game;
+}
+
+test('Allies: the Old Ford’s watch fight on your side as Guards, and don’t count towards how hard it is', () => {
+  const game = fordFight({ party: ['odda', 'fen'] });
+  const battle = game.battle;
+  const allies = fight.allyCombatants(battle);
+  assertEqual(
+    allies.map((c) => [c.id, c.name, c.side, c.monsterId, c.hp, c.maxHp]),
+    [
+      ['brannock', 'Sergeant Brannock', 'hero', 'guard', 11, 11],
+      ['wat', 'Wat', 'hero', 'guard', 11, 11],
+      ['nell', 'Nell', 'hero', 'guard', 11, 11],
+    ],
+  );
+  assertEqual(fight.partyCombatants(battle).map((c) => c.id), ['hero', 'odda', 'fen'], 'the party is the hero and companions');
+  assertTrue(allies.every((c) => battle.order.includes(c.id)), 'each rolls Initiative');
+  assertEqual(fight.companionCombatants(battle).map((c) => c.pos), [{ x: 3, y: 2 }, { x: 2, y: 3 }], 'companions take the free squares nearest you, not the watch’s');
+  assertEqual(fightRating(game, 'ford-dead').rating, 'Moderate', 'a Ghoul and six Zombies, for three');
+  assertEqual(fight.objectiveText(battle), 'Keep the watch alive: 3 of 3 still standing.');
+  assertTrue(!fight.isPartyMember(allies[0]) && fight.upright(game, allies[0]) && fight.stateOf(battle, allies[0]) === 'up');
+});
+
+test('Allies: foes go after the nearest of your side, a soldier too; a soldier fights the foe beside them, or braces', () => {
+  const game = fordFight();
+  const battle = game.battle;
+  const zombie = fight.combatantById(battle, 'zombie-1');
+  const wat = fight.combatantById(battle, 'wat');
+  const nell = fight.combatantById(battle, 'nell');
+  zombie.pos = { x: 0, y: 2 }; // beside Wat, and three squares from you
+  battle.order = ['hero', 'zombie-1', 'wat', 'nell'];
+  battle.turn = 0;
+  // The zombie's Slam (15: a hit on AC 16, 1d8 4), then Wat's Spear (10: a hit on AC 8, 1d6 3).
+  game.rng = scriptedThen([15, 4, 10, 3], 'ford-turns');
+  fight.endHeroTurn(game);
+  assertEqual([wat.hp, zombie.hp], [6, 11]);
+  assertTrue(said(game, 'Zombie 1 hits Wat with Slam') && said(game, 'Wat hits Zombie 1 with Spear'));
+  assertEqual([wat.pos, nell.pos], [{ x: 1, y: 3 }, { x: 6, y: 3 }], 'they hold their ground');
+  assertTrue(said(game, 'Nell braces and holds the line (Dodge)') && fight.conditionsOf(battle, 'nell').includes('dodging'), 'no foe beside her, but foes near');
+});
+
+test('Allies: a soldier at 0 Hit Points dies, and the story hears who lived', () => {
+  const game = fordFight();
+  const battle = game.battle;
+  const wat = fight.combatantById(battle, 'wat');
+  fight.combatantById(battle, 'zombie-1').pos = { x: 0, y: 2 };
+  wat.hp = 1;
+  battle.order = ['hero', 'zombie-1', 'wat'];
+  battle.turn = 0;
+  game.rng = scriptedThen([15, 4], 'ford-falls');
+  fight.endHeroTurn(game);
+  assertEqual([wat.hp, fight.stateOf(battle, wat), fight.upright(game, wat)], [0, 'dead', false]);
+  assertTrue(said(game, "Wat falls, and doesn't get up."));
+  assertTrue(!battle.log.some((e) => e.turnOf === 'wat'), 'the dead take no more turns');
+  assertEqual(fight.objectiveText(battle), 'Keep the watch alive: 2 of 3 still standing.');
+  for (const foe of fight.enemies(battle)) foe.hp = 0;
+  battle.outcome = 'victory';
+  fight.finishBattle(game);
+  assertEqual(game.lastBattle.alliesAlive, ['brannock', 'nell']);
+});
+
+test('Allies: a Ghoul’s Claw can paralyse a soldier, who loses their turn', () => {
+  const game = fordFight();
+  const battle = game.battle;
+  const wat = fight.combatantById(battle, 'wat');
+  fight.combatantById(battle, 'ghoul-1').pos = { x: 0, y: 2 };
+  battle.order = ['hero', 'ghoul-1', 'wat'];
+  battle.turn = 0;
+  // The Claw (15: a hit, 1d4 2), and Wat's Constitution save (3 + 1: a fail against DC 10).
+  game.rng = scriptedThen([15, 2, 3], 'ford-claw');
+  fight.endHeroTurn(game);
+  assertEqual(wat.hp, 7);
+  assertTrue(said(game, "Wat is Paralyzed, and can't move or act."), 'he loses his turn');
+  assertTrue(said(game, 'The numbness fades: Wat can move again.') && !fight.conditionsOf(battle, 'wat').includes('paralyzed'), 'at the end of his next turn');
+});
+
+test('Allies: your potions and healing reach a soldier, though wards are for the party, and the dead are past help', () => {
+  const game = fordFight();
+  const battle = game.battle;
+  const potions = game.inventory.find((e) => e.id === 'potion-of-healing');
+  if (potions) potions.quantity = 1;
+  else game.inventory.push({ id: 'potion-of-healing', quantity: 1 });
+  const brannock = fight.combatantById(battle, 'brannock');
+  const wat = fight.combatantById(battle, 'wat');
+  brannock.hp = 3;
+  const targets = fight.friendTargets(game, 'potion');
+  assertEqual(targets.map(({ c, problem }) => [c.id, problem]), [
+    ['hero', 'You’re at full Hit Points.'],
+    ['brannock', null],
+    ['wat', 'Wat isn’t beside you.'],
+    ['nell', 'Nell isn’t beside you.'],
+  ]);
+  fight.heroDrinkPotion(game, 'brannock');
+  assertTrue(brannock.hp > 3 && brannock.hp <= 11 && said(game, 'You give Sergeant Brannock a Potion of Healing'));
+  const ward = { how: 'ward', effect: 'shield-of-faith', spellId: 'shield-of-faith', range: [60, 60] };
+  assertEqual(fight.friendProblem(game, ward, brannock), 'Shield of Faith is only for you and your companions.');
+  wat.hp = 0;
+  assertEqual(fight.friendProblem(game, { id: 'potion', name: 'Potion of Healing', how: 'potion', range: [5, 5] }, wat), 'Wat is dead.');
+  assertEqual(fight.healCombatant(game, wat, 5), 0);
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

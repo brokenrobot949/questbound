@@ -10,7 +10,10 @@
 //                the hero (id 'hero'; their Hit Points are game.hp), their companions (side
 //                'hero', companion true, with state 'up', 'down', 'stable' or 'dead' and
 //                deathSaves, as the hero's below, and concentration, as the hero's below;
-//                their Hit Points are on game.party, see character/party.js), and the foes
+//                their Hit Points are on game.party, see character/party.js), allies who
+//                aren't in the party (side 'hero', ally true, with a monster's stat block,
+//                monsterId, hp and maxHp, played by the game: the Old Ford's soldiers), and
+//                the foes
 //   turnState    { movementLeft, action, bonus, disengaged, savageUsed, surged, athleteMove,
 //                slotSpent, light, extraUsed } for the current turn: surged after Action
 //                Surge; athleteMove is the free move Remarkable Athlete gives straight after a
@@ -48,7 +51,10 @@
 //   log          [{ round, text, roll, turnOf, newRound }]: everything that happened, in
 //                order; turnOf marks the line that starts a combatant's turn, and newRound
 //                the line that starts a round
-//   outcome      null while fighting, then 'victory' or 'defeat'; xp: earned on victory
+//   outcome      null while fighting, then 'victory' or 'defeat'; xp: earned on victory. When
+//                the fight is over, game.lastBattle remembers { encounterId, outcome, escaped:
+//                the monster ids that fled, alliesAlive: the ids of the allies who lived, if
+//                any fought }
 //   surprise     true if the hero caught the foes unawares (they rolled Initiative with
 //                Disadvantage)
 //   sneakAttackTurn  { combatant id: 'round:turn' }: the turn each Rogue last dealt Sneak
@@ -119,10 +125,16 @@ export const heroCombatant = (battle) => combatantById(battle, 'hero');
 export const enemies = (battle) => battle.combatants.filter((c) => c.side === 'enemy');
 
 // ---- The party: the hero, and the companions fighting beside them ----
-// side 'hero' is everyone on the hero's side; isHero picks out the hero themselves.
+// side 'hero' is everyone on the hero's side: the party, and any allies fighting with them.
+// isHero picks out the hero themselves, and isPartyMember the hero and their companions, who
+// have a character sheet. An ally (the Old Ford's soldiers) has a monster's stat block, as a
+// foe does: the game plays their turns, they don't count towards how hard the fight is, and at
+// 0 Hit Points they die.
 export const isHero = (c) => c.id === 'hero';
-export const partyCombatants = (battle) => battle.combatants.filter((c) => c.side === 'hero');
+export const isPartyMember = (c) => isHero(c) || Boolean(c.companion);
+export const partyCombatants = (battle) => battle.combatants.filter(isPartyMember);
 export const companionCombatants = (battle) => battle.combatants.filter((c) => c.companion);
+export const allyCombatants = (battle) => battle.combatants.filter((c) => c.ally);
 const memberFor = (game, c) => memberOf(game, c.id);
 
 // The game as the rules see it for one of the party: the game itself for the hero, a
@@ -136,13 +148,18 @@ export function hpOf(game, c) {
   return c.companion ? memberFor(game, c).hp : c.hp;
 }
 
-// A party member's Hit Point maximum.
+// A Hit Point maximum: the hero's or a companion's, or a monster's (a foe or an ally).
 export function maxHpOf(game, c) {
+  if (!isPartyMember(c)) return c.maxHp;
   return isHero(c) ? heroMaxHp(game) : memberMaxHp(game, memberFor(game, c));
 }
 
-// 'up', 'down', 'stable' or 'dead', for the hero or a companion.
-export const stateOf = (battle, c) => (isHero(c) ? battle.heroState : c.state);
+// 'up', 'down', 'stable' or 'dead', for the hero or a companion; 'up' or 'dead' for an ally.
+export function stateOf(battle, c) {
+  if (isHero(c)) return battle.heroState;
+  if (c.ally) return c.hp > 0 ? 'up' : 'dead';
+  return c.state;
+}
 
 export const upright = (game, c) => (c.side === 'hero' ? stateOf(game.battle, c) === 'up' : c.hp > 0);
 const hasEffect = (battle, id, kind) => battle.effects.some((e) => e.target === id && e.kind === kind);
@@ -233,7 +250,7 @@ function knockProne(game, c) {
 
 // Sizes, smallest first, for "Medium or smaller" rules.
 const SIZES = ['tiny', 'small', 'medium', 'large', 'huge', 'gargantuan'];
-const sizeOf = (game, c) => (c.side === 'hero' ? actorGame(game, c).character.size : findMonster(c.monsterId).size);
+const sizeOf = (game, c) => (isPartyMember(c) ? actorGame(game, c).character.size : findMonster(c.monsterId).size);
 
 // Standing up costs half the creature's Speed, rounded down. With a Speed of 0 it can't.
 function standCost(game, c) {
@@ -295,7 +312,7 @@ export function battleScene(game) {
       id: c.id,
       pos: { ...c.pos },
       hp: hpOf(game, c),
-      temp: c.side === 'hero' ? actorGame(game, c).tempHp || 0 : 0,
+      temp: isPartyMember(c) ? actorGame(game, c).tempHp || 0 : 0,
       state: c.side === 'hero' ? stateOf(battle, c) : null,
       prone: isProne(battle, c.id),
       conditions: conditionsOf(battle, c.id),
@@ -326,6 +343,8 @@ function freeSquareNear(encounterId, combatants, near) {
 }
 
 // Starts a fight. choiceIndex: the story choice that started it, taken again when it ends.
+// Combatants come in this order (Initiative is rolled in it): the hero, the foes, any allies
+// (encounters.js), then the companions on the free squares nearest the hero.
 // surprise: the hero caught the foes unawares (SRD 5.2.1, "Surprise": they roll Initiative
 // with Disadvantage). practice: for debug mode's practice fights (story/story-runner.js), what
 // to put back when it ends; choiceIndex is null then.
@@ -343,6 +362,12 @@ export function startBattle(game, encounterId, choiceIndex, { surprise = false, 
     const name = given || (counts[id] > 1 ? `${monster.name} ${numbered[id]}` : monster.name);
     combatants.push({ id: `${id}-${numbered[id]}`, side: 'enemy', name, monsterId: id, pos: { ...pos }, hp: monster.hp.average, maxHp: monster.hp.average });
   }
+  // Allies who fight on the hero's side, played by the game (the Old Ford's soldiers).
+  (encounter.allies || []).forEach(({ id: allyId, monster: id, pos, name }, i) => {
+    const monster = findMonster(id);
+    if (!monster) throw new Error(`Unknown monster: ${id}`);
+    combatants.push({ id: allyId || `ally-${i + 1}`, side: 'hero', ally: true, name: name || monster.name, monsterId: id, pos: { ...pos }, hp: monster.hp.average, maxHp: monster.hp.average });
+  });
   // Companions start on the free squares nearest the hero.
   for (const member of fightingMembers(game)) {
     const name = memberGame(game, member).character.name.split(' ')[0];
@@ -382,7 +407,7 @@ export function startBattle(game, encounterId, choiceIndex, { surprise = false, 
 function rollInitiative(game) {
   const battle = game.battle;
   const results = battle.combatants.map((c) => {
-    const character = c.side === 'hero' ? actorGame(game, c).character : null;
+    const character = isPartyMember(c) ? actorGame(game, c).character : null;
     const modifiers = character
       ? heroInitiative(character).parts.map((p) => ({ ...p, source: 'Initiative' }))
       : [{ label: 'Initiative', value: findMonster(c.monsterId).initiative, source: c.name }];
@@ -407,7 +432,7 @@ function speedOf(game, c) {
   // Steady Aim: the hero's Speed is 0 for the rest of their turn.
   const turn = game.battle.turnState;
   if (isHero(c) && turn && turn.steadyAim && currentCombatant(game.battle) === c) return 0;
-  const actor = c.side === 'hero' ? actorGame(game, c) : null;
+  const actor = isPartyMember(c) ? actorGame(game, c) : null;
   const base = actor ? heroSpeed(actor.character, activeSpellIds(actor)).value : findMonster(c.monsterId).speed;
   return Math.max(0, base - (hasEffect(game.battle, c.id, 'slowed') ? 10 : 0));
 }
@@ -454,8 +479,8 @@ function advanceTurn(game) {
   beginTurn(game);
 }
 
-// Fallen foes and dead companions take no more turns.
-const gone = (c) => (c.side === 'enemy' && c.hp <= 0) || (c.companion && c.state === 'dead');
+// Fallen foes, dead allies and dead companions take no more turns.
+const gone = (c) => (!isPartyMember(c) && c.hp <= 0) || (c.companion && c.state === 'dead');
 
 // ---- A hymn (the Ashen Choir) ----
 
@@ -506,15 +531,21 @@ function hymnHurt(game, singer, taken) {
 
 // What the fight is about beyond winning it, for the battle screen, or ''.
 export function objectiveText(battle) {
-  const hymn = findEncounter(battle.encounterId).hymn;
+  const encounter = findEncounter(battle.encounterId);
+  const allies = allyCombatants(battle);
+  if (encounter.allyObjective && allies.length) {
+    const standing = allies.filter((c) => c.hp > 0).length;
+    return `${encounter.allyObjective}: ${standing} of ${allies.length} still standing.`;
+  }
+  const hymn = encounter.hymn;
   if (!hymn || !battle.hymn) return '';
   if (battle.hymn.risen) return 'The hymn is finished.';
   if (!battle.hymn.singing) return 'The hymn is broken. No more of the dead will rise here.';
   return `The hymn: unless the singer is stopped, a second ${findMonster(hymn.rises.monster).name} rises at the start of round ${hymn.round}. Hurting the singer may break it.`;
 }
 
-// Plays every enemy and companion turn (and a downed hero's death saves) until the hero can
-// act or the fight is over.
+// Plays every enemy, ally and companion turn (and a downed hero's death saves) until the hero
+// can act or the fight is over.
 function runEnemyTurns(game) {
   const battle = game.battle;
   let guard = 0;
@@ -522,6 +553,8 @@ function runEnemyTurns(game) {
     const c = currentCombatant(battle);
     if (c.side === 'enemy') {
       enemyTurn(game, c);
+    } else if (c.ally) {
+      allyTurn(game, c);
     } else if (c.companion) {
       if (c.state === 'up') companionTurn(game, c);
     } else if (battle.heroState === 'up') {
@@ -554,7 +587,7 @@ export function endHeroTurn(game) {
 function blockedFor(game, mover) {
   const battle = game.battle;
   return (pos) => {
-    const other = battle.combatants.find((c) => c !== mover && c.pos.x === pos.x && c.pos.y === pos.y && (c.side === 'hero' || c.hp > 0));
+    const other = battle.combatants.find((c) => c !== mover && c.pos.x === pos.x && c.pos.y === pos.y && (isPartyMember(c) || c.hp > 0));
     if (!other) return null;
     return other.side === mover.side ? 'ally' : 'enemy';
   };
@@ -641,7 +674,7 @@ function moveAlong(game, mover, path, { free = false } = {}) {
 
 function opportunityAttack(game, attacker, target) {
   const options =
-    attacker.side === 'hero'
+    isPartyMember(attacker)
       ? heroAttackOptions(actorGame(game, attacker)).filter((o) => o.how === 'melee' && o.source === 'weapon' && !o.extra)
       : monsterAttackOptions(findMonster(attacker.monsterId)).filter((o) => o.how === 'melee');
   if (options.length === 0) return;
@@ -812,7 +845,7 @@ function searchForHidden(game, c) {
 
 // Armor Class, with Mage Armor, the Shield spell and Shield of Faith for the party.
 function acOf(game, c) {
-  if (c.side !== 'hero') return findMonster(c.monsterId).ac;
+  if (!isPartyMember(c)) return findMonster(c.monsterId).ac;
   const actor = actorGame(game, c);
   const shield = hasEffect(game.battle, c.id, 'shield') ? findSpell('shield').combat.acBonus : 0;
   const faith = hasEffect(game.battle, c.id, 'shield-of-faith') ? findSpell('shield-of-faith').combat.acBonus : 0;
@@ -829,7 +862,7 @@ const spiritualWeapon = (battle, casterId = 'hero') => battle.effects.find((e) =
 function weaponSquare(game, target, from) {
   const battle = game.battle;
   const map = battleMap(battle);
-  const occupied = (pos) => battle.combatants.some((c) => c.pos.x === pos.x && c.pos.y === pos.y && (c.side === 'hero' || c.hp > 0));
+  const occupied = (pos) => battle.combatants.some((c) => c.pos.x === pos.x && c.pos.y === pos.y && (isPartyMember(c) || c.hp > 0));
   const free = STEPS_AROUND.map(([dx, dy]) => ({ x: target.pos.x + dx, y: target.pos.y + dy })).filter((pos) => isStandable(map, pos) && !occupied(pos));
   free.sort((a, b) => squaresBetween(a, from) - squaresBetween(b, from));
   return free[0] || { ...target.pos };
@@ -1210,7 +1243,7 @@ function graze(game, attacker, target, option) {
 export function couldTakeHold(game, target, { condition, maxSize, notTypes = [], notSpecies = [] }) {
   if (!upright(game, target) || hasEffect(game.battle, target.id, condition)) return false;
   if (maxSize && SIZES.indexOf(sizeOf(game, target)) > SIZES.indexOf(maxSize)) return false;
-  if (target.side === 'enemy') {
+  if (!isPartyMember(target)) {
     const type = findMonster(target.monsterId).type.toLowerCase();
     return !notTypes.some((t) => type.startsWith(t)) && !(findMonster(target.monsterId).conditionImmunities || []).includes(condition);
   }
@@ -1224,13 +1257,13 @@ function onHitCondition(game, attacker, target, onHit) {
   const { condition, save: against, until } = onHit;
   if (!['prone', 'paralyzed'].includes(condition)) throw new Error(`Unknown condition from a hit: ${condition}`);
   if (!couldTakeHold(game, target, onHit)) {
-    const species = target.side === 'hero' && upright(game, target) && (onHit.notSpecies || []).includes(actorGame(game, target).character.speciesId);
+    const species = isPartyMember(target) && upright(game, target) && (onHit.notSpecies || []).includes(actorGame(game, target).character.speciesId);
     if (species) log(game, isHero(target) ? 'Elven blood: the numbness from the wound can’t take hold of you.' : `Elven blood: the numbness from the wound can't take hold of ${target.name}.`);
     return;
   }
   if (against) {
     const label = `${attacker.name}'s ${condition === 'paralyzed' ? 'paralysing Claw' : 'attack'}`;
-    const save = target.side === 'hero' ? partySave(game, target, against.ability, against.dc, label) : foeSave(game, target, against.ability, against.dc);
+    const save = isPartyMember(target) ? partySave(game, target, against.ability, against.dc, label) : foeSave(game, target, against.ability, against.dc);
     if (save.success) {
       log(game, isHero(target) ? 'You shake off the numbness creeping from the wound.' : `${target.name} shakes off the numbness creeping from the wound.`, { roll: save });
       return;
@@ -1330,7 +1363,8 @@ function applyDamage(game, target, amount, damage) {
 function takeHit(game, target, amount, { type, critical = false, plus = null }) {
   const battle = game.battle;
   if (target.companion) return companionHit(game, target, amount, { type, critical, plus });
-  if (target.side === 'enemy') {
+  // A foe, or an ally: a monster's stat block.
+  if (!isPartyMember(target)) {
     if (target.hp <= 0) return;
     const monster = findMonster(target.monsterId);
     const taken = monsterDamage(game, target, amount, type) + (plus ? monsterDamage(game, target, plus.amount, plus.type) : 0);
@@ -1347,7 +1381,7 @@ function takeHit(game, target, amount, { type, critical = false, plus = null }) 
       log(game, `Undead Fortitude fails ${target.name}.`, { roll: save });
     }
     target.hp = Math.max(0, target.hp - taken);
-    if (target.hp === 0) log(game, `${target.name} falls.`);
+    if (target.hp === 0) log(game, target.ally ? `${target.name} falls, and doesn't get up.` : `${target.name} falls.`);
     if (taken > 0) hymnHurt(game, target, taken);
     // Damage ends Sleep on a creature, and Turn Undead.
     if (taken > 0 && target.hp > 0) wake(game, target, `${target.name} wakes with a start.`);
@@ -1513,11 +1547,17 @@ function companionDies(game, c, reason) {
 }
 
 // Healing for anyone in the party: a fallen hero or companion at 0 Hit Points comes to (still
-// Prone), and their death saves start again. Returns the Hit Points regained.
+// Prone), and their death saves start again. An ally can be healed while they stand (at 0 Hit
+// Points they're dead). Returns the Hit Points regained.
 export function healCombatant(game, target, amount) {
   const battle = game.battle;
   const state = stateOf(battle, target);
   if (state === 'dead') return 0;
+  if (target.ally) {
+    const before = target.hp;
+    target.hp = Math.min(target.maxHp, target.hp + amount);
+    return target.hp - before;
+  }
   const gained = heal(actorGame(game, target), amount);
   if (state !== 'up' && hpOf(game, target) > 0) {
     if (isHero(target)) {
@@ -1712,7 +1752,7 @@ function optionProblem(game, option) {
   if (option.how === 'turn' && !undeadInReach(game).length) return 'No Undead within 30 feet.';
   if (option.how === 'multi' && !nearestTargets(game, option).length) return `No foes within ${option.range[1]} feet.`;
   if (option.targeting === 'friend' || option.targeting === 'party') {
-    const party = partyCombatants(game.battle);
+    const party = option.targeting === 'friend' ? friendsFor(game.battle, option) : partyCombatants(game.battle);
     const problems = party.map((c) => friendProblem(game, option, c));
     if (problems.some((p) => !p)) return null;
     // A hero alone hears why not for themselves; with companions, why not for anyone.
@@ -1838,7 +1878,7 @@ function concentrationCheck(game, c, damage) {
 const CONDITION_NAMES = { poisoned: 'Poisoned', paralyzed: 'Paralyzed', drowsy: 'put to sleep', asleep: 'put to sleep', outlined: 'outlined' };
 function applyCondition(game, target, kind, extra = {}) {
   const battle = game.battle;
-  const monster = target.side === 'enemy' ? findMonster(target.monsterId) : null;
+  const monster = isPartyMember(target) ? null : findMonster(target.monsterId);
   if (monster && (monster.conditionImmunities || []).includes(kind)) {
     log(game, `${target.name} can't be ${CONDITION_NAMES[kind]}.`);
     return false;
@@ -2070,7 +2110,7 @@ function areaDamage(game, c, option, damage, hero) {
   const dodging = option.saveAbility === 'dexterity' && hasEffect(battle, c.id, 'dodging') ? ['Dodging'] : [];
   let save = null;
   if (helpless) save = null;
-  else if (c.side === 'hero') save = partySave(game, c, option.saveAbility, option.saveDc, option.name);
+  else if (isPartyMember(c)) save = partySave(game, c, option.saveAbility, option.saveDc, option.name);
   else save = foeSave(game, c, option.saveAbility, option.saveDc, dodging);
   const saved = Boolean(save && save.success);
   const amount = saved ? (option.halfOnSave ? Math.floor(damage.total / 2) : 0) : damage.total;
@@ -2095,7 +2135,7 @@ function areaCondition(game, c, option) {
   const dodging = option.saveAbility === 'dexterity' && hasEffect(battle, c.id, 'dodging') ? ['Dodging'] : [];
   let save = null;
   if (helpless) save = null;
-  else if (c.side === 'hero') save = partySave(game, c, option.saveAbility, option.saveDc, option.name);
+  else if (isPartyMember(c)) save = partySave(game, c, option.saveAbility, option.saveDc, option.name);
   else save = foeSave(game, c, option.saveAbility, option.saveDc, dodging);
   const who = you ? 'You' : c.name;
   const s = you ? '' : 's';
@@ -2135,7 +2175,7 @@ function pushAway(game, c, from, feet) {
   let at = c.pos;
   for (let i = 0; i < feet / SQUARE_FEET; i++) {
     const next = { x: at.x + step.x, y: at.y + step.y };
-    const occupied = battle.combatants.some((o) => o !== c && o.pos.x === next.x && o.pos.y === next.y && (o.side === 'hero' || o.hp > 0));
+    const occupied = battle.combatants.some((o) => o !== c && o.pos.x === next.x && o.pos.y === next.y && (isPartyMember(o) || o.hp > 0));
     const corner = step.x && step.y && (!isStandable(map, { x: at.x + step.x, y: at.y }) || !isStandable(map, { x: at.x, y: at.y + step.y }));
     if (!isStandable(map, next) || occupied || corner) break;
     path.push(next);
@@ -2185,6 +2225,7 @@ export function friendProblem(game, option, c, caster = heroCombatant(game.battl
   if (option.how === 'preserve' && hp >= Math.floor(max / 2)) return you ? 'Preserve Life heals only up to half your Hit Points, and you’re there already.' : `${c.name} is at half their Hit Points or more.`;
   if (option.how === 'ward' && hasEffect(battle, c.id, option.effect)) return `${name} is already on ${on}.`;
   if (option.how === 'restore' && !option.ends.some((kind) => hasEffect(battle, c.id, kind))) return `${is} not ${restoreList(option)}.`;
+  if (c.ally && !forAllies(option)) return `${name} is only for you and your companions.`;
   if (option.how === 'self') {
     const actor = actorGame(game, c);
     if (option.self === 'mage-armor' && actor.character.armorId) return you ? 'Mage Armor only works on someone who isn’t wearing armour.' : `${c.name} is wearing armour.`;
@@ -2193,12 +2234,22 @@ export function friendProblem(game, option, c, caster = heroCombatant(game.battl
   return null;
 }
 
-// Everyone in the party, and why each can't take this spell (or 'potion') now, or null if they
-// can: [{ c, problem }]. For the battle screen's list of whom to aim it at.
+// Healing, a potion and Lesser Restoration can go on an ally who isn't in the party (the Old
+// Ford's soldiers) too; wards and the party's lasting spells are for the party.
+const forAllies = (option) => ['heal', 'potion', 'restore'].includes(option.how);
+
+// Who a spell for one creature (or a potion) could go on: the party, then any allies it suits.
+function friendsFor(battle, option) {
+  return [...partyCombatants(battle), ...(forAllies(option) ? allyCombatants(battle) : [])];
+}
+
+// Everyone in the party (and any allies the spell suits), and why each can't take this spell
+// (or 'potion') now, or null if they can: [{ c, problem }]. For the battle screen's list of
+// whom to aim it at.
 export function friendTargets(game, optionId) {
   const option = optionId === POTION.id ? POTION : heroAttackOptions(game).find((o) => o.id === optionId);
   if (!option || !game.battle) return [];
-  return partyCombatants(game.battle).map((c) => ({ c, problem: friendProblem(game, option, c) }));
+  return friendsFor(game.battle, option).map((c) => ({ c, problem: friendProblem(game, option, c) }));
 }
 
 // Who a 'party' spell goes on: everyone in the party it can, the hero first, then the nearest
@@ -2470,7 +2521,7 @@ export function teleportSquares(game, optionId) {
     for (let x = 0; x < map.width; x++) {
       const pos = { x, y };
       if ((x === hero.pos.x && y === hero.pos.y) || !isStandable(map, pos) || feetBetween(hero.pos, pos) > option.range[1]) continue;
-      if (battle.combatants.some((c) => c.pos.x === x && c.pos.y === y && (c.side === 'hero' || c.hp > 0))) continue;
+      if (battle.combatants.some((c) => c.pos.x === x && c.pos.y === y && (isPartyMember(c) || c.hp > 0))) continue;
       if (lineOfEffect(map, hero.pos, pos)) squares.push(pos);
     }
   }
@@ -2650,11 +2701,11 @@ function enemyTurn(game, c) {
   return checkEnd(game);
 }
 
-// The one of the party a monster goes after: the nearest still on their feet (a hidden hero
-// doesn't count), the most wounded of equals. Null if there's nobody.
+// Who a monster goes after: the nearest of the hero's side still on their feet (the party, and
+// any allies; a hidden hero doesn't count), the most wounded of equals. Null if there's nobody.
 function chooseTarget(game, c) {
   const battle = game.battle;
-  const standing = partyCombatants(battle).filter((p) => upright(game, p) && !hiddenOf(battle, p.id));
+  const standing = battle.combatants.filter((p) => p.side === 'hero' && upright(game, p) && !hiddenOf(battle, p.id));
   standing.sort((a, b) => squaresBetween(c.pos, a.pos) - squaresBetween(c.pos, b.pos) || hpOf(game, a) - hpOf(game, b));
   return standing[0] || null;
 }
@@ -2676,6 +2727,35 @@ function flee(game, c, exits) {
     log(game, `${c.name} flees into the dark and is gone.`);
   }
   return checkEnd(game);
+}
+
+// ---- An ally's turn ----
+// An ally (the Old Ford's soldiers) holds its ground, as a companion on Hold does: it never
+// leaves its square. It stands up if it's Prone, then attacks the most wounded foe beside it
+// (its Multiattack, if it has one). With no foe beside it but foes near (within 30 feet), it
+// takes the Dodge action, braced for them to come.
+function allyTurn(game, c) {
+  const battle = game.battle;
+  if (isProne(battle, c.id) && speedOf(game, c) > 0) standUp(game, c);
+  if (isIncapacitated(battle, c.id)) {
+    log(game, hasEffect(battle, c.id, 'paralyzed') ? `${c.name} is Paralyzed, and can't move or act.` : `${c.name} can't act.`);
+    return;
+  }
+  const monster = findMonster(c.monsterId);
+  const melee = monsterAttackOptions(monster).find((o) => o.how === 'melee' && !o.alone);
+  const besideFoes = () => enemies(battle).filter((e) => e.hp > 0 && isAdjacent(e.pos, c.pos)).sort((a, b) => a.hp - b.hp);
+  if (melee && besideFoes().length) {
+    for (let i = 0; i < (monster.multiattack || 1); i++) {
+      const [target] = besideFoes();
+      if (battle.outcome || !target || c.hp <= 0) break;
+      performAttack(game, c, target, melee);
+    }
+    return checkEnd(game);
+  }
+  if (enemies(battle).some((e) => e.hp > 0 && squaresBetween(e.pos, c.pos) <= 6)) {
+    battle.effects.push({ kind: 'dodging', target: c.id, endsOn: c.id });
+    log(game, `${c.name} braces and holds the line (Dodge): attacks on them have Disadvantage until their next turn.`);
+  }
 }
 
 // ---- A companion's turn ----
@@ -2893,6 +2973,9 @@ export function finishBattle(game) {
   if (battle.outcome === 'victory') game.xp += battle.xp;
   const escaped = enemies(battle).filter((c) => c.escaped).map((c) => c.monsterId);
   game.lastBattle = { encounterId: battle.encounterId, outcome: battle.outcome, escaped };
+  // Which allies came through it alive (the Old Ford's soldiers), for the story.
+  const allies = allyCombatants(battle);
+  if (allies.length) game.lastBattle.alliesAlive = allies.filter((c) => c.hp > 0).map((c) => c.id);
   game.battle = null;
   return { outcome: battle.outcome, choiceIndex: battle.choiceIndex };
 }

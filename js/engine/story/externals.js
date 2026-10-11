@@ -13,7 +13,7 @@ import { canCastSpell, findSpell, preparePicks } from '../character/spells.js';
 import { castCostText, castInScene, guidanceModifiers, sceneCastCost, spellSaveDc } from '../character/casting.js';
 import { findAbility } from '../character/sheet.js';
 import { addItem, buyItem, canAfford, COPPER_PER, findItem, hasItem, moneyText, removeItem } from '../character/inventory.js';
-import { findDrive } from '../character/creation.js';
+import { findBond, findDrive } from '../character/creation.js';
 import { addDeed, findQuest, finishQuest, questNote, startQuest } from './journal.js';
 import { longRestRecovery } from '../character/resources.js';
 import { approve, findCompanion, inParty, joinParty, leaveParty, memberGame, memberOf, PARTY_LIMIT, partyLongRest } from '../character/party.js';
@@ -315,6 +315,28 @@ export function bindExternals(story, runtime) {
   // foe_escaped(monster): true if a foe of that kind fled the last fight instead of falling,
   // e.g. { foe_escaped("cultist"): He got away. }. monster is an id from data/srd/monsters.js.
   story.BindExternalFunction('foe_escaped', (id) => Boolean(runtime.game.lastBattle && (runtime.game.lastBattle.escaped || []).includes(id)), false);
+
+  // allies_standing(): how many of the allies who fought beside the party in the last fight
+  // (an encounter's allies: the Old Ford's soldiers) came through it alive, won or lost, e.g.
+  //   { allies_standing() == 3: All three of them are still on their feet. }
+  // 0 if the last fight had none. ally_standing(id): true if that one did (an ally's id from
+  // the encounter, e.g. ally_standing("brannock")).
+  const alliesAlive = () => (runtime.game.lastBattle && runtime.game.lastBattle.alliesAlive) || [];
+  story.BindExternalFunction('allies_standing', () => alliesAlive().length, false);
+  story.BindExternalFunction('ally_standing', (id) => alliesAlive().includes(id), false);
+
+  // has_bond(id): true if the hero's Bond is this kind ("sibling", "mentor", "rival" or
+  // "debt", from data/campaign/bonds.js). bond_name(): the name the player gave them (for a
+  // Debt, who the hero owes), to print in a scene: "A letter from {bond_name()}."
+  story.BindExternalFunction(
+    'has_bond',
+    (id) => {
+      if (!findBond(id)) throw new Error(`Unknown Bond: ${id}`);
+      return Boolean(runtime.game.character.bond && runtime.game.character.bond.type === id);
+    },
+    false,
+  );
+  story.BindExternalFunction('bond_name', () => (runtime.game.character.bond && runtime.game.character.bond.name) || '', false);
 
   // give_xp(n): the hero earns XP for a quest or discovery (fights give their own).
   story.BindExternalFunction(

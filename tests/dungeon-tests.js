@@ -22,6 +22,7 @@ import { continueAfterBattle, currentDungeon, currentLocation, currentTime, jump
 import { gameToSave, loadGame, newGame } from '../js/engine/save/save-format.js';
 import { encounterXp, fightRating, partyBudget, ratingFor } from '../js/engine/combat/difficulty.js';
 import { monsters } from '../data/srd/monsters.js';
+import { findPerson, speakerName } from '../js/engine/ui/speakers.js';
 
 const wren = quickStartHeroes.find((h) => h.id === 'wren').character;
 const sorael = quickStartHeroes.find((h) => h.id === 'sorael').character;
@@ -859,8 +860,14 @@ function settleHunters(game, won = true) {
 
 const fenIn = (game) => game.party.some((m) => m.id === 'fen');
 const missingMiller = (game) => game.journal.quests.find((q) => q.id === 'missing-miller').notes.map((n) => n.text).join(' ');
-// The end of the scene: the lead to Cairnfield, and the end of what's written of Chapter 2.
-const toCairnfield = (game) => game.flags.includes('heard_of_cairnfield') && game.objective.includes('Cairnfield') && missingMiller(game).includes('Cairnfield') && game.story.currentChoices.length === 0;
+// The end of the scene: the lead to Cairnfield, then a night at the inn before the road north
+// to the Old Ford (ch2-old-ford.ink).
+const toCairnfield = (game) =>
+  game.flags.includes('heard_of_cairnfield') &&
+  game.objective.includes('Cairnfield') &&
+  missingMiller(game).includes('Cairnfield') &&
+  pageText(game).includes('That night you sleep at the Tallow and Thistle') &&
+  cards(game).join() === 'Set out north at first light';
 
 test('Chapter 2: Fen begs from the stocks; questions don’t repeat; a Rogue who read the chalk marks knows the songbird', async () => {
   const game = await atTheStocks('stocks-talk');
@@ -1037,7 +1044,7 @@ test('Chapter 2: selling Fen is a Wealth moment that Odda hates; Gaunt names Cai
   assertEqual(game.money, 3500);
   assertTrue(game.inspiration && memberOf(game, 'odda').approval === -1 && !fenIn(game) && game.flags.includes('fen_sold'));
   assertTrue(pageText(game).includes("I'll remember your face") && pageText(game).includes('floury fellow'));
-  assertEqual(currentTime(game), 'Dusk');
+  assertTrue(game.page.beats.some((b) => b.type === 'time' && b.value === 'Dusk'), 'they ride out at sundown');
   assertTrue(toCairnfield(game));
 });
 
@@ -1052,6 +1059,215 @@ test('Chapter 2: leave Fen to the hunters, and the lead comes from Nettle’s go
   assertTrue(!pageText(alone).includes('Choir money'), 'no Odda, no word from her');
   pick(alone, 'Leave him to it');
   assertTrue(pageText(alone).includes("If your miller's anywhere, he's there") && !alone.flags.includes('owe_nettle') && toCairnfield(alone));
+});
+
+// ---- Chapter 2: the Old Ford, and the Bond ----
+
+// The night at the inn after the stocks: a hero (a level 3 Champion unless given; Wren's Bond
+// is her sibling, Kit Ashdown) with Odda and Fen (unless left out) and 25 gold.
+async function toTheFord(seed, { character = champion, flags = [], odda = true, fen = true, gold = 25 } = {}) {
+  const game = await storyGame(seed, character);
+  game.flags.push(...flags);
+  game.money = gold * 100;
+  if (odda) joinParty(game, 'odda');
+  if (fen) joinParty(game, 'fen');
+  game.page = jumpTo(game, 'ch2_old_ford');
+  return game;
+}
+
+// Up the barrow road to the post, and ready for the night (Fen, if he's waiting there, has to
+// be answered first: reply is the start of the answer).
+function readyAtTheFord(game, reply = null) {
+  pick(game, 'Set out north at first light');
+  pick(game, 'Walk on');
+  if (reply) pick(game, reply);
+  pick(game, 'Get ready for the night');
+}
+
+// Settles the ford fight: won or lost, with these of the watch still standing.
+function settleFord(game, { won = true, standing = ['brannock', 'wat', 'nell'], setUp = () => {} } = {}) {
+  const choice = game.story.currentChoices.find((c) => (c.tags || []).includes('combat:ford-dead'));
+  if (!choice) throw new Error(`No fight: ${cards(game).join(' / ')}`);
+  startFight(game, choice);
+  for (const ally of fight.allyCombatants(game.battle)) ally.hp = standing.includes(ally.id) ? Math.max(1, ally.hp) : 0;
+  setUp(game);
+  if (won) for (const foe of fight.enemies(game.battle)) foe.hp = 0;
+  else game.hp = 0;
+  game.battle.outcome = won ? 'victory' : 'defeat';
+  game.page = continueAfterBattle(game);
+}
+
+// The oath-stone in the shallows, read with a roll of 20.
+function readTheStone(game) {
+  forceNextD20(20);
+  pick(game, 'Read the carving');
+  revealAll(game);
+}
+
+const speakersOf = (game) => game.page.beats.filter((b) => b.type === 'text' && b.speaker).map((b) => b.speaker);
+const deeds = (game) => game.journal.deeds.map((d) => d.text).join(' ');
+
+test('Chapter 2: a night at the inn, then the barrow road north, where every old barrow stands open', async () => {
+  const game = await toTheFord('ford-road');
+  assertTrue(notes(game).some((n) => n.startsWith('A good place to stop')), 'a long rest at the inn');
+  pick(game, 'Set out north at first light');
+  assertEqual(currentLocation(game), 'The barrow road');
+  assertTrue(pageText(game).includes('Every barrow you pass has been opened') && speakersOf(game).includes('fen'));
+  assertEqual(cards(game), ['Read the ground round the nearest barrow', 'Walk on: you want the ford by nightfall']);
+  forceNextD20(20);
+  pick(game, 'Read the ground');
+  revealAll(game);
+  assertTrue(game.flags.includes('saw_capstone_tracks') && missingMiller(game).includes('capstones'));
+  assertEqual([currentLocation(game), currentTime(game)], ['The Old Ford', 'Dusk']);
+  assertEqual(cards(game), ["Ask what's been happening here", 'Ask where the stones come from', 'Ask why the watch is still here', 'Get ready for the night'], 'Fen is with you already');
+  const said = pick(game, "Ask what's been happening here").beats.filter((b) => b.type === 'text');
+  assertTrue(said.every((b) => b.speaker === 'brannock') && !pageText(game).includes("That's far enough"), 'her answer, and no greeting after it');
+  assertTrue(!cards(game).includes("Ask what's been happening here"), 'asked once');
+  pick(game, 'Get ready for the night');
+  assertEqual(cards(game), ['Hold the ford with the watch', 'Slip away upriver in the dark, and leave the watch to it']);
+  assertTrue(game.objective.includes("keep Sergeant Brannock's watch alive"));
+});
+
+test('Chapter 2: hold the ford with all three of the watch alive: the Regency’s favour, and Varrow’s help to come', async () => {
+  const game = await toTheFord('ford-all');
+  readyAtTheFord(game);
+  const xp = game.xp;
+  settleFord(game);
+  assertTrue(['ford_held', 'ford_watch_saved', 'regency_favour', 'varrow_holds_cairns'].every((f) => game.flags.includes(f)) && !game.flags.includes('ford_fell'));
+  assertTrue(pageText(game).includes('All of us') && speakersOf(game).includes('brannock'));
+  assertEqual(cards(game), ['Read the carving'], 'no Comprehend Languages for a Champion');
+  readTheStone(game);
+  assertTrue(['read_the_oath_stone', 'knows_oath_wards'].every((f) => game.flags.includes(f)) && pageText(game).includes('TAMAR OAKHEART'));
+  assertTrue(pageText(game).includes('An oath-grave') && missingMiller(game).includes('oath-stone') && game.xp - xp === 50, 'the clue is worth 50 XP');
+  assertTrue(deeds(game).includes('Kept all three') && pageText(game).includes('The captain'));
+  // Wren's Bond: a letter from her sibling, in the post's mailbag.
+  assertTrue(pageText(game).includes("Kit Ashdown's") && game.flags.includes('sibling_letter') && missingMiller(game).includes('A letter from Kit Ashdown'));
+  assertTrue(game.objective.startsWith('Cross the Old Ford') && cards(game).length === 0);
+});
+
+test('Chapter 2: if the sergeant falls, the post still holds, and whoever’s left takes up her sash', async () => {
+  const nell = await toTheFord('ford-nell');
+  readyAtTheFord(nell);
+  settleFord(nell, { standing: ['wat', 'nell'] });
+  assertTrue(nell.flags.includes('ford_held') && !['ford_watch_saved', 'regency_favour', 'ford_fell'].some((f) => nell.flags.includes(f)));
+  assertTrue(pageText(nell).includes('ties it round her own arm') && speakersOf(nell).includes('nell') && !speakersOf(nell).includes('brannock'));
+
+  const wat = await toTheFord('ford-wat');
+  readyAtTheFord(wat);
+  settleFord(wat, { standing: ['wat'] });
+  assertTrue(pageText(wat).includes("Didn't it? It held.") && speakersOf(wat).includes('wat'));
+
+  const sergeant = await toTheFord('ford-sergeant');
+  readyAtTheFord(sergeant);
+  settleFord(sergeant, { standing: ['brannock'] });
+  assertTrue(pageText(sergeant).includes('But the post held') && speakersOf(sergeant).includes('brannock'));
+});
+
+test('Chapter 2: if none of the watch live, the post falls, and you carry the news back to Bramblegate', async () => {
+  const game = await toTheFord('ford-fell');
+  readyAtTheFord(game);
+  settleFord(game, { standing: [] });
+  assertTrue(game.flags.includes('ford_fell') && !game.flags.includes('ford_held') && pageText(game).includes('nobody left to keep it'));
+  readTheStone(game);
+  assertTrue(game.objective.startsWith('Carry word to Bramblegate that the Old Ford has fallen'));
+});
+
+test('Chapter 2: losing at the ford is Fate’s Mercy: the river takes your purse, and whoever of the watch still stood drags you in', async () => {
+  const game = await toTheFord('ford-mercy');
+  readyAtTheFord(game);
+  settleFord(game, { won: false, standing: ['brannock', 'nell'] });
+  assertTrue(['ford_fates_mercy', 'ford_held'].every((f) => game.flags.includes(f)) && game.money === 0);
+  assertTrue(pageText(game).includes('dragged you in') && speakersOf(game).includes('brannock') && notes(game).some((n) => n.startsWith('A good place to stop')));
+  assertEqual(game.hp, fight.maxHpOf(game, { id: 'hero' }), 'a long rest');
+
+  const alone = await toTheFord('ford-mercy-alone');
+  readyAtTheFord(alone);
+  settleFord(alone, { won: false, standing: [] });
+  assertTrue(alone.flags.includes('ford_fell') && pageText(alone).includes('You come to in the reeds'));
+});
+
+test('Chapter 2: slipping away leaves the watch to the dead: the post falls, and Odda thinks less of you', async () => {
+  const game = await toTheFord('ford-abandoned', { character: knockWizard });
+  readyAtTheFord(game);
+  const xp = game.xp;
+  pick(game, 'Slip away upriver');
+  assertTrue(['ford_abandoned', 'ford_fell'].every((f) => game.flags.includes(f)) && memberOf(game, 'odda').approval === -1 && game.xp === xp);
+  // A Wizard can read the oath-stone with Comprehend Languages, as a Ritual.
+  assertEqual(cards(game), ['Read the carving', 'Read it with Comprehend Languages']);
+  pick(game, 'Read it with Comprehend Languages');
+  assertTrue(game.flags.includes('read_the_oath_stone') && pageText(game).includes('TAMAR OAKHEART'));
+  // Juniper's Bond: her mentor's letter.
+  assertTrue(pageText(game).includes('If you hear singers in grey, run') && pageText(game).includes('Orrin Mossbottom') && game.flags.includes('mentor_warned'));
+  assertTrue(game.objective.startsWith('Carry word to Bramblegate'));
+});
+
+test('Chapter 2: sold at the stocks, Fen is waiting at the ford, sour; he fights beside you, and comes along after', async () => {
+  const game = await toTheFord('ford-fen-sold', { fen: false, flags: ['fen_sold'] });
+  pick(game, 'Set out north at first light');
+  pick(game, 'Walk on');
+  assertTrue(pageText(game).includes('Ten gold') && fenIn(game) && memberOf(game, 'fen').approval === -2, 'he joins for the night, liking you less');
+  assertEqual(cards(game), ["Tell him you're sorry", "Give him Gaunt's ten gold", 'Tell him it was nothing personal']);
+  pick(game, "Give him Gaunt's ten gold");
+  assertEqual([game.money, memberOf(game, 'fen').approval], [1500, -1]);
+  pick(game, 'Get ready for the night');
+  settleFord(game);
+  readTheStone(game);
+  assertTrue(pageText(game).includes("It's arithmetic") && game.flags.includes('fen_returned'));
+  assertEqual(cards(game), ["Tell him you're glad", 'Tell him to suit himself']);
+  pick(game, 'Tell him to suit himself');
+  assertTrue(fenIn(game) && game.objective.startsWith('Cross the Old Ford'));
+
+  const left = await toTheFord('ford-fen-left', { fen: false, flags: ['fen_left_behind'] });
+  pick(left, 'Set out north at first light');
+  pick(left, 'Walk on');
+  assertTrue(pageText(left).includes('You walked on') && memberOf(left, 'fen').approval === -1);
+  assertEqual(cards(left), ["Tell him you're sorry", 'Tell him it was nothing personal'], 'no gold to give back');
+  pick(left, "Tell him you're sorry");
+  assertEqual(memberOf(left, 'fen').approval, 0);
+});
+
+test('Chapter 2: a companion who falls at the ford lies in state until they can be raised', async () => {
+  const game = await toTheFord('ford-fen-falls');
+  readyAtTheFord(game);
+  settleFord(game, {
+    setUp: (g) => {
+      fight.combatantById(g.battle, 'fen').state = 'dead';
+      Object.assign(memberOf(g, 'fen'), { hp: 0, fallen: true });
+    },
+  });
+  assertTrue(game.flags.includes('fen_fell_at_the_ford') && !game.flags.includes('odda_fell_at_the_ford'));
+  assertTrue(pageText(game).includes('Somebody has to close his eyes') && pageText(game).includes('supply cart'));
+});
+
+test('Chapter 2: a Rival rides in at dawn after the same bounty, under the name you gave them, and goes on ahead alone', async () => {
+  const character = { ...champion, bond: { type: 'rival', name: 'Sable Rook' } };
+  const game = await toTheFord('ford-rival', { character });
+  readyAtTheFord(game);
+  settleFord(game);
+  readTheStone(game);
+  assertTrue(pageText(game).includes("It's Sable Rook") && speakersOf(game).includes('rival'));
+  assertEqual(speakerName(findPerson('rival'), character), 'Sable Rook', 'the portrait shows the name you gave them');
+  assertEqual(speakerName(findPerson('rival'), wren), 'Your rival', 'for a hero with another Bond');
+  assertEqual(cards(game), ['Offer to go after the miller together', 'Warn them about the Choir', "Tell them the miller's yours"]);
+  pick(game, 'Offer to go after the miller together');
+  assertTrue(['rival_offered_truce', 'rival_went_ahead'].every((f) => game.flags.includes(f)) && missingMiller(game).includes('Your rival, Sable Rook'));
+  assertTrue(game.objective.startsWith('Cross the Old Ford') && cards(game).length === 0);
+});
+
+test('Chapter 2: for a Debt, a Free League factor offers to square it for anything shiny from the barrow', async () => {
+  const game = await toTheFord('ford-debt', { character: rogue3 });
+  readyAtTheFord(game);
+  settleFord(game);
+  readTheStone(game);
+  assertTrue(pageText(game).includes('You owe Old Mother Quill a great deal of money') && speakersOf(game).includes('penhallow'));
+  forceNextD20(20);
+  pick(game, 'Ask what the League really wants');
+  revealAll(game);
+  assertTrue(game.flags.includes('league_wants_crowns') && pageText(game).includes('Anything with a crown on it'));
+  assertEqual(cards(game), ['Shake on it', "Turn him down: you don't rob the dead"]);
+  pick(game, 'Shake on it');
+  assertTrue(['league_deal', 'met_penhallow'].every((f) => game.flags.includes(f)) && memberOf(game, 'odda').approval === -1);
+  assertTrue(deeds(game).includes('your debt to Old Mother Quill') && game.objective.startsWith('Cross the Old Ford'));
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

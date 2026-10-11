@@ -19,7 +19,8 @@
 //                  character/resources.js), tempHp and activeSpells (Temporary Hit Points
 //                  and spells on the hero; see character/spell-effects.js), battle (a fight
 //                  in progress, or null; see
-//                  combat/battle.js), lastBattle ({ encounterId, outcome } of the last fight),
+//                  combat/battle.js), lastBattle ({ encounterId, outcome } of the last fight,
+//                  with escaped and alliesAlive when it had any: see combat/battle.js),
 //                  levelUp (a level-up in progress, or null; see character/level-up.js),
 //                  dungeon (the dungeon room the hero is in and the rooms explored, or null;
 //                  see world/dungeons.js), objective (the hero's aim, or null) and session

@@ -648,6 +648,20 @@ test('Party: companions, and a fight with them in it, save and load exactly', as
   assertThrows(() => validateSave({ ...record, game: { ...record.game, party: [{ id: 'nobody' }] } }), 'a companion who isn’t in the data');
 });
 
+test('Allies: a fight with the Old Ford’s watch in it, and who of them lived, save and load exactly', async () => {
+  const runtime = await freshRuntime();
+  const game = newGame(runtime, { slot: 1, seed: 'allies-save', character: testHero });
+  startBattle(game, 'ford-dead', 0);
+  game.battle.combatants.find((c) => c.id === 'wat').hp = 4;
+  const loaded = loadGame(await freshRuntime(), validateSave(migrateSave(structuredClone(gameToSave(game)))));
+  assertEqual(loaded.battle.combatants, game.battle.combatants);
+  assertEqual(loaded.battle.combatants.filter((c) => c.ally).map((c) => [c.id, c.hp]), [['brannock', 11], ['wat', 4], ['nell', 11]]);
+  game.battle = null;
+  game.lastBattle = { encounterId: 'ford-dead', outcome: 'victory', escaped: [], alliesAlive: ['brannock', 'nell'] };
+  const after = loadGame(await freshRuntime(), validateSave(migrateSave(structuredClone(gameToSave(game)))));
+  assertEqual(after.lastBattle.alliesAlive, ['brannock', 'nell']);
+});
+
 test('Sessions: a new session sums up the last one in the journal if the player just closed the game', async () => {
   const game = newGame(await freshRuntime(), { slot: 1, seed: 'session', character: testHero });
   game.journal.deeds.push({ day: 1, text: 'Did a brave thing.' });

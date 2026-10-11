@@ -44,6 +44,12 @@ EXTERNAL has_background(id)
 // "knowledge", "justice", "freedom" or "kinship").
 EXTERNAL has_drive(id)
 
+// has_bond(id): true if the hero's Bond is this kind ("sibling", "mentor", "rival" or
+// "debt"). bond_name(): the name the player gave them (for a Debt, who the hero owes), to
+// print in a scene: A letter, in {bond_name()}'s hand.
+EXTERNAL has_bond(id)
+EXTERNAL bond_name()
+
 // drive_moment(id): call it inside a choice that fits a Drive. If it's the hero's Drive, they
 // gain Heroic Inspiration. Tag the choice too, so the card can show it:
 //   * [Take the job for the silver #drive:wealth]
@@ -134,6 +140,13 @@ EXTERNAL combat_won()
 // e.g. { foe_escaped("cultist"): He got away. }. Add #surprise to a #combat choice when the
 // hero strikes first, unseen: the foes roll Initiative with Disadvantage.
 EXTERNAL foe_escaped(monster)
+
+// allies_standing(): how many allies who fought beside the party in the last fight (an
+// encounter's allies, such as the Old Ford's soldiers) came through it alive, won or lost:
+//   { allies_standing() == 3: All three are still on their feet. }
+// ally_standing(id): true if that one did, e.g. { ally_standing("brannock"): ... }
+EXTERNAL allies_standing()
+EXTERNAL ally_standing(id)
 
 // give_xp(n): the hero earns XP for a quest or discovery. Fights give their own XP.
 EXTERNAL give_xp(n)

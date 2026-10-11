@@ -309,4 +309,25 @@ export const monsters = [
     text: 'Multiattack. The bandit makes two attacks, using Scimitar and Light Crossbow in any combination. Parry (Reaction). Trigger: The bandit is hit by a melee attack roll while holding a weapon. Response: The bandit adds 2 to its AC against that attack, possibly causing it to miss.',
     source: 'SRD 5.2.1',
   },
+  // The Old Ford's soldiers fight on your side as Guards (an ally in encounters.js).
+  {
+    id: 'guard',
+    name: 'Guard',
+    size: 'medium',
+    type: 'Humanoid',
+    ac: 16, // Chain Shirt and Shield
+    hp: { average: 11, dice: '2d8 + 2' },
+    speed: 30,
+    abilities: { strength: 13, dexterity: 12, constitution: 12, intelligence: 10, wisdom: 11, charisma: 10 },
+    saves: { strength: 1, dexterity: 1, constitution: 1, intelligence: 0, wisdom: 0, charisma: 0 },
+    initiative: 1,
+    skills: { perception: 2 },
+    passivePerception: 12,
+    cr: '1/8',
+    xp: 25,
+    attacks: [{ id: 'spear', name: 'Spear', kind: 'melee-or-ranged', bonus: 3, reach: 5, range: [20, 60], damage: { dice: '1d6', bonus: 1, type: 'piercing' } }],
+    behaviour: 'brute',
+    sprite: 'guard',
+    source: 'SRD 5.2.1',
+  },
 ];

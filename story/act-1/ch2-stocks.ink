@@ -23,7 +23,7 @@
 // Losing the fight is Fate's Mercy: the watch comes running, and the hunters drop Fen in the
 // horse trough and run, with your purse.
 // Sold or left behind, Fen escapes the hunters and turns up later, sour (fen_sold,
-// fen_left_behind). That's the Old Ford's scene (beat 5), not written yet.
+// fen_left_behind), at the Old Ford (ch2-old-ford.ink).
 // Fen's lead: the Choir's camp at Cairnfield, past the Old Ford. They took Garrick because
 // they need someone who knows water and wheels.
 // Spells: Knock opens the padlock.
@@ -329,12 +329,12 @@ At sundown, from the window of the Tallow and Thistle, you watch Gaunt's riders 
 }
 -> road_north
 
-// ---- On to Chapter 2's next beats ----
+// ---- On to Chapter 2's next beats: the Old Ford (ch2-old-ford.ink) ----
 
 = road_north
 ~ set_flag("heard_of_cairnfield")
-~ set_objective("Take the barrow road north, past the Old Ford, to the Choir's camp at Cairnfield. (The rest of Chapter 2 is still being written.)")
--> END
+~ set_objective("Take the barrow road north, past the Old Ford, to the Choir's camp at Cairnfield.")
+-> ch2_old_ford
 
 // Fen is out of the stocks. He joins the party if there's room (there always is in the story:
 // Odda is the only other companion so far).

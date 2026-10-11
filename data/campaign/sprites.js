@@ -14,6 +14,7 @@ export const sheets = {
   ground: ['assets/dawnlike/Objects/Ground0.png'],
   tree: ['assets/dawnlike/Objects/Tree0.png'],
   hill: ['assets/dawnlike/Objects/Hill0.png'],
+  pit: ['assets/dawnlike/Objects/Pit0.png'],
 };
 
 // Monsters and other creatures.
@@ -28,6 +29,7 @@ export const sprites = {
   ghoul: { sheet: 'undead', col: 0, row: 0 },
   bandit: { sheet: 'player', col: 3, row: 4 },
   'bandit-captain': { sheet: 'player', col: 5, row: 3 },
+  guard: { sheet: 'player', col: 1, row: 3 }, // a soldier in grey mail
 };
 
 // Floor tiles and things that stand on them. alpha (0 to 1) draws a picture faded, and
@@ -62,6 +64,10 @@ export const tiles = {
   skull: { sheet: 'decor', col: 0, row: 12 },
   cobbles: { sheet: 'floor', col: 15, row: 7 },
   stocks: { sheet: 'decor', col: 0, row: 11 },
+  // The Old Ford: the river's deep water, and the shallow water of the ford itself (from the
+  // water-filled pits, with no rim).
+  'deep-water': { sheet: 'pit', col: 1, row: 15 },
+  ford: { sheet: 'pit', col: 1, row: 9 },
 };
 
 // Walls join up with their neighbours. Each wall style is a block of tiles in DawnLike's

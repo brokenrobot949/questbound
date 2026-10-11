@@ -137,7 +137,7 @@ On screen, every skill pick (class, species and the Skilled feat) shares one Ski
 **Drive and Bond (original additions)**
 
 - **Drive** is what pushes your character: Glory, Faith, Wealth, Knowledge, Justice, Freedom or Kinship. Choices that fit your Drive earn Heroic Inspiration, and the DM's recaps lean on it.
-- **Bond** is who you left behind: a sibling, a mentor, a rival or a debt. The campaign has authored slots where your Bond returns, at least once per act.
+- **Bond** is who you left behind: a sibling, a mentor, a rival or a debt. The campaign has authored slots where your Bond returns, at least once per act. Act I's is at the Old Ford (Chapter 2): a letter from a sibling or a mentor in the watch-post's mailbag, a rival riding in after the same bounty, or a Free League factor who knows all about your debt. Scenes print the name you gave them, and a rival who speaks shows it under their portrait.
 
 **Quick Start**
 
@@ -311,7 +311,7 @@ Combat plays on a tactical grid, like miniatures on a battle map: 5-foot squares
 
 - The fight happens where it starts: the dungeon room, road or tavern you were in.
 - The grid is 8 squares wide so it fits a phone in portrait at 3× pixel scale, and scrolls vertically.
-- Terrain matters: difficult ground, half and three-quarters cover, doors, hazards such as fire and pits, and darkness (darkvision counts).
+- Terrain matters: difficult ground, half and three-quarters cover, doors, hazards such as fire and pits, and darkness (darkvision counts). Deep water can't be waded into, but blocks neither sight nor attacks (the Old Ford); a shallow ford is difficult ground.
 
 **Your turn**
 
@@ -380,6 +380,16 @@ Initiative, attack rolls against AC, critical hits, damage types and resistances
 - **Bandit** (CR 1/8, 25 XP): Scimitar or Light Crossbow; it shoots when it can.
 - **Bandit Captain** (CR 2, 450 XP): Multiattack, two attacks with Scimitar or Light Crossbow. **Parry** (its reaction): +2 AC against a melee hit, used only when that turns the hit into a miss, never against a Critical Hit. Your attack's description warns "Mercy Gaunt can Parry", naming whoever it is. The SRD's captain carries a Pistol; Caldmere has no firearms, so ours has a Light Crossbow (+5, range 80/320 ft, 1d8 + 3) instead (Rob, Oct 10, 2026).
 - **Bounty Hunters at the Stocks** is Bramblegate's market square: Mercy Gaunt (a Bandit Captain) and two Bandits at the top, by the stocks, and the party together near the bottom. Fen fights beside you, because choosing to fight frees him first.
+- **Guard** (CR 1/8, 25 XP): AC 16 (Chain Shirt and Shield), 11 Hit Points, Spear +3 (1d6 + 1 piercing, or thrown 20/60 ft). The Old Ford's three soldiers fight on your side as Guards.
+- **The Dead at the Old Ford** is the river crossing at night: deep water (nobody can wade in, but it blocks neither sight nor attacks) on either side of a shallow ford (difficult ground) four squares wide. The watch-post's tower and a barricade of crates stand on the north bank, where the party starts at the head of the ford, with Sergeant Brannock in the gap of the barricade and Wat and Nell on either flank. Six Zombies and a Ghoul come up out of the river from the south bank. Moderate for a level 3 party of three (500 XP; Low is 450, Moderate 675).
+
+**Allies who aren't companions** (so far only the Old Ford's soldiers; Rob chose these, Oct 11, 2026)
+
+- They fight on your side with a monster's stat block (Guards), on the grid with a faint blue frame, and the game plays their turns. They hold their ground, as a companion on Hold does: they never leave their square, attack the most wounded foe beside them, and with no foe beside them but foes near, take the Dodge action, braced.
+- Foes go after them as they go after the party: the nearest of your side on their feet.
+- They don't count towards how hard a fight is (the party does), and the fight isn't lost or won by them: it's lost when you are, whoever of them still stands.
+- At 0 Hit Points they die. Until then your healing spells, a Potion of Healing (from beside them) and Lesser Restoration reach them, after the party in the list; wards (Bless, Shield of Faith, Sanctuary) and Odda's spells are for the party.
+- The battle screen says what's at stake: "Keep the watch alive: 3 of 3 still standing." The story hears how many lived, and which.
 
 **Encounter design**
 
@@ -536,7 +546,7 @@ You play one character, but up to two companions can travel with you, chosen fro
 **How companions work so far (Phase 2)**
 
 - **Odda Brasswick** (dwarf Cleric, Acolyte, Protector) and **Fen Underbough** (halfling Rogue, Criminal) are full characters, built like heroes. Up to two travel with you.
-- **Joining and leaving:** a scene adds or removes a companion (`join_party`, `leave_party`), and the DM says so. Odda joins at Dunn's Mill at the start of Chapter 2, and goes down the ossuary with you (Rob, Oct 10, 2026). Fen joins in Bramblegate's market square, the moment you get him out of the stocks (Chapter 2, beat 3). If you sell him to the bounty hunters or leave him to them, he escapes and turns up later, sour, and can still join, with low approval (Rob, Oct 11, 2026; that's the Old Ford's scene, not written yet). Debug mode can still add or remove either.
+- **Joining and leaving:** a scene adds or removes a companion (`join_party`, `leave_party`), and the DM says so. Odda joins at Dunn's Mill at the start of Chapter 2, and goes down the ossuary with you (Rob, Oct 10, 2026). Fen joins in Bramblegate's market square, the moment you get him out of the stocks (Chapter 2, beat 3). If you sell him to the bounty hunters or leave him to them, he escapes and turns up later, sour, and can still join, with low approval (Rob, Oct 11, 2026): he's waiting at the Old Ford, joins to fight the dead beside you that night, and afterwards decides to come along. Debug mode can still add or remove either.
 - **Their spells in scenes:** a scene can ask a companion to cast a spell they have (`companion_can_cast`, `companion_cast`): Odda frees Lark with Lesser Restoration. The card says whose spell it is and what it costs them ("Odda's spell · Lesser Restoration · level 2 slot"), and it uses their slot, not yours.
 - **If a companion dies in a story fight,** the scene goes on without their lines (`companion_alive`). If Odda dies in the ossuary, or Fen in the fight at the stocks, the temple keeps them before the altar flame until they can be raised; raising the dead at a temple comes later, and debug mode's Raise works meanwhile.
 - **Levels:** they're always your level. Their big picks are set for now: Odda takes the Life Domain at level 3, Fen the Thief. Each later level takes the fixed Hit Points, and their Hit Points rise when yours do.
@@ -566,7 +576,7 @@ You play one character, but up to two companions can travel with you, chosen fro
 - **When you fall**, the fight goes on while a companion stands. You make death saves, and they try to get you back up. The fight is lost only if you die, or you're stable at 0 Hit Points with no companion left standing; then Fate's Mercy happens as before. After a win, anyone at 0 Hit Points comes to with 1.
 - **Companions fall** and make death saves as you do. Three failures, or a blow of their whole Hit Point maximum, and they die. A fallen companion stays with you but doesn't fight until raised: at a temple or by a spell, once those exist. Debug mode can raise them for now.
 - **Long Rests** bring them back to full, as they do you.
-- **Approval:** each companion keeps a score. Scenes raise or lower it with `approve(id, change)` when you do something they like or dislike (their likes and dislikes are in the data and on the Sheet). The score isn't shown to the player; debug mode shows it. Odda's first moments, under Dunn's Mill: drawing the Ghouls off Lark (+1), robbing the opened coffins (−1), and telling Lark the truth about her father (+1) or a comforting lie (−1). At the stocks: selling Fen to the bounty hunters (Odda −1), picking the stocks' padlock (Fen +1, for cleverness), and, after beating the hunters, speaking for their leader when Captain Varrow means to hang her (Fen +1 and Odda +1) or leaving her to the rope (Fen −1: he hates hangings).
+- **Approval:** each companion keeps a score. Scenes raise or lower it with `approve(id, change)` when you do something they like or dislike (their likes and dislikes are in the data and on the Sheet). The score isn't shown to the player; debug mode shows it. Odda's first moments, under Dunn's Mill: drawing the Ghouls off Lark (+1), robbing the opened coffins (−1), and telling Lark the truth about her father (+1) or a comforting lie (−1). At the stocks: selling Fen to the bounty hunters (Odda −1), picking the stocks' padlock (Fen +1, for cleverness), and, after beating the hunters, speaking for their leader when Captain Varrow means to hang her (Fen +1 and Odda +1) or leaving her to the rope (Fen −1: he hates hangings). At the Old Ford: Fen comes back liking you less (−2 if you sold him, −1 if you left him), and telling him you're sorry or giving him Gaunt's ten gold wins one back (+1); slipping away from the watch-post and leaving its soldiers to the dead (Odda −1); and, for a Debt Bond, shaking on the Free League factor's offer for something from the barrow (Odda −1: she hates robbing tombs) or turning it down (Odda +1).
 - **Not yet:**
   - Odda's other spells in a fight (Guiding Bolt, Command, Sanctuary), and companions using the Help action.
   - Controlling their turns yourself.
