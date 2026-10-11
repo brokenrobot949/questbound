@@ -447,6 +447,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       if (unit.concentrating) notes.push(`${c.name} concentrating on ${unit.concentrating}`);
     }
     if (scene.concentration) notes.push(`Concentrating on ${scene.concentration}`);
+    if (heroConditions.includes('paralyzed')) notes.push('Paralyzed: you can’t move or act');
     if (heroConditions.includes('blessed')) notes.push('Blessed: +1d4 to attacks and saves');
     if (heroConditions.includes('sanctuary')) notes.push('Sanctuary: foes must save to attack you');
     if (heroConditions.includes('shield')) notes.push('Shield up: +5 AC');
@@ -673,9 +674,11 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       if (view.potion && !turn.bonus) controls.append(potionPanel());
     }
 
-    // A fight well under your strength can be played out at once.
+    // A fight well under the party's strength can be played out at once.
     if (canResolve(game)) {
-      const what = 'Well under your strength: play the fight out at once, with real rolls. Weapons and cantrips only, no spell slots or features; it stops if you drop below half your Hit Points.';
+      const what = company()
+        ? 'Well under your party’s strength: play the fight out at once, with real rolls. You use weapons and cantrips only, no spell slots or features; it stops if anyone drops below half their Hit Points.'
+        : 'Well under your strength: play the fight out at once, with real rolls. Weapons and cantrips only, no spell slots or features; it stops if you drop below half your Hit Points.';
       controls.append(actionCard('Resolve', what, () => act(() => resolveFight(game), { instant: true })));
     }
     controls.append(actionCard('End turn', 'Your foes take their turns', () => act(() => fight.endHeroTurn(game)), 'is-primary'));
@@ -762,7 +765,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     } else if (targeting === 'self' || ((targeting === 'friend' || targeting === 'party') && !company())) {
       box.append(actionCard(`Cast ${spellName(chosen)}`, '', () => act(() => fight.heroCastSelf(game, chosen.id)), 'is-primary'));
     } else if (targeting === 'friend') {
-      box.append(friendList(`Who for ${spellName(chosen)}?`, fight.friendTargets(game, chosen.id), (c) => act(() => fight.heroCastOn(game, chosen.id, c.id))));
+      box.append(friendList(`Who for ${spellName(chosen)}?`, fight.friendTargets(game, chosen.id), (c) => act(() => fight.heroCastOn(game, chosen.id, c.id)), chosen));
     } else if (targeting === 'party') {
       const caught = fight.partyTargets(game, chosen);
       const missed = fight.friendTargets(game, chosen.id).filter(({ c }) => !caught.includes(c));
@@ -786,14 +789,19 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     return fight.companionCombatants(game.battle).length > 0;
   }
 
-  // A list of the party to choose from: a button for each, saying how they are (Hit Points),
-  // greyed out with the reason when the spell or potion can't go on them.
-  function friendList(label, friends, onPick) {
+  // A list of the party to choose from: a button for each, saying how they are (Hit Points, and
+  // for Lesser Restoration the conditions it can end), greyed out with the reason when the
+  // spell or potion can't go on them.
+  function friendList(label, friends, onPick, option = null) {
     const group = actionGroup(label);
     for (const { c, problem } of friends) {
       const unit = fight.battleScene(game).units.find((u) => u.id === c.id);
       const max = fight.maxHpOf(game, c);
-      const state = unit.state === 'up' ? `${unit.hp} of ${max} Hit Points` : `${STATE_WORDS[unit.state]} at 0 Hit Points`;
+      let state = unit.state === 'up' ? `${unit.hp} of ${max} Hit Points` : `${STATE_WORDS[unit.state]} at 0 Hit Points`;
+      if (option && option.how === 'restore') {
+        const words = CONDITION_WORDS.filter(([kind]) => option.ends.includes(kind) && unit.conditions.includes(kind)).map(([, word]) => word);
+        if (words.length) state = `${words.join(', ')} · ${state}`;
+      }
       const card = actionCard(fight.isHero(c) ? 'You' : c.name, problem || state, () => onPick(c));
       card.disabled = Boolean(problem);
       group.list.append(card);
@@ -827,7 +835,9 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     const card = el('div', 'battle-outcome');
     const won = battle.outcome === 'victory';
     card.append(el('p', 'battle-outcome-title', won ? 'Victory!' : 'You have fallen…'));
-    card.append(el('p', 'battle-help', won ? `You gain ${battle.xp} XP.` : 'But this isn’t the end of your story.'));
+    let after = won ? `You gain ${battle.xp} XP.` : 'But this isn’t the end of your story.';
+    if (battle.practice) after = 'A practice fight (debug): it doesn’t count, so no XP, and everyone will be back as they were.';
+    card.append(el('p', 'battle-help', after));
     card.append(
       battleButton(
         'Carry on',

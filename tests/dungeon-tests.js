@@ -18,8 +18,18 @@ import { loadStory } from '../js/engine/story/ink-loader.js';
 import { bindExternals } from '../js/engine/story/externals.js';
 import { continueAfterBattle, currentDungeon, currentLocation, jumpTo, makeChoice, revealRoll, startFight } from '../js/engine/story/story-runner.js';
 import { gameToSave, loadGame, newGame } from '../js/engine/save/save-format.js';
+import { encounterXp, partyBudget, ratingFor } from '../js/engine/combat/difficulty.js';
+import { monsters } from '../data/srd/monsters.js';
 
 const wren = quickStartHeroes.find((h) => h.id === 'wren').character;
+const sorael = quickStartHeroes.find((h) => h.id === 'sorael').character;
+
+// Scripted dice first (any die: a d20 face, a d6 face…), then the seeded ones.
+function scriptedThen(faces, seed) {
+  const queue = [...faces];
+  const rest = createRng(seed);
+  return { nextInt: (n) => (queue.length ? queue.shift() - 1 : rest.nextInt(n)), getState: () => rest.getState() };
+}
 
 function gameFor(character, seed = 'dungeon') {
   return { character, rng: createRng(seed), ...startingInventory(character), ...freshResources(character), battle: null, lastBattle: null, pending: [] };
@@ -83,6 +93,15 @@ test('Encounters: every fight’s difficulty starts with Low, Moderate, High or 
   }
 });
 
+test('Encounters: each one’s stated difficulty is what the 2024 budget gives the party it’s sized for', () => {
+  for (const encounter of encounters) {
+    const { level, party } = encounter.sizedFor;
+    const rating = ratingFor(encounterXp(encounter), partyBudget(level, party));
+    assertEqual(rating, encounter.difficulty.split(/[\s:(,]/)[0], encounter.id);
+  }
+  assertEqual(partyBudget(3, 2), { low: 300, moderate: 450, high: 800 }, 'two level 3 characters');
+});
+
 // ---- Fights in the warren ----
 
 // A fight with the hero going first.
@@ -129,6 +148,99 @@ test('Goblin Boss: Redirect Attack drags an ally into the way, once a round', ()
   forceNextD20(15);
   fight.heroAttack(game, 'greatsword-melee', nettle.id);
   assertEqual(battle.log.filter((e) => e.text.includes('Redirect Attack')).length, 1);
+});
+
+// ---- Chapter 2's monsters ----
+
+const said = (game, text) => game.battle.log.some((e) => e.text.includes(text));
+const logText = (game) => game.battle.log.map((e) => e.text).join(' / ');
+
+// The ossuary fight with the hero (at (3, 8)) going first and Ghoul 1 beside them at (3, 7).
+// Ghoul 2 is out of it, unless both: then it stands beside the hero too, at (4, 7), and acts
+// after Ghoul 1. The hero has Hit Points to spare, to watch a few rounds.
+function ghoulFight(character = wren, { both = false, seed = 'ghoul' } = {}) {
+  const game = warrenFight('ossuary-ghouls', character, seed);
+  const [first, second] = fight.enemies(game.battle);
+  first.pos = { x: 3, y: 7 };
+  if (both) second.pos = { x: 4, y: 7 };
+  else second.hp = 0;
+  game.battle.order = ['hero', first.id, second.id];
+  game.battle.turn = 0;
+  game.hp = 60;
+  return game;
+}
+
+test('Ghoul: it rakes with its Claw first; fail the Con save (DC 10) and you’re Paralyzed until the end of your next turn, which is lost', () => {
+  const game = ghoulFight();
+  game.rng = scriptedThen([15, 2, 3], 'claw'); // the Claw hits, 1d4 = 2; then your save: a 3
+  fight.endHeroTurn(game);
+  const text = game.battle.log.map((e) => e.text);
+  const at = (start) => text.findIndex((t) => t.startsWith(start));
+  const steps = [at('Ghoul 1 hits you with Claw'), at('A cold numbness floods out'), at("You're Paralyzed until the end of your next turn"), at('You’re Paralyzed: you can’t move or act this turn'), at('The numbness fades: you can move again')];
+  assertTrue(steps.every((i, n) => i >= 0 && (n === 0 || i > steps[n - 1])), `${steps} ${logText(game)}`);
+  const save = game.battle.log[steps[1]].roll;
+  assertEqual([save.label, save.target.value, save.success], ["Ghoul 1's paralysing Claw (Constitution save)", 10, false]);
+  assertTrue(fight.isHeroTurn(game) && !fight.conditionsOf(game.battle, 'hero').includes('paralyzed'), 'your turn again, free to act');
+});
+
+test('Ghouls: the next one bites the Paralyzed hero twice with Advantage, and a hit from beside is a Critical Hit', () => {
+  const game = ghoulFight(wren, { both: true, seed: 'pack' });
+  // Ghoul 1: the Claw hits, 1d4 = 2, and your save is a 3. Ghoul 2: a Bite with Advantage (18
+  // and 9) that hits, a Critical Hit: 2d6 (3, 4) + 2 piercing, plus 2d6 (2, 5) necrotic.
+  game.rng = scriptedThen([15, 2, 3, 18, 9, 3, 4, 2, 5], 'pack');
+  fight.endHeroTurn(game);
+  const bite = game.battle.log.find((e) => e.text.startsWith('Critical hit! Ghoul 2 hits you with Bite'));
+  assertTrue(Boolean(bite), logText(game));
+  assertEqual([bite.roll.mode, bite.roll.advantage], ['advantage', ['You are Paralyzed']]);
+  assertTrue(bite.text.includes('= 9 piercing damage plus 2d6 (2, 5) = 7 necrotic'), bite.text);
+  assertEqual(game.battle.log.filter((e) => e.roll && e.roll.kind === 'attack' && e.text.includes('Ghoul 2') && e.text.includes('Bite')).length >= 2, true, 'two Bites: its Multiattack');
+});
+
+test('Ghoul: an elf can’t be Paralyzed by its Claw, so it bites twice instead', () => {
+  const game = ghoulFight(sorael, { seed: 'elf' });
+  fight.endHeroTurn(game);
+  const attacks = game.battle.log.filter((e) => e.roll && e.roll.kind === 'attack' && e.text.includes('Ghoul 1'));
+  assertTrue(attacks.length >= 2 && attacks.every((e) => e.text.includes('Bite')), logText(game));
+  assertTrue(!said(game, 'Claw'));
+});
+
+test('Bandit Captain: Parry turns a melee hit into a miss (+2 AC), once a round, never against a Critical Hit', () => {
+  const start = () => {
+    const game = warrenFight('stocks-hunters', { ...wren, level: 2, hitPointRolls: [null] });
+    const captain = fight.enemies(game.battle).find((c) => c.monsterId === 'bandit-captain');
+    captain.pos = { x: 3, y: 4 }; // beside the hero at (3, 5)
+    return { game, captain };
+  };
+  const { game, captain } = start();
+  const preview = fight.attackPreview(game, 'greatsword-melee', captain.id);
+  assertTrue(preview.describe.includes('it can Parry'), preview.describe);
+  const bonus = preview.option.modifiers.reduce((sum, m) => sum + m.value, 0);
+  forceNextD20(15 - bonus); // exactly 15: a hit on its AC 15, a miss against 17
+  fight.heroAttack(game, 'greatsword-melee', captain.id);
+  assertTrue(said(game, 'Bandit Captain parries! (its reaction: AC 17 against this attack)') && said(game, 'You attack Bandit Captain with Greatsword, and miss'), logText(game));
+  // Its reaction is spent until its next turn: Action Surge's swing lands.
+  fight.heroActionSurge(game);
+  forceNextD20(15 - bonus);
+  fight.heroAttack(game, 'greatsword-melee', captain.id);
+  assertTrue(said(game, 'You hit Bandit Captain with Greatsword'), logText(game));
+  assertEqual(game.battle.log.filter((e) => e.text.includes('parries')).length, 1);
+
+  const crit = start();
+  forceNextD20(20);
+  fight.heroAttack(crit.game, 'greatsword-melee', crit.captain.id);
+  assertTrue(!said(crit.game, 'parries') && said(crit.game, 'Critical hit! You hit Bandit Captain'), logText(crit.game));
+});
+
+test('Bounty hunters: the Captain closes in and swings twice (a Light Crossbow, not a Pistol); the Bandits shoot', () => {
+  const data = monsters.find((m) => m.id === 'bandit-captain');
+  assertEqual([data.attacks.map((a) => a.id), data.multiattack, data.xp], [['scimitar', 'light-crossbow'], 2, 450]);
+  assertTrue(data.variant.includes('in place of the Pistol') && data.source === 'SRD 5.2.1');
+  const game = warrenFight('stocks-hunters', wren, 'hunters');
+  game.hp = 60;
+  fight.endHeroTurn(game);
+  const swings = game.battle.log.filter((e) => e.roll && e.roll.kind === 'attack' && e.text.includes('Bandit Captain') && e.text.includes('Scimitar'));
+  const shots = game.battle.log.filter((e) => e.roll && e.roll.kind === 'attack' && /^Bandit \d/.test(e.text) && e.text.includes('Light Crossbow'));
+  assertEqual([swings.length, shots.length], [2, 2], logText(game));
 });
 
 // ---- Traps ----

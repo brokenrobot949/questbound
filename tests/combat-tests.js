@@ -13,7 +13,8 @@ import { monsters } from '../data/srd/monsters.js';
 import { quickStartHeroes } from '../data/campaign/quick-start.js';
 import { loadStory } from '../js/engine/story/ink-loader.js';
 import { bindExternals } from '../js/engine/story/externals.js';
-import { continueAfterBattle, currentLocation, makeChoice, startFight } from '../js/engine/story/story-runner.js';
+import { continueAfterBattle, currentLocation, makeChoice, startFight, startPractice } from '../js/engine/story/story-runner.js';
+import { fightRating } from '../js/engine/combat/difficulty.js';
 import { gameToSave, loadGame, newGame } from '../js/engine/save/save-format.js';
 import { validateCharacter } from '../js/engine/character/validate.js';
 import { attackSummary, averageDamage } from '../js/engine/ui/attack-text.js';
@@ -834,6 +835,77 @@ test('Resolve: offered only for a fight well under the hero’s strength, and ne
   forceNextD20(20);
   fight.startBattle(duel, 'nettle-duel', 0);
   assertTrue(fight.isHeroTurn(duel) && !canResolve(duel), 'Mother Nettle is always fought by hand');
+});
+
+// ---- Fights sized for the party (SRD 5.2.1, "Combat Encounters") ----
+
+const withParty = (character, ids) => {
+  const game = { ...gameFor(character), party: [] };
+  for (const id of ids) joinParty(game, id);
+  return game;
+};
+const wren3 = champion;
+
+test('Fight cards: how hard a fight is counts the companions with you, at your level now', () => {
+  const rate = (game, id) => fightRating(game, id).rating;
+  assertEqual([rate(withParty(wren2, []), 'nettle-duel'), rate(withParty(wren2, ['odda', 'fen']), 'nettle-duel')], ['High', 'Low'], 'Nettle (200 XP) for one level 2 hero, then for three');
+  assertEqual([rate(withParty(wren2, []), 'lower-dead'), rate(withParty(wren2, ['odda']), 'lower-dead')], ['Moderate', 'Low'], 'three Zombies (150 XP)');
+  assertEqual([rate(withParty(wren3, []), 'ossuary-ghouls'), rate(withParty(wren3, ['odda']), 'ossuary-ghouls')], ['High', 'Moderate'], 'two Ghouls (400 XP) at level 3');
+  const fallen = withParty(wren2, ['odda', 'fen']);
+  memberOf(fallen, 'fen').fallen = true;
+  assertEqual(fightRating(fallen, 'nettle-duel').size, 2, 'a fallen companion doesn’t fight');
+  assertEqual(fightRating(fallen, 'nettle-duel').budget, { low: 200, moderate: 300, high: 400 });
+});
+
+test('Resolve: with companions the limit is half the party’s Low budget, and anyone below half stops it', () => {
+  assertEqual([resolveLimit(2, 1), resolveLimit(2, 3)], [50, 150]);
+  const start = (ids, setUp = () => {}) => {
+    const game = withParty(wren2, ids);
+    setUp(game);
+    game.rng = scriptedThen([20, 1, 1, 1, 1, 1], 'resolve-dead');
+    fight.startBattle(game, 'lower-dead', 0);
+    return game;
+  };
+  assertTrue(!canResolve(start([])), 'three Zombies (150 XP) are a real fight for one level 2 hero');
+  assertTrue(canResolve(start(['odda', 'fen'])), 'but well under for three');
+  assertTrue(!canResolve(start(['odda', 'fen'], (g) => (memberOf(g, 'fen').hp = 3))), 'not while Fen is below half his Hit Points');
+});
+
+test('Resolve: companions fight their own turns, and the report says what each of you lost', () => {
+  const game = withParty(wren3, ['odda', 'fen']);
+  game.rng = scriptedThen([20, 1, 1, 1, 1], 'resolve-party');
+  fight.startBattle(game, 'mill-scavengers', 0);
+  assertTrue(canResolve(game));
+  const result = resolveFight(game);
+  assertEqual([result.outcome, result.losses.map((l) => l.id)], ['victory', ['hero', 'odda', 'fen']], game.battle.log.map((e) => e.text).join(' / '));
+  const report = game.battle.log.find((e) => e.text.startsWith('Resolved in')).text;
+  assertTrue(/: (nobody lost a Hit Point|.* lost \d+)/.test(report), report);
+  assertTrue(game.battle.log.some((e) => e.text.startsWith("Odda's turn.") || e.text.startsWith("Fen's turn.")), 'they took their turns');
+});
+
+test('Practice fight (debug): any fight from wherever the story is; afterwards everyone is back as they were', async () => {
+  const game = await storyGame(wren, 'practice');
+  joinParty(game, 'odda');
+  const choices = game.story.currentChoices.map((c) => c.text);
+  const before = { hp: game.hp, xp: game.xp, odda: memberOf(game, 'odda').hp, slots: structuredClone(memberOf(game, 'odda').slotsUsed) };
+  startPractice(game, 'ossuary-ghouls');
+  assertEqual([game.battle.choiceIndex, Boolean(game.battle.practice)], [null, true]);
+  // Saved and reloaded mid-fight, it's still a practice fight.
+  const record = JSON.parse(JSON.stringify(gameToSave(game)));
+  const story = await loadStory(new URL('../story/', import.meta.url));
+  const runtime = { story, game: null };
+  bindExternals(story, runtime);
+  const reloaded = loadGame(runtime, record);
+  assertTrue(fight.battleOk(reloaded.battle) && Boolean(reloaded.battle.practice));
+  // A beating, then the end of it.
+  game.hp = 1;
+  memberOf(game, 'odda').hp = 0;
+  memberOf(game, 'odda').slotsUsed = [2];
+  game.battle.outcome = 'defeat';
+  const page = continueAfterBattle(game);
+  assertEqual([game.battle, game.hp, game.xp, memberOf(game, 'odda').hp, memberOf(game, 'odda').slotsUsed], [null, before.hp, before.xp, before.odda, before.slots]);
+  assertEqual(game.story.currentChoices.map((c) => c.text), choices, 'the story is where it was');
+  assertTrue(page.beats.some((b) => b.type === 'note' && b.text.startsWith('Practice fight lost')));
 });
 
 test('Resolve: plays the fight out with real rolls, spending nothing, and says how it went', () => {

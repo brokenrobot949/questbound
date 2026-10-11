@@ -205,13 +205,13 @@ export function spellAbility(character, spellId) {
   return null;
 }
 
-// Who a spell that helps goes on (a 'self', 'heal', 'ward' or 'stabilise' spell): 'self' (only
-// the caster: False Life), 'friend' (the caster or one companion within range: Cure Wounds,
-// Sanctuary, Spare the Dying) or 'party' (the caster and companions within range, up to its
+// Who a spell that helps goes on (a 'self', 'heal', 'ward', 'stabilise' or 'restore' spell):
+// 'self' (only the caster: False Life), 'friend' (the caster or one companion within range:
+// Cure Wounds, Sanctuary, Spare the Dying, Lesser Restoration) or 'party' (the caster and companions within range, up to its
 // targets: Bless, Aid). From the spell's data (targets); null for any other spell.
 export function spellAim(spell) {
   const c = spell.combat;
-  if (!c || !['self', 'heal', 'ward', 'stabilise'].includes(c.kind)) return null;
+  if (!c || !['self', 'heal', 'ward', 'stabilise', 'restore'].includes(c.kind)) return null;
   if (!c.targets) return 'self';
   return c.targets > 1 ? 'party' : 'friend';
 }

@@ -821,4 +821,67 @@ test('Spare the Dying: with companions, the hero can cast it on a fallen friend 
   assertTrue(said(game, 'You cast Spare the Dying on Fen: Fen stops bleeding, and is Stable.'));
 });
 
+// ---- Chapter 2: a Ghoul's paralysis, and Lesser Restoration ----
+
+// A Ghoul's Claw on someone in the party: Paralyzed until the end of their next turn.
+const paralyse = (game, id) => game.battle.effects.push({ kind: 'paralyzed', target: id, endsOn: id, endsAt: 'end', fromRound: game.battle.round });
+
+test('Lesser Restoration: a Bonus Action and a touch end a friend’s paralysis; alone, it’s offered only when it would help you', () => {
+  const alone = fightWith(posy3, 'mill-scavengers', 'restore-alone');
+  assertTrue(!heroAttackOptions(alone).some((o) => o.spellId === 'lesser-restoration'), 'nothing on Posy for it to end');
+  alone.battle.effects.push({ kind: 'poisoned', target: 'hero', endsOn: 'hero', endsAt: 'end', fromRound: 1 });
+  assertTrue(heroAttackOptions(alone).some((o) => o.spellId === 'lesser-restoration'), 'Poisoned, she can end it on herself');
+
+  const game = fightWith(posy3, 'mill-scavengers', 'restore', { party: ['odda', 'fen'] });
+  const option = heroAttackOptions(game).find((o) => o.spellId === 'lesser-restoration');
+  assertEqual([option.targeting, option.bonusAction, option.slotLevel], ['friend', true, 2]);
+  assertEqual(attackSummary(option).join(' · '), 'Bonus Action · ends Paralyzed, Blinded or Poisoned · touch: you or a friend beside you · uses a level 2 slot');
+  assertEqual(fight.heroCantUse(game, option.id), 'Nobody in your party is Paralyzed, Blinded or Poisoned.');
+  paralyse(game, 'odda');
+  const odda = fight.combatantById(game.battle, 'odda');
+  odda.pos = { x: 1, y: 4 };
+  assertEqual(fight.heroCantUse(game, option.id), 'Odda isn’t beside you.', 'Paralyzed, but out of reach');
+  odda.pos = { x: 2, y: 1 };
+  const problems = Object.fromEntries(fight.friendTargets(game, option.id).map(({ c, problem }) => [c.id, problem]));
+  assertEqual(problems, { hero: 'You’re not Paralyzed, Blinded or Poisoned.', odda: null, fen: 'Fen is not Paralyzed, Blinded or Poisoned.' });
+  fight.heroCastOn(game, option.id, 'odda');
+  assertTrue(said(game, 'You cast Lesser Restoration on Odda, with a touch: Odda is no longer Paralyzed.'), game.battle.log.map((e) => e.text).join(' / '));
+  assertEqual([fight.conditionsOf(game.battle, 'odda'), game.battle.turnState.bonus, game.slotsUsed[1]], [[], true, 1]);
+});
+
+test('Odda: a friend Paralyzed by a Ghoul gets her Lesser Restoration, if she keeps a slot for healing', () => {
+  const game = fightWith(posy3, 'mill-scavengers', 'odda-restore', { party: ['odda', 'fen'] });
+  paralyse(game, 'fen');
+  playTurn(game, 'odda');
+  assertTrue(said(game, 'Odda casts Lesser Restoration on Fen, with a touch: Fen is no longer Paralyzed.'), game.battle.log.map((e) => e.text).join(' / '));
+  assertEqual(memberOf(game, 'odda').slotsUsed[1], 1);
+
+  const last = fightWith(posy3, 'mill-scavengers', 'odda-last-slot', { party: ['odda', 'fen'], setUp: (g) => (memberOf(g, 'odda').slotsUsed = [4, 1]) });
+  paralyse(last, 'fen');
+  playTurn(last, 'odda');
+  assertTrue(!said(last, 'Lesser Restoration'), 'her last slot stays for healing');
+});
+
+test('Paralyzed: Odda loses her Concentration and her turn, and the numbness fades at the end of it', () => {
+  const game = fightWith(posy3, 'ossuary-ghouls', 'odda-claw', { party: ['odda'] });
+  const [ghoul, other] = fight.enemies(game.battle);
+  other.hp = 0;
+  const odda = fight.combatantById(game.battle, 'odda');
+  odda.pos = { x: 5, y: 7 };
+  ghoul.pos = { x: 6, y: 7 }; // beside Odda, three squares from the hero at (3, 8)
+  turnOf(game, 'odda');
+  fight.companionCastOn(game, odda, 'spell-bless');
+  game.battle.order = ['hero', ghoul.id, 'odda', other.id];
+  turnOf(game, 'hero');
+  // The Claw hits Odda (18), 1d4 = 2. She holds Bless (its 1d4 = 1, then a 15), but her save
+  // against the paralysis fails (1d4 = 1, then a 2).
+  game.rng = scriptedThen([18, 2, 1, 15, 1, 2], 'odda-claw');
+  fight.endHeroTurn(game);
+  const text = game.battle.log.map((e) => e.text);
+  const at = (start) => text.findIndex((t) => t.startsWith(start));
+  const steps = [at('Odda is Paralyzed until the end of their next turn'), at("Odda can't hold their concentration: Bless ends."), at("Odda is Paralyzed, and can't move or act."), at('The numbness fades: Odda can move again.')];
+  assertTrue(steps.every((i, n) => i >= 0 && (n === 0 || i > steps[n - 1])), `${steps} ${text.join(' / ')}`);
+  assertEqual([fight.concentrationOf(game.battle, odda), fight.conditionsOf(game.battle, 'hero').includes('blessed')], [null, false]);
+});
+
 run(document.getElementById('summary'), document.getElementById('results'));

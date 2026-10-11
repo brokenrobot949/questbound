@@ -34,6 +34,9 @@
 //            'stabilise' Spare the Dying: a friend at 0 Hit Points becomes Stable (offered
 //                        only with companions; rangeScales: the range doubles at character
 //                        levels 5, 11 and 17)
+//            'restore'   Lesser Restoration: ends one condition (the first of `ends` it has:
+//                        a Ghoul's paralysis first) on you or a friend you touch. Deafened
+//                        does nothing in a fight yet, so it isn't listed
 //            'teleport'  Misty Step: to a square you can see within range
 //            'reaction'  the game casts it for you (see Settings): Shield when it would turn a
 //                        hit into a miss, Hellish Rebuke (trigger 'damaged') when a creature
@@ -883,6 +886,7 @@ export const spells = [
     duration: 'Instantaneous',
     concentration: false,
     text: 'You touch a creature and end one condition on it: Blinded, Deafened, Paralyzed, or Poisoned.',
+    combat: { kind: 'restore', range: 5, targets: 1, bonusAction: true, ends: ['paralyzed', 'blinded', 'poisoned'] },
     source: 'SRD 5.2.1',
   },
   {

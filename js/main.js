@@ -4,7 +4,7 @@
 import { randomSeed } from './engine/rules/rng.js';
 import { loadStory } from './engine/story/ink-loader.js';
 import { bindExternals } from './engine/story/externals.js';
-import { jumpTo, restartStory } from './engine/story/story-runner.js';
+import { jumpTo, restartStory, startPractice } from './engine/story/story-runner.js';
 import { findClass } from './engine/character/sheet.js';
 import { lowerLevel, xpForLevel } from './engine/character/level-up.js';
 import { beginSession, endSession, recap } from './engine/story/sessions.js';
@@ -267,6 +267,8 @@ async function start() {
             member.fallen = false;
             member.hp = memberMaxHp(game, member);
           }),
+        // A practice fight from wherever the story is; it puts everyone back when it ends.
+        practiceFight: (encounterId) => change((game) => startPractice(game, encounterId)),
         setSubclass: (id) =>
           change((game) => {
             if (id && !findClass(game.character.classId).subclasses.some((s) => s.id === id)) {

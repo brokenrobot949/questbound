@@ -154,9 +154,30 @@ export function startFight(game, choice) {
   return startBattle(game, encounterId, choice.index, { surprise });
 }
 
+// Debug mode's practice fight: any encounter, started from wherever the story is. It doesn't
+// count: when it ends, the hero and the party are put back as they were (Hit Points, spell
+// slots, uses, spells on them, the pack, Heroic Inspiration), no XP is earned, and the story
+// is where it was.
+const PRACTICE_KEEPS = ['hp', 'tempHp', 'slotsUsed', 'featureUses', 'activeSpells', 'inventory', 'party', 'inspiration'];
+export function startPractice(game, encounterId) {
+  if (game.battle) throw new Error('Finish this fight first.');
+  const before = {};
+  for (const field of PRACTICE_KEEPS) before[field] = structuredClone(game[field] === undefined ? null : game[field]);
+  game.undo = null;
+  return startBattle(game, encounterId, null, { practice: before });
+}
+
 // Once the player has seen how the fight ended: banks its XP, then takes the story choice
 // that started it, so the scene carries on (combat_won() tells it who won). Returns the page.
+// A practice fight puts everyone back instead, and the page shows the same choices again.
 export function continueAfterBattle(game) {
+  if (game.battle.practice) {
+    const { practice, outcome } = game.battle;
+    for (const field of PRACTICE_KEEPS) game[field] = practice[field];
+    game.battle = null;
+    const result = outcome === 'victory' ? 'won' : 'lost';
+    return { ...game.page, beats: [{ type: 'note', text: `Practice fight ${result}. It doesn’t count: everyone is back as they were, no XP, and the story carries on from here.` }] };
+  }
   const xp = game.battle.outcome === 'victory' ? game.battle.xp : 0;
   const { choiceIndex } = finishBattle(game);
   if (xp) game.pending.push({ type: 'note', text: dmNotes.fightWon.replace('{xp}', xp) });

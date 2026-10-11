@@ -7,8 +7,9 @@
 //   hold        doesn't move; fights only what they can reach from where they stand, or Dodges
 // Whatever the tactic, a companion first helps anyone in the party at 0 Hit Points (the hero
 // first): a healing spell if they have one, or else Spare the Dying, or the Help action's
-// Medicine check (DC 10) to stabilise them. Support also heals anyone Bloodied (at half
-// their Hit Points or fewer).
+// Medicine check (DC 10) to stabilise them. Next, a friend Paralyzed by a Ghoul's Claw (or
+// Blinded or Poisoned) is freed with Lesser Restoration, if they have it. Support also heals
+// anyone Bloodied (at half their Hit Points or fewer).
 // A spellcaster (Odda) opens a real fight with a Concentration spell, chosen by tactic (the
 // tactic's concentrate list): a fight whose foes still standing are worth at least a Low
 // fight for the party (realFight), and only if they'd still have a spell slot left for
@@ -41,9 +42,11 @@ import {
   companionMove,
   companionOptions,
   companionReach,
+  companionRestore,
   companionSpareTheDying,
   companionStandUp,
   concentrationOf,
+  conditionsOf,
   enemies,
   findMonster,
   friendProblem,
@@ -65,7 +68,7 @@ import { findTactic, memberOf } from '../character/party.js';
 import { canCastSpell, findSpell } from '../character/spells.js';
 import { slotsLeft } from '../character/resources.js';
 import { hasFeature } from '../character/sheet.js';
-import { xpBudgetPerCharacter } from '../../../data/srd/encounter-budget.js';
+import { partyBudget } from './difficulty.js';
 
 // The squares from the hero a Defensive or Support companion keeps within (10 feet).
 const STAY_NEAR = 2;
@@ -74,12 +77,12 @@ export function companionTurn(game, c) {
   const battle = game.battle;
   companionStandUp(game, c);
   if (isIncapacitated(battle, c.id)) {
-    addLogLine(game, `${c.name} can't act.`);
+    addLogLine(game, conditionsOf(battle, c.id).includes('paralyzed') ? `${c.name} is Paralyzed, and can't move or act.` : `${c.name} can't act.`);
     return;
   }
   const tactic = memberOf(game, c.id).tactic;
   const able = () => !battle.outcome && upright(game, c);
-  rescue(game, c) || (tactic === 'support' && patchUp(game, c));
+  rescue(game, c) || restoreSomeone(game, c) || (tactic === 'support' && patchUp(game, c));
   if (able()) concentrate(game, c, tactic);
   if (able()) weaponStrike(game, c);
   if (able()) fight(game, c, tactic);
@@ -147,6 +150,30 @@ function rescue(game, c) {
   return false;
 }
 
+// Anyone else in the party Paralyzed (a Ghoul's Claw), Blinded or Poisoned: Lesser Restoration
+// (Odda's, from level 3), the Paralyzed first, then the nearest, if they can get beside them
+// this turn and would still have a spell slot left for healing. True if the companion cast it.
+function restoreSomeone(game, c) {
+  const battle = game.battle;
+  const view = actorGame(game, c);
+  const option = companionOptions(game, c)
+    .filter((o) => o.how === 'restore' && !companionCantUse(game, c, o) && keepsASlot(view, o))
+    .sort((a, b) => (a.slotLevel || 0) - (b.slotLevel || 0))[0];
+  if (!option) return false;
+  const has = (p) => conditionsOf(battle, p.id).filter((kind) => option.ends.includes(kind));
+  const needy = partyCombatants(battle).filter((p) => p !== c && upright(game, p) && has(p).length);
+  needy.sort((a, b) => Number(has(b).includes('paralyzed')) - Number(has(a).includes('paralyzed')) || squaresBetween(c.pos, a.pos) - squaresBetween(c.pos, b.pos));
+  for (const target of needy) {
+    const path = pathWithin(game, c, target.pos, 5);
+    if (!path) continue;
+    companionMove(game, c, path);
+    if (battle.outcome || !upright(game, c)) return true;
+    companionRestore(game, c, option.id, target);
+    return true;
+  }
+  return false;
+}
+
 // Support: heals whoever in the party is Bloodied, the most hurt first. True if they did.
 function patchUp(game, c) {
   const battle = game.battle;
@@ -159,15 +186,14 @@ function patchUp(game, c) {
 
 // True if the foes still standing are worth at least a Low fight for the party: SRD 5.2.1,
 // "XP Budget per Character" at the hero's level, times the party's number (the dead don't
-// count). A fight worth a spell slot.
+// count; combat/difficulty.js). A fight worth a spell slot.
 export function realFight(game) {
   const battle = game.battle;
-  const row = xpBudgetPerCharacter.find((r) => r.level === game.character.level) || xpBudgetPerCharacter[0];
   const party = partyCombatants(battle).filter((p) => stateOf(battle, p) !== 'dead').length;
   const xp = enemies(battle)
     .filter((e) => e.hp > 0 && !e.escaped)
     .reduce((sum, e) => sum + findMonster(e.monsterId).xp, 0);
-  return xp >= row.low * party;
+  return xp >= partyBudget(game.character.level, party).low;
 }
 
 // True if casting this leaves the caster at least one spell slot for healing.

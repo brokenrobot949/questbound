@@ -196,7 +196,7 @@ The free rules include one subclass per class, such as Champion, Thief, Life Dom
   - **Life Domain spells:** Aid, Bless, Cure Wounds and Lesser Restoration are always prepared, on top of the six. A domain spell you'd already prepared frees its place at the level-up.
   - **Preserve Life** (Channel Divinity): up to five times your Cleric level in Hit Points, shared among the Bloodied of your party within 30 feet (you included), none above half their Hit Points. The game shares it out for you: the fallen first, then the most hurt, each up to half before the next.
 - **Aid:** the Hit Point maximum and current Hit Points of you and your companions within 30 feet rise by 5 (10 with a level 3 slot) until your next Long Rest. A companion at 0 Hit Points comes to. Cast it from the Sheet or in a fight.
-- **Lesser Restoration** is waiting for its scene: a level 2 spell, so not before level 3. In Chapter 2, a Ghoul's claws leave Lark Paralyzed in the mill tunnel, and it frees her.
+- **Lesser Restoration** (a level 2 spell, so from level 3; a Life Domain spell): in a fight, a Bonus Action and a touch end Paralyzed (a Ghoul's Claw), Blinded or Poisoned on you or a friend beside you. The list of the party under it says who has which. Alone, it's offered only when one of those is on you. Odda casts it too (see Companions). Its scene is still to come: in Chapter 2, a Ghoul's claws leave Lark Paralyzed in the mill tunnel, and it frees her.
 - **More of the Cleric list** (the Wizard can take Blindness/Deafness too):
   - **Shield of Faith** (Bonus Action, Concentration): +2 AC for you or a friend within 60 feet.
   - **Inflict Wounds** (touch): 2d10 Necrotic, half on a Constitution save; +1d10 per slot level above 1.
@@ -371,18 +371,31 @@ Initiative, attack rolls against AC, critical hits, damage types and resistances
 - Clever enemies focus wounded characters and spellcasters; beasts flee when badly hurt.
 - Humanoids may surrender or run, which opens interrogation or mercy choices afterwards.
 
+**Chapter 2's monsters** (SRD 5.2.1, in `data/srd/monsters.js`; you can try each fight from debug mode's **Practice fight**)
+
+- **Ghoul** (CR 1, 200 XP): its Multiattack is two Bites, each 1d6 + 2 piercing plus 1d6 necrotic. Its **Claw** is an action of its own: 1d4 + 2 slashing, and the target makes a DC 10 Constitution save or is **Paralyzed until the end of their next turn**. Undead and elves can't be paralysed. A Ghoul claws while its target can still be paralysed, and bites twice once they are, so a pack is dangerous: the next Ghoul's bites have Advantage, and a hit from beside is a Critical Hit (the necrotic dice double too).
+- **Paralyzed, for you and your companions:** you can't move or act, so your turn passes ("You're Paralyzed: you can't move or act this turn"); you fail Strength and Dexterity saves; attacks on you have Advantage, and a hit from within 5 feet is a Critical Hit; Dodging does nothing; and your Concentration ends, as it does for anyone Incapacitated. The status line and turn order say so, and "The numbness fades" when it ends. Lesser Restoration ends it at once.
+- **Bandit** (CR 1/8, 25 XP): Scimitar or Light Crossbow; it shoots when it can.
+- **Bandit Captain** (CR 2, 450 XP): Multiattack, two attacks with Scimitar or Light Crossbow. **Parry** (its reaction): +2 AC against a melee hit, used only when that turns the hit into a miss, never against a Critical Hit. Your attack's description warns "it can Parry". The SRD's captain carries a Pistol; Caldmere has no firearms, so ours has a Light Crossbow (+5, range 80/320 ft, 1d8 + 3) instead (Rob, Oct 10, 2026).
+
 **Encounter design**
 
 - Fights are built with the 2024 encounter budget (Low, Moderate, High), sized for you and your companions.
 - Most fights are Moderate and bosses are High. Fewer, better fights beat many filler fights.
 - Every authored fight gets a twist where possible: a hazard, an objective, reinforcements or a chance to parley.
 
+How the game sizes a fight (Rob chose to count companions, Oct 10, 2026):
+
+- **The party** is you plus every companion with you who can fight (a fallen one doesn't count). Its budget is SRD 5.2.1's XP Budget per Character at your level, times that number.
+- **The rating** is the smallest budget that holds the monsters' XP: Low, Moderate or High, and Deadly beyond High. The fight card ("Fight · Moderate") rates it for your party as it is when you choose, so three Zombies (150 XP) are Deadly for a level 1 hero alone and Low with Odda and Fen.
+- **Each authored fight** notes the party it's sized for (`sizedFor` in `data/campaign/encounters.js`), and a check makes sure its stated difficulty matches the budget. Chapter 1's fights are sized for a hero alone; Chapter 2's for the party the story expects then.
+
 **Quick resolve and speed**
 
 - A fight well under your party's strength offers **Resolve**: the engine plays it out instantly with real rolls and reports HP lost and resources spent. Story and boss fights are always played by hand.
-  - **Well under** means the monsters' XP is no more than half the Low budget for one character of your level (SRD 5.2.1, XP Budget per Character): 25 XP at level 1, 50 at level 2, 75 at level 3. In Chapter 1, a level 2 hero can resolve the wolf, the warren's lookout or the mill's two goblins. Encounters marked `byHand` (Mother Nettle, the Choir at the breach) never offer it.
-  - **How you fight:** stand up if Prone, close in if nothing's in reach, and attack the foe you'd hurt most with a weapon or cantrip, then with a second Light weapon if you have one. Resolve never spends spell slots, free casts, Second Wind, Action Surge or potions, and never hides.
-  - **It hands the fight back** if you're below half your Hit Points at the start of one of your turns, and it isn't offered once you are. Otherwise it reports the rounds and Hit Points lost: "Resolved in 3 rounds: you lost 6 Hit Points."
+  - **Well under** means the monsters' XP is no more than half the Low budget of the party in the fight (SRD 5.2.1, XP Budget per Character, times the number of you): for a hero alone, 25 XP at level 1, 50 at level 2, 75 at level 3; with Odda and Fen, three times that. In Chapter 1, a level 2 hero alone can resolve the wolf, the warren's lookout or the mill's two goblins; with Odda and Fen, the three Zombies too. Encounters marked `byHand` (Mother Nettle, the Choir at the breach) never offer it.
+  - **How you fight:** stand up if Prone, close in if nothing's in reach, and attack the foe you'd hurt most with a weapon or cantrip, then with a second Light weapon if you have one. Resolve never spends your spell slots, free casts, Second Wind, Action Surge or potions, and never hides. Companions take their own turns as usual (Odda may spend a slot healing).
+  - **It hands the fight back** if anyone in the party is below half their Hit Points (or down) at the start of one of your turns, and it isn't offered then. Otherwise it reports the rounds and what each of you lost: "Resolved in 3 rounds: you lost 6 Hit Points." or "Resolved in 2 rounds: Fen lost 6 Hit Points.", adding "Odda spent a spell slot." if she did.
 - Settings cover animation speed (Battle speed: Slow, Normal or Fast), auto-roll, automatic reactions (so far: Cast Shield by itself and Cast Hellish Rebuke by itself) and auto end-turn.
 
 ## World and Exploration
@@ -409,7 +422,7 @@ The world is a hand-made region map of towns, wilds and dungeons. You travel bet
 - Tap a door or room to move your party token: the ways on light up in gold, and tapping one is the same as tapping its "Go" choice card. Rooms hold traps, puzzles, monsters, treasure or lore.
 - Whoever is in a room stands on the map when you walk in: Mother Nettle before her throne with her band around her, the dead at their digging. Where a room has a fight, they stand on the squares the fight starts them on. The story moves them on: those who leave or scatter are gone from the map, and those who fall lie where they fell.
 - Traps work as in the rules. Damage outside a fight that drops you to 0 Hit Points means death saving throws with nobody to help (you see each roll); three failures lead to Fate's Mercy.
-- Every fight card shows how hard the fight is ("Fight · Low", "Fight · Deadly"), from the encounter budget.
+- Every fight card shows how hard the fight is ("Fight · Low", "Fight · Deadly"), from the encounter budget for you and your companions at your level now (see Combat, "Encounter design").
 - Searching uses Investigation and Perception checks; traps work as in the rules.
 - Fights start in place on the same map, with no screen change.
 - Most dungeons have 5–15 rooms (20–60 minutes), with cleared rooms safe for a short rest.
@@ -528,6 +541,8 @@ You play one character, but up to two companions can travel with you, chosen fro
 - **In a fight:**
   - They start on the free squares nearest you, roll their own Initiative and take their own turns.
   - Whatever the tactic, they first help anyone at 0 Hit Points, you first. They use a healing spell if they have one (Odda's Healing Word, then Cure Wounds), or else Spare the Dying, or the Help action's DC 10 Medicine check to stabilise.
+  - Next, Odda (from level 3) frees anyone else Paralyzed by a Ghoul (or Blinded or Poisoned) with Lesser Restoration, moving beside them if she can, as long as she'd still have a spell slot left for healing.
+  - A Paralyzed companion loses their turn ("Fen is Paralyzed, and can't move or act") and their Concentration.
   - **Odda's Concentration spells:** in a real fight she opens with her tactic's spell (above) and keeps it going, casting it again on a later turn if it ends.
     - A real fight is one whose foes still standing are worth at least a Low fight for the party: SRD 5.2.1's XP budget per character at your level, times the party's number. At level 1, a party of three needs 150 XP of foes (Chapter 1's three zombies, not the mill's two goblins); at level 2, 300.
     - She casts one only if she'd still have a spell slot left for healing afterwards.
@@ -548,7 +563,7 @@ You play one character, but up to two companions can travel with you, chosen fro
 - **Not yet:**
   - Odda's other spells in a fight (Guiding Bolt, Command, Sanctuary), and companions using the Help action.
   - Controlling their turns yourself.
-  - Camp scenes, the Lone Wolf setting, and sizing fights for the party. Chapter 1's fights are built for one hero, and companions arrive in Chapter 2.
+  - Camp scenes and the Lone Wolf setting. (Fights are now sized for the party: see Combat, "Encounter design". Chapter 1's fights are built for one hero, and companions arrive in Chapter 2.)
 
 **Your spells and potions on your companions (Phase 2)**
 
@@ -651,7 +666,7 @@ The game is a static multi-file website on GitHub Pages, built like Whimsywild: 
 - Content lives in `data/` and `story/`, never hard-coded in engine files.
 - Mobile-first portrait layout that also works on desktop.
 - Testing runs on a local server, with a hard refresh after changes.
-- A debug mode: jump to any scene, set level, grant items, view and edit flags, force a die result, plus a playtest log.
+- A debug mode: jump to any scene, set level, grant items, view and edit flags, force a die result, plus a playtest log. **Practice fight** starts any encounter from wherever the story is, with the party as it is (each listed with its rating for them). It doesn't count: when it ends, everyone's Hit Points, spell slots, uses, spells and pack are put back, no XP is earned, and the story waits at the same choices.
 
 **Folder structure**
 

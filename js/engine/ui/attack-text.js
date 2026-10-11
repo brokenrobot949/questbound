@@ -44,6 +44,7 @@ export function attackSummary(option, { slotsLeft = null } = {}) {
   else if (option.how === 'preserve') parts.push(`if you’re Bloodied, regain up to ${option.amount} Hit Points, but no more than half your maximum`);
   else if (option.how === 'teleport') parts.push(`teleport up to ${option.range[1]} ft to a square you can see`);
   else if (option.how === 'stabilise') parts.push('a friend at 0 Hit Points stops dying and is Stable');
+  else if (option.how === 'restore') parts.push(`ends Paralyzed, Blinded or Poisoned${option.company ? '' : ' on you'}`);
   else if (option.how === 'darts') {
     parts.push(`${option.darts} darts that never miss`, `${damageDice(option.damage)} each`, `${averageText(averageDamage(option.damage) * option.darts)} on average`);
   } else if (option.how === 'rays') {

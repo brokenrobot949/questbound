@@ -1,7 +1,7 @@
 // Debug mode (add ?debug to the address): a "Debug" button that opens a panel of testing tools.
 // Jump to any scene, view and edit story flags and Ink variables, set the hero's level, give
-// XP, gold and items, add or remove companions, force the next d20, toggle auto-roll, reset the
-// current save, and read the playtest log.
+// XP, gold and items, add or remove companions, start a practice fight, force the next d20,
+// toggle auto-roll, reset the current save, and read the playtest log.
 
 import { listScenes } from '../story/story-runner.js';
 import { describeCharacter, findClass } from '../character/sheet.js';
@@ -12,6 +12,8 @@ import { offlineReport } from '../save/offline.js';
 import { nextLevelXp } from '../character/level-up.js';
 import { equipment } from '../../../data/srd/equipment.js';
 import { companions } from '../../../data/campaign/companions.js';
+import { encounters } from '../../../data/campaign/encounters.js';
+import { fightRating } from '../combat/difficulty.js';
 import { actionButton } from './backup-panels.js';
 import { el } from './dom.js';
 
@@ -19,7 +21,8 @@ import { el } from './dom.js';
 // offline: a promise of how offline play started ("on", "off-local", "off-debug", "unsupported").
 // actions: { jumpTo(path), restartStory(), setLevel(n), setSubclass(id), giveXp(n),
 //            giveGold(gp), giveItem(id, quantity), joinParty(id), leaveParty(id),
-//            raiseCompanion(id), setFlags(list), setInkVariable(name, value), resetSave() }
+//            raiseCompanion(id), practiceFight(encounterId), setFlags(list),
+//            setInkVariable(name, value), resetSave() }
 // Each action applies the change, saves and redraws; the panel then redraws itself.
 export function setupDebugPanel({ root, getGame, tracker, offline, actions }) {
   const toggle = root.getElementById('debug-toggle');
@@ -49,7 +52,7 @@ export function setupDebugPanel({ root, getGame, tracker, offline, actions }) {
     panel.replaceChildren(heading('Debug mode'));
     if (problem) panel.append(el('p', 'debug-problem', problem));
     if (game) {
-      panel.append(sceneSection(game), flagSection(game), inkVariableSection(game), heroSection(game), partySection(game));
+      panel.append(sceneSection(game), flagSection(game), inkVariableSection(game), heroSection(game), partySection(game), practiceSection(game));
     } else {
       panel.append(el('p', 'debug-note', 'Open a save slot to use the scene, flag, hero and save tools.'));
     }
@@ -202,6 +205,28 @@ export function setupDebugPanel({ root, getGame, tracker, offline, actions }) {
       section.append(row(el('span', 'debug-label', `${name}: ${state}, approval ${member.approval}`), ...buttons));
     }
     section.append(el('p', 'debug-note', 'Up to two companions travel at once. They join and leave between fights.'));
+    return section;
+  }
+
+  // A practice fight: any encounter, with the party as it is now. It doesn't count: afterwards
+  // everyone is back as they were, no XP, and the story is where it was.
+  function practiceSection(game) {
+    const section = el('section', 'debug-section');
+    section.append(heading('Practice fight', 'h3'));
+    const select = el('select', 'debug-input');
+    select.setAttribute('aria-label', 'Fight to practise');
+    for (const encounter of encounters) {
+      const rated = fightRating(game, encounter.id);
+      const option = el('option', null, `${encounter.name} (${rated.rating}, ${rated.xp} XP)`);
+      option.value = encounter.id;
+      select.append(option);
+    }
+    const start = actionButton('Fight', () => run(() => actions.practiceFight(select.value)));
+    start.disabled = Boolean(game.battle);
+    section.append(
+      row(select, start),
+      el('p', 'debug-note', game.battle ? 'Finish the fight you’re in first.' : 'It doesn’t count: afterwards everyone is back as they were, no XP, and the story is where it was. Close this panel to fight.'),
+    );
     return section;
   }
 

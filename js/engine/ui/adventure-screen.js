@@ -10,7 +10,7 @@
 import { parseTags } from '../story/tags.js';
 import { continueAfterBattle, currentDungeon, currentTime, makeChoice, revealRoll, startFight } from '../story/story-runner.js';
 import { findRoom } from '../world/dungeons.js';
-import { findEncounter } from '../combat/battle.js';
+import { fightRating } from '../combat/difficulty.js';
 import { showDungeonMap } from './dungeon-map.js';
 import { heroMaxHp } from '../character/resources.js';
 import { levelUpReady } from '../character/level-up.js';
@@ -258,7 +258,7 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
       if (tags.check) card.append(el('span', 'choice-tag', checkLabel(tags.check)));
       if (tags.spell) card.append(el('span', 'choice-tag', spellTag(game, tags.spell)));
       if (tags.buy) card.append(el('span', 'choice-tag', `Buy · ${moneyText(priceOf(tags.buy))}`));
-      if (tags.combat) card.append(el('span', 'choice-tag is-fight', `${fightLabel(tags.combat)}${tags.surprise ? ' · Surprise attack' : ''}`));
+      if (tags.combat) card.append(el('span', 'choice-tag is-fight', `${fightLabel(game, tags.combat)}${tags.surprise ? ' · Surprise attack' : ''}`));
       // Only the hero's own Drive is pointed out: that's the choice that earns Inspiration.
       if (tags.drive && tags.drive === game.character.drive) {
         card.append(el('span', 'choice-tag is-drive', `★ Your Drive · ${findDrive(tags.drive).name}`));
@@ -490,12 +490,11 @@ function checkLabel(check) {
   return difficulty ? `${name} · ${difficulty}` : name;
 }
 
-// "Fight · Low", "Fight · Deadly": the first word of the encounter's difficulty
-// (data/campaign/encounters.js), so the player knows what they're walking into.
-function fightLabel(encounterId) {
-  const encounter = findEncounter(encounterId);
-  const rating = encounter ? encounter.difficulty.split(/[\s:(,]/)[0] : '';
-  return rating ? `Fight · ${rating}` : 'Fight';
+// "Fight · Low", "Fight · Deadly": how hard the fight is for the hero and their companions at
+// the hero's level now (combat/difficulty.js), so the player knows what they're walking into.
+function fightLabel(game, encounterId) {
+  const rated = fightRating(game, encounterId);
+  return rated ? `Fight · ${rated.rating}` : 'Fight';
 }
 
 // "Spell · Light", "Spell · Charm Person · level 1 slot", "Spell · Detect Magic · as a Ritual"

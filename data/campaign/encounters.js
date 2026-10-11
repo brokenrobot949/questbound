@@ -1,8 +1,12 @@
 // Encounters (original): authored fights. A scene starts one with a choice tagged
 // #combat:encounter-id. Each has a map, 8 squares wide, where the hero and the monsters start.
 //
-//   difficulty   from the 2024 encounter budget (Low, Moderate, High) for a lone hero of
-//                the level the scene expects; noted here so the fight can be checked
+//   difficulty   from the 2024 encounter budget (Low, Moderate, High, or Deadly beyond High)
+//                for the party the scene expects, noted here so the fight can be checked
+//   sizedFor     that party: { level, party } (the hero's level, and how many characters:
+//                1 for a hero alone). A check makes sure the difficulty's first word matches
+//                the budget. The fight card itself rates the fight for the hero's party as it
+//                is when they choose it (combat/difficulty.js).
 //   map.rows     one letter per square; map.legend says what each letter is:
 //                  terrain 'floor', 'wall', 'obstacle' (blocks movement) or 'difficult'
 //                  (costs double to cross)
@@ -32,6 +36,27 @@ const millLegend = {
   b: { terrain: 'obstacle', tile: 'wood-floor', decor: 'barrel' },
 };
 
+// The old ossuary under Dunn's Mill (Chapter 2): dressed stone, coffins, grave markers and
+// bones.
+const ossuaryLegend = {
+  '#': { terrain: 'wall', wall: 'stone' },
+  '.': { terrain: 'floor', tile: 'crypt-floor' },
+  k: { terrain: 'floor', tile: 'crypt-floor', decor: 'skull' },
+  c: { terrain: 'obstacle', tile: 'crypt-floor', decor: 'coffin' },
+  g: { terrain: 'obstacle', tile: 'crypt-floor', decor: 'gravestone' },
+  p: { terrain: 'obstacle', tile: 'crypt-floor', decor: 'bone-pile' },
+};
+
+// Bramblegate's market square (Chapter 2): cobbles, the stocks, market barrels and crates,
+// with house walls at the corners.
+const squareLegend = {
+  '#': { terrain: 'wall', wall: 'wood' },
+  '.': { terrain: 'floor', tile: 'cobbles' },
+  s: { terrain: 'obstacle', tile: 'cobbles', decor: 'stocks' },
+  b: { terrain: 'obstacle', tile: 'cobbles', decor: 'barrel' },
+  x: { terrain: 'obstacle', tile: 'cobbles', decor: 'crates' },
+};
+
 // The quarry road: a dirt road through grass, trees and bracken, up to the quarry's rock face.
 const roadLegend = {
   R: { terrain: 'wall', wall: 'rock' },
@@ -50,6 +75,7 @@ export const encounters = [
     id: 'mill-scavengers',
     name: 'Scavengers at Dunn’s Mill',
     difficulty: 'Low (50 XP budget for one level 1 hero)',
+    sizedFor: { level: 1, party: 1 },
     map: {
       rows: [
         '########',
@@ -75,6 +101,7 @@ export const encounters = [
     id: 'quarry-wolf',
     name: 'The Wolf on the Quarry Road',
     difficulty: 'Low (50 XP budget for one level 1 hero; one Wolf is 50 XP)',
+    sizedFor: { level: 1, party: 1 },
     map: {
       rows: [
         'RRR..RRR',
@@ -98,6 +125,7 @@ export const encounters = [
     id: 'warren-lookout',
     name: 'The Lookout at Brackenhollow',
     difficulty: 'Low (50 XP budget for one level 1 hero; one Goblin Warrior is 50 XP)',
+    sizedFor: { level: 1, party: 1 },
     map: { dungeon: 'brackenhollow', room: 'mouth' },
     hero: { x: 3, y: 0 },
     monsters: [{ monster: 'goblin-warrior', name: 'Goblin Lookout', pos: { x: 5, y: 4 } }],
@@ -108,6 +136,7 @@ export const encounters = [
     id: 'nettle-duel',
     name: 'Single Combat with Mother Nettle',
     difficulty: 'High (200 XP budget for one level 2 hero; a Goblin Boss is 200 XP)',
+    sizedFor: { level: 2, party: 1 },
     byHand: true,
     map: { dungeon: 'brackenhollow', room: 'hall' },
     hero: { x: 3, y: 1 },
@@ -127,6 +156,7 @@ export const encounters = [
     id: 'nettle-band',
     name: 'Nettle’s Whole Band',
     difficulty: 'Deadly: far beyond High (a Goblin Boss, three Goblin Warriors and two Goblin Minions are 400 XP; High for one level 2 hero is 200)',
+    sizedFor: { level: 2, party: 1 },
     byHand: true,
     map: { dungeon: 'brackenhollow', room: 'hall' },
     hero: { x: 3, y: 1 },
@@ -145,6 +175,7 @@ export const encounters = [
     id: 'lower-dead',
     name: 'The Dead in the Lower Warren',
     difficulty: 'Moderate (150 XP budget for one level 2 hero; three Zombies are 150 XP)',
+    sizedFor: { level: 2, party: 1 },
     map: { dungeon: 'brackenhollow', room: 'lower' },
     hero: { x: 5, y: 1 },
     monsters: [
@@ -159,6 +190,7 @@ export const encounters = [
     id: 'breach-hymn',
     name: 'The Hymn at the Breach',
     difficulty: 'Low, rising to Moderate if the hymn raises a second Skeleton (a Cultist and a Skeleton are 75 XP, then 125; for one level 2 hero Low is 100 and Moderate 150)',
+    sizedFor: { level: 2, party: 1 },
     byHand: true,
     map: { dungeon: 'brackenhollow', room: 'breach' },
     hero: { x: 3, y: 1 },
@@ -172,6 +204,64 @@ export const encounters = [
       { x: 4, y: 7 },
     ],
     whileHeroDown: '{name} stands over you, waiting for the hymn to finish.',
+    source: 'original',
+  },
+  // ---- Chapter 2 ----
+  // Lark's rescue: two Ghouls among the coffins of the old ossuary the dead dug open under the
+  // mill. The party comes in by the tunnel at the bottom.
+  {
+    id: 'ossuary-ghouls',
+    name: 'The Ghouls in the Ossuary',
+    difficulty: 'Moderate (two Ghouls are 400 XP; for a level 3 hero and Odda, Low is 300 and Moderate 450)',
+    sizedFor: { level: 3, party: 2 },
+    map: {
+      rows: [
+        '########',
+        '#c.k.gc#',
+        '#......#',
+        '#.p..k.#',
+        '#......#',
+        '##....##',
+        '#.k...g#',
+        '#......#',
+        '###..###',
+      ],
+      legend: ossuaryLegend,
+    },
+    hero: { x: 3, y: 8 },
+    monsters: [
+      { monster: 'ghoul', pos: { x: 2, y: 2 } },
+      { monster: 'ghoul', pos: { x: 5, y: 2 } },
+    ],
+    whileHeroDown: '{name} crouches among the bones and gnaws at something you’d rather not see.',
+    source: 'original',
+  },
+  // Fen in the stocks: the bounty hunters come for him across the market square.
+  {
+    id: 'stocks-hunters',
+    name: 'Bounty Hunters at the Stocks',
+    difficulty: 'Moderate (a Bandit Captain and two Bandits are 500 XP; for a level 3 party of three, with Fen fighting beside you, Low is 450 and Moderate 675. For two it would be High)',
+    sizedFor: { level: 3, party: 3 },
+    map: {
+      rows: [
+        '##....##',
+        '#......#',
+        '#..s...#',
+        'x......b',
+        '........',
+        '.b......',
+        '......xx',
+        '##....##',
+      ],
+      legend: squareLegend,
+    },
+    hero: { x: 3, y: 5 },
+    monsters: [
+      { monster: 'bandit-captain', pos: { x: 4, y: 1 } },
+      { monster: 'bandit', pos: { x: 1, y: 1 } },
+      { monster: 'bandit', pos: { x: 6, y: 1 } },
+    ],
+    whileHeroDown: '{name} turns back to the stocks, grinning.',
     source: 'original',
   },
 ];

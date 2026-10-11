@@ -25,6 +25,9 @@ export const sprites = {
   zombie: { sheet: 'undead', col: 1, row: 0 },
   skeleton: { sheet: 'undead', col: 0, row: 2 },
   cultist: { sheet: 'humanoid', col: 4, row: 7 },
+  ghoul: { sheet: 'undead', col: 0, row: 0 },
+  bandit: { sheet: 'player', col: 3, row: 4 },
+  'bandit-captain': { sheet: 'player', col: 5, row: 3 },
 };
 
 // Floor tiles and things that stand on them. alpha (0 to 1) draws a picture faded, and
@@ -53,6 +56,12 @@ export const tiles = {
   'crypt-floor': { sheet: 'floor', col: 8, row: 22 },
   bier: { sheet: 'decor', col: 6, row: 10 },
   'bone-pile': { sheet: 'decor', col: 0, row: 13 },
+  // Chapter 2: the old ossuary under Dunn's Mill, and Bramblegate's market square.
+  coffin: { sheet: 'decor', col: 7, row: 10 },
+  gravestone: { sheet: 'decor', col: 1, row: 17 },
+  skull: { sheet: 'decor', col: 0, row: 12 },
+  cobbles: { sheet: 'floor', col: 15, row: 7 },
+  stocks: { sheet: 'decor', col: 0, row: 11 },
 };
 
 // Walls join up with their neighbours. Each wall style is a block of tiles in DawnLike's

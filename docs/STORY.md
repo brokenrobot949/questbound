@@ -4,7 +4,7 @@ Draft 1, Oct 6, 2026. Written by Claude Code; Rob approved its key decisions the
 
 **How to read this.** Each chapter lists its beats in order: what happens, the main choices, the checks and fights, and what it changes later. Exact numbers (DCs, XP, gold) are set when the scenes are built and tuned in playtests. Every monster named here is in SRD 5.2.1; everything else (people, places, the Unking) is original. All names are working names.
 
-**Rules every scene follows** (from CLAUDE.md): second person, present tense, two to four short paragraphs per beat; failure moves the story forward and never dead-ends a quest; options the character doesn't qualify for stay hidden. Most fights are Moderate, bosses are High, and every authored fight gets a twist where it can: a hazard, an objective, reinforcements or a chance to parley.
+**Rules every scene follows** (from CLAUDE.md): second person, present tense, two to four short paragraphs per beat; failure moves the story forward and never dead-ends a quest; options the character doesn't qualify for stay hidden. Most fights are Moderate, bosses are High, and every authored fight gets a twist where it can: a hazard, an objective, reinforcements or a chance to parley. Difficulty is for the whole party the scene expects (the hero plus the companions with them then), as DESIGN.md's "Encounter design" says.
 
 **Conversations don't repeat themselves.** A place or person greets you once per visit, and a different short line each time you come back. Questions you ask loop back to the questions, not to the greeting, so nobody says the same paragraph twice in one conversation. (In Ink: the greeting is the knot, and the questions are a stitch that loops to itself.)
 
@@ -263,7 +263,7 @@ Fate's Mercy costs XP along the way, so a hero who lost fights may still be leve
 - **The breach:** Disguise Self (a grey robe, a hymnal) walks you right up to the singing acolyte for a surprise attack. If you catch him, Charm Person (he saves) is a third way to make him talk.
 - **The hymnal:** its map is torn across. Mending shows the road north past the Old Ford to Cairnfield, ringed twice in red (`hymnal_mended`), which points to Chapter 2.
 - **Guidance** adds 1d4 to every ability check in a scene, cast just before.
-- **Waiting for Chapter 2:** Knock, Invisibility and Lesser Restoration are level 2 spells, so a hero first has them at level 3, at the end of this chapter (see Chapter 2). The same goes for a Life Cleric's Aid, which works on the Sheet and in fights from then on.
+- **Waiting for Chapter 2:** Knock, Invisibility and Lesser Restoration are level 2 spells, so a hero first has them at level 3, at the end of this chapter (see Chapter 2). The same goes for a Life Cleric's Aid, which works on the Sheet and in fights from then on, and Lesser Restoration, which works in fights (against a Ghoul's paralysis) and waits for Lark's scene.
 - **A Cleric's Turn Undead** (from level 2) works on the lower warren's zombies and the skeleton at the breach.
 
 **Chapter 1 side content** (Phase 2):
@@ -273,8 +273,13 @@ Fate's Mercy costs XP along the way, so a hero who lost fights may still be leve
 
 ## Chapter 2 · The Barrow Road (levels 3 → 4, about 2 hours)
 
-1. **The miller's missing daughter.** *(The side-quest example from DESIGN.md, now part of the main line.)* At dawn Lark went down the mill tunnel with a lantern and her father's hatchet, and the dead have dug it clear. A short delve (4 rooms): Ghouls in the old ossuary, and Lark cornered on a ledge. You rescue her. She becomes a recurring face, and wants to be your apprentice.
-   - A Ghoul's claws have left Lark Paralyzed. Lesser Restoration (a Life Cleric has it from level 3) frees her at once; otherwise you carry her out, and the Ghouls follow.
+**Fights ready for these scenes** (`data/campaign/encounters.js`; try them from debug mode's Practice fight). Chapter 2's fights are sized for the party the story expects, and the fight card rates each one for the party the player actually has.
+
+- `ossuary-ghouls`, **The Ghouls in the Ossuary** (beat 1): two Ghouls among the coffins under the mill; the party comes in by the tunnel. Moderate for a level 3 hero and Odda (400 XP; Low 300, Moderate 450). Lark on her ledge, and any objective (reach her before the Ghouls do), come with the scene.
+- `stocks-hunters`, **Bounty Hunters at the Stocks** (beat 3): a Bandit Captain (with a crossbow: Caldmere has no guns) and two Bandits across the market square. Moderate for a level 3 party of three, which assumes Fen fights beside you once you've chosen to fight for him; with Fen still in the stocks, a party of two, it's High. The scene decides which.
+
+1. **The miller's missing daughter.** *(The side-quest example from DESIGN.md, now part of the main line.)* At dawn Lark went down the mill tunnel with a lantern and her father's hatchet, and the dead have dug it clear. A short delve (4 rooms): Ghouls in the old ossuary (`ossuary-ghouls`), and Lark cornered on a ledge. You rescue her. She becomes a recurring face, and wants to be your apprentice.
+   - A Ghoul's claws have left Lark Paralyzed. Lesser Restoration (a Life Cleric has it from level 3; it already works in fights, and Odda casts it on a paralysed friend) frees her at once; otherwise you carry her out, and the Ghouls follow.
 2. **Odda Brasswick arrives.** A dwarf priest sent by her order's mother-house to look into the walking dead: brusque, kind, and always brewing tea. She helps with the rescue and joins (`join_party("odda")`). *(Companion.)*
 3. **Fen in the stocks.** A halfling pickpocket, caught with the reeve's purse. Bounty hunters arrive (a Bandit Captain and two Bandits): "Dead or alive. The Choir pays double for dead."
    - Fen begs: "I know where they're taking your miller. I used to sing with them."
@@ -282,7 +287,7 @@ Fate's Mercy costs XP along the way, so a hero who lost fights may still be leve
    - **Choices:**
      - Free him: pick the lock (Thieves' Tools, or Knock it open, loudly), persuade Varrow, or pay his fine. He joins (`join_party("fen")`). *(Companion.)*
      - Hand him over (a Wealth Drive moment).
-     - Fight the hunters (Moderate).
+     - Fight the hunters (`stocks-hunters`: Moderate for three).
    - Turning Fen away doesn't dead-end anything: Nettle's goblins or the hunters give up the same lead, at a price.
 4. **The Bond returns** *(the Act I slot; see the Bond table)*.
 5. **The Old Ford.** At night, the dead cross the ford carrying capstones from the barrows. The watch-post there is under siege (Zombies and a Ghoul; the objective is to keep three soldiers alive).

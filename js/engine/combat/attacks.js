@@ -5,7 +5,7 @@
 // An attack option (what the attacker can use):
 //   { id, name, source: 'weapon' | 'spell' | 'channel' | 'monster',
 //     how: 'melee' | 'ranged' | 'save' | 'darts' | 'rays' | 'area' | 'self' | 'heal' | 'ward' |
-//          'teleport' | 'turn' | 'preserve' | 'multi' | 'spirit' | 'spirit-strike',
+//          'teleport' | 'turn' | 'preserve' | 'multi' | 'spirit' | 'spirit-strike' | 'restore',
 //     reach (feet, melee), range ([normal, long] feet, ranged), modifiers (to hit, for d20Test),
 //     damage: { dice, bonus, type, extraOnAdvantage } (null for spells that do no damage),
 //     saveDc, saveAbility, darts, rays,
@@ -25,7 +25,8 @@
 // (you and your companions within range: Bless, Aid), 'square' (Misty Step) or 'nearest'
 // (Bane: the nearest `targets` foes in range); and from the spell's data, area, halfOnSave,
 // push, condition, foesOnly, touch, targets, creatureType, self, tempHp, hpBonus (Aid),
-// speedBonus, effect (a 'ward' spell's: 'blessed', 'sanctuary' or 'shield-of-faith') and heal
+// speedBonus, effect (a 'ward' spell's: 'blessed', 'sanctuary' or 'shield-of-faith'), ends (a
+// 'restore' spell's conditions it can end: Lesser Restoration) and heal
 // ({ dice, bonus, extra }: a healing spell's dice, spellcasting modifier, and Disciple of
 // Life's extra Hit Points) (see data/srd/spells.js).
 // company: the hero has companions with them who can fight, so the words on the buttons talk
@@ -177,6 +178,8 @@ export function heroAttackOptions(game) {
       if (!company && c.self === 'mage-armor' && character.armorId) continue;
       if (!company && c.lasts && (game.activeSpells || []).some((s) => s.id === spell.id)) continue;
       if (!company && c.kind === 'stabilise') continue; // Spare the Dying: for a fallen friend
+      // Lesser Restoration: a hero alone sees it only with a condition on them it can end.
+      if (!company && !game.actorId && c.kind === 'restore' && !hasCondition(game, 'hero', c.ends)) continue;
       const modifiers = numbers.attackBonus.parts.map((p) => ({ ...p, source: `${group.label} spellcasting` }));
       const made = { modifiers, saveDc: numbers.saveDc.value, level: character.level, potent, abilityMod: abilityModifierOf(character, group.ability), company };
       if (spell.level > 0 && freeCastsLeft(game, spell.id) > 0) {
@@ -197,6 +200,11 @@ export function heroAttackOptions(game) {
   const strike = spiritStrikeOption(game);
   if (strike) options.push(strike);
   return options;
+}
+
+// True if someone in the fight has one of these conditions (e.g. Lesser Restoration's).
+function hasCondition(game, id, kinds) {
+  return Boolean(game.battle) && game.battle.effects.some((e) => e.target === id && kinds.includes(e.kind));
 }
 
 // The Light property's extra attack, if it's on offer now: on the attacker's own turn (the
@@ -324,6 +332,7 @@ function spellOption(spell, slot, above, { modifiers, saveDc, level, potent, abi
     baseAc: c.baseAc || null,
     lasts: c.lasts || null,
     effect: c.effect || null,
+    ends: c.ends || null,
     heal: c.heal ? { dice: upcastDice(c.heal.dice, c.upcast, above), bonus: abilityMod, extra: 0 } : null,
   };
 }
@@ -345,6 +354,7 @@ export function monsterAttackOptions(monster) {
       modifiers: [{ label: 'Attack', value: attack.bonus, source: `${monster.name}'s ${attack.name}` }],
       damage: { ...attack.damage, extraOnAdvantage: attack.advantageExtra || null },
       onHit: attack.onHit || null,
+      alone: Boolean(attack.alone), // not part of its Multiattack: an action of its own
     };
     if (attack.kind === 'melee' || attack.kind === 'melee-or-ranged') {
       options.push({ ...base, id: `${attack.id}-melee`, name: attack.name, how: 'melee', reach: attack.reach });
