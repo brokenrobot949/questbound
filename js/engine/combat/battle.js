@@ -98,14 +98,15 @@ export const findMonster = (id) => monsters.find((m) => m.id === id) || null;
 
 const maps = new Map();
 // The encounter's map, parsed once: its own, or its room of a dungeon. Onlookers (goblins
-// watching a duel, say) stand in the way like any obstacle.
+// watching a duel, Lark on her ledge) stand in the way like any obstacle. A person onlooker
+// isn't a picture on the map: the battle screen draws them as they look in scenes.
 export function battleMap(battle) {
   if (!maps.has(battle.encounterId)) {
     const encounter = findEncounter(battle.encounterId);
     const { rows, legend } = encounterRows(encounter);
     const map = parseMap(rows, legend);
     for (const { decor, pos } of encounter.onlookers || []) {
-      map.cells[pos.y][pos.x] = { ...map.cells[pos.y][pos.x], terrain: 'obstacle', decor };
+      map.cells[pos.y][pos.x] = { ...map.cells[pos.y][pos.x], terrain: 'obstacle', ...(decor ? { decor } : {}) };
     }
     maps.set(battle.encounterId, map);
   }

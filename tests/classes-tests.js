@@ -867,8 +867,8 @@ test('Paralyzed: Odda loses her Concentration and her turn, and the numbness fad
   const [ghoul, other] = fight.enemies(game.battle);
   other.hp = 0;
   const odda = fight.combatantById(game.battle, 'odda');
-  odda.pos = { x: 5, y: 7 };
-  ghoul.pos = { x: 6, y: 7 }; // beside Odda, three squares from the hero at (3, 8)
+  odda.pos = { x: 5, y: 1 };
+  ghoul.pos = { x: 6, y: 1 }; // beside Odda, three squares from the hero at (3, 1)
   turnOf(game, 'odda');
   fight.companionCastOn(game, odda, 'spell-bless');
   game.battle.order = ['hero', ghoul.id, 'odda', other.id];

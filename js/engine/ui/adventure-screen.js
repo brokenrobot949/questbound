@@ -32,6 +32,7 @@ import {
 import { findSpell } from '../character/spells.js';
 import { activeSpellIds } from '../character/spell-effects.js';
 import { castCostText, sceneCastCost } from '../character/casting.js';
+import { companionCharacter, fightingMembers, memberGame, memberOf } from '../character/party.js';
 import { canRerollRoll, keepRoll, rerollRoll } from '../rules/inspiration.js';
 import { speechBlock } from './speakers.js';
 import { heroSprite } from '../character/look.js';
@@ -203,7 +204,11 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
       return;
     }
     const stillWanted = () => request === mapRequest;
-    showDungeonMap({ container: mapArea, state, flags: game.flags, hero: heroSprite(game.character), doors, onGo: choose, stillWanted }).catch(showFatalError);
+    const party = fightingMembers(game).map((m) => {
+      const character = companionCharacter(m.id, game.character.level);
+      return { sprite: heroSprite(character), name: character.name.split(' ')[0] };
+    });
+    showDungeonMap({ container: mapArea, state, flags: game.flags, hero: heroSprite(game.character), party, doors, onGo: choose, stillWanted }).catch(showFatalError);
   }
 
   function hideMap() {
@@ -256,7 +261,7 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
         doors.push({ room: tags.go, choice });
       }
       if (tags.check) card.append(el('span', 'choice-tag', checkLabel(tags.check)));
-      if (tags.spell) card.append(el('span', 'choice-tag', spellTag(game, tags.spell)));
+      if (tags.spell) card.append(el('span', 'choice-tag', spellTag(game, tags.spell, tags.by)));
       if (tags.buy) card.append(el('span', 'choice-tag', `Buy · ${moneyText(priceOf(tags.buy))}`));
       if (tags.combat) card.append(el('span', 'choice-tag is-fight', `${fightLabel(game, tags.combat)}${tags.surprise ? ' · Surprise attack' : ''}`));
       // Only the hero's own Drive is pointed out: that's the choice that earns Inspiration.
@@ -497,11 +502,16 @@ function fightLabel(game, encounterId) {
   return rated ? `Fight · ${rated.rating}` : 'Fight';
 }
 
-// "Spell · Light", "Spell · Charm Person · level 1 slot", "Spell · Detect Magic · as a Ritual"
-function spellTag(game, id) {
+// "Spell · Light", "Spell · Charm Person · level 1 slot", "Spell · Detect Magic · as a Ritual".
+// by: a companion who casts it instead (#by:odda): "Odda’s spell · Lesser Restoration · level
+// 2 slot", with what it costs them.
+function spellTag(game, id, by = null) {
   const spell = findSpell(id);
-  const cost = castCostText(sceneCastCost(game, id));
-  return `Spell · ${spell ? spell.name : id}${cost ? ` · ${cost}` : ''}`;
+  const member = by ? memberOf(game, by) : null;
+  const caster = member ? memberGame(game, member) : game;
+  const cost = castCostText(sceneCastCost(caster, id));
+  const who = member ? `${caster.character.name.split(' ')[0]}’s spell` : 'Spell';
+  return `${who} · ${spell ? spell.name : id}${cost ? ` · ${cost}` : ''}`;
 }
 
 // "Wren Ashdown · Human Fighter 1 · HP 12 · AC 17 · Str +3 Dex +1 … · Proficiency +2"

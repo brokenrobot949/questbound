@@ -6,8 +6,10 @@ import { createRng } from '../js/engine/rules/rng.js';
 import { forceNextD20 } from '../js/engine/rules/dice.js';
 import { isStandable, parseMap } from '../js/engine/combat/grid.js';
 import * as fight from '../js/engine/combat/battle.js';
-import { enterRoom, findDungeon, parseRoomTag, roomFigures } from '../js/engine/world/dungeons.js';
+import { besideEntry, enterRoom, findDungeon, parseRoomTag, roomFigures } from '../js/engine/world/dungeons.js';
 import { sprites, tiles } from '../data/campaign/sprites.js';
+import { people } from '../data/campaign/people.js';
+import { joinParty, memberOf } from '../js/engine/character/party.js';
 import { takeDamage } from '../js/engine/character/hazards.js';
 import { startingInventory } from '../js/engine/character/inventory.js';
 import { freshResources } from '../js/engine/character/resources.js';
@@ -67,7 +69,7 @@ test('Rooms: whoever is in a room stands on open floor inside it, with a picture
       for (const figure of room.figures || []) {
         const where = `${room.id}: ${figure.name} at ${figure.pos.x},${figure.pos.y}`;
         assertTrue(figure.pos.y >= room.rows[0] && figure.pos.y <= room.rows[1] && isStandable(map, figure.pos), where);
-        assertTrue(Boolean(sprites[figure.sprite] || tiles[figure.sprite]), `${where}: picture`);
+        assertTrue(Boolean(sprites[figure.sprite] || tiles[figure.sprite] || people.some((p) => p.id === figure.person)), `${where}: picture`);
         assertTrue(figure.pos.x !== room.entry.x || figure.pos.y !== room.entry.y, `${where}: on the hero's square`);
       }
     }
@@ -155,14 +157,14 @@ test('Goblin Boss: Redirect Attack drags an ally into the way, once a round', ()
 const said = (game, text) => game.battle.log.some((e) => e.text.includes(text));
 const logText = (game) => game.battle.log.map((e) => e.text).join(' / ');
 
-// The ossuary fight with the hero (at (3, 8)) going first and Ghoul 1 beside them at (3, 7).
-// Ghoul 2 is out of it, unless both: then it stands beside the hero too, at (4, 7), and acts
+// The ossuary fight with the hero (at (3, 1)) going first and Ghoul 1 beside them at (3, 2).
+// Ghoul 2 is out of it, unless both: then it stands beside the hero too, at (4, 2), and acts
 // after Ghoul 1. The hero has Hit Points to spare, to watch a few rounds.
 function ghoulFight(character = wren, { both = false, seed = 'ghoul' } = {}) {
   const game = warrenFight('ossuary-ghouls', character, seed);
   const [first, second] = fight.enemies(game.battle);
-  first.pos = { x: 3, y: 7 };
-  if (both) second.pos = { x: 4, y: 7 };
+  first.pos = { x: 3, y: 2 };
+  if (both) second.pos = { x: 4, y: 2 };
   else second.hp = 0;
   game.battle.order = ['hero', first.id, second.id];
   game.battle.turn = 0;
@@ -289,6 +291,7 @@ function pick(game, start) {
 }
 
 const tagsOf = (game) => game.story.currentChoices.map((c) => (c.tags || []).join(' '));
+const cards = (game) => game.story.currentChoices.map((c) => c.text);
 // As if the player had tapped every d20 on the page.
 const revealAll = (game) => game.page.beats.filter((b) => b.type === 'roll' && !b.revealed).forEach((b) => revealRoll(game, b));
 const pageText = (game) => game.page.beats.filter((b) => b.type === 'text').map((b) => b.text).join(' ');
@@ -601,7 +604,7 @@ test('The whole slice: from the north gate to the lanterns on the hills, with le
   pick(game, 'Turn in for the night');
   assertTrue(game.xp >= 900, `level 3 needs 900 XP; the main path gives ${game.xp}`);
   pick(game, 'Wake in the dark');
-  assertEqual(game.story.currentChoices.length, 0, 'the end of the slice');
+  assertEqual(cards(game), ["Tell her you'll go at first light, and send her back to bed"], 'the end of Chapter 1, and on into Chapter 2');
   assertTrue(['goblins_spared', 'found_hymnal', 'acolyte_talked', 'goblins_at_mill', 'varrow_wary'].every((f) => game.flags.includes(f)));
 });
 
@@ -620,7 +623,199 @@ test('Home: half the bounty, Varrow’s verdict, and level 3 at the inn; then la
   assertEqual(game.xp, 950, 'the raids are over: 150 XP');
   pick(game, 'Wake in the dark');
   assertTrue(pageText(game).includes('They\'re digging toward the Kings\' Barrow'));
-  assertEqual(game.story.currentChoices.length, 0, 'the end of the slice');
+  assertEqual(cards(game), ["Tell her you'll go at first light, and send her back to bed"], 'the end of Chapter 1, and on into Chapter 2');
+  pick(game, "Tell her you'll go at first light");
+  assertTrue(pageText(game).includes('Have you seen Lark?') && game.journal.quests.some((q) => q.id === 'millers-daughter'), 'Chapter 2: Lark is gone');
+});
+
+// ---- Chapter 2: under Dunn's Mill ----
+
+const ossuaryRoom = () => findDungeon('mill-ossuary').rooms.find((r) => r.id === 'ossuary');
+const champion = { ...wren, level: 3, subclassId: 'champion', hitPointRolls: [null, null] };
+const posy = quickStartHeroes.find((h) => h.id === 'posy').character;
+const lifeCleric = { ...posy, level: 3, subclassId: 'life', hitPointRolls: [null, null], spells: { ...posy.spells, prepared: ['guiding-bolt', 'sanctuary', 'detect-magic', 'hold-person'] } };
+
+test('Under the mill: the Ghoul fight is the ossuary’s band of the map, with Lark on her ledge, out of everyone’s way', () => {
+  const game = warrenFight('ossuary-ghouls');
+  const map = fight.battleMap(game.battle);
+  const room = ossuaryRoom();
+  assertEqual(map.height, room.rows[1] - room.rows[0] + 1);
+  assertEqual([map.cells[8][4].terrain, map.cells[8][4].decor], ['obstacle', undefined], 'her ledge: nobody steps there, and the screen draws her');
+  // The ghouls stand on the map where the fight starts them, and Lark lies on her ledge.
+  const encounter = encounters.find((e) => e.id === 'ossuary-ghouls');
+  const onMap = (pos) => ({ x: pos.x, y: pos.y + room.rows[0] });
+  const here = roomFigures(room, []);
+  for (const { pos } of encounter.monsters) assertTrue(here.some((f) => f.sprite === 'ghoul' && f.pos.x === onMap(pos).x && f.pos.y === onMap(pos).y), `a ghoul at ${pos.x},${pos.y}`);
+  const lark = here.find((f) => f.person === 'lark');
+  assertEqual([lark.pos, lark.lying, lark.fallen], [onMap(encounter.onlookers[0].pos), true, false]);
+  assertEqual(roomFigures(room, ['lark_rescued']).filter((f) => f.person).length, 0, 'rescued, she’s gone from the ledge');
+  assertTrue(roomFigures(room, ['ossuary_ghouls_destroyed']).filter((f) => f.sprite === 'ghoul').every((f) => f.fallen), 'beaten, they lie where they fell');
+  assertEqual(roomFigures(room, ['ossuary_ghouls_fled']).filter((f) => f.sprite === 'ghoul'), [], 'driven off, they’re gone');
+});
+
+test('Under the mill: companions stand a step behind the hero on the map, where the fight would start them', () => {
+  const dungeon = findDungeon('mill-ossuary');
+  const map = parseMap(dungeon.rows, dungeon.legend);
+  const room = ossuaryRoom();
+  assertEqual(besideEntry(map, room, roomFigures(room, []).map((f) => f.pos), 2), [{ x: 3, y: 18 }, { x: 4, y: 18 }]);
+  const game = gameFor(wren);
+  game.party = [];
+  joinParty(game, 'odda');
+  fight.startBattle(game, 'ossuary-ghouls', 0);
+  assertEqual(fight.combatantById(game.battle, 'odda').pos, { x: 3, y: 0 }, 'the same square, counted from the room’s top row');
+});
+
+// Chapter 2 from the morning after, for a hero (a level 3 Champion unless given).
+async function chapter2(seed, { character = champion, flags = [] } = {}) {
+  const game = await storyGame(seed, character);
+  game.flags.push(...flags);
+  game.page = jumpTo(game, 'ch2_morning');
+  return game;
+}
+
+// Down to the ossuary: Odda joins at the mill, then the cellar, the tunnel and the niches.
+function downToTheOssuary(game) {
+  pick(game, 'Run for the mill');
+  pick(game, "Tell her you're glad");
+  pick(game, 'Climb down into the tunnel');
+  pick(game, 'Hurry on down');
+  pick(game, 'Go on, towards the gnawing');
+}
+
+// Settles the Ghoul fight the shown choice starts: won, or lost.
+function settleGhouls(game, won = true) {
+  const choice = game.story.currentChoices.find((c) => (c.tags || []).includes('combat:ossuary-ghouls'));
+  startFight(game, choice);
+  if (won) for (const foe of fight.enemies(game.battle)) foe.hp = 0;
+  else game.hp = 0;
+  game.battle.outcome = won ? 'victory' : 'defeat';
+  game.page = continueAfterBattle(game);
+}
+
+test('Chapter 2: Lark is gone; Odda joins at the mill, and the party goes down room by room', async () => {
+  const game = await chapter2('ch2-down', { flags: ['goblins_at_mill', 'met_odda'] });
+  assertEqual(game.journal.quests.find((q) => q.id === 'millers-daughter').status, 'active');
+  pick(game, 'Run for the mill');
+  assertTrue(pageText(game).includes('wolf-bait') && pageText(game).includes('Eat everybody'), 'Odda remembers you; the goblins saw Lark go');
+  pick(game, 'Tell her you work alone');
+  assertEqual(game.party.map((m) => m.id), ['odda'], 'she comes anyway');
+  assertTrue(notes(game).some((n) => n.startsWith('Odda Brasswick joins you')));
+  assertEqual(currentDungeon(game), { id: 'mill-ossuary', room: 'cellar', explored: ['cellar'] });
+  forceNextD20(20);
+  pick(game, 'Read the prints');
+  revealAll(game);
+  assertTrue(game.flags.includes('saw_ghoul_tracks'));
+  pick(game, 'Climb down into the tunnel');
+  assertEqual(currentDungeon(game).room, 'tunnel');
+  assertTrue(pageText(game).includes("I'll have you loose before it bites"), 'at level 3, Odda has Lesser Restoration');
+  forceNextD20(20);
+  pick(game, 'Listen down the tunnel');
+  revealAll(game);
+  pick(game, 'Hurry on down');
+  assertEqual(currentDungeon(game).room, 'niches');
+  const money = game.money;
+  pick(game, 'Pocket the silver pin');
+  assertEqual([game.money - money, memberOf(game, 'odda').approval], [500, -1], 'five gold, and Odda saw');
+  pick(game, 'Go on, towards the gnawing');
+  assertEqual(currentDungeon(game).room, 'ossuary');
+  assertTrue(tagsOf(game).some((t) => t === 'check:stealth:10'), 'heard from the tunnel: easier to creep up');
+  pick(game, 'Shout to draw them away');
+  assertEqual(memberOf(game, 'odda').approval, 0, 'protecting the weak');
+  assertEqual(tagsOf(game), ['combat:ossuary-ghouls']);
+});
+
+test('Chapter 2: sneaking up on the ghouls, or luring them with Minor Illusion, is a surprise attack', async () => {
+  const game = await chapter2('ch2-sneak');
+  downToTheOssuary(game);
+  assertTrue(tagsOf(game).some((t) => t === 'check:stealth:12'));
+  forceNextD20(20);
+  pick(game, 'Creep in');
+  revealAll(game);
+  assertEqual(tagsOf(game), ['combat:ossuary-ghouls surprise']);
+  const juniper = quickStartHeroes.find((h) => h.id === 'juniper').character;
+  const wizard = await chapter2('ch2-illusion', { character: juniper });
+  downToTheOssuary(wizard);
+  pick(wizard, 'Make a sound on the far side');
+  assertEqual(tagsOf(wizard), ['combat:ossuary-ghouls surprise']);
+});
+
+test('Chapter 2: after the ghouls, Odda frees Lark with her Lesser Restoration; the truth pleases her; home', async () => {
+  const game = await chapter2('ch2-odda-frees');
+  downToTheOssuary(game);
+  pick(game, 'Shout to draw them away');
+  settleGhouls(game);
+  assertTrue(game.flags.includes('ossuary_ghouls_destroyed'));
+  assertEqual(cards(game), ['Ask Odda to free her', 'Lift her down and carry her out'], 'a Fighter has no Lesser Restoration');
+  const card = game.story.currentChoices[0];
+  assertTrue(card.tags.includes('spell:lesser-restoration') && card.tags.includes('by:odda'));
+  pick(game, 'Ask Odda to free her');
+  assertEqual(memberOf(game, 'odda').slotsUsed[1], 1, 'her level 2 slot');
+  assertTrue(notes(game).includes('Odda casts Lesser Restoration, using a level 2 slot.'));
+  assertTrue(['lark_rescued', 'lark_restored', 'found_garrick_neckerchief'].every((f) => game.flags.includes(f)));
+  pick(game, 'Tell her the truth');
+  assertEqual(memberOf(game, 'odda').approval, 2, 'the shout, then honesty');
+  pick(game, 'Tell her to ask you again');
+  pick(game, 'Climb back up to the daylight');
+  assertEqual(currentDungeon(game).room, null, 'out from under the mill');
+  assertEqual(game.journal.quests.find((q) => q.id === 'millers-daughter').status, 'done');
+  assertTrue(pageText(game).includes('Somebody has to keep you breathing') && game.objective.includes('with Odda beside you'));
+  assertEqual(game.story.currentChoices.length, 0, 'the end of this part of Chapter 2');
+});
+
+test('Chapter 2: a Life Cleric can free Lark herself; without Lesser Restoration you carry her out, and a lie displeases Odda', async () => {
+  const cleric = await chapter2('ch2-cleric', { character: lifeCleric });
+  downToTheOssuary(cleric);
+  pick(cleric, 'Shout to draw them away');
+  settleGhouls(cleric);
+  assertEqual(cards(cleric).slice(0, 2), ['Free her with Lesser Restoration', 'Ask Odda to free her']);
+  pick(cleric, 'Free her with Lesser Restoration');
+  assertEqual([cleric.slotsUsed[1], memberOf(cleric, 'odda').slotsUsed[1] || 0], [1, 0], 'her own slot, not Odda’s');
+
+  const low = await chapter2('ch2-carry', { character: wren }); // level 1: Odda is too
+  downToTheOssuary(low);
+  pick(low, 'Shout to draw them away');
+  settleGhouls(low);
+  assertEqual(cards(low), ['Lift her down and carry her out']);
+  pick(low, 'Lift her down');
+  assertEqual(currentDungeon(low).room, null, 'carried up into the yard');
+  assertTrue(low.flags.includes('lark_carried_out'));
+  pick(low, 'Tell her he');
+  assertEqual(memberOf(low, 'odda').approval, 0, 'the shout, then the lie');
+  pick(low, 'Tell her no');
+  assertEqual(low.journal.quests.find((q) => q.id === 'millers-daughter').status, 'done');
+});
+
+test('Chapter 2: losing to the ghouls is Fate’s Mercy: Nettle’s goblins, or the watch, bring everyone up alive', async () => {
+  const game = await chapter2('ch2-mercy', { flags: ['goblins_at_mill'] });
+  downToTheOssuary(game);
+  pick(game, 'Shout to draw them away');
+  memberOf(game, 'odda').hp = 0;
+  settleGhouls(game, false);
+  assertTrue(pageText(game).includes('Goblins brought you in') && game.money === 0);
+  assertTrue(['ossuary_ghouls_fled', 'lark_rescued', 'ossuary_fates_mercy'].every((f) => game.flags.includes(f)));
+  assertTrue(memberOf(game, 'odda').hp > 0 && pageText(game).includes('we bring more friends'), 'the night’s rest brings Odda round');
+  assertEqual(currentDungeon(game).room, null);
+
+  const watch = await chapter2('ch2-watch');
+  downToTheOssuary(watch);
+  pick(watch, 'Shout to draw them away');
+  settleGhouls(watch, false);
+  assertTrue(pageText(watch).includes('Morwen raised the whole watch'));
+});
+
+test('Chapter 2: if Odda dies in the ossuary, the scenes go on without her, and the temple keeps her', async () => {
+  const game = await chapter2('ch2-odda-dies');
+  downToTheOssuary(game);
+  pick(game, 'Shout to draw them away');
+  memberOf(game, 'odda').fallen = true;
+  settleGhouls(game);
+  assertTrue(pageText(game).includes("she's gone"));
+  assertEqual(cards(game), ['Lift her down and carry her out'], 'no Lesser Restoration from her now');
+  pick(game, 'Lift her down');
+  pick(game, 'Tell her the truth');
+  assertTrue(!pageText(game).includes('Odda gives you a long look'));
+  pick(game, 'Tell her she already is one');
+  assertTrue(pageText(game).includes('lays her before the altar flame') && !pageText(game).includes('Somebody has to keep you breathing'));
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

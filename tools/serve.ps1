@@ -2,7 +2,7 @@
 # Serves this repo at http://localhost:8000/ so the browser can load ES modules.
 # Start it with serve.cmd (double-click), and stop it by closing its window or pressing Ctrl+C.
 
-param([int]$Port = 8000, [switch]$Open)
+param([int]$Port = $(if ($env:PORT) { [int]$env:PORT } else { 8000 }), [switch]$Open)
 
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\') + '\'
 

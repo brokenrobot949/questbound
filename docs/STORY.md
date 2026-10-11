@@ -263,7 +263,7 @@ Fate's Mercy costs XP along the way, so a hero who lost fights may still be leve
 - **The breach:** Disguise Self (a grey robe, a hymnal) walks you right up to the singing acolyte for a surprise attack. If you catch him, Charm Person (he saves) is a third way to make him talk.
 - **The hymnal:** its map is torn across. Mending shows the road north past the Old Ford to Cairnfield, ringed twice in red (`hymnal_mended`), which points to Chapter 2.
 - **Guidance** adds 1d4 to every ability check in a scene, cast just before.
-- **Waiting for Chapter 2:** Knock, Invisibility and Lesser Restoration are level 2 spells, so a hero first has them at level 3, at the end of this chapter (see Chapter 2). The same goes for a Life Cleric's Aid, which works on the Sheet and in fights from then on, and Lesser Restoration, which works in fights (against a Ghoul's paralysis) and waits for Lark's scene.
+- **Waiting for Chapter 2:** Knock, Invisibility and Lesser Restoration are level 2 spells, so a hero first has them at level 3, at the end of this chapter (see Chapter 2). The same goes for a Life Cleric's Aid, which works on the Sheet and in fights from then on, and Lesser Restoration, which works in fights (against a Ghoul's paralysis) and frees Lark in Chapter 2.
 - **A Cleric's Turn Undead** (from level 2) works on the lower warren's zombies and the skeleton at the breach.
 
 **Chapter 1 side content** (Phase 2):
@@ -275,19 +275,33 @@ Fate's Mercy costs XP along the way, so a hero who lost fights may still be leve
 
 **Fights ready for these scenes** (`data/campaign/encounters.js`; try them from debug mode's Practice fight). Chapter 2's fights are sized for the party the story expects, and the fight card rates each one for the party the player actually has.
 
-- `ossuary-ghouls`, **The Ghouls in the Ossuary** (beat 1): two Ghouls among the coffins under the mill; the party comes in by the tunnel. Moderate for a level 3 hero and Odda (400 XP; Low 300, Moderate 450). Lark on her ledge, and any objective (reach her before the Ghouls do), come with the scene.
-- `stocks-hunters`, **Bounty Hunters at the Stocks** (beat 3): a Bandit Captain (with a crossbow: Caldmere has no guns) and two Bandits across the market square. Moderate for a level 3 party of three, which assumes Fen fights beside you once you've chosen to fight for him; with Fen still in the stocks, a party of two, it's High. The scene decides which.
+- `ossuary-ghouls`, **The Ghouls in the Ossuary** (beat 1): two Ghouls in the last room of the dungeon under Dunn's Mill; the party comes in by the doorway at the top, and Lark lies Paralyzed on a burial ledge in the far wall, out of the fight. Moderate for a level 3 hero and Odda (400 XP; Low 300, Moderate 450).
+- `stocks-hunters`, **Bounty Hunters at the Stocks** (beat 3): a Bandit Captain (with a crossbow: Caldmere has no guns) and two Bandits across the market square. Moderate for a level 3 party of three: choosing to fight for Fen frees him first, so he fights beside you and Odda (Rob, Oct 10, 2026).
 
-1. **The miller's missing daughter.** *(The side-quest example from DESIGN.md, now part of the main line.)* At dawn Lark went down the mill tunnel with a lantern and her father's hatchet, and the dead have dug it clear. A short delve (4 rooms): Ghouls in the old ossuary (`ossuary-ghouls`), and Lark cornered on a ledge. You rescue her. She becomes a recurring face, and wants to be your apprentice.
-   - A Ghoul's claws have left Lark Paralyzed. Lesser Restoration (a Life Cleric has it from level 3; it already works in fights, and Odda casts it on a paralysed friend) frees her at once; otherwise you carry her out, and the Ghouls follow.
-2. **Odda Brasswick arrives.** A dwarf priest sent by her order's mother-house to look into the walking dead: brusque, kind, and always brewing tea. She helps with the rescue and joins (`join_party("odda")`). *(Companion.)*
+Beats 1 and 2 are written (`story/act-1/ch2-millers-daughter.ink`); the rest of the chapter is not yet.
+
+1. **The miller's missing daughter.** *(The side-quest example from DESIGN.md, now part of the main line.)* The night before, Lark knocked to say the Choir is digging toward the Kings' Barrow; you told her you'd go at first light. In the morning Morwen can't find her: Lark has been sleeping in Morwen's back room since her father went, and she's gone, with his hatchet and Morwen's lantern. New quest: **The Miller's Daughter**. *(Promising Morwen you'll bring her back is a Kinship Drive moment.)*
+   - **The delve under Dunn's Mill** (4 rooms on the dungeon map), with Odda (beat 2):
+     1. **The mill cellar:** the hole is dug clear from below. Survival 12 reads the prints: Lark's, and two ghouls' following her (`saw_ghoul_tracks`, 25 XP).
+     2. **The old tunnel:** Lark's dropped lantern, and claw marks. Odda explains ghouls and their numbing claws (and, at level 3, that she can free you). Perception 13 hears the gnawing, and Lark breathing (`heard_lark`), which makes creeping up easier.
+     3. **The bone niches:** the Choir dragged the old dead out of their niches, carved with the Kings' Barrow's crowns, and threw the grave goods aside. History 12 reads the carvings (`ossuary_history`). **Temptation:** pocket the silver pin (5 gold, a Wealth Drive moment; Odda −1, `robbed_the_niches`).
+     4. **The ossuary:** Lark rigid on a burial ledge, and two Ghouls below; one rakes her ankle whenever she stirs. **Lark's numbness is a story liberty** (Rob, Oct 10, 2026): clawed again and again, the numbness has built up and won't fade by itself for an hour. In fights the Claw keeps its rule.
+   - **The approach:** creep in (Stealth 12, or 10 if you heard them) for a surprise attack; lure them off with Minor Illusion (a surprise attack, no roll); or shout to draw them off her (Odda +1). Then `ossuary-ghouls`.
+   - **Freeing Lark:** Lesser Restoration frees her at once: yours (a Life Cleric has it from level 3), or Odda's (from level 3, if she has a slot; the card shows it's her spell and her slot). Otherwise you carry her out, and the numbness wears off on the way up (`lark_carried_out`).
+   - **Lark found her father's neckerchief** knotted on a nail by an old door the Choir filled with rubble: he was taken that way alive, and was leaving a trail (`found_garrick_neckerchief`).
+   - **"Is he alive? Tell me true."** The truth (you don't know, but they need him alive): Odda +1. A comforting lie: Odda −1. Or promise to bring him home (Kinship).
+   - **She wants to be your apprentice:** ask again when her father's home (`lark_apprentice_later`), she already is one (`lark_apprentice`), or stay home and stay alive (`lark_stays_home`). She becomes a recurring face, and never joins the party.
+   - **Home:** Morwen's tears and a late breakfast; the quest is done (100 XP).
+   - **Losing the fight is Fate's Mercy:** you wake in the temple, robbed (your purse is down among the bones). Nettle's goblins brought you all in (if they're camped at the mill), to Warden Pike's horror; otherwise Captain Varrow's watch went down with torches. The ghouls fled into the dark (`ossuary_ghouls_fled`), and Lark is alive.
+2. **Odda Brasswick arrives.** A dwarf priest sent by her order's mother-house to look into the walking dead: brusque, kind, and always brewing tea. She's waiting at Dunn's Mill, having seen a girl with a lantern go into the cellar at first light, and she joins before the delve (`join_party("odda")`), whatever you say (Rob, Oct 10, 2026). She remembers you if she carted you home from the quarry road (`met_odda`). Over breakfast she says she'll stay with you, and drops a seed for beat 6: the Prior "keeps his ledgers locked and his face shut. In my experience, that means debts." *(Companion.)*
+   - If Odda dies in the ossuary fight, the scenes go on without her, and the temple keeps her before the altar flame until she can be raised.
 3. **Fen in the stocks.** A halfling pickpocket, caught with the reeve's purse. Bounty hunters arrive (a Bandit Captain and two Bandits): "Dead or alive. The Choir pays double for dead."
    - Fen begs: "I know where they're taking your miller. I used to sing with them."
    - A Rogue who read the thieves' chalk marks in Bramblegate (`read_cant_marks`) knows him at once: he's the songbird with the bounty on him.
    - **Choices:**
      - Free him: pick the lock (Thieves' Tools, or Knock it open, loudly), persuade Varrow, or pay his fine. He joins (`join_party("fen")`). *(Companion.)*
      - Hand him over (a Wealth Drive moment).
-     - Fight the hunters (`stocks-hunters`: Moderate for three).
+     - Fight the hunters (`stocks-hunters`: Moderate for three). Choosing to fight frees Fen first, and he fights beside you (Rob, Oct 10, 2026).
    - Turning Fen away doesn't dead-end anything: Nettle's goblins or the hunters give up the same lead, at a price.
 4. **The Bond returns** *(the Act I slot; see the Bond table)*.
 5. **The Old Ford.** At night, the dead cross the ford carrying capstones from the barrows. The watch-post there is under siege (Zombies and a Ghoul; the objective is to keep three soldiers alive).

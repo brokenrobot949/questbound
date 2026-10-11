@@ -232,6 +232,19 @@ test('Speakers: every #speaker tag names someone in people.js, and everyone ther
   }
 });
 
+test('Story text: an inline condition never starts its words with a space before punctuation ("Mill , the")', async () => {
+  const main = await (await fetch(new URL('main.ink', STORY_URL))).text();
+  const files = [...main.matchAll(/^INCLUDE (.+)$/gm)].map((m) => m[1].trim());
+  for (const file of files) {
+    const source = await (await fetch(new URL(file, STORY_URL))).text();
+    // Ink keeps the space after the colon: { cond: , text} prints " , text".
+    const bad = source.split('\n').filter((line) => !line.trim().startsWith('//') && /\{[^{}]*\): [,.;:!?]/.test(line));
+    assertEqual(bad, [], file);
+  }
+  const { story } = inlineStory(`${EXTERNALS}Three{has_flag("x"):, four|, five}.\n-> END\n`);
+  assertEqual(story.ContinueMaximally(), 'Three, five.\n', 'no space before the comma');
+});
+
 test('Speakers: a line someone speaks carries who it is on the page', async () => {
   const game = newGame(await freshRuntime(), { slot: 1, seed: 'speakers', character: testHero });
   const pike = game.page.beats.find((b) => b.type === 'text' && b.text.startsWith('"Gate shuts at sundown,"'));

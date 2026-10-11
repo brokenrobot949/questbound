@@ -37,6 +37,7 @@ import { blit, drawCell, drawTile, frameSquare, loadArt, pixelScale, sizeCanvas,
 import { attackSummary, averageText } from './attack-text.js';
 import { rollLine, signedNumber } from './roll-format.js';
 import { skillBonus } from '../character/sheet.js';
+import { findPerson, personSprite } from './speakers.js';
 import { el, showFatalError } from './dom.js';
 
 const FRAME_MS = 500; // each frame of the two-frame idle animation
@@ -113,6 +114,14 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     }
     return companionArt.get(c.id);
   };
+  // People watching from the side who aren't in the fight (Lark on her ledge), drawn as they
+  // look in scenes.
+  const people = (fight.findEncounter(game.battle.encounterId).onlookers || [])
+    .filter((o) => o.person)
+    .map((o) => {
+      const sprite = personSprite(findPerson(o.person));
+      return { pos: o.pos, lying: Boolean(o.lying), image: spriteImage(sprite, sprite.frames[0]) };
+    });
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // option: the attack or spell chosen, waiting to be aimed; aim: where an area spell is aimed
@@ -869,6 +878,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) drawCell(ctx, art, map, x, y, size);
     }
+    for (const person of people) blit(ctx, person.image, 0, 0, person.pos.x, person.pos.y, size, { lying: person.lying });
 
     // Where the hero can move. A pale wash with a bright edge, so it shows on wood and stone
     // alike; gold squares are a free move (Remarkable Athlete).

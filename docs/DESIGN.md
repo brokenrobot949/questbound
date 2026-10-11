@@ -375,6 +375,8 @@ Initiative, attack rolls against AC, critical hits, damage types and resistances
 
 - **Ghoul** (CR 1, 200 XP): its Multiattack is two Bites, each 1d6 + 2 piercing plus 1d6 necrotic. Its **Claw** is an action of its own: 1d4 + 2 slashing, and the target makes a DC 10 Constitution save or is **Paralyzed until the end of their next turn**. Undead and elves can't be paralysed. A Ghoul claws while its target can still be paralysed, and bites twice once they are, so a pack is dangerous: the next Ghoul's bites have Advantage, and a hit from beside is a Critical Hit (the necrotic dice double too).
 - **Paralyzed, for you and your companions:** you can't move or act, so your turn passes ("You're Paralyzed: you can't move or act this turn"); you fail Strength and Dexterity saves; attacks on you have Advantage, and a hit from within 5 feet is a Critical Hit; Dodging does nothing; and your Concentration ends, as it does for anyone Incapacitated. The status line and turn order say so, and "The numbness fades" when it ends. Lesser Restoration ends it at once.
+- **Lark's numbness is a story liberty** (Rob, Oct 10, 2026): in the ossuary, the Ghouls have clawed her so often that the numbness has built up and won't fade by itself for an hour, so Lesser Restoration (yours, or Odda's) frees her at once, or you carry her out. In fights, the Claw keeps the rule above.
+- **The Ghouls in the Ossuary** is the last room of the dungeon under Dunn's Mill. Lark lies on a burial ledge in the far wall, drawn on the grid; nobody can step there, and nobody fights her.
 - **Bandit** (CR 1/8, 25 XP): Scimitar or Light Crossbow; it shoots when it can.
 - **Bandit Captain** (CR 2, 450 XP): Multiattack, two attacks with Scimitar or Light Crossbow. **Parry** (its reaction): +2 AC against a melee hit, used only when that turns the hit into a miss, never against a Critical Hit. Your attack's description warns "it can Parry". The SRD's captain carries a Pistol; Caldmere has no firearms, so ours has a Light Crossbow (+5, range 80/320 ft, 1d8 + 3) instead (Rob, Oct 10, 2026).
 
@@ -420,7 +422,9 @@ The world is a hand-made region map of towns, wilds and dungeons. You travel bet
 - Dungeons use the same tiles as the combat grid. Rooms are revealed as you enter.
 - The map sits above the choices and shows the room you're in, with your hero at its entrance; **Whole map** shows every room explored so far, and the rest stays dark. The story moves you room to room, and the map follows only as far as you've read (it waits for any d20 you haven't tapped).
 - Tap a door or room to move your party token: the ways on light up in gold, and tapping one is the same as tapping its "Go" choice card. Rooms hold traps, puzzles, monsters, treasure or lore.
-- Whoever is in a room stands on the map when you walk in: Mother Nettle before her throne with her band around her, the dead at their digging. Where a room has a fight, they stand on the squares the fight starts them on. The story moves them on: those who leave or scatter are gone from the map, and those who fall lie where they fell.
+- Whoever is in a room stands on the map when you walk in: Mother Nettle before her throne with her band around her, the dead at their digging, Lark on her ledge (people from the story are drawn as they look in scenes). Where a room has a fight, they stand on the squares the fight starts them on. The story moves them on: those who leave or scatter are gone from the map, and those who fall lie where they fell.
+- Your companions stand a step behind you on the map: on the free squares nearest your square, in the order they joined, which is where a fight in that room would start them.
+- **Under Dunn's Mill** (Chapter 2) is a short delve of 4 rooms: the mill cellar, the old tunnel the dead dug clear, the bone niches the Choir emptied, and the ossuary.
 - Traps work as in the rules. Damage outside a fight that drops you to 0 Hit Points means death saving throws with nobody to help (you see each roll); three failures lead to Fate's Mercy.
 - Every fight card shows how hard the fight is ("Fight · Low", "Fight · Deadly"), from the encounter budget for you and your companions at your level now (see Combat, "Encounter design").
 - Searching uses Investigation and Perception checks; traps work as in the rules.
@@ -531,7 +535,9 @@ You play one character, but up to two companions can travel with you, chosen fro
 **How companions work so far (Phase 2)**
 
 - **Odda Brasswick** (dwarf Cleric, Acolyte, Protector) and **Fen Underbough** (halfling Rogue, Criminal) are full characters, built like heroes. Up to two travel with you.
-- **Joining and leaving:** a scene adds or removes a companion (`join_party`, `leave_party`), and the DM says so. Chapter 2 is where Odda and Fen join. Until it's written, debug mode can add or remove them.
+- **Joining and leaving:** a scene adds or removes a companion (`join_party`, `leave_party`), and the DM says so. Odda joins at Dunn's Mill at the start of Chapter 2, and goes down the ossuary with you (Rob, Oct 10, 2026). Fen joins at the stocks, later in Chapter 2 (not written yet). Debug mode can still add or remove either.
+- **Their spells in scenes:** a scene can ask a companion to cast a spell they have (`companion_can_cast`, `companion_cast`): Odda frees Lark with Lesser Restoration. The card says whose spell it is and what it costs them ("Odda's spell · Lesser Restoration · level 2 slot"), and it uses their slot, not yours.
+- **If a companion dies in a story fight,** the scene goes on without their lines (`companion_alive`). If Odda dies in the ossuary, the temple keeps her before the altar flame until she can be raised; raising the dead at a temple comes later, and debug mode's Raise works meanwhile.
 - **Levels:** they're always your level. Their big picks are set for now: Odda takes the Life Domain at level 3, Fen the Thief. Each later level takes the fixed Hit Points, and their Hit Points rise when yours do.
 - **The Party section of the Sheet** shows each companion's portrait, Hit Points, likes and dislikes, full sheet and **tactic**:
   - **Aggressive:** goes after the foe they'd hurt most. Odda opens a real fight with Spiritual Weapon (from level 3), or Bless before then.
@@ -559,7 +565,7 @@ You play one character, but up to two companions can travel with you, chosen fro
 - **When you fall**, the fight goes on while a companion stands. You make death saves, and they try to get you back up. The fight is lost only if you die, or you're stable at 0 Hit Points with no companion left standing; then Fate's Mercy happens as before. After a win, anyone at 0 Hit Points comes to with 1.
 - **Companions fall** and make death saves as you do. Three failures, or a blow of their whole Hit Point maximum, and they die. A fallen companion stays with you but doesn't fight until raised: at a temple or by a spell, once those exist. Debug mode can raise them for now.
 - **Long Rests** bring them back to full, as they do you.
-- **Approval:** each companion keeps a score. Scenes raise or lower it with `approve(id, change)` when you do something they like or dislike (their likes and dislikes are in the data and on the Sheet). The score isn't shown to the player; debug mode shows it.
+- **Approval:** each companion keeps a score. Scenes raise or lower it with `approve(id, change)` when you do something they like or dislike (their likes and dislikes are in the data and on the Sheet). The score isn't shown to the player; debug mode shows it. Odda's first moments, under Dunn's Mill: drawing the Ghouls off Lark (+1), robbing the opened coffins (−1), and telling Lark the truth about her father (+1) or a comforting lie (−1).
 - **Not yet:**
   - Odda's other spells in a fight (Guiding Bolt, Command, Sanctuary), and companions using the Help action.
   - Controlling their turns yourself.

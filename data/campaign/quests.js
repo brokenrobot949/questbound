@@ -17,4 +17,11 @@ export const quests = [
     chapter: 1,
     source: 'original',
   },
+  {
+    id: 'millers-daughter',
+    title: 'The Miller’s Daughter',
+    summary: 'Lark Dunn has gone down the old tunnel under her father’s mill, alone, with a lantern and his hatchet.',
+    chapter: 2,
+    source: 'original',
+  },
 ];

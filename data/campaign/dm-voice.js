@@ -56,6 +56,10 @@ export const dmNotes = {
   castWithSlot: 'You cast {spell}, using a {cost}.',
   castRitual: 'You cast {spell} as a Ritual: ten minutes longer, and no spell slot.',
   castFree: 'You cast {spell} without a spell slot (once per Long Rest).',
+  // A companion casts a spell in a scene ({name}: their first name).
+  companionCastWithSlot: '{name} casts {spell}, using a {cost}.',
+  companionCastRitual: '{name} casts {spell} as a Ritual: ten minutes longer, and no spell slot.',
+  companionCastFree: '{name} casts {spell} without a spell slot (once per Long Rest).',
   source: 'original',
 };
 

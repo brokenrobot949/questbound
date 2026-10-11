@@ -370,9 +370,10 @@ test('Roll line names a Critical Hit', () => {
 });
 
 test('Ink tags: #check:persuasion:15 is a Persuasion check against DC 15; #location sets the place', () => {
-  const none = { check: null, spell: null, location: null, time: null, drive: null, buy: null, combat: null, surprise: false, go: null, room: null, speaker: null };
+  const none = { check: null, spell: null, by: null, location: null, time: null, drive: null, buy: null, combat: null, surprise: false, go: null, room: null, speaker: null };
   assertEqual(parseTags(['check:persuasion:15']), { ...none, check: { testId: 'persuasion', dc: 15 } });
   assertEqual(parseTags(['spell:light']).spell, 'light');
+  assertEqual(parseTags(['spell:lesser-restoration', 'by:odda']), { ...none, spell: 'lesser-restoration', by: 'odda' }, 'a companion’s spell');
   assertEqual(parseTags(['location:Bramblegate, Hob’s forge', 'speaker:hob']), { ...none, location: 'Bramblegate, Hob’s forge', speaker: 'hob' });
   assertEqual(parseTags(['location: Bramblegate, north gate']).location, 'Bramblegate, north gate');
   assertEqual(parseTags(['time:Dusk', 'drive:wealth', 'buy:torch']), { ...none, time: 'Dusk', drive: 'wealth', buy: 'torch' });

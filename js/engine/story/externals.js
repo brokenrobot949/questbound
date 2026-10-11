@@ -16,7 +16,7 @@ import { addItem, buyItem, canAfford, COPPER_PER, findItem, hasItem, moneyText, 
 import { findDrive } from '../character/creation.js';
 import { addDeed, findQuest, finishQuest, questNote, startQuest } from './journal.js';
 import { longRestRecovery } from '../character/resources.js';
-import { approve, findCompanion, inParty, joinParty, leaveParty, PARTY_LIMIT, partyLongRest } from '../character/party.js';
+import { approve, findCompanion, inParty, joinParty, leaveParty, memberGame, memberOf, PARTY_LIMIT, partyLongRest } from '../character/party.js';
 import { tacticalMind } from '../character/features.js';
 import { takeDamage } from '../character/hazards.js';
 import { dmNotes } from '../../../data/campaign/dm-voice.js';
@@ -136,6 +136,42 @@ export function bindExternals(story, runtime) {
   // party_full(): true if two companions already are.
   story.BindExternalFunction('in_party', (id) => inParty(runtime.game, id), false);
   story.BindExternalFunction('party_full', () => (runtime.game.party || []).length >= PARTY_LIMIT, false);
+
+  // companion_alive(id): true if that companion is with the hero and hasn't fallen (died) in a
+  // fight. Wrap a companion's lines in it after a fight they could have died in, e.g.
+  //   { companion_alive("odda"): Odda wipes her mace on a burial cloth. #speaker:odda }
+  story.BindExternalFunction('companion_alive', (id) => aliveMember(runtime.game, id) !== null, false);
+
+  // Companions' spells in scenes, as can_cast and cast are for the hero.
+  // companion_can_cast(id, spell): that companion is with the hero, alive, and can cast the
+  // spell right now, with a way to pay for it (their own spell slots or free casts).
+  // companion_cast(id, spell): they cast it, paying the cheapest way, and the DM says so. Tag
+  // the choice with the spell and #by, so the card shows whose spell it is and its cost:
+  //   * {companion_can_cast("odda", "lesser-restoration")} [Ask Odda to free her #spell:lesser-restoration #by:odda]
+  //       ~ companion_cast("odda", "lesser-restoration")
+  story.BindExternalFunction(
+    'companion_can_cast',
+    (id, spell) => {
+      const member = aliveMember(runtime.game, id);
+      return Boolean(member && sceneCastCost(memberGame(runtime.game, member), spell));
+    },
+    false,
+  );
+  story.BindExternalFunction(
+    'companion_cast',
+    (id, spell) => {
+      const { game } = runtime;
+      const member = aliveMember(game, id);
+      if (!member) throw new Error(`${id} isn't with the hero to cast ${spell}`);
+      const caster = memberGame(game, member);
+      const cost = castInScene(caster, spell);
+      const values = { name: caster.character.name.split(' ')[0], spell: findSpell(spell).name, cost: castCostText(cost) };
+      if (cost.kind === 'ritual') note(game, dmNotes.companionCastRitual, values);
+      if (cost.kind === 'free') note(game, dmNotes.companionCastFree, values);
+      if (cost.kind === 'slot') note(game, dmNotes.companionCastWithSlot, values);
+    },
+    false,
+  );
 
   // approve(id, change): a companion liked (1) or disliked (-1) what the hero just did, e.g.
   // ~ approve("fen", 1) for sparing someone. Nothing happens if they aren't with the hero.
@@ -351,6 +387,13 @@ function castSpellWithNote(game, id) {
   if (cost.kind === 'ritual') note(game, dmNotes.castRitual, { spell });
   if (cost.kind === 'free') note(game, dmNotes.castFree, { spell });
   if (cost.kind === 'slot') note(game, dmNotes.castWithSlot, { spell, cost: castCostText(cost) });
+}
+
+// A companion who's with the hero and hasn't fallen, or null.
+function aliveMember(game, id) {
+  if (!findCompanion(id)) throw new Error(`Unknown companion: ${id}`);
+  const member = memberOf(game, id);
+  return member && !member.fallen ? member : null;
 }
 
 // A short DM note for the page ("New quest: …"), shown where it happened in the story.

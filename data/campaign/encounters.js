@@ -15,7 +15,9 @@
 //                (data/campaign/dungeons.js), and positions count from the room's top row
 //   hero         where the hero starts; monsters: each one and where it starts ({ x, y }),
 //                with a name if it has its own (Mother Nettle)
-//   onlookers    figures who watch but don't fight: { decor, pos }; they stand in the way
+//   onlookers    figures who watch but don't fight: { decor, pos }, or someone from
+//                data/campaign/people.js: { person, pos, lying }. They stand in the way, and
+//                nobody fights them
 //   hymn         a monster sings while it fights (the Ashen Choir): { singer: monster id,
 //                rises: { monster, pos }, round }. Unless the singing stops first, the
 //                monster rises at pos at the start of that round. Damage makes the singer
@@ -34,17 +36,6 @@ const millLegend = {
   '.': { terrain: 'floor', tile: 'wood-floor' },
   s: { terrain: 'obstacle', tile: 'wood-floor', decor: 'flour-sack' },
   b: { terrain: 'obstacle', tile: 'wood-floor', decor: 'barrel' },
-};
-
-// The old ossuary under Dunn's Mill (Chapter 2): dressed stone, coffins, grave markers and
-// bones.
-const ossuaryLegend = {
-  '#': { terrain: 'wall', wall: 'stone' },
-  '.': { terrain: 'floor', tile: 'crypt-floor' },
-  k: { terrain: 'floor', tile: 'crypt-floor', decor: 'skull' },
-  c: { terrain: 'obstacle', tile: 'crypt-floor', decor: 'coffin' },
-  g: { terrain: 'obstacle', tile: 'crypt-floor', decor: 'gravestone' },
-  p: { terrain: 'obstacle', tile: 'crypt-floor', decor: 'bone-pile' },
 };
 
 // Bramblegate's market square (Chapter 2): cobbles, the stocks, market barrels and crates,
@@ -208,31 +199,20 @@ export const encounters = [
   },
   // ---- Chapter 2 ----
   // Lark's rescue: two Ghouls among the coffins of the old ossuary the dead dug open under the
-  // mill. The party comes in by the tunnel at the bottom.
+  // mill (the last room of the dungeon under Dunn's Mill). The party comes in by the doorway at
+  // the top; Lark lies Paralyzed on a burial ledge in the far wall, out of the fight.
   {
     id: 'ossuary-ghouls',
     name: 'The Ghouls in the Ossuary',
     difficulty: 'Moderate (two Ghouls are 400 XP; for a level 3 hero and Odda, Low is 300 and Moderate 450)',
     sizedFor: { level: 3, party: 2 },
-    map: {
-      rows: [
-        '########',
-        '#c.k.gc#',
-        '#......#',
-        '#.p..k.#',
-        '#......#',
-        '##....##',
-        '#.k...g#',
-        '#......#',
-        '###..###',
-      ],
-      legend: ossuaryLegend,
-    },
-    hero: { x: 3, y: 8 },
+    map: { dungeon: 'mill-ossuary', room: 'ossuary' },
+    hero: { x: 3, y: 1 },
     monsters: [
-      { monster: 'ghoul', pos: { x: 2, y: 2 } },
-      { monster: 'ghoul', pos: { x: 5, y: 2 } },
+      { monster: 'ghoul', pos: { x: 4, y: 7 } },
+      { monster: 'ghoul', pos: { x: 2, y: 6 } },
     ],
+    onlookers: [{ person: 'lark', pos: { x: 4, y: 8 }, lying: true }],
     whileHeroDown: '{name} crouches among the bones and gnaws at something you’d rather not see.',
     source: 'original',
   },

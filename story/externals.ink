@@ -96,6 +96,18 @@ EXTERNAL leave_party(id)
 EXTERNAL in_party(id)
 EXTERNAL party_full()
 
+// companion_alive(id): true if the companion is with the hero and hasn't fallen (died) in a
+// fight. Wrap their lines in it after a fight they could have died in.
+EXTERNAL companion_alive(id)
+
+// A companion's spells in scenes, as can_cast and cast are for the hero:
+// companion_can_cast(id, spell) and companion_cast(id, spell). Tag the choice with the spell
+// and #by, so the card shows whose spell it is and what it costs them:
+//   * {companion_can_cast("odda", "lesser-restoration")} [Ask Odda to free her #spell:lesser-restoration #by:odda]
+//       ~ companion_cast("odda", "lesser-restoration")
+EXTERNAL companion_can_cast(id, spell)
+EXTERNAL companion_cast(id, spell)
+
 // approve(id, change): a companion with the hero liked (1) or disliked (-1) what they just
 // did, e.g. ~ approve("fen", 1). Their likes and dislikes are in companions.js.
 EXTERNAL approve(id, change)
