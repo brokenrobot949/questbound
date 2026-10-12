@@ -28,7 +28,7 @@ export function partyBudget(level, size = 1) {
 // How many characters are in the hero's party now: the hero, and each companion who can fight.
 export const partySize = (game) => 1 + fightingMembers(game).length;
 
-// The monsters' XP for an encounter as it starts (a hymn's risen dead aren't counted).
+// The monsters' XP for an encounter as it starts (a hymn's risen dead and reinforcements aren't counted).
 export function encounterXp(encounter) {
   return encounter.monsters.reduce((sum, { monster }) => sum + monsters.find((m) => m.id === monster).xp, 0);
 }

@@ -221,5 +221,5 @@ They pass the sheepfold a long bowshot off, and never turn their heads. When the
 // STORY.md: you reach level 4 here. Most heroes already have.
 ~ xp_milestone(4)
 Dawn comes grey and cold over the moor. Tonight, there will be no moon at all. #time:Dawn
-~ set_objective("Go down into the Kings' Barrow tonight, under the dark of the moon. (The rest of Act I is still being written.)")
--> END
+// Chapter 3 begins (ch3-barrow-gate.ink), and sets the aim: into the barrow tonight.
+-> ch3_dark_moon

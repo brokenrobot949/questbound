@@ -1,6 +1,6 @@
 // Quick Resolve (docs/DESIGN.md, "Quick resolve and speed"): a fight well under the party's
 // strength can be played out at once, with real rolls, instead of turn by turn. Story and boss
-// fights (encounters marked byHand, or with a hymn) are always played by hand.
+// fights (encounters marked byHand, or with a hymn or reinforcements) are always played by hand.
 //
 // "Well under": the monsters' XP adds up to no more than half the Low budget of the party in
 // the fight, at the hero's level (SRD 5.2.1, XP Budget per Character, times the number of the
@@ -73,7 +73,7 @@ export function canResolve(game) {
   const battle = game.battle;
   if (!battle || battle.outcome || !isHeroTurn(game)) return false;
   const encounter = findEncounter(battle.encounterId);
-  if (encounter.byHand || encounter.hymn || belowHalf(game)) return false;
+  if (encounter.byHand || encounter.hymn || encounter.reinforcements || belowHalf(game)) return false;
   if (!plainAttacks(game).length) return false;
   return monstersXp(battle) <= resolveLimit(game.character.level, theParty(game).length);
 }

@@ -1809,7 +1809,8 @@ test('Eve of the barrow: on the last watch the dead walk in with the last stones
   assertTrue(pageText(game).includes('Fen the second, and you the last') && pageText(game).includes('the singing starts up under the hill'));
   assertTrue(notes(game).includes('A milestone: your XP rises to 2700, enough for level 4.') && notes(game).some((n) => n.startsWith('A good place to stop')));
   assertEqual([game.xp, game.hp, currentTime(game)], [2700, fight.maxHpOf(game, { id: 'hero' }), 'Dawn']);
-  assertTrue(game.objective.startsWith("Go down into the Kings' Barrow tonight") && cards(game).length === 0);
+  assertEqual(game.objective, "Go down into the Kings' Barrow tonight, under the dark of the moon.");
+  assertEqual(cards(game), ['Wait out the day, and go down to the barrow at nightfall'], 'and Chapter 3 begins');
 
   const ahead = await atTheEve('eve-ahead', { xp: 3100, odda: false, fen: false });
   toTheCamp(ahead);
@@ -1817,6 +1818,199 @@ test('Eve of the barrow: on the last watch the dead walk in with the last stones
   assertEqual(cards(ahead), ['Get some sleep'], 'nobody to talk to');
   pick(ahead, 'Get some sleep');
   assertTrue(pageText(ahead).includes('You sleep in snatches') && !notes(ahead).some((n) => n.startsWith('A milestone')) && ahead.xp === 3100);
+});
+
+// ---- Chapter 3, beats 1 and 2: under the dark moon, and the barrow gate ----
+
+test('Animated Armor: SRD 5.2.1’s stat block, two Slams a turn, and drawn as plate with a closed helm', () => {
+  const armor = monsters.find((m) => m.id === 'animated-armor');
+  assertEqual([armor.ac, armor.hp.average, armor.speed, armor.initiative, armor.cr, armor.xp, armor.multiattack], [18, 33, 25, 2, '1', 200, 2]);
+  assertEqual(armor.attacks, [{ id: 'slam', name: 'Slam', kind: 'melee', bonus: 4, reach: 5, damage: { dice: '1d6', bonus: 2, type: 'bludgeoning' } }]);
+  assertEqual([armor.immunities, armor.conditionImmunities.includes('paralyzed'), armor.type, armor.source], [['poison', 'psychic'], true, 'Construct', 'SRD 5.2.1']);
+  assertTrue(Boolean(sprites[armor.sprite]) && armor.variant.includes('Blindsight'));
+});
+
+test('The barrow gate: two Gate Guardians either side of the sealing stone, which stands in the way; Low for a level 4 party of three', () => {
+  const game = warrenFight('barrow-gate', champion);
+  assertEqual(fight.enemies(game.battle).map((c) => c.name), ['Gate Guardian 1', 'Gate Guardian 2']);
+  const map = fight.battleMap(game.battle);
+  assertEqual([map.cells[8][3].terrain, map.cells[8][3].decor, map.cells[8][4].decor], ['obstacle', 'sealing-stone', 'sealing-stone']);
+  const gate = encounters.find((e) => e.id === 'barrow-gate');
+  assertEqual([encounterXp(gate), ratingFor(encounterXp(gate), partyBudget(4, 3)), ratingFor(500, partyBudget(4, 3))], [400, 'Low', 'Low'], 'still Low with the two stragglers');
+});
+
+test('The barrow gate: without Varrow’s watch at the cairns, two Zombies come in off the moor behind you on round 3', () => {
+  const game = warrenFight('barrow-gate', champion, 'gate-stragglers');
+  game.hp = 300; // so the hero is still standing to watch
+  assertEqual(fight.objectiveText(game.battle), 'Two Zombies are coming from the moor: they arrive at the start of round 3.');
+  fight.endHeroTurn(game);
+  assertEqual(fight.enemies(game.battle).length, 2, 'not yet on round 2');
+  fight.endHeroTurn(game);
+  assertTrue(said(game, 'Out of the dark from the moor come Zombie 1 and Zombie 2, and join the fight!'), logText(game));
+  const zombies = fight.enemies(game.battle).filter((c) => c.monsterId === 'zombie');
+  assertEqual(zombies.map((c) => c.pos.y), [0, 0], 'at the top of the map, behind the party');
+  assertTrue(zombies.every((z) => game.battle.order.includes(z.id)) && fight.objectiveText(game.battle) === '', 'they take turns, and the screen stops warning');
+  for (const foe of fight.enemies(game.battle)) foe.hp = 0;
+  zombies[0].hp = 1;
+  zombies[0].pos = { x: 3, y: 3 }; // beside the hero
+  forceNextD20(20);
+  fight.heroAttack(game, 'greatsword-melee', zombies[0].id);
+  assertEqual([game.battle.outcome, game.battle.xp], ['victory', 500], 'their XP counts once they come');
+});
+
+test('The barrow gate: with Varrow’s watch holding the cairns, nobody comes up behind you', () => {
+  const game = gameFor(champion, 'gate-held');
+  game.flags = ['varrow_rallied'];
+  game.hp = 300;
+  forceNextD20(20);
+  fight.startBattle(game, 'barrow-gate', 0);
+  assertEqual([game.battle.reinforcements, fight.objectiveText(game.battle)], [null, '']);
+  fight.endHeroTurn(game);
+  fight.endHeroTurn(game);
+  assertEqual(fight.enemies(game.battle).length, 2);
+});
+
+// The start of Chapter 3, at dawn after the eve of the barrow: a hero (a level 3 Champion unless
+// given) with Odda and Fen (unless false).
+async function atTheDarkMoon(seed, { character = champion, flags = [], odda = true, fen = true } = {}) {
+  const game = await storyGame(seed, character);
+  game.flags.push(...flags);
+  if (odda) joinParty(game, 'odda');
+  if (fen) joinParty(game, 'fen');
+  game.page = jumpTo(game, 'ch3_dark_moon');
+  return game;
+}
+
+// The day in the sheepfold, then up to the ridge (beat 1), then down to the great gate (beat 2).
+function toTheGate(game) {
+  pick(game, 'Wait out the day');
+  pick(game, 'Go down into the bowl');
+}
+
+// Settles the fight at the gate from the choice starting `start`: won or lost.
+function settleGate(game, start, { won = true, setUp = () => {} } = {}) {
+  const choice = game.story.currentChoices.find((c) => c.text.startsWith(start) && (c.tags || []).includes('combat:barrow-gate'));
+  if (!choice) throw new Error(`No fight "${start}": ${cards(game).join(' / ')}`);
+  startFight(game, choice);
+  setUp(game);
+  if (won) for (const foe of fight.enemies(game.battle)) foe.hp = 0;
+  else game.hp = 0;
+  game.battle.outcome = won ? 'victory' : 'defeat';
+  game.page = continueAfterBattle(game);
+}
+
+const gateRoom = () => findDungeon('kings-barrow').rooms.find((r) => r.id === 'forecourt');
+const dwarf = { ...champion, speciesId: 'dwarf' };
+
+test('Chapter 3: the day in the sheepfold, then the watch takes the outer cairns and Nettle’s goblins draw off Vesk’s lookout', async () => {
+  const character = { ...champion, bond: { type: 'rival', name: 'Sable Rook' } };
+  const game = await atTheDarkMoon('dark-moon-allies', { character, flags: ['varrow_rallied', 'nettle_rallied', 'vesk_warned', 'knows_miller_at_sluices', 'rival_taken', 'cairnfield_won', 'knows_ward_word'] });
+  assertEqual([cards(game), game.objective], [['Wait out the day, and go down to the barrow at nightfall'], "Go down into the Kings' Barrow tonight, under the dark of the moon."]);
+  pick(game, 'Wait out the day');
+  assertEqual([currentLocation(game), currentTime(game)], ['Cairnfield', 'Night']);
+  const text = pageText(game);
+  assertTrue(['Fen sleeps through', 'ashes and trampled canvas', "Captain Varrow's watch", 'go no farther', 'Garrick is alive', 'is Sable Rook, in Choir chains', 'the door the ward-word was made for', 'a lantern burns', 'goes bobbing away over the top', 'Oh, I like her'].every((s) => text.includes(s)), text);
+  assertTrue(!text.includes('Nobody holds the cairns') && speakersOf(game).includes('odda') && speakersOf(game).includes('fen'));
+  assertEqual(cards(game), ['Go down into the bowl, to the great gate']);
+  pick(game, 'Go down into the bowl');
+  assertTrue(game.flags.includes('gate_unseen') && !game.flags.includes('gate_guardians_woken') && pageText(game).includes('while the goblins hold every eye'));
+  assertEqual(currentDungeon(game), { id: 'kings-barrow', room: 'forecourt', explored: ['forecourt'] });
+  assertEqual(currentLocation(game), "The Kings' Barrow, the great gate");
+  assertTrue(pageText(game).includes('Neither of them stirs') && pageText(game).includes('Made to keep her door'));
+  assertEqual(cards(game), ['Speak the ward-word: "Ysolde"', 'Greet them in the old forms of the faith, with Odda prompting you', "Give them the old court's words of passage", 'Strike before they wake']);
+  assertEqual(tagsOf(game).slice(1), ['check:religion:10 drive:faith', 'check:history:13 drive:knowledge', 'combat:barrow-gate surprise']);
+  assertEqual(roomFigures(gateRoom(), game.flags).map((f) => f.sprite), ['sealing-stone', 'sealing-stone', 'animated-armor', 'animated-armor']);
+});
+
+test('Chapter 3: with Vesk warned and no goblins, his lookout hammers on the stone and the guardians are waiting; nobody holds the cairns', async () => {
+  const game = await atTheDarkMoon('dark-moon-warned', { character: dwarf, flags: ['vesk_warned'], odda: false });
+  pick(game, 'Wait out the day');
+  assertTrue(pageText(game).includes('Fen sleeps through the whole of it') && pageText(game).includes('Nobody holds the cairns tonight'));
+  assertTrue(pageText(game).includes('a lantern burns') && !pageText(game).includes('the din'));
+  pick(game, 'Go down into the bowl');
+  assertTrue(game.flags.includes('gate_guardians_woken') && !game.flags.includes('gate_unseen'));
+  assertTrue(pageText(game).includes('a hammer rings on stone') && pageText(game).includes("They're awake"));
+  assertEqual(cards(game), ['Greet them in the old forms of the faith', "Give them the old court's words of passage", 'Fight them'], 'no ward-word, no dwarf’s look at the stone, no surprise');
+  assertEqual(tagsOf(game), ['check:religion:13 drive:faith', 'check:history:13 drive:knowledge', 'combat:barrow-gate']);
+});
+
+test('Chapter 3: the ward-word, and the guardians kneel and roll the stone aside: the fight’s 400 XP, and the story stops at the open gate', async () => {
+  const game = await atTheDarkMoon('gate-word', { flags: ['knows_ward_word', 'varrow_rallied'] });
+  toTheGate(game);
+  const xp = game.xp;
+  pick(game, 'Speak the ward-word');
+  assertTrue(['between the two guardians', '"Ysolde," you say', 'go down on one knee', 'You said it like you meant it', 'swings round on a hidden pivot', 'a stair goes down into the dark', 'After you'].every((s) => pageText(game).includes(s)));
+  assertTrue(['gate_ward_word', 'gate_guardians_knelt', 'gate_opened'].every((f) => game.flags.includes(f)) && game.xp - xp === 400);
+  assertTrue(deeds(game).includes('they knelt') && missingMiller(game).includes('great gate of the Kings'));
+  assertEqual([cards(game), game.objective], [[], "Go down into the Kings' Barrow, find Garrick, and stop the Choir's hymn. (The rest of Act I is still being written.)"]);
+  assertEqual(roomFigures(gateRoom(), game.flags).map((f) => [f.sprite, f.fallen]), [['animated-armor', false], ['animated-armor', false]], 'the stone is gone from the map; the guardians stand');
+});
+
+test('Chapter 3: the old forms of the faith (easier with Odda) or the words of passage make them kneel; a wrong word is the fight', async () => {
+  const game = await atTheDarkMoon('gate-faith', { character: lifeCleric, fen: false });
+  toTheGate(game);
+  forceNextD20(20);
+  pick(game, 'Greet them in the old forms');
+  revealAll(game);
+  assertTrue(pageText(game).includes('Odda murmurs the old forms') && ['gate_old_forms', 'gate_guardians_knelt', 'gate_opened'].every((f) => game.flags.includes(f)));
+
+  const scholar = await atTheDarkMoon('gate-history', { character: lifeCleric, odda: false, fen: false });
+  toTheGate(scholar);
+  assertTrue(pageText(scholar).includes('Neither of them stirs') && !speakersOf(scholar).length, 'nobody to whisper to');
+  forceNextD20(20);
+  pick(scholar, 'Give them the old court');
+  revealAll(scholar);
+  assertTrue(pageText(scholar).includes('who you are, whose peace you keep') && scholar.flags.includes('gate_words_of_passage'));
+
+  const wrong = await atTheDarkMoon('gate-wrong', { character: lifeCleric, odda: false });
+  toTheGate(wrong);
+  forceNextD20(1);
+  pick(wrong, 'Greet them in the old forms');
+  revealAll(wrong);
+  assertTrue(pageText(wrong).includes("The guardians don't kneel") && !wrong.flags.includes('gate_guardians_knelt'));
+  assertEqual([cards(wrong), tagsOf(wrong)], [['Fight'], ['combat:barrow-gate']], 'they’re awake now: no surprise');
+});
+
+test('Chapter 3: a Dwarf sees the sealing stone is dwarf-cut and pivots, and opens it without waking the guardians', async () => {
+  const game = await atTheDarkMoon('gate-dwarf', { character: dwarf });
+  toTheGate(game);
+  assertTrue(cards(game).includes('Look at how the sealing stone is cut') && !cards(game).some((c) => c.startsWith('Speak the ward-word')));
+  const xp = game.xp;
+  pick(game, 'Look at how the sealing stone is cut');
+  assertTrue(['this sealing stone is dwarf-cut. It pivots.', 'the guardians never stir', 'My grandmother would have boxed my ears'].every((s) => pageText(game).includes(s)));
+  assertTrue(['gate_pivoted', 'gate_opened'].every((f) => game.flags.includes(f)) && !game.flags.includes('gate_guardians_knelt') && game.xp - xp === 400);
+
+  const human = await atTheDarkMoon('gate-not-dwarf');
+  toTheGate(human);
+  assertTrue(!cards(human).includes('Look at how the sealing stone is cut'));
+});
+
+test('Chapter 3: the guardians beaten, the stone opens by itself; a companion who falls is carried home by the watch', async () => {
+  const game = await atTheDarkMoon('gate-won', { flags: ['varrow_rallied'] });
+  toTheGate(game);
+  settleGate(game, 'Strike before they wake', {
+    setUp: (g) => {
+      assertTrue(g.battle.surprise && g.battle.reinforcements === null, 'a surprise attack, and nobody behind you');
+      fight.combatantById(g.battle, 'fen').state = 'dead';
+      Object.assign(memberOf(g, 'fen'), { hp: 0, fallen: true });
+    },
+  });
+  assertTrue(['gate_guardians_destroyed', 'gate_opened', 'fen_fell_at_the_gate'].every((f) => game.flags.includes(f)) && !game.flags.includes('odda_fell_at_the_gate'));
+  assertTrue(['crash like a dropped armoury', "I'd sooner they'd knelt", 'Fen lies small and still', "Two of Varrow's watch", 'waiting for leave'].every((s) => pageText(game).includes(s)));
+  assertTrue(!pageText(game).includes('After you'), 'Fen has nothing to say');
+  assertEqual(roomFigures(gateRoom(), game.flags).map((f) => f.fallen), [true, true], 'the guardians lie where they fell');
+  assertEqual(game.lastBattle.outcome, 'victory');
+});
+
+test('Chapter 3: beaten at the gate, you wake robbed at the edge of the forecourt, and the guardians kneel when you come back', async () => {
+  const game = await atTheDarkMoon('gate-mercy', { flags: ['nettle_rallied'] });
+  game.money = 2500;
+  toTheGate(game);
+  settleGate(game, 'Strike before they wake', { won: false });
+  assertTrue(['gate_fates_mercy', 'gate_guardians_knelt', 'gate_opened'].every((f) => game.flags.includes(f)) && game.money === 0);
+  assertTrue(['They keep the door', 'Odda and Fen lie beside you', 'a goblin giggles', 'getting up again counts', 'swings round on a hidden pivot'].every((s) => pageText(game).includes(s)));
+  assertTrue(notes(game).some((n) => n.startsWith('A good place to stop')) && game.hp === fight.maxHpOf(game, { id: 'hero' }));
+  assertEqual(cards(game), []);
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

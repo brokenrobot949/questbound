@@ -76,6 +76,31 @@ const millLegend = {
 const ghoulsBeaten = ['ossuary_ghouls_destroyed'];
 const ghoulsFled = ['ossuary_ghouls_fled'];
 
+// The Kings' Barrow (Chapter 3). Two maps, one for each level of the barrow (Rob, Oct 12,
+// 2026): this one is the upper barrow, from the great gate down; the deep barrow (the flooded
+// vault and the Chantry of Ash) gets its own map.
+const barrowLegend = {
+  // Outside: the moor's grass and heather, the old processional way, and standing stones.
+  ',': { terrain: 'floor', tile: 'grass' },
+  '"': { terrain: 'difficult', tile: 'grass', decor: 'bracken' },
+  '.': { terrain: 'floor', tile: 'dirt' },
+  o: { terrain: 'obstacle', tile: 'grass', decor: 'boulder' },
+  M: { terrain: 'obstacle', tile: 'grass', decor: 'barrow' }, // the barrow's flanks
+  // The forecourt: old paving, strewn with the dead the Choir sent against the gate.
+  _: { terrain: 'floor', tile: 'crypt-floor' },
+  x: { terrain: 'floor', tile: 'crypt-floor', decor: 'bones' },
+  k: { terrain: 'floor', tile: 'crypt-floor', decor: 'skull' },
+  // The barrow's face, and the doorway of the great gate. The sealing stone that shuts it is a
+  // figure in the room (below), gone once the gate opens; in the fight at the gate it stands in
+  // the way (encounters.js).
+  S: { terrain: 'wall', wall: 'stone' },
+  G: { terrain: 'floor', tile: 'crypt-floor' },
+};
+
+// The guardians lie where they fell once beaten, and the sealing stone is gone once it opens.
+const guardiansBeaten = ['gate_guardians_destroyed'];
+const gateOpen = ['gate_opened'];
+
 export const dungeons = [
   {
     id: 'brackenhollow',
@@ -253,6 +278,43 @@ export const dungeons = [
           { person: 'lark', pos: { x: 4, y: 26 }, name: 'Lark Dunn, on a burial ledge', lying: true, goneOn: ['lark_rescued'] },
           { sprite: 'ghoul', pos: { x: 4, y: 25 }, name: 'two ghouls', fallenOn: ghoulsBeaten, goneOn: ghoulsFled },
           { sprite: 'ghoul', pos: { x: 2, y: 24 }, name: 'two ghouls', fallenOn: ghoulsBeaten, goneOn: ghoulsFled },
+        ],
+      },
+    ],
+    source: 'original',
+  },
+  {
+    id: 'kings-barrow',
+    name: 'The Kings’ Barrow',
+    rows: [
+      // The great gate (rows 0–8): the processional way comes in off the moor at the top,
+      // between standing stones, onto the old paved forecourt. The barrow's stone face closes
+      // the bottom, with the sealing stone in the middle.
+      '",,..,,"',
+      ',,,..,o,',
+      'o,,..,,"',
+      ',______,',
+      ',_x___k,',
+      'M______M',
+      'M_k__x_M',
+      'MM____MM',
+      'SSSGGSSS',
+    ],
+    legend: barrowLegend,
+    rooms: [
+      {
+        id: 'forecourt',
+        name: 'The great gate',
+        rows: [0, 8],
+        entry: { x: 3, y: 0 },
+        exits: {},
+        // The sealing stone in the doorway, and the two guardians either side of it: where the
+        // fight (barrow-gate) starts them.
+        figures: [
+          { sprite: 'sealing-stone', pos: { x: 3, y: 8 }, name: 'the sealing stone', goneOn: gateOpen },
+          { sprite: 'sealing-stone', pos: { x: 4, y: 8 }, name: 'the sealing stone', goneOn: gateOpen },
+          { sprite: 'animated-armor', pos: { x: 2, y: 7 }, name: 'two suits of armour', fallenOn: guardiansBeaten },
+          { sprite: 'animated-armor', pos: { x: 5, y: 7 }, name: 'two suits of armour', fallenOn: guardiansBeaten },
         ],
       },
     ],

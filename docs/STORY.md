@@ -377,7 +377,7 @@ All eight beats are written (`story/act-1/ch2-millers-daughter.ink`, `story/act-
    - **Losing is Fate's Mercy** (`cairnfield_fates_mercy`): the Choir throws the party into an opened barrow to be sung up later, and robs them. At dawn Tobin lets down a rope, tells the plan, and you choose his fate as above. Rhosyn lives, and Vesk knows (`rhosyn_lives`, `vesk_warned`).
    - **A companion who dies here** (`odda_fell_at_cairnfield`, `fen_fell_at_cairnfield`) goes home on the reeve's carts to Bramblegate's temple, to lie before the altar flame until they can be raised.
    - **The aim:** "Go back to Bramblegate and rally help before the dark of the moon, three nights away" (beat 6, `ch2_homeward`), or, if the Old Ford fell and you've been to Bramblegate already, "Make camp near Cairnfield, and go down into the Kings' Barrow before the dark of the moon" (beat 8, `ch2_eve`).
-   - **For Chapter 3:** if Rhosyn lives, she's the Cultist Fanatic beside Cantor Vesk in the Chantry of Ash. With `vesk_warned`, the Choir expects you (no surprise at the barrow gate). `tobin_freed` might bring Tobin back as a small help (he knows the barrow's back ways); `tobin_to_varrow` puts him in Varrow's cells.
+   - **For Chapter 3:** if Rhosyn lives, she's the Cultist Fanatic beside Cantor Vesk in the Chantry of Ash. With `vesk_warned`, the Choir expects you: a lookout wakes the gate's guardians before you reach them, unless Nettle's goblins draw him off (built: Chapter 3, beat 1). `tobin_freed` might bring Tobin back as a small help (he knows the barrow's back ways); `tobin_to_varrow` puts him in Varrow's cells.
 8. **Eve of the barrow.** *(Built: `ch2_eve` in `story/act-1/ch2-eve.ink`.)* A camp scene with Odda and Fen: companion conversations and a long rest. You reach level 4 (Ability Score Improvement or feat).
    - **Where it starts:** the ruined sheepfold an hour short of Cairnfield, the night before the dark of the moon. If the Old Ford held, the party comes up from Bramblegate that day (a carter takes them as far as the ford; Varrow's watch marches behind if he's coming, and a goblin waves from the heather if Nettle is). If it fell, they've lain low there for two days since the camp. Either way the Choir's smoke still rises beyond the ridge, unless you broke their camp (`cairnfield_won`).
    - **The talks** (Rob, Oct 12, 2026): they loop, each once, and sleep ends them.
@@ -391,7 +391,7 @@ All eight beats are written (`story/act-1/ch2-millers-daughter.ink`, `story/act-
      - **Tomorrow, all together:** who's coming (`varrow_rallied`, `nettle_rallied`, or "Nobody else is coming"), the ward-word, Garrick at the sluices, a Rival under the hill (`rival_taken`), and Vesk waiting (`vesk_warned`). Fen: "I've had worse odds. I've had worse company, too, though not lately."
    - **The watch** (no roll): on the last watch, in the coldest hour, the dead walk in from every side with the last stones and go in at the barrow's low door, and the hymn starts up under the hill.
    - **The rest and the milestone** (Rob, Oct 12, 2026): a long rest, then a hero still short of level 4 is brought up to 2,700 XP (`xp_milestone(4)`), so everyone goes into the barrow at level 4. Most heroes (about 2,575 XP after the ford, plus Cairnfield's 650 and the temple's 50) are there already.
-   - **The aim:** "Go down into the Kings' Barrow tonight, under the dark of the moon." The story stops there for now; Chapter 3, beat 1 comes next.
+   - **The aim:** "Go down into the Kings' Barrow tonight, under the dark of the moon." Chapter 3 begins at that dawn (`ch3_dark_moon`, which sets the aim).
    - Odda prepares **Detect Magic** from level 4, so a scene in the barrows can ask her to find the oath-wards' glow (`companion_can_cast("odda", "detect-magic")`).
 
 **Side content:**
@@ -401,23 +401,40 @@ All eight beats are written (`story/act-1/ch2-millers-daughter.ink`, `story/act-
 
 ## Chapter 3 · The Kings' Barrow (levels 4 → 5, about 2 hours)
 
-1. **Under the dark moon.** The allies you earned turn up, or don't:
-   - Nettle's goblins cause a diversion (`nettle_rallied`, asked in Chapter 2's beat 6; `promised_nettle_warren` if you promised them Brackenhollow back).
-   - Varrow's watch holds the outer cairns (`varrow_holds_cairns`: all three of the Old Ford's watch lived, or you talked him round in beat 6).
-   - The ward-word (`knows_ward_word`, unless Crane went to the cells).
-   - Your rival (Rival Bond).
-2. **The barrow gate.** Two Animated Armors guard it (Low).
-   - Speak the ward-word ("Ysolde"), or pass a Religion or History check, and they kneel.
-   - **Dwarf:** "This sealing stone is dwarf-cut. It pivots."
+**Fights ready for these scenes** (`data/campaign/encounters.js`; try them from debug mode's Practice fight):
+
+- `barrow-gate`, **The Guardians of the Great Gate** (beat 2): two Animated Armors either side of the sealing stone, at the foot of the forecourt; the party comes in off the moor at the top. Low for a level 4 party of three (400 XP; Low 750, Moderate 1,125). **The twist is reinforcements** (Rob, Oct 12, 2026): unless Captain Varrow's watch holds the outer cairns (`varrow_rallied`), two Zombies, the last stragglers coming in off the moor, come up behind the party at the start of round 3 (500 XP, still Low). The battle screen warns of them until they come.
+
+**The barrow on the dungeon map** (Rob, Oct 12, 2026): two maps, one for each level. The upper barrow (`kings-barrow` in `data/campaign/dungeons.js`): the forecourt and great gate (built), then the Hall of Champions, the dart corridor and the oath-wall. The deep barrow, a map of its own: the flooded vault, the long way round, the Chantry of Ash and Aveline's tomb.
+
+Beats 1 and 2 are written (`story/act-1/ch3-barrow-gate.ink`: `ch3_dark_moon` and `ch3_gate`). The story stops at the open gate for now; beat 3 comes next.
+
+1. **Under the dark moon.** *(Built: `ch3_dark_moon`, straight after the eve's dawn.)* The allies you earned turn up, or don't.
+   - **The day:** the longest day you can remember, waiting in the sheepfold (Odda checks everyone's straps; Fen sleeps like a cat). At full dark, up to the ridge. The Choir's camp is ashes (`cairnfield_won`) or empty: every singer is inside the hill tonight.
+   - **Varrow's watch** (`varrow_rallied`: all three of the Old Ford's watch lived and you went to him, or you talked him round in beat 6) takes the outer cairns with torches, and the last stragglers of the dead coming in off the moor "find the spears waiting, and go no farther". **In play** (Rob, Oct 12, 2026): they hold back the stragglers who would otherwise come up behind you in the fight at the gate. Without the watch: "Whatever comes in off the moor will come in behind you." (The scene uses `varrow_rallied`, as the eve did, not `varrow_holds_cairns`: a player who held the ford but never went to Varrow was told at the eve that nobody else is coming.)
+   - **Nettle's goblins** (`nettle_rallied`) make the most dreadful noise you've ever heard at the Choir's low door, on the far side of the barrow ("Oh, I like her," says Fen). **In play** (Rob, Oct 12, 2026): they cover your approach. If Vesk was warned (`vesk_warned`), a lookout with a lantern stands on the barrow's crown; the din draws him off. Without the goblins he sees you halfway across the bowl and hammers on the sealing stone to wake its guardians (`gate_guardians_woken`). Otherwise you reach the gate unseen (`gate_unseen`), with the guardians asleep. `promised_nettle_warren` and `owe_nettle` are still for later.
+   - **Garrick** (`knows_miller_at_sluices`): black water still runs from the sluice. **A Rival** (`rival_taken`) is in Choir chains behind the low door: they're found chained at the great sluice wheel beside Garrick in the flooded vault (beat 4), and once freed they fight beside you in the chantry as an ally the game plays (Rob, Oct 12, 2026).
+   - **Why the great gate:** the low door is the Choir's, and they'll be thick behind it (Fen: "I'd sooner knock at the front"); the Choir never got the great gate open (Odda: "And it's the door the ward-word was made for").
+2. **The barrow gate.** *(Built: `ch3_gate`, the first room of the upper barrow's map: `kings-barrow/forecourt`.)* A slab of grey stone under a lintel carved with crowns, and a paved forecourt strewn with the smashed dead the Choir sent against it. On either side, on a low plinth, a suit of old plate armour, green with age: the first queen's guardians (two Animated Armors, Low). They wake for anyone who tries to force the stone (the stone's face is scored where the Choir's dead tried to lever it), or who speaks to them.
+   - **Speak the ward-word** ("Ysolde", `knows_ward_word`, unless Crane went to the cells): they kneel (`gate_ward_word`). Odda: "You said it like you meant it."
+   - **Or the old forms of the faith** (Religion 13, or 10 with Odda murmuring her order's forms a half-breath ahead of you; a Faith moment: `gate_old_forms`), **or the old court's words of passage** at a royal tomb (History 13; a Knowledge moment: `gate_words_of_passage`): they kneel. A wrong word, and they come for you: the fight, without surprise.
+   - **Dwarf** (a Dwarf hero, while the guardians sleep): "This sealing stone is dwarf-cut. It pivots." The Choir tried to force it, so the guardians woke; opened the way its makers meant, there's nothing to wake them for. The stone swings on its pin and they never stir (`gate_pivoted`). Odda: "My grandmother would have boxed my ears."
+   - **Strike before they wake** (a surprise attack, while they sleep), or **Fight them** once they're awake (`barrow-gate`).
+   - **Getting past without a fight** is worth the fight's 400 XP. Kneeling, the guardians rise and roll the stone aside on its hidden pivot, then step back onto their plinths (`gate_guardians_knelt`). Beaten (`gate_guardians_destroyed`), they lie in pieces, and the stone swings open by itself "as if it had only ever been waiting for leave". Odda: "I'd sooner they'd knelt. They were only doing what they were made for."
+   - **Losing is Fate's Mercy** (`gate_fates_mercy`): you come to in the heather at the forecourt's edge, where the guardians laid you (they keep the door; they don't kill). Somebody has been through your pockets (with Nettle's goblins about, one giggles in the dark). It's still dark, and the hymn hasn't stopped. When you go back, the guardians kneel: "Whatever test the first queen set at her door, it seems getting up again counts."
+   - **A companion who dies at the gate** (`odda_fell_at_the_gate`, `fen_fell_at_the_gate`): Varrow's watch carries them back to the road and home to Bramblegate's temple; without the watch, you lay them under a cloak at the forecourt's edge to carry home when it's done.
+   - **Through the gate** (`gate_opened`; the sealing stone is gone from the map): a stair goes down into the dark, and the hymn comes up it. Fen: "After you. No, really. I insist." The aim: "Go down into the Kings' Barrow, find Garrick, and stop the Choir's hymn." The story stops here for now; beat 3 comes next.
 3. **The Hall of Champions.** The tombs of the first queen's sworn champions.
    - A pressure-plate dart corridor.
    - **The oath-wall:** read the champions' oaths to open the way (History or Arcana, with a bonus for a Sage). Their names matter later in this chapter.
    - **Temptation:** loot the graves (Wealth). Odda dislikes it, and it raises the Whisper.
 4. **The flooded vault.** Garrick the miller works a great sluice wheel under Choir guard. An Ogre Zombie wades in the black water (a Moderate fight; the hazard is deep water).
+   - **A Rival** (`rival_taken`) is chained at the wheel beside Garrick (Rob, Oct 12, 2026), and freed with him.
    - Free the miller, then choose:
      - Drain the vault, which opens the quick way down.
      - Flood it back, which cuts off Choir reinforcements but means the long way round.
 5. **The Chantry of Ash.** Cantor Vesk sings the dead awake: a Cultist Fanatic, plus a Wight (the risen champion, Dame Aveline) and Zombies (High, the boss fight).
+   - **A Rival** freed in the flooded vault fights beside you here, as an ally the game plays (like the Old Ford's soldiers), not counted towards the difficulty (Rob, Oct 12, 2026).
    - **The twist:** call the Wight by her name from the oath-wall, and she stops, remembers her oath, and turns on Vesk.
    - **Flag:** `aveline_rested` or `aveline_destroyed`.
 6. **The first shard.** On Aveline's breastplate lies a sliver of gold that hums. As Vesk dies he breaks its seal, and it flies to your hand.

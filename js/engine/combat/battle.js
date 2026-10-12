@@ -61,6 +61,9 @@
 //   sneakAttackTurn  { combatant id: 'round:turn' }: the turn each Rogue last dealt Sneak
 //                Attack (once a turn); a plain 'round:turn' in older saves was the hero's
 //   hymn         for an encounter with a hymn: { singing, risen } (see encounters.js)
+//   reinforcements  for an encounter with reinforcements: { coming: true } until they arrive,
+//                then { coming: false }; null if none are coming (the encounter has none, or
+//                its unlessFlag was set when the fight began)
 //   practice     only in debug mode's practice fights: the hero's and party's state before it,
 //                put back when it ends (story/story-runner.js); choiceIndex is null
 // A foe that flees the fight is marked escaped, and its hp set to 0 so it no longer counts.
@@ -405,6 +408,7 @@ export function startBattle(game, encounterId, choiceIndex, { surprise = false, 
     surprise,
     sneakAttackTurn: null,
     hymn: encounter.hymn ? { singing: true, risen: false } : null,
+    reinforcements: reinforcementsDue(game, encounter) ? { coming: true } : null,
     concentration: null,
   };
   if (practice) game.battle.practice = practice;
@@ -486,6 +490,7 @@ function advanceTurn(game) {
       battle.round += 1;
       log(game, `Round ${battle.round}.`, { newRound: true });
       hymnRises(game);
+      reinforcementsArrive(game);
     }
   } while (gone(currentCombatant(battle)));
   beginTurn(game);
@@ -541,6 +546,48 @@ function hymnHurt(game, singer, taken) {
   }
 }
 
+// ---- Reinforcements ----
+
+// Whether an encounter's reinforcements will come: it has some, and its unlessFlag (if any)
+// isn't one of the story's flags (Captain Varrow's watch holding the outer cairns).
+function reinforcementsDue(game, encounter) {
+  const coming = encounter.reinforcements;
+  return Boolean(coming) && !(coming.unlessFlag && (game.flags || []).includes(coming.unlessFlag));
+}
+
+// At the start of their round, the reinforcements join the fight: each at its square, or the
+// nearest free one around it. They take their turns after everyone else's.
+function reinforcementsArrive(game) {
+  const battle = game.battle;
+  const coming = findEncounter(battle.encounterId).reinforcements;
+  if (!battle.reinforcements || !battle.reinforcements.coming || battle.round < coming.round) return;
+  battle.reinforcements = { coming: false };
+  const blocked = blockedFor(game, { side: 'enemy' });
+  const map = battleMap(battle);
+  const arrived = [];
+  for (const { monster: id, pos } of coming.monsters) {
+    const spot = [pos, ...STEPS_AROUND.map(([dx, dy]) => ({ x: pos.x + dx, y: pos.y + dy }))].find((p) => isStandable(map, p) && !blocked(p));
+    if (!spot) continue;
+    const monster = findMonster(id);
+    const count = battle.combatants.filter((c) => c.monsterId === id).length + 1;
+    const foe = { id: `${id}-${count}`, side: 'enemy', name: `${monster.name} ${count}`, monsterId: id, pos: { ...spot }, hp: monster.hp.average, maxHp: monster.hp.average };
+    battle.combatants.push(foe);
+    battle.order.push(foe.id);
+    arrived.push(foe.name);
+  }
+  if (arrived.length) log(game, `Out of the dark from ${coming.from} come ${namesText(arrived)}, and join the fight!`);
+}
+
+const NUMBER_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six'];
+
+// "Two Zombies are coming from the moor: they arrive at the start of round 3."
+function reinforcementsText(coming) {
+  const count = coming.monsters.length;
+  const names = [...new Set(coming.monsters.map((m) => findMonster(m.monster).name))];
+  const what = names.length === 1 ? `${NUMBER_WORDS[count] || count} ${names[0]}${count === 1 ? '' : 's'}` : namesText(coming.monsters.map((m) => `a ${findMonster(m.monster).name}`));
+  return `${what.charAt(0).toUpperCase()}${what.slice(1)} ${count === 1 ? 'is' : 'are'} coming from ${coming.from}: ${count === 1 ? 'it arrives' : 'they arrive'} at the start of round ${coming.round}.`;
+}
+
 // What the fight is about beyond winning it, for the battle screen, or ''.
 export function objectiveText(battle) {
   const encounter = findEncounter(battle.encounterId);
@@ -549,6 +596,7 @@ export function objectiveText(battle) {
     const standing = allies.filter((c) => c.hp > 0).length;
     return `${encounter.allyObjective}: ${standing} of ${allies.length} still standing.`;
   }
+  if (battle.reinforcements && battle.reinforcements.coming) return reinforcementsText(encounter.reinforcements);
   const hymn = encounter.hymn;
   if (!hymn || !battle.hymn) return '';
   if (battle.hymn.risen) return 'The hymn is finished.';

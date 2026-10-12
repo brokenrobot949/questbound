@@ -17,6 +17,7 @@ export const sheets = {
   pit: ['assets/dawnlike/Objects/Pit0.png'],
   map: ['assets/dawnlike/Objects/Map0.png'],
   effect: ['assets/dawnlike/Objects/Effect0.png'],
+  door: ['assets/dawnlike/Objects/Door0.png'],
 };
 
 // Monsters and other creatures.
@@ -33,6 +34,7 @@ export const sprites = {
   'bandit-captain': { sheet: 'player', col: 5, row: 3 },
   guard: { sheet: 'player', col: 1, row: 3 }, // a soldier in grey mail
   'cultist-fanatic': { sheet: 'player', col: 7, row: 3 }, // a red-hooded figure, face in shadow
+  'animated-armor': { sheet: 'humanoid', col: 3, row: 4 }, // plate and a closed helm, sword and shield
 };
 
 // Floor tiles and things that stand on them. alpha (0 to 1) draws a picture faded, and
@@ -77,6 +79,8 @@ export const tiles = {
   'open-barrow': { sheet: 'pit', col: 4, row: 4 },
   tent: { sheet: 'map', col: 6, row: 12 },
   campfire: { sheet: 'effect', col: 1, row: 21 },
+  // Chapter 3: the Kings' Barrow's great gate, a sealing stone between grey stone doorposts.
+  'sealing-stone': { sheet: 'door', col: 0, row: 1 },
 };
 
 // Walls join up with their neighbours. Each wall style is a block of tiles in DawnLike's

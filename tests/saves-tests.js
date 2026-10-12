@@ -663,7 +663,7 @@ test('Migration: a version 17 hero has taken no feats at levels yet, a level-up 
 
 test('Old ends: a save made where the story used to stop “for now” carries on where the story goes today', async () => {
   const game = newGame(await freshRuntime(), { slot: 1, seed: 'old-end', character: testHero });
-  game.page = jumpTo(game, 'ch2_eve.watch'); // where the story stops today
+  game.page = jumpTo(game, 'ch3_gate.into_the_dark'); // where the story stops today
   assertEqual(game.story.currentChoices.length, 0);
   const record = throughJson(gameToSave(game));
   const today = loadGame(await freshRuntime(), throughJson(record));
@@ -678,7 +678,7 @@ test('Old ends: a save made where the story used to stop “for now” carries o
 
 test('Old ends: a save that stopped after Cairnfield goes back to Bramblegate now, or, if the Old Ford fell, on to the eve of the barrow', async () => {
   const game = newGame(await freshRuntime(), { slot: 1, seed: 'old-cairnfield', character: testHero });
-  game.page = jumpTo(game, 'ch2_eve.watch');
+  game.page = jumpTo(game, 'ch3_gate.into_the_dark');
   const record = throughJson(gameToSave(game));
   record.game.page.scene = 'ch2_cairnfield'; // as if it had stopped at Cairnfield's old end
   const held = loadGame(await freshRuntime(), throughJson(record));
@@ -691,11 +691,22 @@ test('Old ends: a save that stopped after Cairnfield goes back to Bramblegate no
 
 test('Old ends: a save that stopped at Bramblegate’s north gate goes on to the eve of the barrow', async () => {
   const game = newGame(await freshRuntime(), { slot: 1, seed: 'old-gate', character: testHero });
-  game.page = jumpTo(game, 'ch2_eve.watch');
+  game.page = jumpTo(game, 'ch3_gate.into_the_dark');
   const record = throughJson(gameToSave(game));
   record.game.page.scene = 'ch2_rally'; // as if it had stopped at the north gate
   const loaded = loadGame(await freshRuntime(), throughJson(record));
   assertEqual(loaded.story.currentChoices.map((c) => c.text), ['Follow the barrow road north, onto the moor']);
+});
+
+test('Old ends: a save that stopped at dawn after the eve of the barrow goes on into Chapter 3', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'old-eve', character: testHero });
+  game.page = jumpTo(game, 'ch3_gate.into_the_dark');
+  const record = throughJson(gameToSave(game));
+  record.game.page.scene = 'ch2_eve'; // as if it had stopped at dawn after the eve
+  record.game.objective = "Go down into the Kings' Barrow tonight, under the dark of the moon. (The rest of Act I is still being written.)";
+  const loaded = loadGame(await freshRuntime(), throughJson(record));
+  assertEqual(loaded.story.currentChoices.map((c) => c.text), ['Wait out the day, and go down to the barrow at nightfall']);
+  assertEqual(loaded.objective, "Go down into the Kings' Barrow tonight, under the dark of the moon.", 'the aim no longer says it’s still being written');
 });
 
 test('Old ends: every scene where the story used to stop, and where it carries on, is in the story', async () => {

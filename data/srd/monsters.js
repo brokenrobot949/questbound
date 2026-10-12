@@ -355,4 +355,31 @@ export const monsters = [
     sprite: 'guard',
     source: 'SRD 5.2.1',
   },
+  // ---- Chapter 3 ----
+  // The two guardians of the Kings' Barrow's great gate.
+  {
+    id: 'animated-armor',
+    name: 'Animated Armor',
+    size: 'medium',
+    type: 'Construct',
+    ac: 18,
+    hp: { average: 33, dice: '6d8 + 6' },
+    speed: 25,
+    abilities: { strength: 14, dexterity: 11, constitution: 13, intelligence: 1, wisdom: 3, charisma: 1 },
+    saves: { strength: 2, dexterity: 0, constitution: 1, intelligence: -5, wisdom: -4, charisma: -5 },
+    initiative: 2,
+    immunities: ['poison', 'psychic'],
+    conditionImmunities: ['charmed', 'deafened', 'exhaustion', 'frightened', 'paralyzed', 'petrified', 'poisoned'],
+    blindsight: 60,
+    passivePerception: 6,
+    cr: '1',
+    xp: 200,
+    multiattack: 2, // two Slam attacks
+    attacks: [{ id: 'slam', name: 'Slam', kind: 'melee', bonus: 4, reach: 5, damage: { dice: '1d6', bonus: 2, type: 'bludgeoning' } }],
+    behaviour: 'brute',
+    sprite: 'animated-armor',
+    variant: 'Its Blindsight (60 feet) isn’t played yet: in a fight it sees like anyone else, so a hidden hero stays hidden from it.',
+    text: 'Multiattack. The armor makes two Slam attacks. Slam. Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Bludgeoning damage.',
+    source: 'SRD 5.2.1',
+  },
 ];

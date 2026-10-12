@@ -33,6 +33,12 @@
 //                bones" if not given). The singer does nothing but sing until then. Damage
 //                makes the singer save (Constitution, DC 10 or half the damage) or the hymn
 //                breaks off.
+//   reinforcements  more foes on the way: { round, monsters: [{ monster, pos }], from,
+//                unlessFlag }. They join the fight at the start of that round, each at its
+//                square (or the nearest free one), coming "from" somewhere ("the moor"). With
+//                unlessFlag set in the story (Captain Varrow's watch holding the outer cairns),
+//                they never come. The battle screen says they're coming, and when. They don't
+//                count towards the difficulty, and a fight with them is played by hand.
 //   escape       squares a fleeing monster can leave the fight by (it flees once Bloodied,
 //                at half its Hit Points or fewer)
 //   whileHeroDown  what each monster does on its turn while the hero lies at 0 Hit Points
@@ -369,6 +375,40 @@ export const encounters = [
       { x: 4, y: 0 },
     ],
     whileHeroDown: '{name} leaves you lying in the heather. The Choir can bury you later.',
+    source: 'original',
+  },
+  // ---- Chapter 3 ----
+  // The Kings' Barrow's great gate (beat 2): the first queen's two guardians, suits of animated
+  // armour either side of the sealing stone. The party comes in off the moor at the top. Unless
+  // Captain Varrow's watch holds the outer cairns, the last of the dead walking in off the moor
+  // come up behind the party on round 3 (Rob, Oct 12, 2026).
+  {
+    id: 'barrow-gate',
+    name: 'The Guardians of the Great Gate',
+    difficulty: 'Low (two Animated Armors are 400 XP; for a level 4 party of three, Low is 750 and Moderate 1,125. Unless Varrow’s watch holds the outer cairns, two Zombies come in off the moor behind you on round 3: 500 XP, still Low)',
+    sizedFor: { level: 4, party: 3 },
+    byHand: true,
+    map: { dungeon: 'kings-barrow', room: 'forecourt' },
+    hero: { x: 3, y: 2 },
+    monsters: [
+      { monster: 'animated-armor', name: 'Gate Guardian', pos: { x: 2, y: 7 } },
+      { monster: 'animated-armor', name: 'Gate Guardian', pos: { x: 5, y: 7 } },
+    ],
+    // The sealing stone, still shut in the doorway.
+    onlookers: [
+      { decor: 'sealing-stone', pos: { x: 3, y: 8 } },
+      { decor: 'sealing-stone', pos: { x: 4, y: 8 } },
+    ],
+    reinforcements: {
+      round: 3,
+      monsters: [
+        { monster: 'zombie', pos: { x: 3, y: 0 } },
+        { monster: 'zombie', pos: { x: 4, y: 0 } },
+      ],
+      from: 'the moor',
+      unlessFlag: 'varrow_rallied',
+    },
+    whileHeroDown: '{name} stands over you, as still as if it had never moved.',
     source: 'original',
   },
 ];

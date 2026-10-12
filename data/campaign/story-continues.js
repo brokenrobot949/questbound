@@ -27,4 +27,6 @@ export const storyContinues = [
   // Cairnfield (it fell: the line above skips those saves, so they take this one).
   { scene: 'ch2_rally', continueAt: 'ch2_eve', source: 'original' },
   { scene: 'ch2_cairnfield', continueAt: 'ch2_eve', source: 'original' },
+  // Then at dawn after the eve of the barrow; Chapter 3 begins that day.
+  { scene: 'ch2_eve', continueAt: 'ch3_dark_moon', source: 'original' },
 ];
