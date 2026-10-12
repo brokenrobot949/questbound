@@ -37,6 +37,7 @@ export const quickStartHeroes = [
       magicInitiate: [], // only for Magic Initiate feats
       look: { skin: 'peach', hairStyle: 'tousled', hairColor: 'auburn', beard: false, outfit: 'red', accent: 'brown', headgear: 'none' },
 
+      levelFeats: [], // feats taken at level 4 and later (see character/sheet.js)
       hitPointRolls: [], // levels after 1; null means "took the fixed value"
       armorId: 'chain-mail',
       shield: false,
@@ -82,6 +83,7 @@ export const quickStartHeroes = [
       magicInitiate: [{ source: 'background', list: 'wizard', ability: 'intelligence', cantrips: ['minor-illusion', 'ray-of-frost'], spell: 'thunderwave' }],
       look: { skin: 'peach', hairStyle: 'long', hairColor: 'blonde', beard: false, outfit: 'sky', accent: 'red', headgear: 'none' },
 
+      levelFeats: [],
       hitPointRolls: [],
       armorId: null,
       shield: false,
@@ -128,6 +130,7 @@ export const quickStartHeroes = [
       magicInitiate: [{ source: 'background', list: 'cleric', ability: 'wisdom', cantrips: ['spare-the-dying', 'mending'], spell: 'healing-word' }],
       look: { skin: 'tan', hairStyle: 'tousled', hairColor: 'brown', beard: false, outfit: 'white', accent: 'yellow', headgear: 'none' },
 
+      levelFeats: [],
       hitPointRolls: [],
       armorId: 'chain-shirt',
       shield: true,
@@ -170,6 +173,7 @@ export const quickStartHeroes = [
       magicInitiate: [],
       look: { skin: 'porcelain', hairStyle: 'long', hairColor: 'black', beard: false, outfit: 'black', accent: 'grey', headgear: 'hood' },
 
+      levelFeats: [],
       hitPointRolls: [],
       armorId: 'leather-armor',
       shield: false,

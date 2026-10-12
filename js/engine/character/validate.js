@@ -8,7 +8,20 @@ import { skills } from '../../../data/srd/skills.js';
 import { standardArray, pointBuy, maxAbilityScore } from '../../../data/srd/character-creation.js';
 import { drives } from '../../../data/campaign/drives.js';
 import { bonds } from '../../../data/campaign/bonds.js';
-import { expertiseChoices, expertiseCount, findArmor, findBackground, findClass, findFeat, findSpecies, masteryChoices, weaponMasteryCount } from './sheet.js';
+import {
+  characterFeats,
+  expertiseChoices,
+  expertiseCount,
+  featLevels,
+  findArmor,
+  findBackground,
+  findClass,
+  findFeat,
+  findSpecies,
+  masteryChoices,
+  qualifiesForFeat,
+  weaponMasteryCount,
+} from './sheet.js';
 import { spellProblems } from './spells.js';
 import { lookProblems } from './look.js';
 
@@ -144,6 +157,18 @@ export function validateCharacter(character) {
     const skilled = expertiseChoices(character);
     const expertOk = expertise.length === experts && new Set(expertise).size === experts && expertise.every((id) => skilled.includes(id));
     need(expertOk, experts ? `Choose ${experts} different skills you’re proficient in for Expertise.` : `A ${cls.name} has no Expertise to choose.`);
+
+    // Feats taken at levels (the Ability Score Improvement feature, from level 4).
+    problems.push(...levelFeatProblems(character));
+  }
+
+  // No score above 20, Ability Score Improvements included.
+  if (scores.every(Number.isInteger) && Array.isArray(character.levelFeats)) {
+    for (const id of ABILITY_IDS) {
+      let total = base[id] + ((character.backgroundIncreases || {})[id] || 0);
+      for (const entry of character.levelFeats) total += ((entry && entry.increases) || {})[id] || 0;
+      need(total <= maxAbilityScore, `No score can go above ${maxAbilityScore}.`);
+    }
   }
 
   // Drive and Bond (original additions; see docs/DESIGN.md, "Character Creation").
@@ -173,5 +198,44 @@ export function validateCharacter(character) {
   if (character.armorId) need(findArmor(character.armorId), `Unknown armor: ${character.armorId}.`);
   need(typeof character.shield === 'boolean', 'Say whether the hero carries a Shield.');
 
+  return problems;
+}
+
+// The feats taken at levels: one at each level with the Ability Score Improvement feature,
+// each one the hero qualifies for, with its choices made. (Magic Initiate's spells are
+// checked with the other spells.)
+function levelFeatProblems(character) {
+  const entries = character.levelFeats;
+  if (!Array.isArray(entries) || !entries.every((e) => e && typeof e === 'object')) return ['The feats taken at levels need a list.'];
+  const problems = [];
+  const need = (ok, message) => {
+    if (!ok) problems.push(message);
+  };
+  const levels = featLevels(character);
+  const oneEach = entries.length === levels.length && levels.every((level) => entries.filter((e) => e.level === level).length === 1);
+  need(oneEach, levels.length ? `Choose an Ability Score Improvement or a feat at level ${levels.join(', ')}.` : 'Feats from levels come with the Ability Score Improvement feature.');
+  for (const entry of entries) {
+    const feat = findFeat(entry.id);
+    if (!feat) {
+      problems.push(`Unknown feat: ${entry.id}.`);
+      continue;
+    }
+    need(qualifiesForFeat(character, feat, entry.level), `${feat.name} can’t be taken at level ${entry.level}.`);
+    if (!feat.repeatable) need(characterFeats(character).filter((f) => f.feat.id === feat.id).length === 1, `${feat.name} can be taken only once.`);
+    const increases = Object.entries(entry.increases || {});
+    if (feat.scoreIncrease) {
+      const { points, perAbility } = feat.scoreIncrease;
+      const ok = increases.every(([id, n]) => ABILITY_IDS.includes(id) && Number.isInteger(n) && n >= 1 && n <= perAbility) && increases.reduce((sum, [, n]) => sum + n, 0) === points;
+      need(ok, `${feat.name}: ${points} points to share among your scores, at most ${perAbility} to one.`);
+    } else {
+      need(increases.length === 0, `${feat.name} doesn’t raise ability scores.`);
+    }
+    const skillIds = entry.skills || [];
+    if (feat.skillChoices) {
+      need(skillIds.length === feat.skillChoices && new Set(skillIds).size === skillIds.length && skillIds.every((s) => SKILL_IDS.includes(s)), `Choose ${feat.skillChoices} different skills for ${feat.name}.`);
+    } else {
+      need(skillIds.length === 0, `${feat.name} doesn’t give skills.`);
+    }
+  }
   return problems;
 }

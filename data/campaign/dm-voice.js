@@ -69,6 +69,8 @@ export const dmNotes = {
 export const levelUpVoice = {
   fighter: 'Somewhere between the last fight and this quiet moment, your body learned something your mind is only now catching up with. Your stance is surer and your swing is quicker. You reach level {level}.',
   wizard: 'Your notes, scrawled by candlelight and spattered with mud, suddenly make a new kind of sense. The shape of the magic feels less like a riddle and more like a tool. You reach level {level}.',
+  cleric: 'Your prayers come easier now, as if someone has been listening all along and has finally decided to answer a little louder. You reach level {level}.',
+  rogue: 'You catch yourself counting the exits without meaning to, and reading a stranger’s hands before their face. The tricks are turning into instincts. You reach level {level}.',
   default: 'Everything you have survived has taught you something. You reach level {level}.',
   source: 'original',
 };

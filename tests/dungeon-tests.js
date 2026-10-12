@@ -1142,7 +1142,8 @@ test('Chapter 2: hold the ford with all three of the watch alive: the Regency’
   assertTrue(deeds(game).includes('Kept all three') && pageText(game).includes('The captain'));
   // Wren's Bond: a letter from her sibling, in the post's mailbag.
   assertTrue(pageText(game).includes("Kit Ashdown's") && game.flags.includes('sibling_letter') && missingMiller(game).includes('A letter from Kit Ashdown'));
-  assertTrue(game.objective.startsWith('Cross the Old Ford') && cards(game).length === 0);
+  assertTrue(game.objective.startsWith('Cross the Old Ford'));
+  assertEqual(cards(game), ['Follow the barrow road north'], 'on to Cairnfield');
 });
 
 test('Chapter 2: if the sergeant falls, the post still holds, and whoever’s left takes up her sash', async () => {
@@ -1251,7 +1252,8 @@ test('Chapter 2: a Rival rides in at dawn after the same bounty, under the name 
   assertEqual(cards(game), ['Offer to go after the miller together', 'Warn them about the Choir', "Tell them the miller's yours"]);
   pick(game, 'Offer to go after the miller together');
   assertTrue(['rival_offered_truce', 'rival_went_ahead'].every((f) => game.flags.includes(f)) && missingMiller(game).includes('Your rival, Sable Rook'));
-  assertTrue(game.objective.startsWith('Cross the Old Ford') && cards(game).length === 0);
+  assertTrue(game.objective.startsWith('Cross the Old Ford'));
+  assertEqual(cards(game), ['Follow the barrow road north'], 'on to Cairnfield');
 });
 
 test('Chapter 2: for a Debt, a Free League factor offers to square it for anything shiny from the barrow', async () => {
@@ -1268,6 +1270,199 @@ test('Chapter 2: for a Debt, a Free League factor offers to square it for anythi
   pick(game, 'Shake on it');
   assertTrue(['league_deal', 'met_penhallow'].every((f) => game.flags.includes(f)) && memberOf(game, 'odda').approval === -1);
   assertTrue(deeds(game).includes('your debt to Old Mother Quill') && game.objective.startsWith('Cross the Old Ford'));
+});
+
+// ---- Chapter 2, beat 7: the camp at Cairnfield ----
+
+// The start of the Cairnfield scene, just after the Old Ford: a hero (a level 3 Champion unless
+// given) with Odda and Fen (unless false), and anything extra in the pack (items: ids).
+async function atCairnfield(seed, { character = champion, flags = [], odda = true, fen = true, items = [] } = {}) {
+  const game = await storyGame(seed, character);
+  game.flags.push(...flags);
+  for (const id of items) game.inventory.push({ id, quantity: 1 });
+  if (odda) joinParty(game, 'odda');
+  if (fen) joinParty(game, 'fen');
+  game.page = jumpTo(game, 'ch2_cairnfield');
+  return game;
+}
+
+// Up the road (by way of Bramblegate, if the ford fell), a night in the sheepfold, and up to
+// the ridge at dusk.
+function upToTheRidge(game) {
+  if (game.flags.includes('ford_fell')) {
+    pick(game, 'Carry the news down to Bramblegate');
+    pick(game, 'Take the barrow road north again');
+  } else {
+    pick(game, 'Follow the barrow road north');
+  }
+  pick(game, 'Get some sleep');
+  pick(game, 'Go up to the ridge');
+}
+
+// Settles the camp fight from the choice starting `start`: won (with the foes in `fled` run
+// off) or lost.
+function settleCamp(game, start, { won = true, fled = [], setUp = () => {} } = {}) {
+  const choice = game.story.currentChoices.find((c) => c.text.startsWith(start) && (c.tags || []).includes('combat:cairnfield-camp'));
+  if (!choice) throw new Error(`No fight "${start}": ${cards(game).join(' / ')}`);
+  startFight(game, choice);
+  setUp(game);
+  if (won) {
+    for (const foe of fight.enemies(game.battle)) {
+      foe.hp = 0;
+      if (fled.includes(foe.id)) foe.escaped = true;
+    }
+  } else {
+    game.hp = 0;
+  }
+  game.battle.outcome = won ? 'victory' : 'defeat';
+  game.page = continueAfterBattle(game);
+}
+
+// Juniper at level 3 with Invisibility in her spellbook, prepared.
+const invisibleWizard = {
+  ...knockWizard,
+  spells: { ...knockWizard.spells, spellbook: [...knockWizard.spells.spellbook, 'invisibility'], prepared: [...knockWizard.spells.prepared, 'invisibility'] },
+};
+
+test('Cairnfield: Rhosyn sings, the acolytes are numbered, and unless the hymn breaks, another Zombie rises on round 3', () => {
+  const game = warrenFight('cairnfield-camp', champion);
+  game.hp = 300; // so the hero is still standing to watch
+  assertEqual(fight.enemies(game.battle).map((c) => c.name), ['Sister Rhosyn', 'Choir Acolyte 1', 'Choir Acolyte 2', 'Choir Acolyte 3', 'Choir Acolyte 4', 'Zombie 1', 'Zombie 2']);
+  assertTrue(fight.objectiveText(game.battle).includes('another Zombie rises at the start of round 3'));
+  fight.endHeroTurn(game);
+  assertTrue(game.battle.log.some((e) => e.text.startsWith('Sister Rhosyn sings on')), 'she does nothing but sing');
+  fight.endHeroTurn(game);
+  assertTrue(game.battle.log.some((e) => e.text.includes('Zombie 3 drags itself up out of the opened barrow')));
+  assertEqual(fight.objectiveText(game.battle), 'The hymn is finished.');
+});
+
+test('Cairnfield: Sister Rhosyn is a Cultist Fanatic with her Pact Blade, her spells noted as left out for now', () => {
+  const fanatic = monsters.find((m) => m.id === 'cultist-fanatic');
+  assertEqual([fanatic.ac, fanatic.hp.average, fanatic.xp, fanatic.saves.wisdom], [13, 44, 450, 4]);
+  assertEqual(fanatic.attacks[0].damage, { dice: '1d8', bonus: 2, type: 'slashing', plus: { dice: '2d6', type: 'necrotic' } });
+  assertTrue(fanatic.variant.includes('Hold Person') && Boolean(sprites[fanatic.sprite]));
+});
+
+test('Chapter 2: from the ford the barrow road climbs onto the moor; a night in a sheepfold, and a word with Fen or Odda', async () => {
+  const game = await atCairnfield('cairn-road');
+  assertEqual(cards(game), ['Follow the barrow road north']);
+  pick(game, 'Follow the barrow road north');
+  assertEqual([currentLocation(game), currentTime(game)], ['A sheepfold on the high moor', 'Night']);
+  assertTrue(pageText(game).includes('Every one stands open') && speakersOf(game).includes('fen'));
+  assertEqual(cards(game), ['Ask Fen what the Choir is like, from the inside', "Ask Odda what she thinks is under the Kings' Barrow", 'Get some sleep']);
+  pick(game, 'Ask Fen');
+  assertTrue(pageText(game).includes('sang like a lost child') && !cards(game).some((c) => c.startsWith('Ask Fen')), 'asked once');
+  game.hp = 1;
+  pick(game, 'Get some sleep');
+  assertTrue(notes(game).some((n) => n.startsWith('A good place to stop')));
+  assertEqual(game.hp, fight.maxHpOf(game, { id: 'hero' }), 'a long rest at last, after the night at the ford');
+  pick(game, 'Go up to the ridge');
+  assertEqual([currentLocation(game), currentTime(game)], ['Cairnfield', 'Dusk']);
+  assertTrue(pageText(game).includes("the Kings' Barrow") && speakersOf(game).includes('fen') && !game.flags.includes('rival_taken'));
+  assertEqual(cards(game), ['Follow Fen down the gully the sentries never watch', 'Put on grey and sing with Fen', 'Attack the camp']);
+  assertEqual(tagsOf(game), ['check:stealth:12', 'check:performance:13', 'combat:cairnfield-camp']);
+});
+
+test('Chapter 2: down Fen’s gully unseen, you overhear the Choir’s plan, then slip away with the fight’s full XP', async () => {
+  const game = await atCairnfield('cairn-sneak', { character: rogue3 });
+  upToTheRidge(game);
+  const xp = game.xp;
+  forceNextD20(20);
+  pick(game, 'Follow Fen down the gully');
+  revealAll(game);
+  assertTrue(speakersOf(game).includes('rhosyn') && speakersOf(game).includes('tobin') && pageText(game).includes('the dark of the moon'));
+  assertTrue(['knows_dark_of_moon', 'knows_miller_at_sluices', 'cairnfield_sneaked'].every((f) => game.flags.includes(f)));
+  assertTrue(missingMiller(game).includes('turning the sluice wheels') && game.xp - xp === 50, 'the plan is worth 50 XP');
+  assertEqual(cards(game), ['Slip away the way you came, with what you know', "Fetch the others, and strike while the camp doesn't know you're here"]);
+  assertTrue(tagsOf(game)[1].includes('surprise'));
+  pick(game, 'Slip away');
+  assertTrue(['cairnfield_slipped_away', 'rhosyn_lives'].every((f) => game.flags.includes(f)) && game.xp - xp === 700, 'and the fight’s 650 XP');
+  assertTrue(pageText(game).includes('I do like clever') && memberOf(game, 'fen').approval === 1);
+  assertTrue(game.objective.startsWith('Go back to Bramblegate and rally help') && cards(game).length === 0);
+});
+
+test('Chapter 2: spotted in the heather, it’s a fight; Tobin yields after it and tells what he knows, and an acolyte who ran warns Vesk', async () => {
+  const game = await atCairnfield('cairn-spotted', { character: lifeCleric, fen: false });
+  upToTheRidge(game);
+  assertEqual(cards(game), ['Creep down through the heather after dark', 'Attack the camp'], 'no gully and no hymn without Fen');
+  assertEqual(tagsOf(game)[0], 'check:stealth:15');
+  forceNextD20(1);
+  pick(game, 'Creep down');
+  revealAll(game);
+  assertTrue(game.flags.includes('cairnfield_spotted') && !game.flags.includes('knows_dark_of_moon') && pageText(game).includes('In the heather!'));
+  assertEqual([cards(game), tagsOf(game)], [['Fight'], ['combat:cairnfield-camp']], 'no surprise');
+  settleCamp(game, 'Fight', { fled: ['cultist-2'] });
+  assertTrue(['cairnfield_won', 'rhosyn_dead', 'vesk_warned', 'knows_dark_of_moon'].every((f) => game.flags.includes(f)));
+  assertTrue(pageText(game).includes('booms shut') && speakersOf(game).includes('tobin') && pageText(game).includes('He hums while he works'));
+  assertEqual(cards(game), ['Let him go home to Ashby', 'Send him down to Captain Varrow, to answer for the Choir', 'Leave him tied by the fire for the Choir to find']);
+  pick(game, 'Send him down');
+  assertTrue(game.flags.includes('tobin_to_varrow') && deeds(game).includes('Broke the Ashen Choir'));
+  assertTrue(game.objective.startsWith('Go back to Bramblegate'));
+});
+
+test('Chapter 2: in borrowed grey, singing with Fen (easier with the Choir’s hymnal), you hear Rhosyn’s sermon; strike with surprise, then let Tobin go', async () => {
+  const game = await atCairnfield('cairn-hymn', { character: rogue3, items: ['choir-hymnal'] });
+  upToTheRidge(game);
+  assertTrue(cards(game).includes('Put on grey and sing with Fen: you know the words from the hymnal') && tagsOf(game).includes('check:performance:10'));
+  forceNextD20(20);
+  pick(game, 'Put on grey and sing with Fen');
+  revealAll(game);
+  assertTrue(game.flags.includes('tobin_saw_fen') && pageText(game).includes('Sing, Tobin') && pageText(game).includes("I'll not sing their songs"));
+  assertTrue(game.flags.includes('knows_dark_of_moon') && speakersOf(game).includes('rhosyn'));
+  let surprised = false;
+  settleCamp(game, 'Fetch the others', { setUp: (g) => (surprised = g.battle.surprise) });
+  assertTrue(surprised && game.flags.includes('cairnfield_struck_first') && !game.flags.includes('vesk_warned'));
+  assertTrue(pageText(game).includes('You were supposed to be dead') && pageText(game).includes('the singing never stops'), 'Tobin adds what you didn’t hear');
+  pick(game, 'Let him go home');
+  assertEqual([memberOf(game, 'fen').approval, memberOf(game, 'odda').approval], [1, 1]);
+  assertTrue(game.flags.includes('tobin_freed'));
+});
+
+test('Chapter 2: Invisibility walks you into the camp alone, for a level 2 slot, and back out again', async () => {
+  const game = await atCairnfield('cairn-invisible', { character: invisibleWizard, flags: ['mentor_warned'] });
+  upToTheRidge(game);
+  assertTrue(pageText(game).includes("Orrin Mossbottom's letter: if you hear singers in grey, run"));
+  assertTrue(cards(game).includes('Cast Invisibility, and walk into the camp alone') && tagsOf(game).includes('spell:invisibility'));
+  pick(game, 'Cast Invisibility');
+  assertTrue(notes(game).includes('You cast Invisibility, using a level 2 slot.') && game.slotsUsed[1] === 1);
+  assertTrue(pageText(game).includes('watch your own hands fade') && speakersOf(game).includes('rhosyn') && game.flags.includes('knows_dark_of_moon'));
+  pick(game, 'Slip away');
+  assertTrue(pageText(game).includes("the spell holds until you're back out in the heather") && game.flags.includes('cairnfield_invisible'));
+});
+
+test('Chapter 2: beaten at Cairnfield, you wake robbed in an opened barrow; Tobin lets down a rope and tells you the plan', async () => {
+  const character = { ...champion, bond: { type: 'rival', name: 'Sable Rook' } };
+  const game = await atCairnfield('cairn-mercy', { character, flags: ['rival_went_ahead'] });
+  game.money = 2500;
+  upToTheRidge(game);
+  assertTrue(game.flags.includes('rival_taken') && pageText(game).includes("It's Sable Rook") && missingMiller(game).includes('took Sable Rook prisoner'));
+  settleCamp(game, 'Attack the camp', { won: false });
+  assertTrue(['cairnfield_fates_mercy', 'rhosyn_lives', 'vesk_warned', 'knows_dark_of_moon', 'cairnfield_attacked'].every((f) => game.flags.includes(f)) && game.money === 0);
+  assertTrue(pageText(game).includes('bed of old bones') && pageText(game).includes('Odda and Fen lie beside you') && speakersOf(game).includes('tobin'));
+  assertTrue(notes(game).some((n) => n.startsWith('A good place to stop')) && game.hp === fight.maxHpOf(game, { id: 'hero' }));
+  pick(game, 'Leave him tied');
+  assertEqual([memberOf(game, 'odda').approval, memberOf(game, 'fen').approval], [-1, -1]);
+});
+
+test('Chapter 2: if the Old Ford fell, the news goes to Varrow first; a companion who falls at Cairnfield goes home to the temple', async () => {
+  const game = await atCairnfield('cairn-fell', { flags: ['ford_fell'] });
+  assertEqual(cards(game), ['Carry the news down to Bramblegate']);
+  pick(game, 'Carry the news down to Bramblegate');
+  assertTrue(speakersOf(game).includes('varrow') && pageText(game).includes("I can't spare you a single spear") && notes(game).some((n) => n.startsWith('A good place to stop')));
+  pick(game, 'Take the barrow road north again');
+  assertTrue(pageText(game).includes('fresh graves on the north bank'));
+  pick(game, 'Get some sleep');
+  pick(game, 'Go up to the ridge');
+  settleCamp(game, 'Attack the camp', {
+    setUp: (g) => {
+      fight.combatantById(g.battle, 'odda').state = 'dead';
+      Object.assign(memberOf(g, 'odda'), { hp: 0, fallen: true });
+    },
+  });
+  assertTrue(game.flags.includes('odda_fell_at_cairnfield') && !game.flags.includes('fen_fell_at_cairnfield'));
+  assertTrue(pageText(game).includes("Odda didn't get up") && pageText(game).includes("Bramblegate's temple"));
+  pick(game, 'Let him go home');
+  assertTrue(game.objective.startsWith('Make camp near Cairnfield'));
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

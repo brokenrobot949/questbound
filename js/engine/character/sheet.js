@@ -14,6 +14,10 @@
 //   drive (an id from data/campaign/drives.js), bond ({ type, name }: who the hero left behind)
 //   startingEquipment ({ class: 'A', background: 'B' }: the kit options taken at creation)
 //   spells, magicInitiate (spell choices; see spells.js)
+//   levelFeats (the feat taken at each level with Ability Score Improvement, from level 4):
+//     [{ level, id, increases?, skills? }]: the feat's id; for the Ability Score
+//     Improvement, the scores raised ({ wisdom: 1, constitution: 1 }); for Skilled, the three
+//     skills. Magic Initiate's spells are in magicInitiate, as source 'level-4' (and so on).
 //   hitPointRolls (the Hit Die rolled at each level after 1; null = took the fixed value)
 //   armorId (null = no armour), shield (true or false)
 //
@@ -156,7 +160,8 @@ export function proficiencyBonus(level) {
   return row.proficiencyBonus;
 }
 
-// A score: the assigned score plus the background increase, never above 20.
+// A score: the assigned score plus the background increase and any Ability Score
+// Improvements, never above 20.
 export function abilityScore(character, abilityId) {
   const ability = findAbility(abilityId);
   if (!ability) throw new Error(`Unknown ability: ${abilityId}`);
@@ -165,6 +170,11 @@ export function abilityScore(character, abilityId) {
   const parts = [{ label: 'Assigned score', value: base }];
   const increase = (character.backgroundIncreases || {})[abilityId] || 0;
   if (increase) parts.push({ label: `Background (${backgroundOf(character).name})`, value: increase });
+  for (const entry of character.levelFeats || []) {
+    const raised = (entry.increases || {})[abilityId] || 0;
+    const feat = findFeat(entry.id);
+    if (raised && feat) parts.push({ label: `${feat.name} (level ${entry.level})`, value: raised });
+  }
   const total = parts.reduce((sum, p) => sum + p.value, 0);
   if (total > maxAbilityScore) parts.push({ label: `Capped at ${maxAbilityScore}`, value: maxAbilityScore - total });
   return derived(parts);
@@ -186,7 +196,26 @@ export function characterFeats(character) {
   }
   const style = (character.classChoices || {}).fightingStyle;
   if (style) list.push({ feat: findFeat(style), source: `Class (${classOf(character).name})` });
+  for (const entry of character.levelFeats || []) list.push({ feat: findFeat(entry.id), source: `Level ${entry.level}` });
   return list.filter((entry) => entry.feat);
+}
+
+// The levels, up to the character's, at which their class gives the Ability Score
+// Improvement feature (a feat or the Ability Score Improvement): [4] for a level 4 Fighter.
+export function featLevels(character) {
+  return classOf(character)
+    .levels.filter((row) => row.level <= character.level && row.features.includes('ability-score-improvement'))
+    .map((row) => row.level);
+}
+
+// Whether the character qualifies for a feat taken at a level: a General feat whose level
+// they've reached, any Origin feat, or a Fighting Style feat if they have the Fighting Style
+// feature. (Whether they already have it is for the caller: some feats repeat.)
+export function qualifiesForFeat(character, feat, level) {
+  if (feat.category === 'general') return level >= (feat.prerequisiteLevel || 1);
+  if (feat.category === 'origin') return true;
+  if (feat.category === 'fighting-style') return hasFeature(character, 'fighting-style');
+  return false;
 }
 
 const hasFeat = (character, featId) => characterFeats(character).some((entry) => entry.feat.id === featId);
@@ -201,6 +230,9 @@ export function skillProficiency(character, skillId) {
   if (backgroundOf(character).skills.includes(skillId)) sources.push(`${backgroundOf(character).name} background`);
   if ((character.speciesSkills || []).includes(skillId)) sources.push(`${speciesOf(character).name} trait`);
   if ((character.featSkills || []).includes(skillId)) sources.push('Skilled feat');
+  for (const entry of character.levelFeats || []) {
+    if ((entry.skills || []).includes(skillId)) sources.push(`Skilled feat (level ${entry.level})`);
+  }
   const choices = character.classChoices || {};
   const expert = character.classId === 'wizard' && character.level >= 2 && choices.scholarSkill === skillId;
   if (expert) return { level: 'expertise', sources: [...sources, 'Scholar'] };

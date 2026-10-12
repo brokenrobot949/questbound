@@ -10,7 +10,7 @@ import * as levelUp from '../js/engine/character/level-up.js';
 import * as fight from '../js/engine/combat/battle.js';
 import { heroAttackOptions, rollDamage } from '../js/engine/combat/attacks.js';
 import { squaresBetween } from '../js/engine/combat/grid.js';
-import { armorClass, armorTraining, checkModifiers, climbSpeed, maxHitPoints, proficientWithWeapon, sneakAttackDice, spellcasting, weaponProficiencies } from '../js/engine/character/sheet.js';
+import { abilityScore, armorClass, armorTraining, checkModifiers, climbSpeed, maxHitPoints, proficientWithWeapon, sneakAttackDice, spellcasting, weaponProficiencies } from '../js/engine/character/sheet.js';
 import { canCastSpell, classSpellCounts, domainSpells, preparePicks, togglePrepared } from '../js/engine/character/spells.js';
 import { castFromSheet, sheetSpellProblem, sheetSpells } from '../js/engine/character/spell-effects.js';
 import { validateCharacter } from '../js/engine/character/validate.js';
@@ -223,6 +223,31 @@ test('Shield of Faith: a Bonus Action, +2 AC while Posy concentrates', () => {
   fight.endHeroTurn(game);
   const attack = game.battle.log.filter((e) => e.roll && e.roll.kind === 'attack').pop().roll;
   assertEqual(attack.target, { type: 'AC', value: 16 }, 'chain shirt and Shield 14, +2');
+});
+
+test('Resistance (a Cleric cantrip from level 4): 1d4 less of the damage the foes deal most, once a turn', () => {
+  // Posy with Resistance, her level 4 cantrip, against the mill's goblins and their Daggers.
+  const posyResists = { ...posyFights, spells: { ...posyFights.spells, cantrips: [...posy.spells.cantrips, 'resistance'] } };
+  const { game, far } = millWith(posyResists, 'resist');
+  far.hp = 0;
+  const option = heroAttackOptions(game).find((o) => o.id === 'spell-resistance');
+  assertTrue(attackSummary(option).join(' · ').includes('1d4 less damage, once a turn, of the type your foes deal most'));
+  fight.heroCastSelf(game, 'spell-resistance');
+  const ward = game.battle.effects.find((e) => e.kind === 'resisting');
+  assertEqual([ward.target, ward.damageType, game.battle.concentration.name, game.battle.turnState.action], ['hero', 'piercing', 'Resistance', true]);
+  assertTrue(said(game, 'You cast Resistance, against the piercing damage your foes deal most: you take 1d4 less piercing damage once a turn while you concentrate.'));
+  assertTrue(fight.conditionsOf(game.battle, 'hero').includes('resisting'));
+  const before = game.hp;
+  forceNextD20(15); // the goblin's Dagger hits
+  fight.endHeroTurn(game);
+  const lines = game.battle.log.map((e) => e.text);
+  const hit = lines.find((t) => t.startsWith('Goblin') && / = \d+ piercing damage/.test(t));
+  const resisted = lines.find((t) => t.startsWith('Resistance: you take'));
+  assertTrue(Boolean(hit && resisted), lines.join(' / '));
+  const dealt = Number(/ = (\d+) piercing/.exec(hit)[1]);
+  const cut = Number(/you take (\d+) less piercing/.exec(resisted)[1]);
+  assertTrue(cut >= 1 && cut <= 4);
+  assertEqual(before - game.hp, Math.max(0, dealt - cut), `${dealt} piercing, ${cut} less`);
 });
 
 test('Inflict Wounds: by touch, 2d10 necrotic, half on a Constitution save', () => {
@@ -478,11 +503,33 @@ test('Rogue scenes: Thieves’ Tools open the postern; a Rogue reads the thieves
 
 test('Companions: Odda and Fen are legal characters at every level, levelling with the hero', () => {
   for (const id of ['odda', 'fen']) {
-    for (const level of [1, 2, 3]) assertEqual(validateCharacter(companionCharacter(id, level)), [], `${id} at level ${level}`);
+    for (const level of [1, 2, 3, 4]) assertEqual(validateCharacter(companionCharacter(id, level)), [], `${id} at level ${level}`);
+  }
+  for (const level of [1, 2, 3, 4]) {
+    const odda = companionCharacter('odda', level);
+    const counts = classSpellCounts(odda);
+    assertEqual([odda.spells.cantrips.length, odda.spells.prepared.length], [counts.cantrips, counts.prepared], `Odda has all her spells at level ${level}`);
   }
   const odda = companionCharacter('odda', 3);
   assertEqual([odda.subclassId, domainSpells(odda).includes('cure-wounds'), maxHitPoints(odda).value], ['life', true, 24], 'Life Domain at 3; 8 + 5 + 5, Con +1 and Dwarven Toughness +1 a level');
-  assertEqual([companionCharacter('fen', 3).subclassId, companionCharacter('fen', 9).level], ['thief', 3], 'no higher than the rules data goes');
+  assertEqual([companionCharacter('fen', 3).subclassId, companionCharacter('fen', 9).level], ['thief', 4], 'no higher than the rules data goes');
+});
+
+test('Companions at level 4: Odda +1 Wisdom and Constitution, with Mending and Detect Magic; Fen +1 Dexterity and Constitution', () => {
+  const odda = companionCharacter('odda', 4);
+  assertEqual([abilityScore(odda, 'wisdom').value, abilityScore(odda, 'constitution').value, maxHitPoints(odda).value], [18, 14, 35], '8 + 5 + 5 + 5, Con +2 and Dwarven Toughness +1 a level');
+  assertEqual([odda.spells.cantrips.at(-1), odda.spells.prepared.at(-1), spellcasting(odda).saveDc.value], ['mending', 'detect-magic', 14]);
+  const fen = companionCharacter('fen', 4);
+  assertEqual([abilityScore(fen, 'dexterity').value, abilityScore(fen, 'constitution').value, maxHitPoints(fen).value], [18, 14, 31]);
+  assertEqual(odda.levelFeats, [{ level: 4, id: 'ability-score-improvement', increases: { wisdom: 1, constitution: 1 } }]);
+  // The hero reaches level 4: each companion's Hit Points rise as much as their maximum.
+  const game = gameFor(posy3);
+  game.party = [];
+  joinParty(game, 'odda');
+  joinParty(game, 'fen');
+  game.character = { ...posy3, level: 4, hitPointRolls: [null, null, null], levelFeats: [{ level: 4, id: 'ability-score-improvement', increases: { wisdom: 1, constitution: 1 } }] };
+  partyLevelUp(game, 3);
+  assertEqual(game.party.map((m) => [m.hp, memberMaxHp(game, m)]), [[35, 35], [31, 31]], 'Odda 24 + 11, Fen 21 + 10');
 });
 
 test('Party: up to two companions join with full Hit Points and their kit; rests and levels carry them along', () => {

@@ -18,6 +18,7 @@ import { armorTraining, divineOrderOf, expertiseChoices, expertiseCount, findBac
 import { validateCharacter } from './validate.js';
 import {
   classSpellCounts,
+  domainSpells,
   highestSpellLevel,
   magicInitiateLists,
   magicInitiateSources,
@@ -69,6 +70,7 @@ export function emptyDraft() {
     spells: null,
     magicInitiate: [],
     look: null, // set on the Look step (see look.js)
+    levelFeats: [],
     hitPointRolls: [],
     armorId: null,
     shield: false,
@@ -379,7 +381,7 @@ export function creationSteps(draft) {
 }
 
 // The usual spellcasting ability for each spell list, offered first for Magic Initiate.
-const LIST_ABILITY = { cleric: 'wisdom', druid: 'wisdom', wizard: 'intelligence' };
+export const LIST_ABILITY = { cleric: 'wisdom', druid: 'wisdom', wizard: 'intelligence' };
 
 // Keeps one Magic Initiate entry for each Magic Initiate feat the hero has, keeping any
 // choices already made. Changes the draft it's given (always a fresh copy).
@@ -414,7 +416,8 @@ function freeSpeciesSpells(draft) {
 
 // What already gives the hero this spell, other than `where`, or null. Used to stop the
 // same spell being picked twice. Sources: 'species', 'class-cantrips', 'class-spellbook',
-// 'initiate-background' and 'initiate-species'.
+// 'class-prepared' (a Cleric's), 'class-domain' (a Cleric subclass's always-prepared spells)
+// and 'initiate-' + the Magic Initiate feat's source ('initiate-background', 'initiate-level-4').
 export function spellTakenBy(draft, spellId, where) {
   const holders = [];
   const given = draft.speciesId ? speciesSpells(draft) : null;
@@ -423,6 +426,7 @@ export function spellTakenBy(draft, spellId, where) {
     if (draft.spells.cantrips.includes(spellId)) holders.push('class-cantrips');
     if (draft.spells.spellbook.includes(spellId)) holders.push('class-spellbook');
     if (preparesFromList(draft) && draft.spells.prepared.includes(spellId)) holders.push('class-prepared');
+    if (domainSpells(draft).includes(spellId)) holders.push('class-domain');
   }
   for (const entry of draft.magicInitiate) {
     if (entry.cantrips.includes(spellId) || entry.spell === spellId) holders.push(`initiate-${entry.source}`);

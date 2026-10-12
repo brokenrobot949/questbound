@@ -4,7 +4,7 @@
 // gives by character level 3. Phase 2 adds the Cleric's own spells: the Life Domain's (Aid,
 // Lesser Restoration), then a first set of the Cleric list (Bane, Command, Inflict Wounds,
 // Purify Food and Drink, Shield of Faith, Blindness/Deafness, Prayer of Healing, Spiritual
-// Weapon).
+// Weapon). Level 4 adds Resistance, the last SRD Cleric cantrip.
 //
 //   level         0 for a cantrip
 //   lists         the class spell lists the spell is on
@@ -30,7 +30,9 @@
 //                        ability modifier); it can be cast from the Sheet between fights too
 //            'ward'      a spell for the rest of the fight: effect 'blessed' (Bless: +1d4 to
 //                        attack rolls and saving throws), 'sanctuary' (a foe must make a Wisdom
-//                        save to attack the warded creature) or 'shield-of-faith' (+2 AC)
+//                        save to attack the warded creature), 'shield-of-faith' (+2 AC) or
+//                        'resisting' (Resistance: damage of one type is cut by the `reduce`
+//                        dice, once a turn; the game picks the type the foes deal most)
 //            'stabilise' Spare the Dying: a friend at 0 Hit Points becomes Stable (offered
 //                        only with companions; rangeScales: the range doubles at character
 //                        levels 5, 11 and 17)
@@ -278,6 +280,22 @@ export const spells = [
     concentration: false,
     text: 'A frigid beam of blue-white light streaks toward a creature within range. Make a ranged spell attack against the target. On a hit, it takes 1d8 Cold damage, and its Speed is reduced by 10 feet until the start of your next turn.',
     upgrade: 'The damage increases by 1d8 when you reach levels 5 (2d8), 11 (3d8), and 17 (4d8).',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'resistance',
+    combat: { kind: 'ward', effect: 'resisting', range: 5, targets: 1, reduce: '1d4' },
+    name: 'Resistance',
+    level: 0,
+    school: 'Abjuration',
+    lists: ['cleric', 'druid'],
+    castingTime: 'Action',
+    ritual: false,
+    range: 'Touch',
+    components: 'V, S',
+    duration: 'Concentration, up to 1 minute',
+    concentration: true,
+    text: 'You touch a willing creature and choose a damage type: Acid, Bludgeoning, Cold, Fire, Lightning, Necrotic, Piercing, Poison, Radiant, Slashing, or Thunder. When the creature takes damage of the chosen type before the spell ends, the creature reduces the total damage taken by 1d4. A creature can benefit from this spell only once per turn.',
     source: 'SRD 5.2.1',
   },
   {

@@ -162,6 +162,18 @@ The DM marks the moment with a line of narration, then walks you through: hit po
 - Every choice is saved as you make it. A rolled Hit Die stands: reloading can't swap a bad roll for the fixed value.
 - Your current Hit Points rise by as much as your maximum does.
 - The journal records each new level as a deed.
+- Each class has its own line from the DM (the Fighter, the Wizard, the Cleric and the Rogue).
+
+**Level 4: the Ability Score Improvement or a feat** (Rob, Oct 11, 2026)
+
+- The rules data covers levels 1–4 for the four classes; a hero stops at level 4 (2,700 XP) for now.
+- At level 4 every class takes the **Ability Score Improvement** (+2 to one score, or +1 to two, none above 20), or a feat instead. The level-up screen lists the Ability Score Improvement first (marked Recommended), then the **Origin feats** (Alert, Magic Initiate, Savage Attacker, Skilled), then, for a Fighter, the **Fighting Styles** she doesn't have yet. A feat the hero already has isn't offered again unless it repeats: Skilled repeats, and Magic Initiate repeats with a spell list not used yet.
+- **Grappler**, the SRD's other level 4 feat, waits until grappling is in fights.
+- The Ability Score Improvement is a + and − for each score, with the points left shown. Skilled picks three skills the hero isn't proficient in. Magic Initiate picks its list, spellcasting ability, two cantrips and a level 1 spell, as at creation. A spell the hero already has another way (a class cantrip, a domain spell) is greyed out with the reason.
+- A higher Constitution raises the Hit Points of every earlier level too; the Hit Points section says how many.
+- The Sheet shows each raise in the score's maths ("Ability Score Improvement (level 4): +1"), and the feat among the features ("· Level 4").
+- **Also at level 4:** a Wizard and a Cleric learn a fourth class cantrip (a Thaumaturge a fifth) and prepare seven spells, with a third level 2 slot; a Fighter gains a fourth kind of weapon for Weapon Mastery and a third Second Wind. The Rogue's Sneak Attack stays 2d6. The level-up screen lists what grows ("Second Wind: you can use it 3 times between Long Rests (was 2)").
+- Debug's lower level takes back the feat, its spells, the new cantrip and the extra Weapon Mastery.
 
 **Class features that act on their own**
 
@@ -183,11 +195,12 @@ A setting to be asked instead can come later, alongside the Shield spell's react
 
 The free rules include one subclass per class, such as Champion, Thief, Life Domain and Evoker. Original subclasses can be added later.
 
-**The Cleric (Phase 2, levels 1–3 so far)**
+**The Cleric (Phase 2, levels 1–4 so far)**
 
 - **The basics:** Wisdom spellcasting, d8 Hit Dice, Wisdom and Charisma saves, two skills from History, Insight, Medicine, Persuasion or Religion, Simple weapons, Light and Medium armour and Shields. Kit A is a chain shirt, Shield, mace, Holy Symbol and Priest's Pack with 7 GP; kit B is 110 GP.
 - **Divine Order** (chosen on the Class step): a **Protector** gains Martial weapons and Heavy armour; a **Thaumaturge** knows a fourth cantrip and adds their Wisdom modifier (at least +1) to Arcana and Religion checks, shown in the roll.
-- **Spells:** three cantrips, and prepared spells straight from the whole Cleric list (no spellbook): four at level 1, five at level 2, six at level 3 (when level 2 spells open up). The Cleric list in the game is the curated one: the cantrips and spells already in the data, growing with each slice.
+- **Spells:** three cantrips (four from level 4), and prepared spells straight from the whole Cleric list (no spellbook): four at level 1, five at level 2, six at level 3 (when level 2 spells open up), seven at level 4. The Cleric list in the game is the curated one: the cantrips and spells already in the data, growing with each slice. It now has all seven SRD Cleric cantrips, so every Cleric has one to learn at level 4 (a Thaumaturge Acolyte such as Posy already knows the other six).
+- **Resistance** (a cantrip; Concentration; touch): you or a friend beside you takes 1d4 less damage of one type, once a turn. The game picks the type for you: the one most of the foes still standing deal (the zombies' bludgeoning at the Old Ford, the goblins' piercing at the mill), and the log says which. The turn order marks the warded one "(Resistance)", and the status line says what it guards against when it's on you. Its part of the damage is cut before any Resistance from species halves it.
 - **Channel Divinity** (level 2; two uses, back after a Long Rest; a Short Rest would give one back once Short Rests arrive): its own group of buttons in a fight.
   - **Divine Spark:** 1d8 + Wisdom, either Radiant damage to a foe within 30 feet (Constitution save for half) or healing for a companion within 30 feet. The SRD says "another creature", so it never heals the Cleric, and a Cleric alone can only use it to hurt. (The Necrotic option comes when a foe resists Radiant.)
   - **Turn Undead:** every Undead within 30 feet makes a Wisdom save or is Turned for a minute: Frightened and Incapacitated, it spends its turns moving as far from you as it can. Damage ends it, and so does your dropping to 0 Hit Points. The button is greyed out with no Undead in reach.
@@ -206,10 +219,10 @@ The free rules include one subclass per class, such as Champion, Thief, Life Dom
   - **Spiritual Weapon** (Bonus Action, Concentration): a spectral mace appears beside a foe within 60 feet and makes a melee spell attack (1d8 + Wisdom, Force). On later turns, as a Bonus Action and with no slot, it moves up to 20 feet and strikes again. It's drawn on the grid.
   - **Prayer of Healing** takes 10 minutes, so it's cast from the Sheet only: one roll of 2d8 (no Wisdom bonus), and everyone in the party who's hurt regains that much, each once until their next Long Rest.
   - **Purify Food and Drink** (a Ritual) cleans the spoiled flour in the goblins' larder, and Nettle notices.
-  - **Not yet:** Protection from Evil and Good, because it uses up a flask of Holy Water (25 GP) each time, and Holy Water arrives with shops. The Resistance cantrip and the rest of the level 2 list come later.
+  - **Not yet:** Protection from Evil and Good, because it uses up a flask of Holy Water (25 GP) each time, and Holy Water arrives with shops. The rest of the level 2 list comes later.
 - **Posy Hearthstone** is the Quick Start Cleric: a halfling Acolyte and Thaumaturge, with Healing Word from the Acolyte's Magic Initiate.
 
-**The Rogue (Phase 2, levels 1–3 so far)**
+**The Rogue (Phase 2, levels 1–4 so far)**
 
 - **The basics:** Dexterity, d8 Hit Dice, Dexterity and Intelligence saves, four skills from Acrobatics, Athletics, Deception, Insight, Intimidation, Investigation, Perception, Persuasion, Sleight of Hand or Stealth. Simple weapons, and Martial weapons with Finesse or Light (Shortsword, Scimitar); Light armour; Thieves' Tools. Kit A is leather armour, two Daggers, a Shortsword, a Shortbow with 20 arrows and a Quiver, Thieves' Tools and a Burglar's Pack, with 8 GP; kit B is 100 GP.
 - **Expertise** (on the Skills step): two skills the Rogue is proficient in add twice the Proficiency Bonus, marked ★ on the sheet. Sleight of Hand and Stealth are suggested.
@@ -228,7 +241,7 @@ The free rules include one subclass per class, such as Champion, Thief, Life Dom
 
 The free rules hold over 300 spells, and each needs either combat code or a story use. Launch ships a curated set of about 60 Cleric and Wizard spells across spell levels 1–9, growing with each phase. Utility spells such as Detect Magic, Speak with Dead and Knock double as keys that unlock choice cards in scenes. Concentration and ritual casting work as written.
 
-Phase 1 ships 44 spells (16 cantrips, 22 level 1, 6 level 2): enough choice for a Wizard of levels 1–3, for Magic Initiate on the Cleric, Druid or Wizard list, and every spell a species grants by character level 3. Phase 2 adds the Cleric's own (so far Aid, Bane, Blindness/Deafness, Command, Inflict Wounds, Lesser Restoration, Prayer of Healing, Purify Food and Drink, Shield of Faith and Spiritual Weapon: 54 in all). In a scene, a choice that needs a spell is shown only to heroes who can cast it: a known cantrip, a prepared or always-prepared spell, or a ritual in a Wizard's spellbook.
+Phase 1 ships 44 spells (16 cantrips, 22 level 1, 6 level 2): enough choice for a Wizard of levels 1–3, for Magic Initiate on the Cleric, Druid or Wizard list, and every spell a species grants by character level 3. Phase 2 adds the Cleric's own (so far Aid, Bane, Blindness/Deafness, Command, Inflict Wounds, Lesser Restoration, Prayer of Healing, Purify Food and Drink, Shield of Faith, Spiritual Weapon and the Resistance cantrip: 55 in all). In a scene, a choice that needs a spell is shown only to heroes who can cast it: a known cantrip, a prepared or always-prepared spell, or a ritual in a Wizard's spellbook.
 
 How spells work in the game so far:
 
@@ -255,9 +268,9 @@ How spells work in the game so far:
 - **In scenes:** a spell choice shows only to a hero who can cast it now, and its card says what it costs: "Spell · Light" for a cantrip, "· as a Ritual" (10 minutes longer, no slot), "· free" (Magic Initiate's once-per-Long-Rest cast), or "· level 1 slot". The scene takes the cheapest way, and a DM note says what was spent.
   - A Wizard can cast any Ritual in their spellbook, prepared or not; anyone else needs the ritual spell prepared.
   - A spell its target saves against, such as Charm Person on Warden Pike, rolls that save in the open. The die is the NPC's, so the colours flip: their success is your setback.
-  - STORY.md lists where each spell is useful in Chapter 1. Level 2 spells wait for Chapter 2, because a hero first has them at level 3: Lesser Restoration frees Lark, Knock opens the stocks' padlock (with a bang the whole square hears), and Invisibility waits for the Choir's camp.
+  - STORY.md lists where each spell is useful in Chapter 1. Level 2 spells wait for Chapter 2, because a hero first has them at level 3: Lesser Restoration frees Lark, Knock opens the stocks' padlock (with a bang the whole square hears), and Invisibility walks the hero into the Choir's camp at Cairnfield alone, unseen (one creature: a level 2 slot can't take a second).
 - **Guidance:** a hero who knows it adds 1d4 to every ability check in a scene, shown in the roll's breakdown.
-- **Not yet in fights:** Charm Person, Fog Cloud and Invisibility. They work in scenes.
+- **Not yet in fights:** Charm Person, Fog Cloud and Invisibility. They work in scenes (Invisibility at Cairnfield).
 
 **Rests**
 
@@ -339,7 +352,7 @@ Initiative, attack rolls against AC, critical hits, damage types and resistances
 
 **Weapon Mastery and two weapons** (so far)
 
-- A Fighter chooses three kinds of weapon and a Rogue two. The choice comes on the Equipment step of creation, starting with the weapons in the kits. Older saves give a Fighter the weapons in their pack. Changing them after a Long Rest comes with shops, once there are new weapons to master.
+- A Fighter chooses three kinds of weapon (four from level 4, chosen on the level-up screen) and a Rogue two. The choice comes on the Equipment step of creation, starting with the weapons in the kits. Older saves give a Fighter the weapons in their pack. Changing them after a Long Rest comes with shops, once there are new weapons to master.
 - The properties the game's weapons have:
   - **Vex** (Shortsword, Shortbow): a hit that deals damage gives Advantage on your next attack roll against that foe, until the end of your next turn.
   - **Sap** (Mace, Spear, Flail): a hit gives the foe Disadvantage on its next attack roll, until the start of your next turn.
@@ -396,6 +409,9 @@ Initiative, attack rolls against AC, critical hits, damage types and resistances
 - Fights are built with the 2024 encounter budget (Low, Moderate, High), sized for you and your companions.
 - Most fights are Moderate and bosses are High. Fewer, better fights beat many filler fights.
 - Every authored fight gets a twist where possible: a hazard, an objective, reinforcements or a chance to parley.
+- **The Choir's hymn** is a twist of reinforcements: a singer does nothing but sing until a set round, when another of the dead climbs up (out of the bones, or an opened barrow). Hurting the singer can break it (a Constitution save), and so can anything that stops them speaking. Chapter 1's acolyte raises a Skeleton; at Cairnfield, Sister Rhosyn raises a Zombie on round 3.
+- **Foes don't cast spells yet.** A stat block's spells are left out, with a note in the monster data, until they're built (Rob, Oct 11, 2026): the Cultist Fanatic (Sister Rhosyn) fights with her Pact Blade, and her Command, Hold Person and Spiritual Weapon come with Chapter 3's chantry fight, where a Fanatic stands beside Cantor Vesk.
+- Foes who share a name in the encounter ("Choir Acolyte") are numbered on the grid, as unnamed ones are ("Zombie 1", "Zombie 2").
 
 How the game sizes a fight (Rob chose to count companions, Oct 10, 2026):
 
@@ -550,6 +566,7 @@ You play one character, but up to two companions can travel with you, chosen fro
 - **Their spells in scenes:** a scene can ask a companion to cast a spell they have (`companion_can_cast`, `companion_cast`): Odda frees Lark with Lesser Restoration. The card says whose spell it is and what it costs them ("Odda's spell · Lesser Restoration · level 2 slot"), and it uses their slot, not yours.
 - **If a companion dies in a story fight,** the scene goes on without their lines (`companion_alive`). If Odda dies in the ossuary, or Fen in the fight at the stocks, the temple keeps them before the altar flame until they can be raised; raising the dead at a temple comes later, and debug mode's Raise works meanwhile.
 - **Levels:** they're always your level. Their big picks are set for now: Odda takes the Life Domain at level 3, Fen the Thief. Each later level takes the fixed Hit Points, and their Hit Points rise when yours do.
+  - **Level 4** (Rob, Oct 11, 2026): both take the Ability Score Improvement as +1 to their main score and +1 Constitution. Odda's Wisdom goes 17 to 18 (+4, spell save DC 14) and Fen's Dexterity 17 to 18 (+4), the same modifier +2 would give, and each gains 4 Hit Points from the Constitution (Odda 35, Fen 31 at level 4). Odda also learns Mending (her fourth cantrip) and prepares Detect Magic (her seventh spell), ready for the wards of the barrows.
 - **The Party section of the Sheet** shows each companion's portrait, Hit Points, likes and dislikes, full sheet and **tactic**:
   - **Aggressive:** goes after the foe they'd hurt most. Odda opens a real fight with Spiritual Weapon (from level 3), or Bless before then.
   - **Defensive:** stays within 10 feet of you and fights what comes near, or Dodges. Odda opens a real fight with Shield of Faith on you.
@@ -749,8 +766,9 @@ Rules content is typed into `data/srd/` from the SRD 5.2.1 document, one phase a
 **Saves**
 
 - Three save slots in the browser's IndexedDB storage, which holds far more than localStorage. Settings stay in localStorage. Every key is prefixed with `questbound:`.
-- Autosave after every choice and every combat turn. The dice generator's state is saved too, so reloading can't reroll. While you hold Heroic Inspiration, the save also keeps the moment before your last choice or attack, so a reroll still works after the game is closed (save version 14). It also notes when a Wizard or Cleric has just rested and can change their prepared spells (version 15). Version 16 adds a Fighter's Weapon Mastery weapons, taken from their pack for older saves, and version 17 the party.
+- Autosave after every choice and every combat turn. The dice generator's state is saved too, so reloading can't reroll. While you hold Heroic Inspiration, the save also keeps the moment before your last choice or attack, so a reroll still works after the game is closed (save version 14). It also notes when a Wizard or Cleric has just rested and can change their prepared spells (version 15). Version 16 adds a Fighter's Weapon Mastery weapons, taken from their pack for older saves, version 17 the party, and version 18 the feats taken at level 4 (and a level-up's new choices: the feat, a cantrip and a Weapon Mastery weapon).
 - Every save has a version number and a migration path.
+- **Where the story stops for now:** the end card says the tale picks up from there in a later update, and it does. A save made where an older version of the story stopped carries on where the story goes today when it's loaded, with the last page read still on screen (`data/campaign/story-continues.js` lists those old ends: the end of Chapter 1, Morwen's breakfast, Fen's lead, and the Old Ford).
 - Export and import as a downloadable file or a copyable text code, with a backup reminder every 10 sessions.
 
 **Offline and home-screen install**

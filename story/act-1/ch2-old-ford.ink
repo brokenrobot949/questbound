@@ -403,11 +403,11 @@ In the post's yard stands a covered wagon with a merchant's mark on the canvas: 
 
 = road_on
 { has_flag("ford_fell"):
-    ~ set_objective("Carry word to Bramblegate that the Old Ford has fallen, then take the barrow road north to the Choir's camp at Cairnfield. (The rest of Chapter 2 is still being written.)")
+    ~ set_objective("Carry word to Bramblegate that the Old Ford has fallen, then take the barrow road north to the Choir's camp at Cairnfield.")
 - else:
-    ~ set_objective("Cross the Old Ford and follow the barrow road north to the Choir's camp at Cairnfield. (The rest of Chapter 2 is still being written.)")
+    ~ set_objective("Cross the Old Ford and follow the barrow road north to the Choir's camp at Cairnfield.")
 }
--> END
+-> ch2_cairnfield
 
 // The watch's fate, from how many of them came through the fight (Rob chose these, Oct 11,
 // 2026): all three, the Regency's favour and Varrow's help in Chapter 3; one or two, the post

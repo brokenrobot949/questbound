@@ -32,7 +32,7 @@
 //                  and party (the companions with the hero; see character/party.js)
 
 import { createRng, Rng } from '../rules/rng.js';
-import { currentDungeon, currentLocation, currentTime, runPage } from '../story/story-runner.js';
+import { currentDungeon, currentLocation, currentTime, pickUpOldEnd, runPage } from '../story/story-runner.js';
 import { dungeonStateOk } from '../world/dungeons.js';
 import { sessionOk, sessionSnapshot } from '../story/sessions.js';
 import { journalOk, newJournal } from '../story/journal.js';
@@ -45,7 +45,7 @@ import { validateCharacter } from '../character/validate.js';
 import { undoOk } from './undo.js';
 import { partyProblems } from '../character/party.js';
 
-export const SAVE_VERSION = 17;
+export const SAVE_VERSION = 18;
 
 // runtime: { story, game } — the compiled story, and whichever game is being played.
 
@@ -186,6 +186,12 @@ export function loadGame(runtime, record) {
     game.undo = null;
     game.page = runPage(game);
     game.notice = 'The story has changed since this save, so the scene starts again.';
+  }
+  // Saved where the story used to stop "for now"? The next part is here: carry on.
+  const picked = game.battle || game.levelUp ? null : pickUpOldEnd(game);
+  if (picked) {
+    game.page = picked;
+    game.undo = null;
   }
   return game;
 }

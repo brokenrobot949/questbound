@@ -35,7 +35,8 @@
 //                them; wards on anyone in the party (see "Wards" below): 'blessed'
 //                (concentration) and 'sanctuary' (with the DC foes save against, until the
 //                start of the warded one's turn in untilRound), 'shield-of-faith'
-//                (concentration); 'spiritual-weapon' (target: its caster, concentration; pos:
+//                (concentration), 'resisting' (concentration; damageType, and usedTurn: the
+//                "round:turn" it last cut damage); 'spiritual-weapon' (target: its caster, concentration; pos:
 //                the square the spectral weapon is in,
 //                damage and modifiers: its attack); and 'turned' (Turn Undead) and 'blinded'
 //                (Blindness/Deafness), until the start of the creature's turn in untilRound;
@@ -207,12 +208,15 @@ const autoFails = (battle, c, abilityId) => isHelpless(battle, c.id) && ['streng
 //                      the attack is lost. It ends when they attack, cast a spell or deal
 //                      damage, or after a minute (10 rounds).
 //   'shield-of-faith'  Shield of Faith: +2 AC while the hero concentrates
+//   'resisting'        Resistance: while the caster concentrates, damage of one type
+//                      (damageType) is cut by 1d4, once a turn. The game picks the type the
+//                      foes standing deal most (resistedType).
 // A ward that needs Concentration lasts while its caster concentrates: the hero, or a
 // companion such as Odda (effect.by).
-const WARDS = ['blessed', 'sanctuary', 'shield-of-faith'];
+const WARDS = ['blessed', 'sanctuary', 'shield-of-faith', 'resisting'];
 
 // Conditions on a creature, for the battle screen: e.g. ['asleep', 'poisoned'].
-const SHOWN = ['drowsy', 'asleep', 'paralyzed', 'turned', 'blinded', 'grovel', 'baned', 'poisoned', 'outlined', 'guided', 'vexed', 'sapped', 'slowed', 'hidden', 'shield', 'shield-of-faith', 'dodging', 'blessed', 'sanctuary', 'helped'];
+const SHOWN = ['drowsy', 'asleep', 'paralyzed', 'turned', 'blinded', 'grovel', 'baned', 'poisoned', 'outlined', 'guided', 'vexed', 'sapped', 'slowed', 'hidden', 'shield', 'shield-of-faith', 'dodging', 'blessed', 'sanctuary', 'resisting', 'helped'];
 export function conditionsOf(battle, id) {
   return SHOWN.filter((kind) => hasEffect(battle, id, kind));
 }
@@ -351,15 +355,23 @@ function freeSquareNear(encounterId, combatants, near) {
 export function startBattle(game, encounterId, choiceIndex, { surprise = false, practice = null } = {}) {
   const encounter = findEncounter(encounterId);
   if (!encounter) throw new Error(`Unknown encounter: ${encounterId}`);
+  // Foes who share a name, their own (four "Choir Acolyte"s) or their monster's, are numbered.
+  const baseName = ({ monster, name }) => name || findMonster(monster).name;
   const counts = {};
-  for (const { monster } of encounter.monsters) counts[monster] = (counts[monster] || 0) + 1;
+  for (const entry of encounter.monsters) {
+    if (!findMonster(entry.monster)) throw new Error(`Unknown monster: ${entry.monster}`);
+    counts[baseName(entry)] = (counts[baseName(entry)] || 0) + 1;
+  }
   const numbered = {};
+  const named = {};
   const combatants = [{ id: 'hero', side: 'hero', name: game.character.name, pos: { ...encounter.hero } }];
-  for (const { monster: id, pos, name: given } of encounter.monsters) {
+  for (const entry of encounter.monsters) {
+    const { monster: id, pos } = entry;
     const monster = findMonster(id);
-    if (!monster) throw new Error(`Unknown monster: ${id}`);
     numbered[id] = (numbered[id] || 0) + 1;
-    const name = given || (counts[id] > 1 ? `${monster.name} ${numbered[id]}` : monster.name);
+    const base = baseName(entry);
+    named[base] = (named[base] || 0) + 1;
+    const name = counts[base] > 1 ? `${base} ${named[base]}` : base;
     combatants.push({ id: `${id}-${numbered[id]}`, side: 'enemy', name, monsterId: id, pos: { ...pos }, hp: monster.hp.average, maxHp: monster.hp.average });
   }
   // Allies who fight on the hero's side, played by the game (the Old Ford's soldiers).
@@ -507,7 +519,7 @@ function hymnRises(game) {
   const risen = { id: `${monster.id}-${count}`, side: 'enemy', name: `${monster.name} ${count}`, monsterId: monster.id, pos: { ...spot }, hp: monster.hp.average, maxHp: monster.hp.average };
   battle.combatants.push(risen);
   battle.order.push(risen.id);
-  log(game, `The hymn swells to its end, and ${risen.name} drags itself up out of the bones!`);
+  log(game, `The hymn swells to its end, and ${risen.name} drags itself up out of ${hymn.from || 'the bones'}!`);
 }
 
 // Damage makes the singer save to keep singing: Constitution, DC 10 or half the damage.
@@ -541,7 +553,10 @@ export function objectiveText(battle) {
   if (!hymn || !battle.hymn) return '';
   if (battle.hymn.risen) return 'The hymn is finished.';
   if (!battle.hymn.singing) return 'The hymn is broken. No more of the dead will rise here.';
-  return `The hymn: unless the singer is stopped, a second ${findMonster(hymn.rises.monster).name} rises at the start of round ${hymn.round}. Hurting the singer may break it.`;
+  // "A second Skeleton" when it's the only one of its kind; "another Zombie" when there are more.
+  const kind = findMonster(hymn.rises.monster).name;
+  const already = encounter.monsters.filter((m) => m.monster === hymn.rises.monster).length;
+  return `The hymn: unless the singer is stopped, ${already === 1 ? 'a second' : 'another'} ${kind} rises at the start of round ${hymn.round}. Hurting the singer may break it.`;
 }
 
 // Plays every enemy, ally and companion turn (and a downed hero's death saves) until the hero
@@ -1392,6 +1407,7 @@ function takeHit(game, target, amount, { type, critical = false, plus = null }) 
     return;
   }
   const resisted = heroResistances(game.character);
+  ({ amount, plus } = resistanceCut(game, target, amount, type, plus));
   const taken = damageAfterResistance(amount, type, resisted) + (plus ? damageAfterResistance(plus.amount, plus.type, resisted) : 0);
   if (taken < amount + (plus ? plus.amount : 0)) log(game, `You resist some of the damage: you take ${taken}.`);
   if (battle.heroState === 'up') {
@@ -1424,6 +1440,41 @@ function takeHit(game, target, amount, { type, critical = false, plus = null }) 
   battle.heroState = 'down';
   log(game, `You take damage while down: ${critical ? 'two death save failures' : 'a death save failure'}.`);
   if (battle.deathSaves.failures >= 3) heroDies(game, 'Your third death save fails.');
+}
+
+// Resistance (the cantrip) on someone in the party: damage of its type is cut by 1d4, once a
+// turn. Damage that comes in two types (plus) is cut in the part of the warded type. Returns
+// what's left: { amount, plus }.
+function resistanceCut(game, target, amount, type, plus) {
+  const battle = game.battle;
+  const ward = battle.effects.find((e) => e.target === target.id && e.kind === 'resisting');
+  const turn = `${battle.round}:${battle.turn}`;
+  if (!ward || ward.usedTurn === turn) return { amount, plus };
+  const onMain = type === ward.damageType && amount > 0;
+  const onPlus = !onMain && Boolean(plus) && plus.type === ward.damageType && plus.amount > 0;
+  if (!onMain && !onPlus) return { amount, plus };
+  ward.usedTurn = turn;
+  const { count, sides } = parseDice(findSpell('resistance').combat.reduce);
+  const cut = rollDice(game.rng, count, sides).total;
+  log(game, `Resistance: ${isHero(target) ? 'you take' : `${target.name} takes`} ${cut} less ${ward.damageType} damage (1d4: ${cut}).`);
+  if (onMain) return { amount: Math.max(0, amount - cut), plus };
+  return { amount, plus: { ...plus, amount: Math.max(0, plus.amount - cut) } };
+}
+
+// The damage type Resistance guards against: the one most of the foes still standing can deal
+// (each foe counts once for each type its attacks deal), the first of them on a tie.
+function resistedType(game) {
+  const counts = new Map();
+  for (const foe of enemies(game.battle).filter((c) => c.hp > 0 && !c.escaped)) {
+    const types = new Set(monsterAttackOptions(findMonster(foe.monsterId)).map((o) => o.damage && o.damage.type).filter(Boolean));
+    for (const type of types) counts.set(type, (counts.get(type) || 0) + 1);
+  }
+  let best = 'bludgeoning';
+  let most = 0;
+  for (const [type, n] of counts) {
+    if (n > most) [best, most] = [type, n];
+  }
+  return best;
 }
 
 // ---- Death saves ----
@@ -1480,6 +1531,7 @@ function companionHit(game, target, amount, { type, critical, plus }) {
   const member = memberFor(game, target);
   const actor = actorGame(game, target);
   const resisted = heroResistances(actor.character);
+  ({ amount, plus } = resistanceCut(game, target, amount, type, plus));
   const taken = damageAfterResistance(amount, type, resisted) + (plus ? damageAfterResistance(plus.amount, plus.type, resisted) : 0);
   if (taken < amount + (plus ? plus.amount : 0)) log(game, `${target.name} resists some of the damage, and takes ${taken}.`);
   if (target.state === 'up') {
@@ -2489,17 +2541,27 @@ function castWard(game, option, targets, caster = heroCombatant(game.battle)) {
     const effect = { kind: option.effect, target: c.id, endsOn: null };
     if (option.concentration) Object.assign(effect, { concentration: true, by: caster.id });
     if (option.effect === 'sanctuary') Object.assign(effect, { dc: option.saveDc, untilRound: battle.round + 10 });
+    if (option.effect === 'resisting') Object.assign(effect, { damageType: resistedType(game), usedTurn: null });
     battle.effects.push(effect);
   }
   const name = findSpell(option.spellId).name;
   const [c] = targets;
+  const type = option.effect === 'resisting' ? battle.effects.at(-1).damageType : null;
   if (!isHero(caster)) {
     // A companion's ward: "Odda casts Bless on you, Odda and Fen".
     const who = c && targets.length === 1 ? (isHero(c) ? 'you' : c.name) : whoText(targets, caster);
-    const what = { blessed: `while ${caster.name} concentrates, each adds 1d4 to attack rolls and saving throws`, sanctuary: `a foe must make a DC ${option.saveDc} Wisdom save to attack them`, 'shield-of-faith': `+2 to AC while ${caster.name} concentrates` }[option.effect];
+    const what = {
+      blessed: `while ${caster.name} concentrates, each adds 1d4 to attack rolls and saving throws`,
+      sanctuary: `a foe must make a DC ${option.saveDc} Wisdom save to attack them`,
+      'shield-of-faith': `+2 to AC while ${caster.name} concentrates`,
+      resisting: `1d4 less ${type} damage once a turn, while ${caster.name} concentrates`,
+    }[option.effect];
     return log(game, `${caster.name} casts ${name} on ${who}: ${what}.`);
   }
   const you = targets.length === 1 && isHero(c);
+  if (option.effect === 'resisting') {
+    return log(game, `You cast ${name}${you ? '' : ` on ${c.name}`}, against the ${type} damage your foes deal most: ${you ? 'you take' : `${c.name} takes`} 1d4 less ${type} damage once a turn while you concentrate.`);
+  }
   if (option.effect === 'blessed') {
     log(game, you ? `You cast ${name}: while you concentrate, you add 1d4 to your attack rolls and saving throws.` : `You cast ${name} on ${whoText(targets)}: while you concentrate, each adds 1d4 to attack rolls and saving throws.`);
   } else if (option.effect === 'sanctuary') {
@@ -2650,7 +2712,8 @@ function enemyTurn(game, c) {
   }
   if (isProne(battle, c.id) && speedOf(game, c) > 0) standUp(game, c);
   if (battle.hymn && battle.hymn.singing && c === singerOf(battle)) {
-    log(game, `${c.name} sings on, eyes closed, and the bones on the floor twitch in time.`);
+    const from = encounter.hymn.from;
+    log(game, `${c.name} sings on, eyes closed, and the bones ${from ? `in ${from}` : 'on the floor'} twitch in time.`);
     return;
   }
   // A sleeping ally beside it, and its target out of reach: it shakes the sleeper awake (its

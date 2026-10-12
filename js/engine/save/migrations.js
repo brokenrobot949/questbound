@@ -216,4 +216,16 @@ export const migrations = {
     const undo = game.undo && game.undo.state ? { ...game.undo, state: { ...game.undo.state, party: [] } } : game.undo;
     return { ...save, version: 17, game: { ...game, party: [], undo } };
   },
+
+  // Version 18 adds level 4: the feats a hero takes at levels (none yet, since heroes stopped
+  // at level 3), and a level-up's new choices (a feat, cantrips and Weapon Mastery weapons,
+  // none made yet). The undo point's copy of the game gets the same.
+  17: (save) => {
+    const withFeats = (character) => (character && typeof character === 'object' ? { ...character, levelFeats: [] } : character);
+    const withChoices = (draft) => (draft && typeof draft === 'object' ? { ...draft, cantrips: [], masteries: [], feat: null } : draft);
+    const upgrade = (state) => ({ ...state, character: withFeats(state.character), levelUp: withChoices(state.levelUp) });
+    const { game } = save;
+    const undo = game.undo && game.undo.state ? { ...game.undo, state: upgrade(game.undo.state) } : game.undo;
+    return { ...save, version: 18, game: { ...upgrade(game), undo } };
+  },
 };

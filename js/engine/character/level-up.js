@@ -15,14 +15,49 @@
 //                   Savant; its one extra spell at each new level of spell slots starts at 5)
 //     prepared      Wizard and Cleric: spells added to the prepared list, up to the new
 //                   number (a Wizard's from the spellbook, a Cleric's from the Cleric list)
+//     cantrips      Wizard and Cleric: new class cantrips (one at level 4)
+//     masteries     Fighter: new kinds of weapon for Weapon Mastery (one at level 4)
+//     feat          level 4 (Ability Score Improvement): null, or the feat chosen and its
+//                   choices: { id, increases: { ability: points }, skills: [ids] (Skilled),
+//                   list, ability, cantrips, spell (Magic Initiate) }
 //   }
 
 import { advancement } from '../../../data/srd/advancement.js';
+import { abilities } from '../../../data/srd/abilities.js';
+import { skills } from '../../../data/srd/skills.js';
+import { feats } from '../../../data/srd/feats.js';
+import { maxAbilityScore } from '../../../data/srd/character-creation.js';
 import { dmNotes } from '../../../data/campaign/dm-voice.js';
 import { rollDie } from '../rules/dice.js';
-import { abilityModifierOf, findClass, skillProficiency, subclassOf } from './sheet.js';
-import { classSpellCounts, domainSpells, findSpell, highestSpellLevel, preparePicks, speciesSpells, spellsOnList } from './spells.js';
-import { aidBonus, maxHp } from './resources.js';
+import {
+  abilityModifierOf,
+  abilityScore,
+  characterFeats,
+  findClass,
+  findFeat,
+  masteredWeapons,
+  masteryChoices,
+  qualifiesForFeat,
+  skillProficiency,
+  sneakAttackDice,
+  subclassOf,
+  weaponMasteryCount,
+} from './sheet.js';
+import {
+  classSpellCounts,
+  domainSpells,
+  findSpell,
+  highestSpellLevel,
+  levelSource,
+  magicInitiateLists,
+  preparePicks,
+  preparesFromList,
+  speciesSpells,
+  spellsOnList,
+  SPELLCASTING_ABILITIES,
+} from './spells.js';
+import { LIST_ABILITY, spellTakenBy } from './creation.js';
+import { aidBonus, featureUsesMax, maxHp } from './resources.js';
 import { validateCharacter } from './validate.js';
 import { addDeed } from '../story/journal.js';
 import { memberMaxHp, partyLevelUp } from './party.js';
@@ -51,7 +86,7 @@ export function beginLevelUp(game) {
   if (!levelUpReady(game)) throw new Error('Not enough XP to level up yet.');
   const level = game.character.level + 1;
   if (!game.levelUp || game.levelUp.level !== level) {
-    game.levelUp = { level, hitPoints: null, subclassId: null, scholarSkill: null, spellbook: [], savant: [], prepared: [] };
+    game.levelUp = { level, hitPoints: null, subclassId: null, scholarSkill: null, spellbook: [], savant: [], prepared: [], cantrips: [], masteries: [], feat: null };
   }
   return game.levelUp;
 }
@@ -67,11 +102,25 @@ export function heroAfter(game) {
   hero.hitPointRolls = [...rolls, Number.isInteger(draft.hitPoints) ? draft.hitPoints : null];
   if (draft.subclassId) hero.subclassId = draft.subclassId;
   if (draft.scholarSkill) hero.classChoices = { ...hero.classChoices, scholarSkill: draft.scholarSkill };
+  if (draft.masteries.length) hero.classChoices = { ...hero.classChoices, weaponMasteries: [...masteredWeapons(before), ...draft.masteries] };
+  hero.levelFeats = [...(before.levelFeats || [])];
+  if (draft.feat) {
+    const feat = findFeat(draft.feat.id);
+    const entry = { level: draft.level, id: feat.id };
+    if (feat.scoreIncrease) entry.increases = { ...draft.feat.increases };
+    if (feat.skillChoices) entry.skills = [...draft.feat.skills];
+    hero.levelFeats.push(entry);
+    if (feat.id === 'magic-initiate') {
+      const { list, ability, cantrips, spell } = draft.feat;
+      hero.magicInitiate = [...(hero.magicInitiate || []), { source: levelSource(draft.level), list, ability, cantrips: [...cantrips], spell }];
+    }
+  }
   if (hero.spells) {
     // A domain spell the Cleric had prepared is now always prepared, and frees its place.
     const domain = domainSpells(hero);
     hero.spells = {
       ...hero.spells,
+      cantrips: [...hero.spells.cantrips, ...draft.cantrips],
       spellbook: [...hero.spells.spellbook, ...draft.spellbook, ...draft.savant],
       prepared: [...hero.spells.prepared, ...draft.prepared].filter((id) => !domain.includes(id)),
     };
@@ -81,11 +130,16 @@ export function heroAfter(game) {
 
 // Everything the new level brings, for the level-up screen:
 //   level, className
-//   hitPoints   { die, fixed, con, fixedGain, gained (once chosen), rolled (the roll, if rolled) }
+//   hitPoints   { die, fixed, con (the new Constitution modifier), conGain (Hit Points a
+//               higher Constitution adds for the earlier levels), fixedGain, gained (once
+//               chosen), rolled (the roll, if rolled) }
 //   features    [{ id, name, text, source }]: new class, subclass and species features
+//   more        [{ name, text }]: features that grow ("Second Wind: 3 uses (was 2)")
 //   subclasses  the subclasses to choose from (level 3), or null
 //   scholar     { from: [skill ids] } (Wizard level 2), or null
-//   spellbook, savant, prepared   { count, from: [spell ids] }, or null
+//   feat        level 4: { choices: [feats], increase, skills, initiate } (see featPlan), or null
+//   masteries   { count, from: [weapon ids] } (Fighter level 4), or null
+//   cantrips, spellbook, savant, prepared   { count, from: [spell ids] }, or null
 //   slots       { before: [...], after: [...] } per spell level, or null
 //   speciesSpells  [{ spell, note }]: spells the hero's lineage or legacy gives at this level
 export function levelUpPlan(game) {
@@ -94,13 +148,13 @@ export function levelUpPlan(game) {
   const after = heroAfter(game);
   const cls = findClass(before.classId);
   const row = cls.levels[draft.level - 1];
-  const con = abilityModifierOf(before, 'constitution');
 
   const withFixed = { ...after, hitPointRolls: [...after.hitPointRolls.slice(0, -1), null] };
   const hitPoints = {
     die: cls.hitDie,
     fixed: cls.hitPointsPerLevel,
-    con,
+    con: abilityModifierOf(after, 'constitution'),
+    conGain: maxHp({ ...before, levelFeats: after.levelFeats }) - maxHp(before),
     fixedGain: maxHp(withFixed) - maxHp(before),
     gained: draft.hitPoints === null ? null : maxHp(after) - maxHp(before),
     rolled: Number.isInteger(draft.hitPoints) ? draft.hitPoints : null,
@@ -126,8 +180,12 @@ export function levelUpPlan(game) {
     className: cls.name,
     hitPoints,
     features,
+    more: growingFeatures(before, after),
     subclasses: row.features.some((id) => id.endsWith('-subclass')) ? cls.subclasses : null,
     scholar: null,
+    feat: row.features.includes('ability-score-improvement') ? featPlan(game, before, after) : null,
+    masteries: null,
+    cantrips: null,
     spellbook: null,
     savant: null,
     prepared: null,
@@ -139,7 +197,24 @@ export function levelUpPlan(game) {
     plan.scholar = { from: cls.scholarSkills.filter((id) => skillProficiency(before, id).level !== 'none') };
   }
 
+  // A Fighter's Weapon Mastery grows to four kinds of weapon at level 4.
+  const masteryMore = weaponMasteryCount(after) - masteredWeapons(before).length;
+  if (masteryMore > 0) {
+    const from = masteryChoices(after).filter((id) => !masteredWeapons(before).includes(id));
+    plan.masteries = { count: Math.min(masteryMore, from.length), from };
+  }
+
   if (cls.spellcasting && before.spells) {
+    // New class cantrips: ones the hero doesn't already have from anywhere.
+    const cantripsMore = classSpellCounts(after).cantrips - before.spells.cantrips.length;
+    if (cantripsMore > 0) {
+      const given = [...((species && species.cantrips) || []), ...(before.magicInitiate || []).flatMap((entry) => entry.cantrips)];
+      const from = spellsOnList(cls.id, 0)
+        .map((s) => s.id)
+        .filter((id) => !before.spells.cantrips.includes(id) && !given.includes(id));
+      if (from.length) plan.cantrips = { count: Math.min(cantripsMore, from.length), from };
+    }
+
     let preparable;
     if (cls.spellcasting.spellbook) {
       // Spells the hero already has another way (species, Magic Initiate) aren't offered
@@ -176,20 +251,104 @@ export function levelUpPlan(game) {
   return plan;
 }
 
+// Limited features that grow with the level, in words: more uses, more dice.
+function growingFeatures(before, after) {
+  const lines = [];
+  const uses = [
+    ['second-wind', 'Second Wind'],
+    ['action-surge', 'Action Surge'],
+    ['channel-divinity', 'Channel Divinity'],
+  ];
+  for (const [id, name] of uses) {
+    const was = featureUsesMax(before, id);
+    const now = featureUsesMax(after, id);
+    if (was && now > was) lines.push({ name, text: `You can use it ${now} times between Long Rests (was ${was}).` });
+  }
+  const sneakBefore = sneakAttackDice(before);
+  const sneakAfter = sneakAttackDice(after);
+  if (sneakBefore && sneakAfter !== sneakBefore) lines.push({ name: 'Sneak Attack', text: `${sneakAfter} extra damage (was ${sneakBefore}).` });
+  return lines;
+}
+
+// The feat a level gives (the Ability Score Improvement feature):
+//   choices    the feats the hero can take: the Ability Score Improvement, the Origin feats,
+//              and (with the Fighting Style feature) the Fighting Styles they don't have.
+//              A feat they have can't be taken again unless it repeats, and Magic Initiate
+//              needs a spell list they haven't used.
+//   increase   for the Ability Score Improvement: { points, perAbility, left, abilities:
+//              [{ id, name, score (before), raised }] }, else null
+//   skills     for Skilled: { count, from: [skill ids they aren't proficient in] }, else null
+//   initiate   for Magic Initiate: { lists (allowed), cantrips, spells: [ids on the chosen
+//              list] }, else null
+function featPlan(game, before, after) {
+  const draft = game.levelUp;
+  const had = characterFeats(before).map((entry) => entry.feat.id);
+  const order = ['general', 'origin', 'fighting-style'];
+  const choices = feats
+    .filter((feat) => {
+      if (!qualifiesForFeat(before, feat, draft.level)) return false;
+      if (had.includes(feat.id) && !feat.repeatable) return false;
+      if (feat.id === 'magic-initiate') return magicInitiateLists(before, levelSource(draft.level)).length > 0;
+      return true;
+    })
+    .sort((a, b) => order.indexOf(a.category) - order.indexOf(b.category));
+  const chosen = draft.feat ? findFeat(draft.feat.id) : null;
+  const plan = { choices, increase: null, skills: null, initiate: null };
+  if (!chosen) return plan;
+  if (chosen.scoreIncrease) {
+    const { points, perAbility } = chosen.scoreIncrease;
+    const spent = Object.values(draft.feat.increases).reduce((sum, n) => sum + n, 0);
+    plan.increase = {
+      points,
+      perAbility,
+      left: points - spent,
+      abilities: abilities.map((a) => ({ id: a.id, name: a.name, score: abilityScore(before, a.id).value, raised: draft.feat.increases[a.id] || 0 })),
+    };
+  }
+  if (chosen.skillChoices) {
+    plan.skills = { count: chosen.skillChoices, from: skills.map((s) => s.id).filter((id) => skillProficiency(before, id).level === 'none') };
+  }
+  if (chosen.id === 'magic-initiate') {
+    const list = draft.feat.list;
+    plan.initiate = {
+      lists: magicInitiateLists(before, levelSource(draft.level)),
+      cantrips: spellsOnList(list, 0).map((s) => s.id),
+      spells: spellsOnList(list, 1).map((s) => s.id),
+    };
+  }
+  return plan;
+}
+
 // What's still to choose, in plain words. Empty when the hero can level up.
 export function levelUpProblems(game) {
   const draft = requireDraft(game);
   const plan = levelUpPlan(game);
   const problems = [];
-  const more = (pick, chosen, what) => {
+  const more = (pick, chosen, what, whats = `${what}s`) => {
     if (pick && chosen.length < pick.count) {
       const n = pick.count - chosen.length;
-      problems.push(`Choose ${n} more ${what}${n === 1 ? '' : 's'}.`);
+      problems.push(`Choose ${n} more ${n === 1 ? what : whats}.`);
     }
   };
   if (draft.hitPoints === null) problems.push('Roll your Hit Die or take the fixed Hit Points.');
   if (plan.subclasses && !draft.subclassId) problems.push(`Choose your ${plan.className} subclass.`);
   if (plan.scholar && !draft.scholarSkill) problems.push('Choose a skill for Scholar.');
+  if (plan.feat) {
+    const feat = draft.feat;
+    if (!feat) problems.push('Choose the Ability Score Improvement or a feat.');
+    else if (plan.feat.increase && plan.feat.increase.left > 0) {
+      const n = plan.feat.increase.left;
+      problems.push(`Add ${n} more ${n === 1 ? 'point' : 'points'} to your ability scores.`);
+    }
+    if (plan.feat.skills) more(plan.feat.skills, feat.skills, 'skill for Skilled', 'skills for Skilled');
+    if (plan.feat.initiate) {
+      if (!feat.ability) problems.push('Magic Initiate: choose a spellcasting ability.');
+      more({ count: 2 }, feat.cantrips, 'Magic Initiate cantrip');
+      if (!feat.spell) problems.push('Magic Initiate: choose a level 1 spell.');
+    }
+  }
+  more(plan.masteries, draft.masteries, 'weapon for Weapon Mastery', 'weapons for Weapon Mastery');
+  more(plan.cantrips, draft.cantrips, 'cantrip');
   more(plan.savant, draft.savant, 'Evocation spell');
   more(plan.spellbook, draft.spellbook, 'spellbook spell');
   more(plan.prepared, draft.prepared, 'prepared spell');
@@ -229,20 +388,134 @@ export function chooseScholarSkill(game, skillId) {
   draft.scholarSkill = skillId;
 }
 
-// which: 'spellbook', 'savant' or 'prepared'. Picks the spell, or unpicks it if picked.
-// Taking a spell back out of the spellbook also unprepares it.
+// Where each kind of new spell goes, for spotting a spell the hero would then have twice
+// (see creation.spellTakenBy). A Wizard's prepared spells come from their own spellbook.
+const SPELL_HOLDER = { cantrips: 'class-cantrips', spellbook: 'class-spellbook', savant: 'class-spellbook' };
+
+// which: 'cantrips', 'spellbook', 'savant' or 'prepared'. Picks the spell, or unpicks it if
+// picked. Taking a spell back out of the spellbook also unprepares it.
 export function toggleLevelUpSpell(game, which, spellId) {
   const draft = requireDraft(game);
   const pick = levelUpPlan(game)[which];
   if (!pick) throw new Error(`There are no ${which} spells to choose at this level.`);
   if (draft[which].includes(spellId)) {
     draft[which] = draft[which].filter((id) => id !== spellId);
-    if (which !== 'prepared') draft.prepared = draft.prepared.filter((id) => id !== spellId);
+    if (which === 'spellbook' || which === 'savant') draft.prepared = draft.prepared.filter((id) => id !== spellId);
     return;
   }
   if (!pick.from.includes(spellId)) throw new Error(`You can't choose ${spellId} here.`);
   if (draft[which].length >= pick.count) throw new Error(`You've already chosen ${pick.count}.`);
+  const holder = SPELL_HOLDER[which] || (which === 'prepared' && preparesFromList(game.character) ? 'class-prepared' : null);
+  if (holder && spellTakenBy(heroAfter(game), spellId, holder)) throw new Error(`You already have ${findSpell(spellId).name} another way.`);
   draft[which].push(spellId);
+}
+
+// A Fighter's new kind of weapon for Weapon Mastery: picks it, or unpicks it if picked.
+export function toggleLevelUpMastery(game, weaponId) {
+  const draft = requireDraft(game);
+  const pick = levelUpPlan(game).masteries;
+  if (!pick) throw new Error('There’s no Weapon Mastery to choose at this level.');
+  if (draft.masteries.includes(weaponId)) {
+    draft.masteries = draft.masteries.filter((id) => id !== weaponId);
+    return;
+  }
+  if (!pick.from.includes(weaponId)) throw new Error(`You can't choose ${weaponId} for Weapon Mastery.`);
+  if (draft.masteries.length >= pick.count) throw new Error(`You've already chosen ${pick.count}.`);
+  draft.masteries.push(weaponId);
+}
+
+// The Ability Score Improvement or a feat. Choosing a different one clears the old one's
+// choices. Magic Initiate starts on the first spell list the hero hasn't used.
+export function chooseFeat(game, featId) {
+  const draft = requireDraft(game);
+  const plan = levelUpPlan(game).feat;
+  if (!plan || !plan.choices.some((f) => f.id === featId)) throw new Error(`You can't take ${featId} now.`);
+  if (draft.feat && draft.feat.id === featId) return;
+  const list = featId === 'magic-initiate' ? magicInitiateLists(game.character, levelSource(draft.level))[0] : null;
+  draft.feat = { id: featId, increases: {}, skills: [], list, ability: list ? LIST_ABILITY[list] : null, cantrips: [], spell: null };
+}
+
+// The Ability Score Improvement: one more point on a score (delta 1) or one fewer (-1).
+export function adjustFeatIncrease(game, abilityId, delta) {
+  const draft = requireDraft(game);
+  const increase = draft.feat && levelUpPlan(game).feat.increase;
+  if (!increase) throw new Error('No ability scores to raise.');
+  const row = increase.abilities.find((a) => a.id === abilityId);
+  if (!row || ![1, -1].includes(delta)) throw new Error(`Can't change ${abilityId} by ${delta}.`);
+  const next = row.raised + delta;
+  if (next < 0) throw new Error(`${row.name} isn't raised.`);
+  if (delta > 0) {
+    if (increase.left < 1) throw new Error(`You've added all ${increase.points} points.`);
+    if (next > increase.perAbility) throw new Error(`At most +${increase.perAbility} to one score.`);
+    if (row.score + delta > maxAbilityScore) throw new Error(`No score can go above ${maxAbilityScore}.`);
+  }
+  if (next === 0) delete draft.feat.increases[abilityId];
+  else draft.feat.increases[abilityId] = next;
+}
+
+// Whether a score can go up or down a point in the Ability Score Improvement (for the
+// screen's + and − buttons).
+export function canAdjustIncrease(increase, row, delta) {
+  if (delta < 0) return row.raised > 0;
+  return increase.left > 0 && row.raised < increase.perAbility && row.score + 1 <= maxAbilityScore;
+}
+
+// Skilled: picks a skill, or unpicks it if picked.
+export function toggleFeatSkill(game, skillId) {
+  const draft = requireDraft(game);
+  const pick = draft.feat && levelUpPlan(game).feat.skills;
+  if (!pick) throw new Error('No skills to choose.');
+  const chosen = draft.feat.skills;
+  if (chosen.includes(skillId)) {
+    draft.feat.skills = chosen.filter((id) => id !== skillId);
+    return;
+  }
+  if (!pick.from.includes(skillId)) throw new Error(`You can't choose ${skillId} for Skilled.`);
+  if (chosen.length >= pick.count) throw new Error(`You've already chosen ${pick.count}.`);
+  chosen.push(skillId);
+}
+
+// Magic Initiate: its spell list (a new list clears the spells chosen from the old one).
+export function setFeatList(game, list) {
+  const feat = initiateDraft(game);
+  if (!levelUpPlan(game).feat.initiate.lists.includes(list)) throw new Error(`Magic Initiate can't use the ${list} list here.`);
+  if (feat.list !== list) Object.assign(feat, { list, ability: feat.ability || LIST_ABILITY[list], cantrips: [], spell: null });
+}
+
+export function setFeatAbility(game, ability) {
+  const feat = initiateDraft(game);
+  if (!SPELLCASTING_ABILITIES.includes(ability)) throw new Error(`Not a spellcasting ability: ${ability}`);
+  feat.ability = ability;
+}
+
+// Magic Initiate's two cantrips: picks or unpicks one.
+export function toggleFeatCantrip(game, spellId) {
+  const feat = initiateDraft(game);
+  if (feat.cantrips.includes(spellId)) {
+    feat.cantrips = feat.cantrips.filter((id) => id !== spellId);
+    return;
+  }
+  if (!levelUpPlan(game).feat.initiate.cantrips.includes(spellId)) throw new Error(`${spellId} isn't a ${feat.list} cantrip.`);
+  if (feat.cantrips.length >= 2) throw new Error('Magic Initiate gives two cantrips.');
+  if (spellTakenBy(heroAfter(game), spellId, initiateHolder(game))) throw new Error(`You already have ${findSpell(spellId).name} another way.`);
+  feat.cantrips.push(spellId);
+}
+
+// Magic Initiate's level 1 spell: choosing another swaps it.
+export function chooseFeatSpell(game, spellId) {
+  const feat = initiateDraft(game);
+  if (!levelUpPlan(game).feat.initiate.spells.includes(spellId)) throw new Error(`${spellId} isn't a level 1 ${feat.list} spell.`);
+  if (spellTakenBy(heroAfter(game), spellId, initiateHolder(game))) throw new Error(`You already have ${findSpell(spellId).name} another way.`);
+  feat.spell = spellId;
+}
+
+// Where this level's Magic Initiate spells are, for creation.spellTakenBy: 'initiate-level-4'.
+export const initiateHolder = (game) => `initiate-${levelSource(requireDraft(game).level)}`;
+
+function initiateDraft(game) {
+  const draft = requireDraft(game);
+  if (!draft.feat || draft.feat.id !== 'magic-initiate') throw new Error('Magic Initiate isn’t the feat chosen.');
+  return draft.feat;
 }
 
 // Makes the new level real: the hero gains it, their Hit Points rise by as much as their
@@ -264,8 +537,9 @@ export function finishLevelUp(game) {
 }
 
 // Debug mode only: takes the hero back down to a lower level, undoing what the levels above
-// gave (Hit Point rolls, the subclass, Scholar, spells past the lower level's numbers), and
-// sets their XP to that level's total so the level-up doesn't open again straight away.
+// gave (Hit Point rolls, the subclass, Scholar, feats, cantrips, Weapon Mastery and spells
+// past the lower level's numbers), and sets their XP to that level's total so the level-up
+// doesn't open again straight away.
 export function lowerLevel(game, level) {
   const hero = structuredClone(game.character);
   if (!Number.isInteger(level) || level < 1 || level >= hero.level) throw new Error(`Level ${level} isn't lower than ${hero.level}.`);
@@ -276,13 +550,20 @@ export function lowerLevel(game, level) {
     const { scholarSkill, ...rest } = hero.classChoices;
     hero.classChoices = rest;
   }
+  const dropped = (hero.levelFeats || []).filter((entry) => entry.level > level).map((entry) => levelSource(entry.level));
+  hero.levelFeats = (hero.levelFeats || []).filter((entry) => entry.level <= level);
+  hero.magicInitiate = (hero.magicInitiate || []).filter((entry) => !dropped.includes(entry.source));
+  if (hero.classChoices && hero.classChoices.weaponMasteries) {
+    hero.classChoices = { ...hero.classChoices, weaponMasteries: hero.classChoices.weaponMasteries.slice(0, weaponMasteryCount(hero)) };
+  }
   if (hero.spells) {
     const counts = classSpellCounts(hero);
     const top = highestSpellLevel(hero);
+    const cantrips = hero.spells.cantrips.slice(0, counts.cantrips);
     const spellbook = hero.spells.spellbook.filter((id) => findSpell(id).level <= top).slice(0, counts.spellbook);
     const fromList = spellbook.length === 0 && counts.spellbook === 0; // a Cleric
     const prepared = hero.spells.prepared.filter((id) => (fromList ? findSpell(id).level <= top : spellbook.includes(id))).slice(0, counts.prepared);
-    hero.spells = { ...hero.spells, spellbook, prepared };
+    hero.spells = { ...hero.spells, cantrips, spellbook, prepared };
   }
   game.character = hero;
   game.xp = xpForLevel(level);
@@ -298,15 +579,34 @@ export function lowerLevel(game, level) {
 // Checks a saved level-up's shape, for loading saves.
 export function levelUpOk(draft) {
   const ids = (list) => Array.isArray(list) && list.every((id) => typeof id === 'string');
+  const textOrNull = (v) => v === null || typeof v === 'string';
+  const feat = draft && draft.feat;
+  const featOk =
+    feat === null ||
+    Boolean(
+      feat &&
+        typeof feat.id === 'string' &&
+        feat.increases &&
+        typeof feat.increases === 'object' &&
+        Object.values(feat.increases).every(Number.isInteger) &&
+        ids(feat.skills) &&
+        textOrNull(feat.list) &&
+        textOrNull(feat.ability) &&
+        ids(feat.cantrips) &&
+        textOrNull(feat.spell),
+    );
   return Boolean(
     draft &&
       Number.isInteger(draft.level) &&
       (draft.hitPoints === null || draft.hitPoints === 'fixed' || Number.isInteger(draft.hitPoints)) &&
-      (draft.subclassId === null || typeof draft.subclassId === 'string') &&
-      (draft.scholarSkill === null || typeof draft.scholarSkill === 'string') &&
+      textOrNull(draft.subclassId) &&
+      textOrNull(draft.scholarSkill) &&
       ids(draft.spellbook) &&
       ids(draft.savant) &&
-      ids(draft.prepared),
+      ids(draft.prepared) &&
+      ids(draft.cantrips) &&
+      ids(draft.masteries) &&
+      featOk,
   );
 }
 

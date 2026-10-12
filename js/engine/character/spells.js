@@ -7,9 +7,10 @@
 //                  A Cleric has no spellbook (it stays empty): prepared spells come straight
 //                  from the Cleric list. Either can change them after a Long Rest. A Cleric
 //                  subclass's domain spells are always prepared, on top of these.
-//   magicInitiate  one entry per Magic Initiate feat (from the background, or the Human's
-//                  Versatile trait): { source: 'background' | 'species', list: 'cleric' |
-//                  'druid' | 'wizard', ability, cantrips: [two ids], spell: id }
+//   magicInitiate  one entry per Magic Initiate feat (from the background, the Human's
+//                  Versatile trait, or a level's feat): { source: 'background' | 'species' |
+//                  'level-4' (and so on), list: 'cleric' | 'druid' | 'wizard', ability,
+//                  cantrips: [two ids], spell: id }
 // Species spells (Elf, Gnome and Tiefling lineages) come from the species data and need
 // no choices beyond the spellcasting ability.
 
@@ -104,21 +105,27 @@ export function togglePrepared(character, spellId) {
 }
 
 // The Magic Initiate feats the character has, and which spell list each is tied to
-// (null = the player picks, which is the Human's Versatile trait).
+// (null = the player picks: the Human's Versatile trait, or a feat taken at a level).
 export function magicInitiateSources(character) {
   const sources = [];
   const background = findBackground(character.backgroundId);
   if (background && background.feat.id === 'magic-initiate') sources.push({ source: 'background', list: background.feat.spellList });
   const sp = findSpecies(character.speciesId);
   if (sp && sp.originFeat && character.originFeat === 'magic-initiate') sources.push({ source: 'species', list: null });
+  for (const entry of character.levelFeats || []) {
+    if (entry.id === 'magic-initiate') sources.push({ source: levelSource(entry.level), list: null });
+  }
   return sources;
 }
 
-// The lists a Magic Initiate feat can use: any the feat allows, except one already taken
-// by the character's other Magic Initiate (the feat can repeat, with a different list).
+// Where a Magic Initiate feat taken at a level keeps its spells: 'level-4'.
+export const levelSource = (level) => `level-${level}`;
+
+// The lists a Magic Initiate feat can use: any the feat allows, except those already taken
+// by the character's other Magic Initiate feats (the feat can repeat, with a different list).
 export function magicInitiateLists(character, source) {
-  const other = (character.magicInitiate || []).find((entry) => entry.source !== source);
-  return findFeat('magic-initiate').spellLists.filter((list) => !other || other.list !== list);
+  const taken = (character.magicInitiate || []).filter((entry) => entry.source !== source).map((entry) => entry.list);
+  return findFeat('magic-initiate').spellLists.filter((list) => !taken.includes(list));
 }
 
 // The spells a species gives at the character's level: cantrips, plus spells it can cast

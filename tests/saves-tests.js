@@ -4,7 +4,8 @@
 import { test, assertEqual, assertTrue, assertThrows, assertRejects, run } from './harness.js';
 import { loadStory } from '../js/engine/story/ink-loader.js';
 import { bindExternals } from '../js/engine/story/externals.js';
-import { currentLocation, currentTime, makeChoice, revealRoll, ROLL_LOG_LIMIT } from '../js/engine/story/story-runner.js';
+import { currentLocation, currentTime, jumpTo, listScenes, makeChoice, revealRoll, ROLL_LOG_LIMIT } from '../js/engine/story/story-runner.js';
+import { storyContinues } from '../data/campaign/story-continues.js';
 import { SAVE_VERSION, gameToSave, loadGame, migrateSave, newGame, validateSave } from '../js/engine/save/save-format.js';
 import { backupCode, backupFileName, backupFileText, isBackupDue, readBackup } from '../js/engine/save/backup.js';
 import { migrations } from '../js/engine/save/migrations.js';
@@ -444,12 +445,26 @@ test('A level-up half done is saved, and a rolled Hit Die stays rolled after a r
   chooseHitPoints(game, 'roll');
   const rolled = game.levelUp.hitPoints;
   const reloaded = loadGame(await freshRuntime(), throughJson(gameToSave(game)));
-  assertEqual(reloaded.levelUp, { level: 2, hitPoints: rolled, subclassId: null, scholarSkill: null, spellbook: [], savant: [], prepared: [] });
+  assertEqual(reloaded.levelUp, { level: 2, hitPoints: rolled, subclassId: null, scholarSkill: null, spellbook: [], savant: [], prepared: [], cantrips: [], masteries: [], feat: null });
   assertThrows(() => chooseHitPoints(reloaded, 'fixed'), 'no swapping a bad roll for the fixed value');
   assertEqual(validateSave(throughJson(gameToSave(reloaded))).version, SAVE_VERSION);
   const broken = throughJson(gameToSave(reloaded));
   broken.game.levelUp.spellbook = 'lots';
   assertThrows(() => validateSave(broken), 'a damaged level-up is refused');
+  const badFeat = throughJson(gameToSave(reloaded));
+  badFeat.game.levelUp.feat = { id: 'ability-score-improvement', increases: { strength: 'two' }, skills: [], list: null, ability: null, cantrips: [], spell: null };
+  assertThrows(() => validateSave(badFeat), 'a damaged feat choice is refused');
+});
+
+test('Level 4: a hero’s Ability Score Improvement saves and loads, and a hero missing their level 4 feat is refused', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'level-4-save', character: testHero });
+  game.character = { ...game.character, level: 4, subclassId: 'champion', hitPointRolls: [null, null, null], levelFeats: [{ level: 4, id: 'ability-score-improvement', increases: { strength: 1, constitution: 1 } }], classChoices: { ...testHero.classChoices, weaponMasteries: [...testHero.classChoices.weaponMasteries, 'longbow'] } };
+  const reloaded = loadGame(await freshRuntime(), throughJson(gameToSave(game)));
+  assertEqual(reloaded.character.levelFeats, [{ level: 4, id: 'ability-score-improvement', increases: { strength: 1, constitution: 1 } }]);
+  assertEqual(validateSave(throughJson(gameToSave(reloaded))).version, SAVE_VERSION);
+  const missing = throughJson(gameToSave(reloaded));
+  missing.game.character.levelFeats = [];
+  assertThrows(() => validateSave(missing), 'a level 4 hero needs their feat');
 });
 
 test('Migration: a version 7 game gains a day, a journal, and coins and a pack from its kits, and becomes version 8', () => {
@@ -632,6 +647,39 @@ test('Migration: a version 15 Fighter takes the weapons in their pack for Weapon
 test('Migration: a version 16 game has nobody in the party yet, and becomes version 17', () => {
   const save = migrateSave({ version: 16, slot: 1, game: { undo: { kind: 'choice', state: { hp: 5 } } } }, migrations, 17);
   assertEqual([save.version, save.game.party, save.game.undo.state.party], [17, [], []]);
+});
+
+test('Migration: a version 17 hero has taken no feats at levels yet, a level-up gains its new choices, and it becomes version 18', () => {
+  const hero = structuredClone(testHero);
+  delete hero.levelFeats;
+  const draft = { level: 3, hitPoints: 'fixed', subclassId: null, scholarSkill: null, spellbook: [], savant: [], prepared: [] };
+  const v17 = { version: 17, slot: 1, game: { character: hero, levelUp: draft, undo: { kind: 'choice', state: { character: hero, levelUp: null } } } };
+  const save = migrateSave(v17, migrations, 18);
+  assertEqual([save.version, save.game.character.levelFeats, save.game.undo.state.character.levelFeats, save.game.undo.state.levelUp], [18, [], [], null]);
+  assertEqual(save.game.levelUp, { ...draft, cantrips: [], masteries: [], feat: null });
+  assertEqual(validateCharacter(save.game.character), []);
+  assertEqual(migrateSave({ version: 17, slot: 1, game: { character: hero, levelUp: null, undo: null } }, migrations, 18).game.levelUp, null, 'no level-up, nothing to add');
+});
+
+test('Old ends: a save made where the story used to stop “for now” carries on where the story goes today', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'old-end', character: testHero });
+  game.page = jumpTo(game, 'ch2_cairnfield.road_back'); // where the story stops today
+  assertEqual(game.story.currentChoices.length, 0);
+  const record = throughJson(gameToSave(game));
+  const today = loadGame(await freshRuntime(), throughJson(record));
+  assertEqual([today.story.currentChoices.length, today.page.beats.length], [0, record.game.page.beats.length], 'today’s end stays put');
+  // As if this save had stopped at the Old Ford, before Cairnfield was written.
+  record.game.page.scene = 'ch2_old_ford';
+  const old = loadGame(await freshRuntime(), record);
+  assertEqual(old.story.currentChoices.map((c) => c.text), ['Follow the barrow road north']);
+  assertEqual(old.page.beats.slice(0, record.game.page.beats.length), record.game.page.beats, 'the last page read stays on screen above it');
+  assertEqual(validateSave(throughJson(gameToSave(old))).version, SAVE_VERSION);
+});
+
+test('Old ends: every scene where the story used to stop, and where it carries on, is in the story', async () => {
+  const { story } = await freshRuntime();
+  const scenes = listScenes(story);
+  for (const { scene, continueAt } of storyContinues) assertTrue(scenes.includes(scene) && scenes.includes(continueAt), `${scene} → ${continueAt}`);
 });
 
 test('Party: companions, and a fight with them in it, save and load exactly', async () => {

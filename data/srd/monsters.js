@@ -223,6 +223,31 @@ export const monsters = [
     sprite: 'cultist',
     source: 'SRD 5.2.1',
   },
+  // Sister Rhosyn at Cairnfield (Chapter 2) leads the Choir's acolytes, and sings the dead up.
+  {
+    id: 'cultist-fanatic',
+    name: 'Cultist Fanatic',
+    size: 'medium',
+    type: 'Humanoid',
+    ac: 13, // Leather Armor
+    hp: { average: 44, dice: '8d8 + 8' },
+    speed: 30,
+    abilities: { strength: 11, dexterity: 14, constitution: 12, intelligence: 10, wisdom: 14, charisma: 13 },
+    saves: { strength: 0, dexterity: 2, constitution: 1, intelligence: 0, wisdom: 4, charisma: 1 },
+    initiative: 2,
+    skills: { deception: 3, persuasion: 3, religion: 2 },
+    passivePerception: 12,
+    cr: '2',
+    xp: 450,
+    attacks: [
+      { id: 'pact-blade', name: 'Pact Blade', kind: 'melee', bonus: 4, reach: 5, damage: { dice: '1d8', bonus: 2, type: 'slashing', plus: { dice: '2d6', type: 'necrotic' } } },
+    ],
+    behaviour: 'brute',
+    sprite: 'cultist-fanatic',
+    variant: 'Her Spellcasting (Light and Thaumaturgy at will, Command twice a day, Hold Person once) and her Spiritual Weapon are left out until foes can cast spells, which comes with Chapter 3’s chantry fight (Rob, Oct 11, 2026). She fights with her Pact Blade, and at Cairnfield she sings the hymn that raises the dead.',
+    text: 'Pact Blade. Melee Attack Roll: +4, reach 5 ft. Hit: 6 (1d8 + 2) Slashing damage plus 7 (2d6) Necrotic damage.',
+    source: 'SRD 5.2.1',
+  },
   // ---- Chapter 2 ----
   {
     id: 'ghoul',

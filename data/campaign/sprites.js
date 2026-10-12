@@ -15,6 +15,8 @@ export const sheets = {
   tree: ['assets/dawnlike/Objects/Tree0.png'],
   hill: ['assets/dawnlike/Objects/Hill0.png'],
   pit: ['assets/dawnlike/Objects/Pit0.png'],
+  map: ['assets/dawnlike/Objects/Map0.png'],
+  effect: ['assets/dawnlike/Objects/Effect0.png'],
 };
 
 // Monsters and other creatures.
@@ -30,6 +32,7 @@ export const sprites = {
   bandit: { sheet: 'player', col: 3, row: 4 },
   'bandit-captain': { sheet: 'player', col: 5, row: 3 },
   guard: { sheet: 'player', col: 1, row: 3 }, // a soldier in grey mail
+  'cultist-fanatic': { sheet: 'player', col: 7, row: 3 }, // a red-hooded figure, face in shadow
 };
 
 // Floor tiles and things that stand on them. alpha (0 to 1) draws a picture faded, and
@@ -68,6 +71,12 @@ export const tiles = {
   // water-filled pits, with no rim).
   'deep-water': { sheet: 'pit', col: 1, row: 15 },
   ford: { sheet: 'pit', col: 1, row: 9 },
+  // Cairnfield: the barrow mounds on the moor, a barrow the dead have opened (a dug pit), the
+  // Choir's tents (from the world-map pictures) and their campfire.
+  barrow: { sheet: 'hill', col: 7, row: 3 },
+  'open-barrow': { sheet: 'pit', col: 4, row: 4 },
+  tent: { sheet: 'map', col: 6, row: 12 },
+  campfire: { sheet: 'effect', col: 1, row: 21 },
 };
 
 // Walls join up with their neighbours. Each wall style is a block of tiles in DawnLike's

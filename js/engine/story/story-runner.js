@@ -20,6 +20,7 @@ import { parseTags } from './tags.js';
 import { enterRoom, parseRoomTag } from '../world/dungeons.js';
 import { finishBattle, startBattle } from '../combat/battle.js';
 import { dmNotes } from '../../../data/campaign/dm-voice.js';
+import { storyContinues } from '../../../data/campaign/story-continues.js';
 import { timePasses } from '../character/spell-effects.js';
 import { takeUndoPoint } from '../save/undo.js';
 import { startD20Count, stopD20Count } from '../rules/d20-test.js';
@@ -55,6 +56,20 @@ export function runPage(game, leadBeats = []) {
   }
   if (stoppingPoint) beats.push({ type: 'note', text: dmNotes.stoppingPoint });
   return { beats, scene: scene || currentKnot(story) };
+}
+
+// A save made where an older version of the story stopped "for now" (data/campaign/
+// story-continues.js): if the story has nothing more to read and no choices, and it stopped in
+// one of those scenes, it carries on from where the story goes now. Returns the page (the last
+// one the player read, then the new part), or null if there's nothing to pick up.
+export function pickUpOldEnd(game, continues = storyContinues) {
+  const { story } = game;
+  if (story.canContinue || story.currentChoices.length > 0) return null;
+  const next = continues.find((c) => game.page && c.scene === game.page.scene);
+  if (!next) return null;
+  story.ChoosePathString(next.continueAt);
+  const page = runPage(game);
+  return { beats: [...game.page.beats, ...page.beats], scene: page.scene };
 }
 
 // Every knot and stitch in the story, e.g. "ch1_arrival" and "ch1_arrival.gate_opens".

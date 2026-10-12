@@ -28,9 +28,11 @@
 //                data/campaign/people.js: { person, pos, lying }. They stand in the way, and
 //                nobody fights them
 //   hymn         a monster sings while it fights (the Ashen Choir): { singer: monster id,
-//                rises: { monster, pos }, round }. Unless the singing stops first, the
-//                monster rises at pos at the start of that round. Damage makes the singer
-//                save (Constitution, DC 10 or half the damage) or the hymn breaks off.
+//                rises: { monster, pos }, round, from }. Unless the singing stops first, the
+//                monster rises at pos at the start of that round, up out of `from` ("the
+//                bones" if not given). The singer does nothing but sing until then. Damage
+//                makes the singer save (Constitution, DC 10 or half the damage) or the hymn
+//                breaks off.
 //   escape       squares a fleeing monster can leave the fight by (it flees once Bloodied,
 //                at half its Hit Points or fewer)
 //   whileHeroDown  what each monster does on its turn while the hero lies at 0 Hit Points
@@ -70,6 +72,20 @@ const fordLegend = {
   x: { terrain: 'obstacle', tile: 'grass', decor: 'crates' },
   '~': { terrain: 'water', tile: 'deep-water' },
   '=': { terrain: 'difficult', tile: 'ford' },
+};
+
+// Cairnfield (Chapter 2): the Choir's camp on the high moor, among barrow mounds the dead have
+// opened. A track runs north to the Kings' Barrow; grey tents stand round a campfire, and a
+// capstone lies where its carrier set it down.
+const cairnfieldLegend = {
+  ',': { terrain: 'floor', tile: 'grass' },
+  '.': { terrain: 'floor', tile: 'dirt' },
+  '"': { terrain: 'difficult', tile: 'grass', decor: 'bracken' },
+  M: { terrain: 'obstacle', tile: 'grass', decor: 'barrow' },
+  O: { terrain: 'obstacle', tile: 'grass', decor: 'open-barrow' },
+  t: { terrain: 'obstacle', tile: 'grass', decor: 'tent' },
+  F: { terrain: 'obstacle', tile: 'dirt', decor: 'campfire' },
+  o: { terrain: 'obstacle', tile: 'grass', decor: 'boulder' },
 };
 
 // The quarry road: a dirt road through grass, trees and bracken, up to the quarry's rock face.
@@ -310,6 +326,49 @@ export const encounters = [
       { monster: 'zombie', pos: { x: 2, y: 9 } },
     ],
     whileHeroDown: '{name} turns north again, as if you were never there.',
+    source: 'original',
+  },
+  // Cairnfield (beat 7): the Choir's camp. Sister Rhosyn sings by the fire while her acolytes
+  // fight, and unless someone breaks the hymn, more of the dead climb out of an opened barrow.
+  // The party comes up the track from the south; frightened acolytes run north for the
+  // Kings' Barrow.
+  {
+    id: 'cairnfield-camp',
+    name: 'The Choir’s Camp at Cairnfield',
+    difficulty: 'Moderate (Sister Rhosyn, four acolytes and two Zombies are 650 XP; for a level 3 party of three, Low is 450 and Moderate 675. Unless the hymn is broken, a third Zombie rises on round 3)',
+    sizedFor: { level: 3, party: 3 },
+    byHand: true,
+    map: {
+      rows: [
+        'M,,..,,M',
+        ',O,..,O,',
+        '",t,,t,"',
+        ',,,F,,,,',
+        ',t,,,,o,',
+        '",,..,,"',
+        ',M,..,O,',
+        ',,,..,,,',
+        '",,..,,"',
+        ',,,..,,M',
+      ],
+      legend: cairnfieldLegend,
+    },
+    hero: { x: 3, y: 8 },
+    monsters: [
+      { monster: 'cultist-fanatic', name: 'Sister Rhosyn', pos: { x: 4, y: 2 } },
+      { monster: 'cultist', name: 'Choir Acolyte', pos: { x: 3, y: 2 } },
+      { monster: 'cultist', name: 'Choir Acolyte', pos: { x: 6, y: 3 } },
+      { monster: 'cultist', name: 'Choir Acolyte', pos: { x: 2, y: 4 } },
+      { monster: 'cultist', name: 'Choir Acolyte', pos: { x: 5, y: 5 } },
+      { monster: 'zombie', pos: { x: 2, y: 1 } },
+      { monster: 'zombie', pos: { x: 5, y: 6 } },
+    ],
+    hymn: { singer: 'cultist-fanatic', rises: { monster: 'zombie', pos: { x: 1, y: 2 } }, round: 3, from: 'the opened barrow' },
+    escape: [
+      { x: 3, y: 0 },
+      { x: 4, y: 0 },
+    ],
+    whileHeroDown: '{name} leaves you lying in the heather. The Choir can bury you later.',
     source: 'original',
   },
 ];

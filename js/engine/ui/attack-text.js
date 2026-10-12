@@ -107,6 +107,7 @@ const WARDS = {
       ? `foes make a Wis save against DC ${option.saveDc} to attack the warded one; ends if they attack or cast a spell`
       : `foes make a Wis save against DC ${option.saveDc} to attack you; ends if you attack or cast a spell`,
   'shield-of-faith': (option) => (option.company ? '+2 to AC' : '+2 to your AC'),
+  resisting: () => '1d4 less damage, once a turn, of the type your foes deal most',
 };
 
 // Who a spell that helps can go on, with companions: "you or a friend within 60 ft",

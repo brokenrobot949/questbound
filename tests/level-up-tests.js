@@ -1,20 +1,42 @@
 // Level-up checks. Open tests/levels.html through the local server to run them.
-// Add checks here whenever levelling up or a level 2–3 feature changes.
+// Add checks here whenever levelling up or a level 2–4 feature changes.
 
 import { test, assertEqual, assertTrue, assertThrows, scriptedRng, run } from './harness.js';
 import { createRng } from '../js/engine/rules/rng.js';
 import { abilityCheck } from '../js/engine/rules/ability-check.js';
 import * as levelUp from '../js/engine/character/level-up.js';
 import { tacticalMind } from '../js/engine/character/features.js';
-import { hasFeature, maxHitPoints, skillProficiency } from '../js/engine/character/sheet.js';
+import { abilityScore, characterFeats, hasFeature, maxHitPoints, skillProficiency, sneakAttackDice } from '../js/engine/character/sheet.js';
+import { canCastSpell, freeCastsLeft } from '../js/engine/character/spells.js';
 import { validateCharacter } from '../js/engine/character/validate.js';
-import { freshResources, slotsAt } from '../js/engine/character/resources.js';
+import { featureUsesMax, freshResources, slotsAt } from '../js/engine/character/resources.js';
 import { startingInventory } from '../js/engine/character/inventory.js';
 import { newJournal } from '../js/engine/story/journal.js';
 import { quickStartHeroes } from '../data/campaign/quick-start.js';
 
 const wren = quickStartHeroes.find((h) => h.id === 'wren').character;
 const juniper = quickStartHeroes.find((h) => h.id === 'juniper').character;
+const posy = quickStartHeroes.find((h) => h.id === 'posy').character;
+const sorael = quickStartHeroes.find((h) => h.id === 'sorael').character;
+
+// The Quick Start heroes at level 3, ready for level 4 (2,700 XP).
+const wren3 = { ...wren, level: 3, subclassId: 'champion', hitPointRolls: [null, null] };
+const juniper3 = {
+  ...juniper,
+  level: 3,
+  subclassId: 'evoker',
+  hitPointRolls: [null, null],
+  classChoices: { scholarSkill: 'arcana' },
+  spells: {
+    ...juniper.spells,
+    spellbook: [...juniper.spells.spellbook, 'burning-hands', 'false-life', 'scorching-ray', 'shatter', 'misty-step', 'knock'],
+    prepared: [...juniper.spells.prepared, 'burning-hands', 'scorching-ray'],
+  },
+};
+const posy3 = { ...posy, level: 3, subclassId: 'life', hitPointRolls: [null, null], spells: { ...posy.spells, prepared: ['guiding-bolt', 'sanctuary', 'detect-magic', 'hold-person'] } };
+const sorael3 = { ...sorael, level: 3, subclassId: 'thief', hitPointRolls: [null, null] };
+// Wren at level 4 with her fourth Weapon Mastery, and whatever feat a check gives her.
+const wren4 = (levelFeats) => ({ ...wren3, level: 4, hitPointRolls: [null, null, null], classChoices: { ...wren.classChoices, weaponMasteries: [...wren.classChoices.weaponMasteries, 'longbow'] }, levelFeats });
 
 // A game with what levelling up needs: the hero, their kit and Hit Points, XP, the journal.
 function gameFor(character, xp = 0, rng = createRng('levels')) {
@@ -47,8 +69,9 @@ test('Ready: level 2 needs 300 XP, and never opens during a fight', () => {
   assertThrows(() => levelUp.beginLevelUp(gameFor(wren, 0)), 'no level-up without the XP');
 });
 
-test('Ready: level 3 is as far as the rules data goes for now', () => {
-  assertEqual([levelUp.nextLevelXp(wren), levelUp.nextLevelXp({ ...wren, level: 2 }), levelUp.nextLevelXp({ ...wren, level: 3 })], [300, 900, null]);
+test('Ready: level 4 (2,700 XP) is as far as the rules data goes for now', () => {
+  const next = (level) => levelUp.nextLevelXp({ ...wren, level });
+  assertEqual([next(1), next(2), next(3), next(4)], [300, 900, 2700, null]);
 });
 
 // ---- Fighter ----
@@ -94,7 +117,7 @@ test('Fighter 3: the Champion, with Improved Critical and Remarkable Athlete', (
   assertEqual(levelUp.levelUpPlan(game).features.map((f) => f.id), ['fighter-subclass', 'improved-critical', 'remarkable-athlete']);
   levelUp.finishLevelUp(game);
   assertEqual([game.character.level, game.character.subclassId, game.character.hitPointRolls], [3, 'champion', [null, null]]);
-  assertTrue(!levelUp.levelUpReady(game), 'level 3 is the top for now');
+  assertTrue(!levelUp.levelUpReady(game), 'level 4 needs 2,700 XP');
   assertEqual(validateCharacter(game.character), []);
 });
 
@@ -189,6 +212,179 @@ test('Species: a lineage spell that arrives at level 3 is shown as new', () => {
   assertEqual(levelUp.levelUpPlan(game).speciesSpells.map((s) => [s.spell.id, s.source]), [['faerie-fire', 'Drow']]);
 });
 
+// ---- Level 4: the Ability Score Improvement or a feat ----
+
+test('Level 4: the level 3 heroes these checks start from are legal', () => {
+  for (const hero of [wren3, juniper3, posy3, sorael3]) assertEqual(validateCharacter(hero), [], hero.name);
+});
+
+test('Fighter 4: an Ability Score Improvement, a fourth Weapon Mastery and a third Second Wind', () => {
+  const game = gameFor(wren3, 2700);
+  levelUp.beginLevelUp(game);
+  const plan = levelUp.levelUpPlan(game);
+  assertEqual(plan.feat.choices.map((f) => f.id), ['ability-score-improvement', 'magic-initiate', 'skilled', 'archery', 'great-weapon-fighting', 'two-weapon-fighting'], 'not Alert, Savage Attacker or Defense: she has those');
+  assertEqual(plan.more, [{ name: 'Second Wind', text: 'You can use it 3 times between Long Rests (was 2).' }]);
+  assertEqual([plan.masteries.count, plan.masteries.from.includes('greatsword'), plan.masteries.from.includes('longbow')], [1, false, true]);
+  assertEqual(plan.features.map((f) => f.id), ['ability-score-improvement']);
+  assertEqual(levelUp.levelUpProblems(game), ['Roll your Hit Die or take the fixed Hit Points.', 'Choose the Ability Score Improvement or a feat.', 'Choose 1 more weapon for Weapon Mastery.']);
+  levelUp.chooseHitPoints(game, 'fixed');
+  levelUp.chooseFeat(game, 'ability-score-improvement');
+  levelUp.adjustFeatIncrease(game, 'strength', 1);
+  levelUp.adjustFeatIncrease(game, 'strength', 1);
+  assertThrows(() => levelUp.adjustFeatIncrease(game, 'constitution', 1), 'only two points');
+  assertThrows(() => levelUp.adjustFeatIncrease(game, 'dexterity', -1), 'Dexterity isn’t raised');
+  levelUp.adjustFeatIncrease(game, 'strength', -1);
+  assertEqual(levelUp.levelUpProblems(game), ['Add 1 more point to your ability scores.', 'Choose 1 more weapon for Weapon Mastery.']);
+  levelUp.adjustFeatIncrease(game, 'constitution', 1);
+  assertEqual(game.levelUp.feat.increases, { strength: 1, constitution: 1 });
+  const hp = levelUp.levelUpPlan(game).hitPoints;
+  assertEqual([hp.con, hp.conGain, hp.fixedGain], [3, 3, 12], 'Con 16 (+3): 3 more for levels 1–3, then 6 + 3 for level 4');
+  levelUp.toggleLevelUpMastery(game, 'longbow');
+  assertThrows(() => levelUp.toggleLevelUpMastery(game, 'spear'), 'only one more');
+  assertEqual(levelUp.levelUpProblems(game), []);
+  game.hp = 20;
+  assertEqual(levelUp.finishLevelUp(game), { level: 4, hpGained: 12 });
+  const hero = game.character;
+  assertEqual([abilityScore(hero, 'strength').value, abilityScore(hero, 'constitution').value, maxHitPoints(hero).value, game.hp], [18, 16, 40, 32]);
+  assertEqual(abilityScore(hero, 'strength').parts.at(-1), { label: 'Ability Score Improvement (level 4)', value: 1 }, 'the maths says where it came from');
+  assertEqual([hero.classChoices.weaponMasteries, featureUsesMax(hero, 'second-wind')], [['greatsword', 'flail', 'javelin', 'longbow'], 3]);
+  assertEqual(hero.levelFeats, [{ level: 4, id: 'ability-score-improvement', increases: { strength: 1, constitution: 1 } }]);
+  assertEqual(validateCharacter(hero), []);
+  assertTrue(!levelUp.levelUpReady({ ...game, xp: 100000 }), 'level 4 is the top for now');
+});
+
+test('Ability Score Improvement: no score above 20', () => {
+  // Strength 18 assigned by hand, plus the Soldier's +2: already 20.
+  const strong = { ...wren3, abilityScoreMethod: 'manual', baseAbilityScores: { ...wren.baseAbilityScores, strength: 18 } };
+  assertEqual(validateCharacter(strong), []);
+  const game = gameFor(strong, 2700);
+  levelUp.beginLevelUp(game);
+  levelUp.chooseFeat(game, 'ability-score-improvement');
+  const increase = () => levelUp.levelUpPlan(game).feat.increase;
+  const row = (id) => increase().abilities.find((a) => a.id === id);
+  assertTrue(!levelUp.canAdjustIncrease(increase(), row('strength'), 1), 'the + is greyed out');
+  assertThrows(() => levelUp.adjustFeatIncrease(game, 'strength', 1), 'Strength is 20 already');
+  assertEqual(validateCharacter(wren4([{ level: 4, id: 'ability-score-improvement', increases: { strength: 2 } }])), [], 'Wren’s 17 can take +2');
+  const over = { ...wren4([{ level: 4, id: 'ability-score-improvement', increases: { strength: 1, constitution: 1 } }]), abilityScoreMethod: 'manual', baseAbilityScores: strong.baseAbilityScores };
+  assertEqual(validateCharacter(over), ['No score can go above 20.']);
+});
+
+test('Level 4 feats: the rules checker refuses a missing, doubled or wrong choice', () => {
+  const asi = (increases) => wren4([{ level: 4, id: 'ability-score-improvement', increases }]);
+  assertEqual(validateCharacter(asi({ wisdom: 1, constitution: 1 })), []);
+  assertEqual(validateCharacter(wren4([])), ['Choose an Ability Score Improvement or a feat at level 4.']);
+  const points = ['Ability Score Improvement: 2 points to share among your scores, at most 2 to one.'];
+  assertEqual([validateCharacter(asi({ strength: 1 })), validateCharacter(asi({ dexterity: 1, wisdom: 1, charisma: 1 }))], [points, points]);
+  assertEqual(validateCharacter(wren4([{ level: 4, id: 'alert' }])), ['Alert can be taken only once.'], 'her Versatile trait gave her Alert');
+  assertEqual(validateCharacter(wren4([{ level: 4, id: 'defense' }])), ['Defense can be taken only once.'], 'her Fighting Style is Defense');
+  assertEqual(validateCharacter(wren4([{ level: 4, id: 'archery' }])), []);
+  assertEqual(validateCharacter(wren4([{ level: 4, id: 'skilled', skills: ['stealth', 'arcana'] }])), ['Choose 3 different skills for Skilled.']);
+  const wizard = { ...juniper3, level: 4, hitPointRolls: [null, null, null], levelFeats: [{ level: 4, id: 'archery' }] };
+  assertTrue(validateCharacter(wizard).includes('Archery can’t be taken at level 4.'), 'a Wizard has no Fighting Style');
+  assertEqual(validateCharacter({ ...wren3, levelFeats: [{ level: 4, id: 'alert' }] }), ['Feats from levels come with the Ability Score Improvement feature.', 'Alert can be taken only once.']);
+});
+
+test('Fighter 4: a second Fighting Style as her feat', () => {
+  const game = gameFor(wren3, 2700);
+  levelUp.beginLevelUp(game);
+  assertThrows(() => levelUp.chooseFeat(game, 'defense'), 'she has Defense');
+  levelUp.chooseHitPoints(game, 'fixed');
+  levelUp.chooseFeat(game, 'archery');
+  levelUp.toggleLevelUpMastery(game, 'longbow');
+  levelUp.finishLevelUp(game);
+  assertEqual(characterFeats(game.character).map((entry) => [entry.feat.id, entry.source]).at(-1), ['archery', 'Level 4']);
+  assertEqual(validateCharacter(game.character), []);
+});
+
+test('Wizard 4: a fourth cantrip, Magic Initiate on a new list, and a seventh prepared spell', () => {
+  const game = gameFor(juniper3, 2700);
+  levelUp.beginLevelUp(game);
+  let plan = levelUp.levelUpPlan(game);
+  assertEqual(plan.cantrips, { count: 1, from: ['chill-touch', 'dancing-lights', 'poison-spray', 'shocking-grasp'] }, 'not her own, her Magic Initiate ones or her Rock Gnome ones');
+  assertEqual([plan.spellbook.count, plan.prepared.count, plan.slots], [2, 1, { before: [4, 2], after: [4, 3] }]);
+  assertEqual(plan.feat.choices.map((f) => f.id), ['ability-score-improvement', 'alert', 'magic-initiate', 'savage-attacker', 'skilled']);
+  levelUp.chooseFeat(game, 'magic-initiate');
+  plan = levelUp.levelUpPlan(game);
+  assertEqual([plan.feat.initiate.lists, game.levelUp.feat.list, game.levelUp.feat.ability], [['cleric', 'druid'], 'cleric', 'wisdom'], 'the Wizard list is her Sage’s already');
+  assertThrows(() => levelUp.setFeatList(game, 'wizard'));
+  levelUp.setFeatList(game, 'druid');
+  levelUp.setFeatAbility(game, 'intelligence');
+  levelUp.toggleLevelUpSpell(game, 'cantrips', 'poison-spray');
+  assertThrows(() => levelUp.toggleFeatCantrip(game, 'poison-spray'), 'already her new Wizard cantrip');
+  assertThrows(() => levelUp.toggleFeatCantrip(game, 'mending'), 'already a Rock Gnome cantrip');
+  levelUp.toggleFeatCantrip(game, 'druidcraft');
+  levelUp.toggleFeatCantrip(game, 'guidance');
+  levelUp.chooseFeatSpell(game, 'cure-wounds');
+  levelUp.chooseFeatSpell(game, 'faerie-fire'); // choosing another swaps it
+  assertThrows(() => levelUp.chooseFeatSpell(game, 'thunderwave'), 'her Sage’s Magic Initiate spell');
+  levelUp.chooseHitPoints(game, 'fixed');
+  levelUp.toggleLevelUpSpell(game, 'spellbook', 'charm-person');
+  levelUp.toggleLevelUpSpell(game, 'spellbook', 'fog-cloud');
+  levelUp.toggleLevelUpSpell(game, 'prepared', 'misty-step');
+  assertEqual(levelUp.levelUpProblems(game), []);
+  levelUp.finishLevelUp(game);
+  const hero = game.character;
+  assertEqual(
+    hero.magicInitiate.map((e) => [e.source, e.list, e.ability, e.cantrips, e.spell]),
+    [['background', 'wizard', 'intelligence', ['minor-illusion', 'ray-of-frost'], 'thunderwave'], ['level-4', 'druid', 'intelligence', ['druidcraft', 'guidance'], 'faerie-fire']],
+  );
+  assertEqual([hero.spells.cantrips.length, hero.spells.spellbook.length, hero.spells.prepared.length, slotsAt(hero, 2)], [4, 14, 7, 3]);
+  assertTrue(canCastSpell(hero, 'faerie-fire') && canCastSpell(hero, 'guidance') && canCastSpell(hero, 'poison-spray'));
+  assertEqual(freeCastsLeft({ character: hero, featureUses: {} }, 'faerie-fire'), 1, 'free once per Long Rest');
+  assertEqual(validateCharacter(hero), []);
+});
+
+test('Cleric 4: Resistance is the one Cleric cantrip Posy doesn’t know; Skilled gives three new skills', () => {
+  const game = gameFor(posy3, 2700);
+  levelUp.beginLevelUp(game);
+  const plan = levelUp.levelUpPlan(game);
+  assertEqual(plan.cantrips, { count: 1, from: ['resistance'] });
+  assertEqual([plan.prepared.count, plan.slots.after, plan.more], [3, [4, 3], []], 'seven prepared, three of them new; Channel Divinity stays at two');
+  levelUp.chooseFeat(game, 'skilled');
+  assertTrue(!levelUp.levelUpPlan(game).feat.skills.from.includes('insight'), 'she knows Insight already');
+  assertThrows(() => levelUp.toggleFeatSkill(game, 'religion'));
+  for (const id of ['perception', 'stealth', 'arcana']) levelUp.toggleFeatSkill(game, id);
+  assertThrows(() => levelUp.toggleFeatSkill(game, 'history'), 'three only');
+  levelUp.chooseHitPoints(game, 'fixed');
+  levelUp.toggleLevelUpSpell(game, 'cantrips', 'resistance');
+  for (const id of ['shield-of-faith', 'command', 'spiritual-weapon']) levelUp.toggleLevelUpSpell(game, 'prepared', id);
+  assertEqual(levelUp.levelUpProblems(game), []);
+  levelUp.finishLevelUp(game);
+  const hero = game.character;
+  assertEqual(skillProficiency(hero, 'perception'), { level: 'proficient', sources: ['Skilled feat (level 4)'] });
+  assertEqual([hero.spells.cantrips.includes('resistance'), hero.spells.prepared.length, featureUsesMax(hero, 'channel-divinity')], [true, 7, 2]);
+  assertEqual(validateCharacter(hero), []);
+});
+
+test('Rogue 4: +2 Dexterity; Sneak Attack stays 2d6', () => {
+  const game = gameFor(sorael3, 2700);
+  levelUp.beginLevelUp(game);
+  const plan = levelUp.levelUpPlan(game);
+  assertEqual(plan.feat.choices.map((f) => f.id), ['ability-score-improvement', 'magic-initiate', 'savage-attacker', 'skilled'], 'the Criminal gave her Alert');
+  assertEqual([plan.more, plan.masteries, plan.cantrips, plan.slots], [[], null, null, null]);
+  levelUp.chooseHitPoints(game, 'fixed');
+  levelUp.chooseFeat(game, 'ability-score-improvement');
+  levelUp.adjustFeatIncrease(game, 'dexterity', 1);
+  levelUp.adjustFeatIncrease(game, 'dexterity', 1);
+  assertThrows(() => levelUp.adjustFeatIncrease(game, 'dexterity', 1), 'at most +2 to one score');
+  levelUp.finishLevelUp(game);
+  assertEqual([abilityScore(game.character, 'dexterity').value, sneakAttackDice(game.character)], [19, '2d6']);
+  assertEqual(validateCharacter(game.character), []);
+});
+
+test('Level 4: choosing another feat clears the first one’s choices', () => {
+  const game = gameFor(juniper3, 2700);
+  levelUp.beginLevelUp(game);
+  levelUp.chooseFeat(game, 'ability-score-improvement');
+  levelUp.adjustFeatIncrease(game, 'intelligence', 1);
+  levelUp.adjustFeatIncrease(game, 'intelligence', 1);
+  levelUp.chooseFeat(game, 'skilled');
+  assertEqual([game.levelUp.feat.id, game.levelUp.feat.increases], ['skilled', {}]);
+  assertThrows(() => levelUp.adjustFeatIncrease(game, 'intelligence', 1), 'Skilled raises no scores');
+  assertThrows(() => levelUp.chooseFeat(game, 'grappler'), 'not in the game yet');
+  assertEqual(levelUp.levelUpOk(game.levelUp), true);
+});
+
 // ---- Debug ----
 
 test('Debug: lowering a level undoes what it gave', () => {
@@ -198,6 +394,21 @@ test('Debug: lowering a level undoes what it gave', () => {
   const hero = game.character;
   assertEqual([hero.level, hero.spells.spellbook.length, hero.spells.prepared.length, hero.classChoices.scholarSkill, game.xp], [1, 6, 4, undefined, 0]);
   assertEqual(validateCharacter(hero), []);
+});
+
+test('Debug: lowering from level 4 takes back the feat, its spells, the new cantrip and Weapon Mastery', () => {
+  const wizard = { ...juniper3, level: 4, hitPointRolls: [null, null, null], levelFeats: [{ level: 4, id: 'magic-initiate' }] };
+  wizard.magicInitiate = [...juniper.magicInitiate, { source: 'level-4', list: 'druid', ability: 'intelligence', cantrips: ['druidcraft', 'guidance'], spell: 'faerie-fire' }];
+  wizard.spells = { ...juniper3.spells, cantrips: [...juniper.spells.cantrips, 'poison-spray'] };
+  assertEqual(validateCharacter(wizard), []);
+  const game = gameFor(wizard, 2700);
+  levelUp.lowerLevel(game, 3);
+  assertEqual([game.character.levelFeats, game.character.magicInitiate.length, game.character.spells.cantrips.length], [[], 1, 3]);
+  assertEqual(validateCharacter(game.character), []);
+  const fighter = gameFor(wren4([{ level: 4, id: 'ability-score-improvement', increases: { strength: 2 } }]), 2700);
+  levelUp.lowerLevel(fighter, 3);
+  assertEqual([fighter.character.classChoices.weaponMasteries.length, abilityScore(fighter.character, 'strength').value], [3, 17]);
+  assertEqual(validateCharacter(fighter.character), []);
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

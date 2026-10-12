@@ -144,6 +144,19 @@ export const people = [
     source: 'original',
   },
 
+  // ---- Cairnfield (Chapter 2): the Choir's camp among the opened barrows ----
+  { id: 'rhosyn', name: 'Sister Rhosyn', sprite: 'cultist-fanatic', source: 'original' },
+  {
+    id: 'tobin',
+    name: 'Tobin Reed', // the youngest acolyte, a cobbler's boy who joined the Choir the winter Fen did
+    species: 'human',
+    size: 'medium',
+    armor: null,
+    robe: true,
+    look: { skin: 'peach', hairStyle: 'tousled', hairColor: 'blonde', beard: false, outfit: 'grey', accent: 'grey', headgear: 'hood' },
+    source: 'original',
+  },
+
   // ---- The hero's Bond, when they turn up in person ----
   {
     id: 'rival',

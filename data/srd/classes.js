@@ -1,5 +1,5 @@
 // Classes (SRD 5.2.1). Only what the current phase needs: the Fighter, the Wizard, the Cleric
-// and the Rogue at levels 1–3. More classes and levels are added as each phase needs them.
+// and the Rogue at levels 1–4. More classes and levels are added as each phase needs them.
 //
 // Numbers per level are in `levels` (index 0 is level 1). Feature text is in `features`.
 // Item ids in starting equipment match the equipment data (armour is in data/srd/armor.js;
@@ -18,6 +18,9 @@
 // Per level: cantrips, preparedSpells, slots (per spell level, starting with level 1), uses of
 // limited features (secondWindUses, actionSurgeUses, channelDivinity), and weaponMasteries
 // (how many kinds of weapon get Weapon Mastery; see data/srd/weapon-masteries.js).
+//
+// The 'ability-score-improvement' feature (level 4, then 8, 12, 16) is the level-up screen's
+// choice of the Ability Score Improvement feat or another feat (data/srd/feats.js).
 
 export const classes = [
   {
@@ -67,6 +70,7 @@ export const classes = [
       { level: 1, features: ['fighting-style', 'second-wind', 'weapon-mastery'], secondWindUses: 2, weaponMasteries: 3 },
       { level: 2, features: ['action-surge', 'tactical-mind'], secondWindUses: 2, weaponMasteries: 3, actionSurgeUses: 1 },
       { level: 3, features: ['fighter-subclass'], secondWindUses: 2, weaponMasteries: 3, actionSurgeUses: 1 },
+      { level: 4, features: ['ability-score-improvement'], secondWindUses: 3, weaponMasteries: 4, actionSurgeUses: 1 },
     ],
     features: {
       'fighting-style': {
@@ -92,6 +96,10 @@ export const classes = [
       'fighter-subclass': {
         name: 'Fighter Subclass',
         text: "You gain a Fighter subclass of your choice. A subclass is a specialization that grants you features at certain Fighter levels. For the rest of your career, you gain each of your subclass's features that are of your Fighter level or lower.",
+      },
+      'ability-score-improvement': {
+        name: 'Ability Score Improvement',
+        text: 'You gain the Ability Score Improvement feat or another feat of your choice for which you qualify. You gain this feature again at Fighter levels 6, 8, 12, 14, and 16.',
       },
     },
     subclasses: [
@@ -156,11 +164,12 @@ export const classes = [
       { level: 1, features: ['spellcasting', 'ritual-adept', 'arcane-recovery'], cantrips: 3, preparedSpells: 4, slots: [2] },
       { level: 2, features: ['scholar'], cantrips: 3, preparedSpells: 5, slots: [3] },
       { level: 3, features: ['wizard-subclass'], cantrips: 3, preparedSpells: 6, slots: [4, 2] },
+      { level: 4, features: ['ability-score-improvement'], cantrips: 4, preparedSpells: 7, slots: [4, 3] },
     ],
     features: {
       spellcasting: {
         name: 'Spellcasting',
-        text: 'Intelligence is your spellcasting ability. You know three Wizard cantrips, and your spellbook starts with six level 1 Wizard spells; you add two Wizard spells to it each time you gain a Wizard level. You prepare spells from your spellbook (four at level 1) and can change the list whenever you finish a Long Rest. You regain all expended spell slots when you finish a Long Rest. You can use an Arcane Focus or your spellbook as a Spellcasting Focus.',
+        text: 'Intelligence is your spellcasting ability. You know three Wizard cantrips (four from level 4), and your spellbook starts with six level 1 Wizard spells; you add two Wizard spells to it each time you gain a Wizard level. You prepare spells from your spellbook (four at level 1, one more at each of levels 2, 3 and 4) and can change the list whenever you finish a Long Rest. You regain all expended spell slots when you finish a Long Rest. You can use an Arcane Focus or your spellbook as a Spellcasting Focus.',
       },
       'ritual-adept': {
         name: 'Ritual Adept',
@@ -177,6 +186,10 @@ export const classes = [
       'wizard-subclass': {
         name: 'Wizard Subclass',
         text: "You gain a Wizard subclass of your choice. A subclass is a specialization that grants you features at certain Wizard levels. For the rest of your career, you gain each of your subclass's features that are of your Wizard level or lower.",
+      },
+      'ability-score-improvement': {
+        name: 'Ability Score Improvement',
+        text: 'You gain the Ability Score Improvement feat or another feat of your choice for which you qualify. You gain this feature again at Wizard levels 8, 12, and 16.',
       },
     },
     // Skills the Scholar feature can give Expertise in.
@@ -238,11 +251,12 @@ export const classes = [
       { level: 1, features: ['spellcasting', 'divine-order'], cantrips: 3, preparedSpells: 4, slots: [2] },
       { level: 2, features: ['channel-divinity'], cantrips: 3, preparedSpells: 5, slots: [3], channelDivinity: 2 },
       { level: 3, features: ['cleric-subclass'], cantrips: 3, preparedSpells: 6, slots: [4, 2], channelDivinity: 2 },
+      { level: 4, features: ['ability-score-improvement'], cantrips: 4, preparedSpells: 7, slots: [4, 3], channelDivinity: 2 },
     ],
     features: {
       spellcasting: {
         name: 'Spellcasting',
-        text: 'Wisdom is your spellcasting ability. You know three Cleric cantrips; Guidance, Sacred Flame and Thaumaturgy are recommended. You prepare level 1+ spells straight from the Cleric spell list (four at level 1, one more at each of levels 2 and 3), choosing only spells of levels you have slots for, and can change the list whenever you finish a Long Rest. You regain all expended spell slots when you finish a Long Rest. You can use a Holy Symbol as a Spellcasting Focus.',
+        text: 'Wisdom is your spellcasting ability. You know three Cleric cantrips (four from level 4); Guidance, Sacred Flame and Thaumaturgy are recommended. You prepare level 1+ spells straight from the Cleric spell list (four at level 1, one more at each of levels 2, 3 and 4), choosing only spells of levels you have slots for, and can change the list whenever you finish a Long Rest. You regain all expended spell slots when you finish a Long Rest. You can use a Holy Symbol as a Spellcasting Focus.',
       },
       'divine-order': {
         name: 'Divine Order',
@@ -255,6 +269,10 @@ export const classes = [
       'cleric-subclass': {
         name: 'Cleric Subclass',
         text: 'You gain a Cleric subclass of your choice. A subclass is a specialization that grants you features at certain Cleric levels. For the rest of your career, you gain each of your subclass’s features that are of your Cleric level or lower.',
+      },
+      'ability-score-improvement': {
+        name: 'Ability Score Improvement',
+        text: 'You gain the Ability Score Improvement feat or another feat of your choice for which you qualify. You gain this feature again at Cleric levels 8, 12, and 16.',
       },
     },
     // The roles the Divine Order feature offers at level 1 (classChoices.divineOrder).
@@ -346,6 +364,7 @@ export const classes = [
       { level: 1, features: ['expertise', 'sneak-attack', 'thieves-cant', 'weapon-mastery'], sneakAttack: '1d6', weaponMasteries: 2, expertise: 2 },
       { level: 2, features: ['cunning-action'], sneakAttack: '1d6', weaponMasteries: 2, expertise: 2 },
       { level: 3, features: ['rogue-subclass', 'steady-aim'], sneakAttack: '2d6', weaponMasteries: 2, expertise: 2 },
+      { level: 4, features: ['ability-score-improvement'], sneakAttack: '2d6', weaponMasteries: 2, expertise: 2 },
     ],
     features: {
       expertise: {
@@ -375,6 +394,10 @@ export const classes = [
       'steady-aim': {
         name: 'Steady Aim',
         text: 'As a Bonus Action, you give yourself Advantage on your next attack roll on the current turn. You can use this feature only if you haven’t moved during this turn, and after you use it, your Speed is 0 until the end of the current turn.',
+      },
+      'ability-score-improvement': {
+        name: 'Ability Score Improvement',
+        text: 'You gain the Ability Score Improvement feat or another feat of your choice for which you qualify. You gain this feature again at Rogue levels 8, 10, 12, and 16.',
       },
     },
     subclasses: [

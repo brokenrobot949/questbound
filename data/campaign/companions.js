@@ -3,8 +3,14 @@
 //
 // A companion is a full character, built like a hero (see character/sheet.js), and levels
 // with the hero: they're always the hero's level. Only their level 1 choices are written out;
-// `levels` says what changes from a later level on (a new spell prepared, the subclass at 3),
-// and every level after 1 takes the fixed Hit Points.
+// `levels` says what changes from a later level on, and every level after 1 takes the fixed
+// Hit Points. A level's changes can have:
+//   subclassId   the subclass (level 3)
+//   cantrips     their class cantrips from then on (the whole list)
+//   prepared     their prepared spells from then on (the whole list)
+//   levelFeats   the feat taken at that level, added to the earlier ones: the Ability Score
+//                Improvement at level 4 is { level: 4, id: 'ability-score-improvement',
+//                increases: { wisdom: 1, constitution: 1 } } (see character/sheet.js)
 //
 //   speaker   their id in people.js, for their portrait in scenes
 //   summary   who they are, in a line, for the Party section of the Sheet
@@ -52,6 +58,7 @@ export const companions = [
       // The Acolyte's Magic Initiate (Cleric): Healing Word, free once per Long Rest.
       magicInitiate: [{ source: 'background', list: 'cleric', ability: 'wisdom', cantrips: ['light', 'thaumaturgy'], spell: 'healing-word' }],
       look: { skin: 'tan', hairStyle: 'long', hairColor: 'auburn', beard: false, outfit: 'yellow', accent: 'red', headgear: 'none' },
+      levelFeats: [],
       hitPointRolls: [],
       armorId: 'chain-shirt',
       shield: true,
@@ -60,6 +67,13 @@ export const companions = [
       2: { prepared: ['cure-wounds', 'bless', 'guiding-bolt', 'shield-of-faith', 'sanctuary'] },
       // The Life Domain: Aid, Bless, Cure Wounds and Lesser Restoration are always prepared.
       3: { subclassId: 'life', prepared: ['guiding-bolt', 'shield-of-faith', 'sanctuary', 'spiritual-weapon', 'prayer-of-healing', 'command'] },
+      // Wisdom 17 to 18 (+4) and Constitution 13 to 14 (+2: 4 more Hit Points); Mending as her
+      // fourth cantrip, and Detect Magic, for the wards of the barrows.
+      4: {
+        levelFeats: [{ level: 4, id: 'ability-score-improvement', increases: { wisdom: 1, constitution: 1 } }],
+        cantrips: ['sacred-flame', 'spare-the-dying', 'guidance', 'mending'],
+        prepared: ['guiding-bolt', 'shield-of-faith', 'sanctuary', 'spiritual-weapon', 'prayer-of-healing', 'command', 'detect-magic'],
+      },
     },
     source: 'original',
   },
@@ -96,12 +110,15 @@ export const companions = [
       spells: null,
       magicInitiate: [],
       look: { skin: 'peach', hairStyle: 'tousled', hairColor: 'brown', beard: false, outfit: 'green', accent: 'brown', headgear: 'hood' },
+      levelFeats: [],
       hitPointRolls: [],
       armorId: 'leather-armor',
       shield: false,
     },
     levels: {
       3: { subclassId: 'thief' },
+      // Dexterity 17 to 18 (+4) and Constitution 13 to 14 (+2: 4 more Hit Points).
+      4: { levelFeats: [{ level: 4, id: 'ability-score-improvement', increases: { dexterity: 1, constitution: 1 } }] },
     },
     source: 'original',
   },

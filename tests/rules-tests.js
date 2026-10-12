@@ -80,6 +80,7 @@ function makeHero(overrides = {}) {
     spells: null,
     magicInitiate: [],
     look: { skin: 'peach', hairStyle: 'tousled', hairColor: 'brown', beard: false, outfit: 'red', accent: 'brown', headgear: 'none' },
+    levelFeats: [],
     hitPointRolls: [],
     armorId: null,
     shield: false,
@@ -439,8 +440,13 @@ test('Data: class numbers match the SRD tables', () => {
   const wizard = classes.find((c) => c.id === 'wizard');
   assertEqual([fighter.hitDie, fighter.hitPointsAtLevel1, fighter.hitPointsPerLevel, fighter.savingThrows], [10, 10, 6, ['strength', 'constitution']]);
   assertEqual([wizard.hitDie, wizard.hitPointsAtLevel1, wizard.hitPointsPerLevel, wizard.savingThrows], [6, 6, 4, ['intelligence', 'wisdom']]);
-  assertEqual(wizard.levels.map((r) => [r.cantrips, r.preparedSpells, r.slots]), [[3, 4, [2]], [3, 5, [3]], [3, 6, [4, 2]]]);
-  assertEqual(fighter.levels.map((r) => r.secondWindUses), [2, 2, 2]);
+  assertEqual(wizard.levels.map((r) => [r.cantrips, r.preparedSpells, r.slots]), [[3, 4, [2]], [3, 5, [3]], [3, 6, [4, 2]], [4, 7, [4, 3]]]);
+  assertEqual(fighter.levels.map((r) => [r.secondWindUses, r.weaponMasteries]), [[2, 3], [2, 3], [2, 3], [3, 4]]);
+  const cleric = classes.find((c) => c.id === 'cleric');
+  const rogue = classes.find((c) => c.id === 'rogue');
+  assertEqual(cleric.levels.map((r) => [r.cantrips, r.preparedSpells, r.slots, r.channelDivinity || 0]), [[3, 4, [2], 0], [3, 5, [3], 2], [3, 6, [4, 2], 2], [4, 7, [4, 3], 2]]);
+  assertEqual(rogue.levels.map((r) => [r.sneakAttack, r.weaponMasteries, r.expertise]), [['1d6', 2, 2], ['1d6', 2, 2], ['2d6', 2, 2], ['2d6', 2, 2]]);
+  for (const cls of classes) assertTrue(cls.levels[3].features.includes('ability-score-improvement'), `${cls.name} 4: Ability Score Improvement`);
 });
 
 test('Data: the armour table matches the SRD', () => {

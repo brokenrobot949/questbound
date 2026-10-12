@@ -93,6 +93,7 @@ const CONDITION_WORDS = [
   ['blessed', 'Blessed'],
   ['sanctuary', 'Sanctuary'],
   ['shield-of-faith', 'Shield of Faith'],
+  ['resisting', 'Resistance'],
   ['helped', 'Distracted'],
 ];
 
@@ -465,6 +466,11 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     if (heroConditions.includes('sanctuary')) notes.push('Sanctuary: foes must save to attack you');
     if (heroConditions.includes('shield')) notes.push('Shield up: +5 AC');
     if (heroConditions.includes('shield-of-faith')) notes.push('Shield of Faith: +2 AC');
+    if (heroConditions.includes('resisting')) {
+      // (While a turn plays out, the scene can be a moment behind the fight itself.)
+      const ward = battle.effects.find((e) => e.target === 'hero' && e.kind === 'resisting');
+      notes.push(ward ? `Resistance: 1d4 less ${ward.damageType} damage once a turn` : 'Resistance');
+    }
     if ((scene.weapons || []).some((w) => w.by === 'hero')) notes.push('Spiritual Weapon: strikes as a Bonus Action');
     if (heroConditions.includes('outlined')) notes.push('Outlined: attacks on you have Advantage');
     if (heroConditions.includes('dodging')) notes.push('Dodging');

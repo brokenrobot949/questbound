@@ -19,6 +19,7 @@
 import { companions, tactics } from '../../../data/campaign/companions.js';
 import { startingInventory } from './inventory.js';
 import { maxHp } from './resources.js';
+import { findClass } from './sheet.js';
 
 // Up to two companions travel with the hero.
 export const PARTY_LIMIT = 2;
@@ -26,21 +27,22 @@ export const PARTY_LIMIT = 2;
 export const findCompanion = (id) => companions.find((c) => c.id === id) || null;
 export const findTactic = (id) => tactics.find((t) => t.id === id) || null;
 
-// The levels the rules data covers for a class (1–3 so far): a companion can't outgrow them.
-const TOP_LEVEL = 3;
-
 // A companion's character at a level: their level 1 choices, with each later level's changes
-// laid on top, and the fixed Hit Points at every level after 1.
+// laid on top, and the fixed Hit Points at every level after 1. They can't outgrow the levels
+// the rules data covers for their class (1–4 so far).
 export function companionCharacter(id, level) {
   const companion = findCompanion(id);
   if (!companion) throw new Error(`Unknown companion: ${id}`);
-  const at = Math.max(1, Math.min(level, TOP_LEVEL));
+  const top = findClass(companion.character.classId).levels.length;
+  const at = Math.max(1, Math.min(level, top));
   const character = structuredClone(companion.character);
   for (let l = 2; l <= at; l++) {
     const changes = (companion.levels || {})[l];
     if (!changes) continue;
     if (changes.subclassId) character.subclassId = changes.subclassId;
+    if (changes.cantrips) character.spells = { ...character.spells, cantrips: [...changes.cantrips] };
     if (changes.prepared) character.spells = { ...character.spells, prepared: [...changes.prepared] };
+    if (changes.levelFeats) character.levelFeats = [...character.levelFeats, ...structuredClone(changes.levelFeats)];
   }
   character.level = at;
   character.hitPointRolls = Array(at - 1).fill(null);
