@@ -663,7 +663,7 @@ test('Migration: a version 17 hero has taken no feats at levels yet, a level-up 
 
 test('Old ends: a save made where the story used to stop “for now” carries on where the story goes today', async () => {
   const game = newGame(await freshRuntime(), { slot: 1, seed: 'old-end', character: testHero });
-  game.page = jumpTo(game, 'ch2_rally.north_for_now'); // where the story stops today
+  game.page = jumpTo(game, 'ch2_eve.watch'); // where the story stops today
   assertEqual(game.story.currentChoices.length, 0);
   const record = throughJson(gameToSave(game));
   const today = loadGame(await freshRuntime(), throughJson(record));
@@ -676,9 +676,9 @@ test('Old ends: a save made where the story used to stop “for now” carries o
   assertEqual(validateSave(throughJson(gameToSave(old))).version, SAVE_VERSION);
 });
 
-test('Old ends: a save that stopped after Cairnfield goes back to Bramblegate now, unless the Old Ford fell (that path still stops there)', async () => {
+test('Old ends: a save that stopped after Cairnfield goes back to Bramblegate now, or, if the Old Ford fell, on to the eve of the barrow', async () => {
   const game = newGame(await freshRuntime(), { slot: 1, seed: 'old-cairnfield', character: testHero });
-  game.page = jumpTo(game, 'ch2_rally.north_for_now');
+  game.page = jumpTo(game, 'ch2_eve.watch');
   const record = throughJson(gameToSave(game));
   record.game.page.scene = 'ch2_cairnfield'; // as if it had stopped at Cairnfield's old end
   const held = loadGame(await freshRuntime(), throughJson(record));
@@ -686,7 +686,16 @@ test('Old ends: a save that stopped after Cairnfield goes back to Bramblegate no
   assertEqual(held.objective, 'Go back to Bramblegate and rally help before the dark of the moon, three nights away.');
   record.game.flags.push('ford_fell');
   const fell = loadGame(await freshRuntime(), throughJson(record));
-  assertEqual([fell.story.currentChoices.length, fell.page.beats.length], [0, record.game.page.beats.length], 'it still ends there');
+  assertEqual(fell.story.currentChoices.map((c) => c.text), ['Lie low near Cairnfield until the dark of the moon'], 'the first line skips it');
+});
+
+test('Old ends: a save that stopped at Bramblegate’s north gate goes on to the eve of the barrow', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'old-gate', character: testHero });
+  game.page = jumpTo(game, 'ch2_eve.watch');
+  const record = throughJson(gameToSave(game));
+  record.game.page.scene = 'ch2_rally'; // as if it had stopped at the north gate
+  const loaded = loadGame(await freshRuntime(), throughJson(record));
+  assertEqual(loaded.story.currentChoices.map((c) => c.text), ['Follow the barrow road north, onto the moor']);
 });
 
 test('Old ends: every scene where the story used to stop, and where it carries on, is in the story', async () => {

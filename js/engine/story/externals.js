@@ -16,7 +16,8 @@ import { addItem, buyItem, canAfford, COPPER_PER, findItem, hasItem, moneyText, 
 import { findBond, findDrive } from '../character/creation.js';
 import { addDeed, findQuest, finishQuest, questNote, startQuest } from './journal.js';
 import { longRestRecovery } from '../character/resources.js';
-import { approve, findCompanion, inParty, joinParty, leaveParty, memberGame, memberOf, PARTY_LIMIT, partyLongRest, raiseMember } from '../character/party.js';
+import { approve, feeling, findCompanion, inParty, joinParty, leaveParty, memberGame, memberOf, PARTY_LIMIT, partyLongRest, raiseMember } from '../character/party.js';
+import { xpForLevel } from '../character/level-up.js';
 import { tacticalMind } from '../character/features.js';
 import { takeDamage } from '../character/hazards.js';
 import { dmNotes } from '../../../data/campaign/dm-voice.js';
@@ -198,6 +199,13 @@ export function bindExternals(story, runtime) {
     false,
   );
 
+  // likes_you(id), dislikes_you(id): how a companion with the hero (and alive) feels about
+  // them, from their hidden approval and approvalBands in data/campaign/companions.js. Both
+  // false in between, or if they're not with the hero, e.g.
+  //   * {likes_you("odda")} [Sit with Odda while the fire burns down]
+  story.BindExternalFunction('likes_you', (id) => Boolean(aliveMember(runtime.game, id)) && feeling(runtime.game, id) === 'likes', false);
+  story.BindExternalFunction('dislikes_you', (id) => Boolean(aliveMember(runtime.game, id)) && feeling(runtime.game, id) === 'dislikes', false);
+
   // has_drive(id): true if the hero's Drive is this one (data/campaign/drives.js).
   story.BindExternalFunction('has_drive', (id) => runtime.game.character.drive === id, false);
 
@@ -358,6 +366,21 @@ export function bindExternals(story, runtime) {
       if (!Number.isInteger(amount) || amount < 0) throw new Error(`give_xp needs a whole number, got ${amount}`);
       runtime.game.xp += amount;
       note(runtime.game, dmNotes.xpGained, { xp: amount });
+    },
+    false,
+  );
+
+  // xp_milestone(level): a story milestone the hero should have reached that level by, e.g.
+  // ~ xp_milestone(4). A hero with less XP than the level needs is brought up to it (the level-up
+  // follows), and the DM says so; a hero with enough already gets nothing more.
+  story.BindExternalFunction(
+    'xp_milestone',
+    (level) => {
+      const { game } = runtime;
+      const needed = xpForLevel(level);
+      if (game.xp >= needed) return;
+      game.xp = needed;
+      note(game, dmNotes.xpMilestone, { xp: needed, level });
     },
     false,
   );

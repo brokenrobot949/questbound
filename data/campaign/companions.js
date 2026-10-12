@@ -124,6 +124,13 @@ export const companions = [
   },
 ];
 
+// Where a companion's approval (hidden from the player; it starts at 0, and each choice they
+// like or dislike moves it by 1 or 2) starts to show in scenes. Safe to edit.
+//   likes      at this or more, they like you: they open up (on the eve of the barrow, a
+//              confidence: Odda's order and Emberdeep, Fen's stolen ledger)
+//   dislikes   at this or less, they dislike you, and say so
+export const approvalBands = { likes: 3, dislikes: -2, source: 'original' };
+
 // How companions fight (the Party section of the Sheet lets the player choose).
 //   concentrate  the Concentration spells a spellcaster opens a real fight with (one that's
 //                worth at least a Low fight for the party), the first they can cast: Bless

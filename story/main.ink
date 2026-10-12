@@ -14,6 +14,7 @@ INCLUDE act-1/ch2-stocks.ink
 INCLUDE act-1/ch2-old-ford.ink
 INCLUDE act-1/ch2-cairnfield.ink
 INCLUDE act-1/ch2-temple.ink
+INCLUDE act-1/ch2-eve.ink
 
 // Where play begins: Chapter 1, on the road to Bramblegate.
 -> ch1_arrival

@@ -8,6 +8,8 @@ Draft 1, Oct 6, 2026. Written by Claude Code; Rob approved its key decisions the
 
 **Conversations don't repeat themselves.** A place or person greets you once per visit, and a different short line each time you come back. Questions you ask loop back to the questions, not to the greeting, so nobody says the same paragraph twice in one conversation. (In Ink: the greeting is the knot, and the questions are a stitch that loops to itself.)
 
+**Every character has their own name** (Rob, Oct 12, 2026). No two characters share a name, and no name is a letter away from another or rhymes with it (Odda and Edda, Fen and Venn, Nell and Pell were all changed for this). That covers the cast, minor named people (the dead at the Old Ford, a name on a notice), the Quick Start heroes and their Bonds. The "Roll a name" tables in `data/campaign/names.js` avoid them too. Check a new name against the cast here and those tables before using it.
+
 **Who's speaking.** A line where someone speaks ends with `#speaker:id`, and the game shows their portrait and name beside it. Everyone who speaks has an entry in `data/campaign/people.js`, with their look. A new character needs one before their first line (a check fails otherwise). Lines the hero speaks get no tag.
 
 ---
@@ -46,7 +48,7 @@ About 46 hours in all, matching the roadmap in DESIGN.md. \*Chapters 5–8 can b
 
 **The lie that grew.** Over the centuries the truth became ceremony. Kings wore the crown and believed it was a symbol. Only the Old Circle remembered, and they dwindled. Thirty years ago **King Osric Caldwen** learned the truth from the last goliaths of the **Highvane** clan, who guarded the prison's mountain gate. Fearing the secret would tear the realm apart, he had the clan destroyed. One child survived.
 
-**The shattering, twenty years ago.** The crown must pass from living head to living head. Osric lay dying, and his heir, **Princess Maelis**, was twelve. His steward, **Corvin Hale**, believed a child queen would be eaten alive by the great houses, and tried to take the crown "into keeping" until she came of age. They struggled over it in the king's chamber. The king died with the crown half off his head. With no living wearer, the lock failed for one heartbeat, and the crown shattered into **seven shards** that flew like sparks to the places where its oaths were first sworn.
+**The shattering, twenty years ago.** The crown must pass from living head to living head. Osric lay dying, and his heir, **Princess Maelis**, was twelve. His steward, **Everard Hale**, believed a child queen would be eaten alive by the great houses, and tried to take the crown "into keeping" until she came of age. They struggled over it in the king's chamber. The king died with the crown half off his head. With no living wearer, the lock failed for one heartbeat, and the crown shattered into **seven shards** that flew like sparks to the places where its oaths were first sworn.
 
 In that heartbeat, the Unking spoke to the girl in the room, in her father's voice. Maelis ran into the night and everyone believed her dead. Hale became **Lord Regent** "until the crown is mended", and kept one secret: a shard landed at his feet that night, and he has hidden it ever since.
 
@@ -85,8 +87,8 @@ A hidden score from 0 to 100. It rises when you use a shard's power, when a dark
 | Name | Who | Faction | Wants | Secret |
 | --- | --- | --- | --- | --- |
 | **Maelis Caldwen, the Precentor** | The lost princess, now 32 | The Ashen Choir | To reforge the crown and wake her father | Part of her knows the voice isn't him |
-| **Lord Regent Corvin Hale** | Steward turned ruler; tired, capable, growing paranoid | The Regency | The crown reforged and on his own head, to make his rule lawful | He caused the shattering, and he keeps the Shard of Sight |
-| **Magister Orla Venn** | Voice of the Free League's merchant council; funny and ruthless with a ledger | The Free League | The crown destroyed and the cities free | She doesn't know what destroying it would release, until you tell her |
+| **Lord Regent Everard Hale** | Steward turned ruler; tired, capable, growing paranoid | The Regency | The crown reforged and on his own head, to make his rule lawful | He caused the shattering, and he keeps the Shard of Sight |
+| **Magister Orla Kettering** | Voice of the Free League's merchant council; funny and ruthless with a ledger | The Free League | The crown destroyed and the cities free | She doesn't know what destroying it would release, until you tell her |
 | **Hesper Wildmoor** | The last speaker of the Old Circle; very old | The Old Circle | The prison kept sealed at any cost | "Any cost" includes making you the lock |
 
 **Bramblegate (Act I)**
@@ -108,8 +110,8 @@ A hidden score from 0 to 100. It rises when you use a shard's power, when a dark
 | **Odda Brasswick**, dwarf priest | Cleric | Ch 2 | Mercy, honesty, protecting the weak | Robbing tombs, cruelty, lies | Her temple sold the barrow to the Choir (Ch 2), and her order's roots lie in Emberdeep (Ch 6) |
 | **Fen Underbough**, halfling informant | Rogue | Ch 2 | Cleverness, freedom, sparing people | Hangings, people who worship authority, the Choir | The Precentor put the price on his head: he stole the Choir's ledger (Ch 11) |
 | **Brakka Holloway**, orc sellsword | Fighter | Ch 4 | Keeping your word, straight talk, courage | Cowardice, cruelty to the defenceless | The Regency holds her brother in the salt mines against her debt (Ch 11) |
-| **Ithrien Vale**, elf scholar | Wizard | Ch 7 | Curiosity, truth, respect for old things | Burning knowledge, rash shard use | She found the truth about the crown and hid it from her own court (Ch 7, Interlude) |
-| **Lucan Morrow**, tiefling outcast | Warlock | Ch 8 | Bold choices, mercy for outcasts | Self-righteousness, the Regency | His patron, the Hollow Ledger, is something the Unking half-unmade, and it wants to finish the job or be finished (Ch 11, 15) |
+| **Ithrien Starling**, elf scholar | Wizard | Ch 7 | Curiosity, truth, respect for old things | Burning knowledge, rash shard use | She found the truth about the crown and hid it from her own court (Ch 7, Interlude) |
+| **Lucan Ravensworth**, tiefling outcast | Warlock | Ch 8 | Bold choices, mercy for outcasts | Self-righteousness, the Regency | His patron, the Hollow Ledger, is something the Unking half-unmade, and it wants to finish the job or be finished (Ch 11, 15) |
 | **Tor Highvane**, goliath wanderer | Barbarian | Ch 10 | Honour, endurance, the truth told aloud | Lies by kings, cowardice | The last of the clan King Osric destroyed. He wants the truth known, or the Caldwen line ended (Ch 10–13) |
 
 Approval works as DESIGN.md says. High approval unlocks the personal quest and a better epilogue. Low approval means they leave, or become the Act III betrayer. In a scene, a choice that touches a companion's likes or dislikes calls `approve(id, 1)` or `approve(id, -1)` while they're with the hero.
@@ -121,7 +123,7 @@ Every act has an authored slot where your Bond returns. The Bond person gets a n
 | Act | Sibling | Mentor | Rival | Debt |
 | --- | --- | --- | --- | --- |
 | I (Ch 2) | A letter from your sibling, posted to the Old Ford watch-post: the dead walked past them carrying stones | Your mentor's letter: "If you hear singers in grey, run." They knew of the Choir | Your rival arrives chasing the same bounty; later the Choir takes them, and you can rescue them in Ch 3 | A Free League factor offers to forgive your debt for "anything shiny" from the barrow: the League's first contact |
-| II (Ch 4–9) | They've been drafted into the Regency's shard-hunters | They're revealed as one of the last of the Old Circle | They've joined the Ashen Choir | The League has bought your debt, and Venn uses it as leverage |
+| II (Ch 4–9) | They've been drafted into the Regency's shard-hunters | They're revealed as one of the last of the Old Circle | They've joined the Ashen Choir | The League has bought your debt, and Kettering uses it as leverage |
 | III (Ch 12) | They defect to stand with you, or stand against you, depending on what you did | They give their life to hold a door, or not, if you saved them in Act II | If never reconciled, a candidate for the betrayer | The debt is called in at the worst possible moment |
 | IV (Ch 16) | The Unking speaks to you in their voice. Their fate is told in the epilogue | | | |
 
@@ -132,7 +134,7 @@ Someone you trusted steals the shards and opens the way into the Undercity, beli
 1. The companion with the lowest approval, if it's below the "leaving" line.
 2. Your rival (Rival Bond only), if you never reconciled.
 3. The leader of the faction you backed, if you also made a secret deal with another faction.
-4. Otherwise, Lord Regent Hale (the Shard of Sight shows him a vision of you betraying him first). If you backed the Regency, it's Magister Venn instead.
+4. Otherwise, Lord Regent Hale (the Shard of Sight shows him a vision of you betraying him first). If you backed the Regency, it's Magister Kettering instead.
 
 ## The endings (Act IV, Chapter 16)
 
@@ -142,7 +144,7 @@ As DESIGN.md sets out, with what each needs:
 2. **Crown a ruler.** Needs all seven shards and a living, willing candidate from the faction you backed:
    - **Regency:** Lord Regent Hale.
    - **Ashen Choir:** Maelis. If you turned her, she chooses to be the lock knowingly, a tragic rightful queen. If not, she wears it still listening to the voice, which is the grim version.
-   - **Free League:** Magister Venn, as "First Citizen".
+   - **Free League:** Magister Kettering, as "First Citizen".
    - **Old Circle:** Hesper. She will die within years, and the Circle must find the next keeper.
 3. **Break the prison.** Destroy the crown and fight the Unking. This is the hardest fight in the game. How many allies come depends on what you earned across the acts: the goblins, Emberdeep, the Glass Court, the merfolk, Vharkessa, the factions and loyal companions. With too few it can't be won, and Fate's Mercy turns the loss into a bleak but survivable epilogue.
 4. **Kneel.** Needs a Whisper of 75 or more. You bargain with the Unking, open the last lock yourself and take the realm.
@@ -280,7 +282,7 @@ Fate's Mercy costs XP along the way, so a hero who lost fights may still be leve
 - `ford-dead`, **The Dead at the Old Ford** (beat 5): six Zombies and a Ghoul come up out of the river at night. Moderate for a level 3 party of three (500 XP). The watch's three soldiers fight beside you as Guards, played by the game, and don't count towards the difficulty; the objective is to keep them alive (Rob, Oct 11, 2026).
 - `cairnfield-camp`, **The Choir's Camp at Cairnfield** (beat 7): Sister Rhosyn (a Cultist Fanatic), four Choir acolytes (Cultists) and two Zombies among the tents and opened barrows. Moderate for a level 3 party of three (650 XP). Rhosyn sings: unless the hymn is broken, a third Zombie climbs out of an opened barrow on round 3. Acolytes who are Bloodied run for the Kings' Barrow (Rob, Oct 11, 2026).
 
-Beats 1 to 7 are written (`story/act-1/ch2-millers-daughter.ink`, `story/act-1/ch2-stocks.ink`, `story/act-1/ch2-old-ford.ink`, `story/act-1/ch2-cairnfield.ink` and `story/act-1/ch2-temple.ink`; beats 4 and 5 are one scene, at the Old Ford, as Rob chose on Oct 11, 2026). Beat 8 is not yet.
+All eight beats are written (`story/act-1/ch2-millers-daughter.ink`, `story/act-1/ch2-stocks.ink`, `story/act-1/ch2-old-ford.ink`, `story/act-1/ch2-cairnfield.ink`, `story/act-1/ch2-temple.ink` and `story/act-1/ch2-eve.ink`; beats 4 and 5 are one scene, at the Old Ford, as Rob chose on Oct 11, 2026). Chapter 2 is complete.
 
 1. **The miller's missing daughter.** *(The side-quest example from DESIGN.md, now part of the main line.)* The night before, Lark knocked to say the Choir is digging toward the Kings' Barrow; you told her you'd go at first light. In the morning Morwen can't find her: Lark has been sleeping in Morwen's back room since her father went, and she's gone, with his hatchet and Morwen's lantern. New quest: **The Miller's Daughter**. *(Promising Morwen you'll bring her back is a Kinship Drive moment.)*
    - **The delve under Dunn's Mill** (4 rooms on the dungeon map), with Odda (beat 2):
@@ -328,7 +330,7 @@ Beats 1 to 7 are written (`story/act-1/ch2-millers-daughter.ink`, `story/act-1/c
    - **The barrow road** (morning): every old barrow along the road stands open, its capstone lifted off and carried away. Survival 12 reads the ground: deep, heavy footprints, all going north (`saw_capstone_tracks`). Or walk on.
    - **The Old Ford** (dusk): the barrow road and the realm's post road cross the river here. On the north bank, a stone watch-post and a barricade, held by **Sergeant Brannock**, **Wat** and **Nell**. Hendry went for help two days ago and never reached Bramblegate.
    - **If you sold Fen or left him in the stocks** (`fen_sold`, `fen_left_behind`), he's here already, eating the watch's bread, having slipped Gaunt's ropes on the road north and floated down the river, sour (Rob, Oct 11, 2026). "The dead don't ask whose side you're on": he joins to fight beside you tonight, liking you less (approval −2 if sold, −1 if left: `fen_returned`). Tell him you're sorry, or give him Gaunt's ten gold back (each Fen +1), or tell him it was nothing personal.
-   - **Brannock's questions** (they loop, and nothing is said twice): what's been happening (for two nights the dead have come up out of the river carrying stones, and killed Ashe and Dunmore when they tried to stop them); where the stones come from (the barrows' capstones; her gran said the old graves on the barrow road "hold things down"); why the watch is still here (Varrow's orders; last night the dead came for the post, and something fast with long arms took Pell: "A ghoul," Odda says).
+   - **Brannock's questions** (they loop, and nothing is said twice): what's been happening (for two nights the dead have come up out of the river carrying stones, and killed Ashe and Dunmore when they tried to stop them); where the stones come from (the barrows' capstones; her gran said the old graves on the barrow road "hold things down"); why the watch is still here (Varrow's orders; last night the dead came for the post, and something fast with long arms took Rufus: "A ghoul," Odda says).
    - **The night:** hold the ford with the watch (`ford-dead`), or slip away upriver in the dark and leave them to it (`ford_abandoned`, `ford_fell`, Odda −1).
    - **How many of the watch lived** (Rob, Oct 11, 2026): all three earns the Regency's favour, and Varrow's watch holds the outer cairns in Chapter 3 (`ford_held`, `ford_watch_saved`, `regency_favour`, `varrow_holds_cairns`); Brannock sends a report to Varrow "and the Regent's men". One or two: the post holds, and Varrow will hear who held it (`ford_held`). If the sergeant falls, Nell (or Wat) takes up her red sash. None: the post falls, and you carry the news back to Bramblegate (`ford_fell`).
    - **Losing the fight is Fate's Mercy:** you come to at dawn, robbed (the river took your purse). Whoever of the watch still stood dragged you into the tower and barred the door; with none, you wake in the reeds. The dead went on north with their stones (`ford_fates_mercy`). Who lived counts as above.
@@ -374,12 +376,22 @@ Beats 1 to 7 are written (`story/act-1/ch2-millers-daughter.ink`, `story/act-1/c
    - **After a won fight** (`cairnfield_won`, `rhosyn_dead`): Rhosyn dies singing, and the dead in their row lie still. An acolyte who ran reaches the barrow door: Vesk will know you're coming (`vesk_warned`). **Tobin Reed**, the youngest acolyte (a cobbler's boy from Ashby who joined the winter Fen did), hid behind a barrel and yields; Fen knows him. He tells what he knows (the plan, if you hadn't heard it; that the Cantor sleeps in the barrow now, if you had). Then: let him go home (`tobin_freed`, Fen +1, Odda +1), send him down to Varrow to answer for the Choir (a Justice moment, `tobin_to_varrow`, Fen −1: "Varrow hangs people"), or leave him tied by the fire for the Choir to find (`tobin_left`, Odda −1, Fen −1).
    - **Losing is Fate's Mercy** (`cairnfield_fates_mercy`): the Choir throws the party into an opened barrow to be sung up later, and robs them. At dawn Tobin lets down a rope, tells the plan, and you choose his fate as above. Rhosyn lives, and Vesk knows (`rhosyn_lives`, `vesk_warned`).
    - **A companion who dies here** (`odda_fell_at_cairnfield`, `fen_fell_at_cairnfield`) goes home on the reeve's carts to Bramblegate's temple, to lie before the altar flame until they can be raised.
-   - **The aim:** "Go back to Bramblegate and rally help before the dark of the moon, three nights away" (beat 6, `ch2_homeward`), or, if the Old Ford fell and you've been to Bramblegate already, "Make camp near Cairnfield, and go down into the Kings' Barrow before the dark of the moon" (beat 8, still to write: the story stops there on that path for now).
+   - **The aim:** "Go back to Bramblegate and rally help before the dark of the moon, three nights away" (beat 6, `ch2_homeward`), or, if the Old Ford fell and you've been to Bramblegate already, "Make camp near Cairnfield, and go down into the Kings' Barrow before the dark of the moon" (beat 8, `ch2_eve`).
    - **For Chapter 3:** if Rhosyn lives, she's the Cultist Fanatic beside Cantor Vesk in the Chantry of Ash. With `vesk_warned`, the Choir expects you (no surprise at the barrow gate). `tobin_freed` might bring Tobin back as a small help (he knows the barrow's back ways); `tobin_to_varrow` puts him in Varrow's cells.
-8. **Eve of the barrow.** A camp scene with Odda and Fen: companion conversations and a long rest. You reach level 4 (Ability Score Improvement or feat).
-   - **Where it starts:** if the Old Ford held, the story stops today at Bramblegate's north gate the morning before the dark of the moon (`ch2_rally.north_for_now`, with the aim "Take the barrow road north, make camp near Cairnfield, and go down into the Kings' Barrow at the dark of the moon"); it's two days' walk, so the eve is that night's camp on the moor. If it fell, the story stops after Cairnfield (`ch2_cairnfield.road_back`), and the eve is the next night, near the camp. Both ends need a line in `data/campaign/story-continues.js` when beat 8 is written.
-   - **Things to pick up:** the conversations can touch on the temple's secret (Odda's approval, `crane_confessed` and the rest), a raised companion's brush with death (`odda_raised`, `fen_raised`), and who's coming tomorrow (`varrow_rallied`, `nettle_rallied`, `knows_ward_word`).
-   - **Level 4 is built** (Oct 11, 2026). It opens as soon as the hero has 2,700 XP, so a typical hero (about 2,575 after the ford) reaches it during Cairnfield rather than here; the eve's long rest is still the natural moment if they haven't.
+8. **Eve of the barrow.** *(Built: `ch2_eve` in `story/act-1/ch2-eve.ink`.)* A camp scene with Odda and Fen: companion conversations and a long rest. You reach level 4 (Ability Score Improvement or feat).
+   - **Where it starts:** the ruined sheepfold an hour short of Cairnfield, the night before the dark of the moon. If the Old Ford held, the party comes up from Bramblegate that day (a carter takes them as far as the ford; Varrow's watch marches behind if he's coming, and a goblin waves from the heather if Nettle is). If it fell, they've lain low there for two days since the camp. Either way the Choir's smoke still rises beyond the ridge, unless you broke their camp (`cairnfield_won`).
+   - **The talks** (Rob, Oct 12, 2026): they loop, each once, and sleep ends them.
+     - **Odda on the Prior,** by what you did: the confession ("I keep hearing Morwen"), the quiet amends ("Wise, I think. Don't let it go to your head"), the reeve ("You never gave it the chance") or the blackmail ("I'll not talk about the Prior. Not tonight. Maybe not ever").
+     - **Fen on the Precentor:** she put the price on his head; nobody sees her face (she sings behind a screen of grey gauze); her hands are younger than you'd think, with a signet with a crown cut in it (`heard_of_precentor_signet`: Maelis, for later).
+     - **Being dead,** for a companion the great candle brought back (`odda_raised`, `fen_raised`): Odda, "Like the moment before the kettle sings"; Fen, "Nobody had a hand in my purse, which made a change."
+     - **How they feel shows at the end of their first talk** (`likes_you` / `dislikes_you`: approval 3 or more, or −2 or less, by `approvalBands` in `data/campaign/companions.js`; approval itself stays hidden). Liked, they hint at more, and a second talk opens:
+       - **Odda's order began in a forge:** the first Flame was carried out of Emberdeep in a lantern, by a smith sworn to keep something burning, and the forge-fire and the Flame are the same fire. She means to go there after the barrow and ask "what dark", and asks you along (`odda_told_of_emberdeep`, Chapter 6).
+       - **Fen stole the Precentor's ledger:** who pays the Choir, who they've bought, and with what. It's sewn into a coat somewhere; some of the names wear chains of office. That's why it's double for dead (`fen_told_of_ledger`, Chapter 11).
+       - Disliked: Odda will see the barrow through for Garrick and Lark, then go home to her order (`odda_means_to_go_home`); Fen says it's only arithmetic (`fen_just_arithmetic`).
+     - **Tomorrow, all together:** who's coming (`varrow_rallied`, `nettle_rallied`, or "Nobody else is coming"), the ward-word, Garrick at the sluices, a Rival under the hill (`rival_taken`), and Vesk waiting (`vesk_warned`). Fen: "I've had worse odds. I've had worse company, too, though not lately."
+   - **The watch** (no roll): on the last watch, in the coldest hour, the dead walk in from every side with the last stones and go in at the barrow's low door, and the hymn starts up under the hill.
+   - **The rest and the milestone** (Rob, Oct 12, 2026): a long rest, then a hero still short of level 4 is brought up to 2,700 XP (`xp_milestone(4)`), so everyone goes into the barrow at level 4. Most heroes (about 2,575 XP after the ford, plus Cairnfield's 650 and the temple's 50) are there already.
+   - **The aim:** "Go down into the Kings' Barrow tonight, under the dark of the moon." The story stops there for now; Chapter 3, beat 1 comes next.
    - Odda prepares **Detect Magic** from level 4, so a scene in the barrows can ask her to find the oath-wards' glow (`companion_can_cast("odda", "detect-magic")`).
 
 **Side content:**
@@ -413,7 +425,7 @@ Beats 1 to 7 are written (`story/act-1/ch2-millers-daughter.ink`, `story/act-1/c
    - A vision: a girl in a burning chamber, and a crown breaking.
    - The barrow shudders as if something far away shifted in its sleep (`shard_names`, Whisper begins).
 7. **Bramblegate's thanks.** A feast at the Tallow and Thistle, the miller home, Lark beaming, the reeve's reward.
-   - A Regency envoy, **Knight-Captain Edda Marchbank**, "requests" you bring the shard to Highcrown.
+   - A Regency envoy, **Knight-Captain Beatrix Marchbank**, "requests" you bring the shard to Highcrown.
    - A Free League courier slips you a letter.
    - An old woman with an owl watches from the crowd (the Old Circle).
    - That night the shard says your name again. You reach level 5. **End of Act I.**
@@ -436,7 +448,7 @@ Beats 1 to 7 are written (`story/act-1/ch2-millers-daughter.ink`, `story/act-1/c
 3. **The Choir's ambush.** Cultist Fanatics and Shadows on a lonely stretch. The Precentor speaks through a corpse: "Bring it to me, and I'll give back what you lost." The Unking is already learning your Bond.
 4. **The three offers:**
    - **Regency:** a writ, gold and a title "for the shard's safe keeping".
-   - **Free League:** Magister Venn's agent, **Pell Marrick**, offers ship passage, money and freedom.
+   - **Free League:** Magister Kettering's agent, **Silas Dray**, offers ship passage, money and freedom.
    - **Old Circle:** Hesper's owl leads you to a stone ring at night: "Every shard you lift loosens a chain."
    - You can accept, refuse or play them against each other. That faction standing shapes the act.
 5. **The shard calls to its siblings.** It shows you four places, which unlocks the region map: the Drowned Abbey, Emberdeep, the Glass Court and Vharkessa's mountain. You choose the order.
@@ -444,7 +456,7 @@ Beats 1 to 7 are written (`story/act-1/ch2-millers-daughter.ink`, `story/act-1/c
 ## Chapter 5 · The Drowned Abbey (any order)
 
 - **The place:** **Lowtide Abbey** sank in a storm on the night of the shattering, dragged under as the shard arrived. Only at the low spring tide does its spire show, and the drowned monks still walk its cloisters.
-- **The pressure:** the Free League wants the Tides shard for its fleets, and Pell Marrick's smugglers use the sea-caves.
+- **The pressure:** the Free League wants the Tides shard for its fleets, and Silas Dray's smugglers use the sea-caves.
 - **The encounters:**
   - Sahuagin raiders.
   - Drowned dead (Zombies and Ghouls).
@@ -456,14 +468,14 @@ Beats 1 to 7 are written (`story/act-1/ch2-millers-daughter.ink`, `story/act-1/c
 ## Chapter 6 · Emberdeep (any order)
 
 - **The place:** the dwarven foundry-hold where the crown's gold was first worked. The shard fell into the Great Forge, which has burned out of control ever since, and the lower halls are sealed.
-- **The pressure:** dwarf politics. **Thane Hulda Ironmantle** wants the forge back, the forge-masters want it sealed for good, and the Regency wants Emberdeep's weapons for the coming war.
+- **The pressure:** dwarf politics. **Thane Solveig Ironmantle** wants the forge back, the forge-masters want it sealed for good, and the Regency wants Emberdeep's weapons for the coming war.
 - **The encounters:** Azers, Magmins, Salamanders, a Fire Elemental and Stone Golem forge-guardians.
-- **Odda's personal quest:** her order was founded in Emberdeep by a dwarf who helped bind the Unking. Her faith is shaken, then renewed (or not, depending on approval).
+- **Odda's personal quest:** her order was founded in Emberdeep by a dwarf who helped bind the Unking. Her faith is shaken, then renewed (or not, depending on approval). Seeded on the eve of the barrow (Chapter 2): if she liked you then, she told you the Flame was carried out of Emberdeep's forge and asked you to come with her (`odda_told_of_emberdeep`); if she didn't, she meant to go home to her order after the barrow (`odda_means_to_go_home`).
 
 ## Chapter 7 · The Glass Court (any order)
 
 - **The place:** an elven court in the Whitewood, where time runs strangely. For twenty years the court's queen, **Aelith**, has used the shard from the Mirror Pool to wear any face. Nobody is sure what her real one looks like.
-- **Ithrien Vale:** an exiled elf scholar, joins at the court's edge *(companion)*. She was banished for studying the crown, and she hid her findings in the court archive.
+- **Ithrien Starling:** an exiled elf scholar, joins at the court's edge *(companion)*. She was banished for studying the crown, and she hid her findings in the court archive.
 - **The masked ball:** an intrigue chapter. Find the true queen among masked courtiers (Insight), steal the archive (Stealth), or win the queen's favour (Performance or Persuasion).
 - **The encounters:** Dryads, Satyrs, Sprites, a Green Hag in the briars and a Treant at the court's gate.
 - **Fey bargains:** they always have prices, which become flags that come due in Act III.
@@ -471,7 +483,7 @@ Beats 1 to 7 are written (`story/act-1/ch2-millers-daughter.ink`, `story/act-1/c
 ## Chapter 8 · Vharkessa's Hoard (any order)
 
 - **The place:** the mountain of **Vharkessa**, an old Adult Red Dragon whose wings are failing. She wants the Shard of Wings for herself, and you can't fight her at this level and win.
-- **Lucan Morrow:** a tiefling warlock, is here to steal the shard for his patron. He joins *(companion)*, or becomes a rival.
+- **Lucan Ravensworth:** a tiefling warlock, is here to steal the shard for his patron. He joins *(companion)*, or becomes a rival.
 - **Approaches:**
   - A heist: Stealth past her Young Red Dragon brood, and the Gargoyles and Hell Hounds in the mountain halls.
   - A bargain: what will she take for it?
@@ -513,7 +525,7 @@ Beats 1 to 7 are written (`story/act-1/ch2-millers-daughter.ink`, `story/act-1/c
 - **Companion personal quests come to a head:**
   - Brakka's brother in the salt mines.
   - Lucan's patron calls in its price.
-  - Fen faces the Precentor over the stolen ledger.
+  - Fen faces the Precentor over the stolen ledger. (If he liked you on the eve of the barrow, he told you about it then: `fen_told_of_ledger`. He also saw her crowned signet: `heard_of_precentor_signet`.)
   - Tor confronts the Caldwen legacy.
 - **King Osric's tomb:** with the Shard of Names, ask the dead king himself. His answer proves the "Sleeping King" isn't him. This is the key to turning Maelis.
 

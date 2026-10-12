@@ -46,6 +46,7 @@ export const dmNotes = {
   itemBought: 'Bought: {item}, for {cost}.',
   itemGone: 'Gone from your pack: {item}.',
   xpGained: 'You gain {xp} XP.',
+  xpMilestone: 'A milestone: your XP rises to {xp}, enough for level {level}.',
   coinsLost: 'Your purse is gone.',
   fightWon: 'Victory! You gain {xp} XP.',
   damageTaken: 'You take {damage} {type} damage ({dice}: {rolls}).',

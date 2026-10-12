@@ -378,10 +378,10 @@ You climb. At the top the boy sits down in the heather as if his legs have given
 // ---- The aim, now ----
 
 // The Old Ford held: back to Bramblegate to rally help (ch2-temple.ink). It fell: the party has
-// been to Bramblegate already, and the eve of the barrow comes next.
+// been to Bramblegate already, and the eve of the barrow comes next (ch2-eve.ink).
 = road_back
 { has_flag("ford_fell"):
-    ~ set_objective("Make camp near Cairnfield, and go down into the Kings' Barrow before the dark of the moon. (The rest of Chapter 2 is still being written.)")
-    -> END
+    ~ set_objective("Make camp near Cairnfield, and go down into the Kings' Barrow at the dark of the moon.")
+    -> ch2_eve
 }
 -> ch2_homeward

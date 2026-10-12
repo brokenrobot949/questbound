@@ -16,7 +16,7 @@
 // (companionCharacter). memberGame() lets the rules that take a game (attack options, spell
 // slots, healing) work on a companion too.
 
-import { companions, tactics } from '../../../data/campaign/companions.js';
+import { approvalBands, companions, tactics } from '../../../data/campaign/companions.js';
 import { startingInventory } from './inventory.js';
 import { maxHp } from './resources.js';
 import { findClass } from './sheet.js';
@@ -122,6 +122,17 @@ export function setTactic(game, id, tactic) {
 export function approve(game, id, change) {
   const member = memberOf(game, id);
   if (member) member.approval += change;
+}
+
+// How a companion with the hero feels about them, from their approval (approvalBands in the
+// companion data): 'likes', 'dislikes', or 'neutral' in between. null if they're not with the
+// hero.
+export function feeling(game, id) {
+  const member = memberOf(game, id);
+  if (!member) return null;
+  if (member.approval >= approvalBands.likes) return 'likes';
+  if (member.approval <= approvalBands.dislikes) return 'dislikes';
+  return 'neutral';
 }
 
 // A Long Rest: every companion who hasn't fallen is back to full, as the hero is.

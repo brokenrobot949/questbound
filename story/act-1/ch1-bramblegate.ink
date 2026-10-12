@@ -166,9 +166,9 @@ Reeve Ansel Corbin's hall is a long room full of ledgers and worried people. The
 
     LOST: one grey cat, answers to Biscuit, does not answer to anything else. Ask at the Tallow and Thistle.
 
-    {not has_flag("tore_down_notice"): WANTED: runaway bond-servant Tobin Reed, aged fourteen. Reward for his return from Master Fulke, tanner.}
+    {not has_flag("tore_down_notice"): WANTED: runaway bond-servant Davy Thrush, aged fourteen. Reward for his return from Master Fulke, tanner.}
 - else:
-    The same damp notices: the reeve's call for capable folk, Captain Varrow's ear bounty, and Biscuit the cat, still missing.{not has_flag("tore_down_notice"): The one about the runaway, Tobin Reed, is still there too.} #location:Bramblegate, the square
+    The same damp notices: the reeve's call for capable folk, Captain Varrow's ear bounty, and Biscuit the cat, still missing.{not has_flag("tore_down_notice"): The one about the runaway, Davy Thrush, is still there too.} #location:Bramblegate, the square
 }
 -> read
 

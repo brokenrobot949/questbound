@@ -123,6 +123,13 @@ EXTERNAL companion_cast(id, spell)
 // did, e.g. ~ approve("fen", 1). Their likes and dislikes are in companions.js.
 EXTERNAL approve(id, change)
 
+// likes_you(id), dislikes_you(id): how a companion with the hero (and alive) feels about them,
+// from their hidden approval and the approvalBands in data/campaign/companions.js. Both are
+// false in between.
+//   * {likes_you("odda")} [Sit with Odda while the fire burns down]
+EXTERNAL likes_you(id)
+EXTERNAL dislikes_you(id)
+
 // take_damage(dice, type): the hero takes damage outside a fight, from a trap or a fall, e.g.
 //   ~ temp fall = take_damage("1d6", "bludgeoning")
 // At 0 Hit Points they make death saving throws (the player sees each roll) with nobody to
@@ -155,6 +162,11 @@ EXTERNAL ally_standing(id)
 
 // give_xp(n): the hero earns XP for a quest or discovery. Fights give their own XP.
 EXTERNAL give_xp(n)
+
+// xp_milestone(level): the story says the hero has reached that level by now. A hero with less
+// XP than it needs is brought up to it (the level-up follows), and the DM says so.
+//   ~ xp_milestone(4)
+EXTERNAL xp_milestone(level)
 
 // lose_coins(): the hero's purse is gone (for Fate's Mercy: robbed while unconscious).
 EXTERNAL lose_coins()

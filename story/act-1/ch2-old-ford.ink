@@ -106,7 +106,7 @@ Inside the barricade, sitting on the tower steps and eating the watch's bread, i
     -> post_talk
 * [Ask why the watch is still here]
     "Because the post holds the ford, and those are Captain Varrow's orders, and nobody's told me otherwise." Brannock rubs her eyes. "Last night they came back. Not for the road. For us. And there was one with them that wasn't carrying anything." #speaker:brannock
-    "Fast, it was. Long arms. It got Pell by the leg and dragged him into the water, and he went stiff as a board before he went under." #speaker:brannock
+    "Fast, it was. Long arms. It got Rufus by the leg and dragged him into the water, and he went stiff as a board before he went under." #speaker:brannock
     { companion_alive("odda"):
         "A ghoul," Odda says quietly. #speaker:odda
     }
@@ -170,7 +170,7 @@ The last of the dead goes down in the shallows, and the river closes over its st
             Brannock kneels a long while at the barricade, between Wat and Nell.
         }
     }
-    When she gets up, her face is set like a wall. "Hendry, Ashe, Dunmore, Pell{ not ally_standing("wat"):, and Wat}{ not ally_standing("nell"):, and Nell}," she says. "But the post held." #speaker:brannock
+    When she gets up, her face is set like a wall. "Hendry, Ashe, Dunmore, Rufus{ not ally_standing("wat"):, and Wat}{ not ally_standing("nell"):, and Nell}," she says. "But the post held." #speaker:brannock
 - else:
     Sergeant Brannock lies at the head of the ford where she stood, her spear still pointing at the river.
     { ally_standing("nell"):

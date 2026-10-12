@@ -23,4 +23,8 @@ export const storyContinues = [
   // Then at the aim back to Bramblegate after Cairnfield. If the Old Ford fell, the party went
   // to Bramblegate before Cairnfield, and that path still stops there (the eve of the barrow).
   { scene: 'ch2_cairnfield', continueAt: 'ch2_homeward', unlessFlag: 'ford_fell', source: 'original' },
+  // Then at the eve of the barrow: at Bramblegate's north gate (the Old Ford held), or after
+  // Cairnfield (it fell: the line above skips those saves, so they take this one).
+  { scene: 'ch2_rally', continueAt: 'ch2_eve', source: 'original' },
+  { scene: 'ch2_cairnfield', continueAt: 'ch2_eve', source: 'original' },
 ];

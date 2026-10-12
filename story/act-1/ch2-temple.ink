@@ -429,8 +429,8 @@ Lark Dunn is waiting at the north gate, sitting on the mounting block with her f
 "Bring him home," she says. That's all. She doesn't need to say anything else. #speaker:lark
 ->->
 
-// The Old Ford held: north to the Kings' Barrow. Beat 8, the eve of the barrow, comes next.
+// The Old Ford held: north to the Kings' Barrow, and beat 8, the eve of the barrow (ch2-eve.ink).
 = north_for_now
-~ set_objective("Take the barrow road north, make camp near Cairnfield, and go down into the Kings' Barrow at the dark of the moon. (The rest of Chapter 2 is still being written.)")
+~ set_objective("Take the barrow road north, make camp near Cairnfield, and go down into the Kings' Barrow at the dark of the moon.")
 You go out through the north gate, with Bramblegate behind you and the barrow road ahead.
--> END
+-> ch2_eve

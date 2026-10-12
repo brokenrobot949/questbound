@@ -1470,6 +1470,7 @@ test('Chapter 2: if the Old Ford fell, the news goes to Varrow first; a companio
   assertTrue(pageText(game).includes("Odda didn't get up") && pageText(game).includes("Bramblegate's temple"));
   pick(game, 'Let him go home');
   assertTrue(game.objective.startsWith('Make camp near Cairnfield'));
+  assertEqual(cards(game), ['Lie low near Cairnfield until the dark of the moon'], 'on to the eve of the barrow');
 });
 
 // ---- Chapter 2, beat 6: the temple's secret, and rallying help ----
@@ -1647,7 +1648,8 @@ test('Chapter 2: in the morning Varrow’s watch will hold the outer cairns (all
   assertEqual(cards(game), ["Visit Nan Burdock's stall", "Take the barrow road north, to the Kings' Barrow"]);
   pick(game, 'Take the barrow road north');
   assertTrue(speakersOf(game).includes('lark') && pageText(game).includes('a pack on her back'));
-  assertTrue(game.objective.startsWith('Take the barrow road north, make camp near Cairnfield') && cards(game).length === 0);
+  assertTrue(game.objective.startsWith('Take the barrow road north, make camp near Cairnfield'));
+  assertEqual(cards(game), ['Follow the barrow road north, onto the moor'], 'on to the eve of the barrow');
 });
 
 test('Chapter 2: if only some of the watch lived, Varrow takes talking round (Persuasion 15 if he was wary); if he won’t, he keeps them home', async () => {
@@ -1694,6 +1696,127 @@ test('Chapter 2: if the Old Ford fell, the temple comes before Cairnfield: Odda,
   pick(game, 'Take the barrow road north again');
   assertTrue(pageText(game).includes('Bring him home') && pageText(game).includes('fresh graves on the north bank'));
   assertTrue(speakersOf(game).includes('odda') || pageText(game).includes('Odda brews tea'), 'Odda comes north with you');
+});
+
+// ---- Chapter 2, beat 8: the eve of the barrow ----
+
+// The start of the eve (on the road north from Bramblegate, or near Cairnfield if ford_fell): a
+// hero (a level 3 Champion unless given) with Odda and Fen (unless false), their approval
+// ({ odda, fen }), and XP.
+async function atTheEve(seed, { character = champion, flags = [], odda = true, fen = true, approval = {}, xp = 3000 } = {}) {
+  const game = await storyGame(seed, character);
+  game.flags.push(...flags);
+  game.xp = xp;
+  if (odda) joinParty(game, 'odda');
+  if (fen) joinParty(game, 'fen');
+  for (const [id, value] of Object.entries(approval)) memberOf(game, id).approval = value;
+  game.page = jumpTo(game, 'ch2_eve');
+  return game;
+}
+
+// Up to the camp, by whichever path the flags say.
+function toTheCamp(game) {
+  pick(game, game.flags.includes('ford_fell') ? 'Lie low' : 'Follow the barrow road north');
+}
+
+test('Eve of the barrow: up from Bramblegate in a day, with the watch on the road behind you, back to the sheepfold', async () => {
+  const game = await atTheEve('eve-road', { flags: ['varrow_rallied', 'nettle_rallied', 'cairnfield_won'] });
+  assertEqual(cards(game), ['Follow the barrow road north, onto the moor']);
+  toTheCamp(game);
+  assertEqual([currentLocation(game), currentTime(game)], ['A sheepfold on the high moor', 'Night']);
+  assertTrue(pageText(game).includes("Captain Varrow's watch comes marching north") && pageText(game).includes('a goblin wave'));
+  assertTrue(pageText(game).includes('No juniper smoke') && pageText(game).includes('Odda brews tea') && pageText(game).includes('Fen sits'));
+  assertEqual(cards(game), ['Ask Odda what she makes of what you did with the Prior', 'Ask Fen about the Precentor', 'Go over tomorrow, all together', 'Get some sleep']);
+});
+
+test('Eve of the barrow: if the Old Ford fell, you lie low near Cairnfield for two days, and the Choir is still there', async () => {
+  const game = await atTheEve('eve-fell', { flags: ['ford_fell'] });
+  assertEqual(cards(game), ['Lie low near Cairnfield until the dark of the moon']);
+  toTheCamp(game);
+  assertTrue(pageText(game).includes('For two days you lie low') && pageText(game).includes('grey tents') && pageText(game).includes('no more than a paring'));
+});
+
+test('Eve of the barrow: Odda, who likes you, talks about the Prior and being dead, then tells you her order began in Emberdeep', async () => {
+  const game = await atTheEve('eve-odda-warm', { flags: ['crane_confessed', 'odda_raised', 'flame_spent'], approval: { odda: 3 } });
+  toTheCamp(game);
+  assertTrue(cards(game).includes('Ask Odda what it was like, being dead') && !cards(game).includes('Sit with Odda while the fire burns down'));
+  pick(game, 'Ask Odda what it was like');
+  assertTrue(pageText(game).includes('the moment before the kettle sings'));
+  pick(game, 'Ask Odda what she makes');
+  assertTrue(pageText(game).includes('The roof is better') && pageText(game).includes('Ask me later, when the fire'));
+  pick(game, 'Sit with Odda');
+  assertTrue(game.flags.includes('odda_told_of_emberdeep') && pageText(game).includes('Emberdeep') && pageText(game).includes('The Prior said it was lit'));
+  assertTrue(!cards(game).some((c) => c.startsWith('Ask Odda') || c.startsWith('Sit with Odda')), 'each talk once');
+});
+
+test('Eve of the barrow: Odda, who dislikes you, won’t talk about the blackmailed Prior, and means to go home after the barrow', async () => {
+  const game = await atTheEve('eve-odda-cold', { flags: ['crane_blackmailed'], approval: { odda: -2 } });
+  toTheCamp(game);
+  pick(game, 'Ask Odda what she makes');
+  assertTrue(pageText(game).includes("I'll not talk about the Prior") && pageText(game).includes('go home to my order') && game.flags.includes('odda_means_to_go_home'));
+  assertTrue(!cards(game).includes('Sit with Odda while the fire burns down'));
+});
+
+test('Eve of the barrow: in between, Odda just answers (the Prior helped, or handed to the reeve), and nothing more', async () => {
+  for (const [flag, line] of [['crane_made_amends', 'Wise, I think'], ['crane_exposed', 'you never gave it the chance']]) {
+    const game = await atTheEve(`eve-odda-${flag}`, { flags: [flag], approval: { odda: 1 } });
+    toTheCamp(game);
+    pick(game, 'Ask Odda what she makes');
+    assertTrue(pageText(game).includes(line) && !pageText(game).includes('Ask me later') && !game.flags.includes('odda_means_to_go_home'), flag);
+  }
+});
+
+test('Eve of the barrow: Fen on the Precentor (the crowned signet); if he likes you, he owns up to stealing her ledger', async () => {
+  const game = await atTheEve('eve-fen-warm', { flags: ['rhosyn_dead', 'fen_raised'], approval: { fen: 4 } });
+  toTheCamp(game);
+  pick(game, 'Ask Fen what it was like');
+  assertTrue(pageText(game).includes('nobody had a hand in my purse'));
+  pick(game, 'Ask Fen about the Precentor');
+  assertTrue(pageText(game).includes('a signet with a crown cut in it') && pageText(game).includes('Rhosyn did, in a way') && pageText(game).includes('a bit I left out'));
+  pick(game, 'Ask Fen what he left out');
+  assertTrue(game.flags.includes('fen_told_of_ledger') && pageText(game).includes('Every name') && pageText(game).includes('Odda is snoring'));
+});
+
+test('Eve of the barrow: Fen, who dislikes you, says it’s only arithmetic', async () => {
+  const game = await atTheEve('eve-fen-cold', { approval: { fen: -3 } });
+  toTheCamp(game);
+  pick(game, 'Ask Fen about the Precentor');
+  assertTrue(pageText(game).includes('So would Rhosyn') && pageText(game).includes("It's arithmetic") && game.flags.includes('fen_just_arithmetic'));
+  assertTrue(!cards(game).includes('Ask Fen what he left out'));
+});
+
+test('Eve of the barrow: going over tomorrow names who’s coming and what waits under the hill', async () => {
+  const character = { ...champion, bond: { type: 'rival', name: 'Sable Rook' } };
+  const game = await atTheEve('eve-plan', { character, flags: ['varrow_rallied', 'knows_ward_word', 'knows_miller_at_sluices', 'rival_taken', 'vesk_warned'] });
+  toTheCamp(game);
+  assertTrue(pageText(game).includes('Somewhere under that hill is Sable Rook'));
+  pick(game, 'Go over tomorrow');
+  const text = pageText(game);
+  assertTrue(['outer cairns', 'Ysolde', 'Garrick, at his sluice wheels', 'Sable Rook, somewhere in the dark', 'He knows you', 'Say the name like you mean it'].every((s) => text.includes(s)));
+  assertTrue(!text.includes('Nobody else is coming'));
+
+  const alone = await atTheEve('eve-plan-alone');
+  toTheCamp(alone);
+  pick(alone, 'Go over tomorrow');
+  assertTrue(pageText(alone).includes('Nobody else is coming') && pageText(alone).includes('we stop that hymn'));
+});
+
+test('Eve of the barrow: on the last watch the dead walk in with the last stones; the rest brings a hero short of level 4 up to it', async () => {
+  const game = await atTheEve('eve-watch', { xp: 2000 });
+  toTheCamp(game);
+  game.hp = 1;
+  pick(game, 'Get some sleep');
+  assertTrue(pageText(game).includes('Fen the second, and you the last') && pageText(game).includes('the singing starts up under the hill'));
+  assertTrue(notes(game).includes('A milestone: your XP rises to 2700, enough for level 4.') && notes(game).some((n) => n.startsWith('A good place to stop')));
+  assertEqual([game.xp, game.hp, currentTime(game)], [2700, fight.maxHpOf(game, { id: 'hero' }), 'Dawn']);
+  assertTrue(game.objective.startsWith("Go down into the Kings' Barrow tonight") && cards(game).length === 0);
+
+  const ahead = await atTheEve('eve-ahead', { xp: 3100, odda: false, fen: false });
+  toTheCamp(ahead);
+  assertTrue(pageText(ahead).includes('cold camp') && pageText(ahead).includes('alone'));
+  assertEqual(cards(ahead), ['Get some sleep'], 'nobody to talk to');
+  pick(ahead, 'Get some sleep');
+  assertTrue(pageText(ahead).includes('You sleep in snatches') && !notes(ahead).some((n) => n.startsWith('A milestone')) && ahead.xp === 3100);
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));
