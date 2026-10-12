@@ -663,7 +663,7 @@ test('Migration: a version 17 hero has taken no feats at levels yet, a level-up 
 
 test('Old ends: a save made where the story used to stop “for now” carries on where the story goes today', async () => {
   const game = newGame(await freshRuntime(), { slot: 1, seed: 'old-end', character: testHero });
-  game.page = jumpTo(game, 'ch2_cairnfield.road_back'); // where the story stops today
+  game.page = jumpTo(game, 'ch2_rally.north_for_now'); // where the story stops today
   assertEqual(game.story.currentChoices.length, 0);
   const record = throughJson(gameToSave(game));
   const today = loadGame(await freshRuntime(), throughJson(record));
@@ -674,6 +674,19 @@ test('Old ends: a save made where the story used to stop “for now” carries o
   assertEqual(old.story.currentChoices.map((c) => c.text), ['Follow the barrow road north']);
   assertEqual(old.page.beats.slice(0, record.game.page.beats.length), record.game.page.beats, 'the last page read stays on screen above it');
   assertEqual(validateSave(throughJson(gameToSave(old))).version, SAVE_VERSION);
+});
+
+test('Old ends: a save that stopped after Cairnfield goes back to Bramblegate now, unless the Old Ford fell (that path still stops there)', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'old-cairnfield', character: testHero });
+  game.page = jumpTo(game, 'ch2_rally.north_for_now');
+  const record = throughJson(gameToSave(game));
+  record.game.page.scene = 'ch2_cairnfield'; // as if it had stopped at Cairnfield's old end
+  const held = loadGame(await freshRuntime(), throughJson(record));
+  assertEqual(held.story.currentChoices.map((c) => c.text), ['Go back down the barrow road to Bramblegate']);
+  assertEqual(held.objective, 'Go back to Bramblegate and rally help before the dark of the moon, three nights away.');
+  record.game.flags.push('ford_fell');
+  const fell = loadGame(await freshRuntime(), throughJson(record));
+  assertEqual([fell.story.currentChoices.length, fell.page.beats.length], [0, record.game.page.beats.length], 'it still ends there');
 });
 
 test('Old ends: every scene where the story used to stop, and where it carries on, is in the story', async () => {

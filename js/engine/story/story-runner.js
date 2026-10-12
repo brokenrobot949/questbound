@@ -60,12 +60,13 @@ export function runPage(game, leadBeats = []) {
 
 // A save made where an older version of the story stopped "for now" (data/campaign/
 // story-continues.js): if the story has nothing more to read and no choices, and it stopped in
-// one of those scenes, it carries on from where the story goes now. Returns the page (the last
-// one the player read, then the new part), or null if there's nothing to pick up.
+// one of those scenes (and not on a path that still ends there: unlessFlag), it carries on from
+// where the story goes now. Returns the page (the last one the player read, then the new
+// part), or null if there's nothing to pick up.
 export function pickUpOldEnd(game, continues = storyContinues) {
   const { story } = game;
   if (story.canContinue || story.currentChoices.length > 0) return null;
-  const next = continues.find((c) => game.page && c.scene === game.page.scene);
+  const next = continues.find((c) => game.page && c.scene === game.page.scene && !(c.unlessFlag && game.flags.includes(c.unlessFlag)));
   if (!next) return null;
   story.ChoosePathString(next.continueAt);
   const page = runPage(game);

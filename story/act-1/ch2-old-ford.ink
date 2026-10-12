@@ -234,7 +234,7 @@ At dawn you come back down the far bank to the ford. The dead have gone on north
 }
 { has_flag("odda_fell_at_the_ford") || has_flag("fen_fell_at_the_ford"):
     { has_flag("ford_fell"):
-        You lay them in the tower, out of the weather. When the news goes down to Bramblegate, the temple will send for them, and keep them before the altar flame until they can be raised.
+        You lay them on the watch's handcart, to bring down to Bramblegate with the news. The temple will keep them before the altar flame until they can be raised.
     - else:
         The watch's supply cart will carry them down to Bramblegate, to lie before the temple's altar flame until they can be raised.
     }

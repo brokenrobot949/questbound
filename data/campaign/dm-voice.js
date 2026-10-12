@@ -35,6 +35,7 @@ export const dmNotes = {
   // A companion joins or leaves ({name}). The Sheet's Party section has their sheet and tactic.
   joinedParty: '{name} joins you. You can see their sheet, and choose how they fight, in the Party section of the Sheet.',
   leftParty: '{name} goes their own way.',
+  companionRaised: '{name} lives again, at full Hit Points.',
   questStarted: 'New quest: {title}. It’s in your journal.',
   questUpdated: 'Journal: {title} updated.',
   questFinished: 'Quest complete: {title}.',

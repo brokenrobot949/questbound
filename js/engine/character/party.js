@@ -135,6 +135,21 @@ export function partyLongRest(game) {
   }
 }
 
+// A fallen companion is brought back to life (by the temple's Flame, or debug mode's Raise):
+// on their feet with all their Hit Points, and everything spent back, as after a Long Rest.
+// Returns false if they're not in the party or haven't fallen.
+export function raiseMember(game, id) {
+  const member = memberOf(game, id);
+  if (!member || !member.fallen) return false;
+  member.fallen = false;
+  member.slotsUsed = [];
+  member.featureUses = {};
+  member.tempHp = 0;
+  member.activeSpells = [];
+  member.hp = memberMaxHp(game, member);
+  return true;
+}
+
 // The hero has gone up a level, and so has the party: each companion's Hit Points rise as
 // much as their maximum does. before: the hero's level before.
 export function partyLevelUp(game, before) {

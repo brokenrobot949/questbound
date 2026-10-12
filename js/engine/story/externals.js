@@ -16,7 +16,7 @@ import { addItem, buyItem, canAfford, COPPER_PER, findItem, hasItem, moneyText, 
 import { findBond, findDrive } from '../character/creation.js';
 import { addDeed, findQuest, finishQuest, questNote, startQuest } from './journal.js';
 import { longRestRecovery } from '../character/resources.js';
-import { approve, findCompanion, inParty, joinParty, leaveParty, memberGame, memberOf, PARTY_LIMIT, partyLongRest } from '../character/party.js';
+import { approve, findCompanion, inParty, joinParty, leaveParty, memberGame, memberOf, PARTY_LIMIT, partyLongRest, raiseMember } from '../character/party.js';
 import { tacticalMind } from '../character/features.js';
 import { takeDamage } from '../character/hazards.js';
 import { dmNotes } from '../../../data/campaign/dm-voice.js';
@@ -141,6 +141,19 @@ export function bindExternals(story, runtime) {
   // fight. Wrap a companion's lines in it after a fight they could have died in, e.g.
   //   { companion_alive("odda"): Odda wipes her mace on a burial cloth. #speaker:odda }
   story.BindExternalFunction('companion_alive', (id) => aliveMember(runtime.game, id) !== null, false);
+
+  // raise_companion(id): a companion who fell (died) is alive again, on their feet with all
+  // their Hit Points, and the DM says so. Nothing happens if they're not with the hero or
+  // haven't fallen, e.g. { in_party("odda") && not companion_alive("odda"): ~ raise_companion("odda") }
+  story.BindExternalFunction(
+    'raise_companion',
+    (id) => {
+      const { game } = runtime;
+      if (!findCompanion(id)) throw new Error(`Unknown companion: ${id}`);
+      if (raiseMember(game, id)) note(game, dmNotes.companionRaised, { name: findCompanion(id).character.name.split(' ')[0] });
+    },
+    false,
+  );
 
   // Companions' spells in scenes, as can_cast and cast are for the hero.
   // companion_can_cast(id, spell): that companion is with the hero, alive, and can cast the

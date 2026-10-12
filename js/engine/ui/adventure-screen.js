@@ -266,8 +266,8 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
       if (tags.pay) card.append(el('span', 'choice-tag', `Pay · ${moneyText(tags.pay * COPPER_PER.gp)}`));
       if (tags.combat) card.append(el('span', 'choice-tag is-fight', `${fightLabel(game, tags.combat)}${tags.surprise ? ' · Surprise attack' : ''}`));
       // Only the hero's own Drive is pointed out: that's the choice that earns Inspiration.
-      if (tags.drive && tags.drive === game.character.drive) {
-        card.append(el('span', 'choice-tag is-drive', `★ Your Drive · ${findDrive(tags.drive).name}`));
+      if (tags.drives.includes(game.character.drive)) {
+        card.append(el('span', 'choice-tag is-drive', `★ Your Drive · ${findDrive(game.character.drive).name}`));
       }
       card.append(el('span', 'choice-text', choice.text));
       card.addEventListener('click', () => choose(choice));

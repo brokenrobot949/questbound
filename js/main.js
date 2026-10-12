@@ -9,7 +9,7 @@ import { findClass } from './engine/character/sheet.js';
 import { lowerLevel, xpForLevel } from './engine/character/level-up.js';
 import { beginSession, endSession, recap } from './engine/story/sessions.js';
 import { addItem, COPPER_PER } from './engine/character/inventory.js';
-import { joinParty, leaveParty, memberMaxHp, memberOf } from './engine/character/party.js';
+import { joinParty, leaveParty, raiseMember } from './engine/character/party.js';
 import { openSaveStore } from './engine/save/save-store.js';
 import { gameToSave, loadGame, newGame } from './engine/save/save-format.js';
 import { isBackupDue } from './engine/save/backup.js';
@@ -261,12 +261,7 @@ async function start() {
             if (game.battle) throw new Error('Not in the middle of a fight.');
             leaveParty(game, id);
           }),
-        raiseCompanion: (id) =>
-          change((game) => {
-            const member = memberOf(game, id);
-            member.fallen = false;
-            member.hp = memberMaxHp(game, member);
-          }),
+        raiseCompanion: (id) => change((game) => raiseMember(game, id)),
         // A practice fight from wherever the story is; it puts everyone back when it ends.
         practiceFight: (encounterId) => change((game) => startPractice(game, encounterId)),
         setSubclass: (id) =>

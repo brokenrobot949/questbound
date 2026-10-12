@@ -106,6 +106,11 @@ EXTERNAL party_full()
 // fight. Wrap their lines in it after a fight they could have died in.
 EXTERNAL companion_alive(id)
 
+// raise_companion(id): a companion who fell (died) is alive again, with all their Hit Points,
+// and the DM says so. Nothing happens if they're not with the hero or haven't fallen.
+//   { in_party("odda") && not companion_alive("odda"): ~ raise_companion("odda") }
+EXTERNAL raise_companion(id)
+
 // A companion's spells in scenes, as can_cast and cast are for the hero:
 // companion_can_cast(id, spell) and companion_cast(id, spell). Tag the choice with the spell
 // and #by, so the card shows whose spell it is and what it costs them:

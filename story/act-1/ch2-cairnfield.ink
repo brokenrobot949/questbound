@@ -1,8 +1,9 @@
 // Chapter 2 · The Barrow Road, beat 7: the camp at Cairnfield (docs/STORY.md).
 //
 // From the Old Ford the barrow road climbs onto the high moor. If the post fell (ford_fell),
-// the party carries the news down to Bramblegate first, then comes back north. (Beat 6, the
-// temple's secret, will happen on that visit once it's written.) A night in a ruined sheepfold
+// the party carries the news down to Bramblegate first, then comes back north. Beat 6, the
+// temple's secret (ch2-temple.ink), happens on that visit; if the post held, the party goes
+// back to Bramblegate for it after Cairnfield (ch2_homeward). A night in a ruined sheepfold
 // (a long rest, with a word from Odda or Fen), then a day watching from the ridge, and at dusk
 // the camp: the Ashen Choir's grey tents among the opened barrows, at the foot of the Kings'
 // Barrow, where black water runs out of a sluice in the barrow's flank. A Rival who rode on
@@ -42,10 +43,12 @@
 It's a long day's walk back down the barrow road with nothing to carry but bad news. Captain Varrow hears it out in the watch-house, standing, with his hands flat on the table. #location:Bramblegate, the watch-house #time:Dusk
 "Brannock," he says at last. "Wat. Nell." He says each name as if he's setting it down somewhere careful. "Hendry never reached me. Now I know why." #speaker:varrow
 He sends two riders north that same hour, to bury his people and hold the ford if it can be held. Then he looks at you. "Cairnfield, you said. Go and see what the Choir are digging for, and come back and tell me. I can't spare you a single spear." #speaker:varrow
+-> ch2_temple ->
 That night you sleep at the Tallow and Thistle. Morwen asks no questions at all, which is how you know she's heard. #location:Bramblegate, the Tallow and Thistle #time:Night
 ~ long_rest()
-* [Take the barrow road north again at first light]
-    -> road_north
+// In the morning, a round of the town (ch2-temple.ink), and then the road north.
+* [Go out into the town at first light]
+    -> ch2_rally
 
 // ---- Up onto the high moor ----
 
@@ -374,10 +377,11 @@ You climb. At the top the boy sits down in the heather as if his legs have given
 
 // ---- The aim, now ----
 
+// The Old Ford held: back to Bramblegate to rally help (ch2-temple.ink). It fell: the party has
+// been to Bramblegate already, and the eve of the barrow comes next.
 = road_back
 { has_flag("ford_fell"):
     ~ set_objective("Make camp near Cairnfield, and go down into the Kings' Barrow before the dark of the moon. (The rest of Chapter 2 is still being written.)")
-- else:
-    ~ set_objective("Go back to Bramblegate and rally help before the dark of the moon, three nights away. (The rest of Chapter 2 is still being written.)")
+    -> END
 }
--> END
+-> ch2_homeward

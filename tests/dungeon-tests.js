@@ -9,7 +9,7 @@ import * as fight from '../js/engine/combat/battle.js';
 import { besideEntry, enterRoom, findDungeon, parseRoomTag, roomFigures } from '../js/engine/world/dungeons.js';
 import { sprites, tiles } from '../data/campaign/sprites.js';
 import { people } from '../data/campaign/people.js';
-import { joinParty, memberOf } from '../js/engine/character/party.js';
+import { joinParty, memberMaxHp, memberOf } from '../js/engine/character/party.js';
 import { takeDamage } from '../js/engine/character/hazards.js';
 import { startingInventory } from '../js/engine/character/inventory.js';
 import { freshResources } from '../js/engine/character/resources.js';
@@ -1286,11 +1286,13 @@ async function atCairnfield(seed, { character = champion, flags = [], odda = tru
   return game;
 }
 
-// Up the road (by way of Bramblegate, if the ford fell), a night in the sheepfold, and up to
-// the ridge at dusk.
+// Up the road (by way of Bramblegate, if the ford fell: the temple, the inn, and the road north
+// in the morning), a night in the sheepfold, and up to the ridge at dusk.
 function upToTheRidge(game) {
   if (game.flags.includes('ford_fell')) {
     pick(game, 'Carry the news down to Bramblegate');
+    throughTheTemple(game);
+    pick(game, 'Go out into the town at first light');
     pick(game, 'Take the barrow road north again');
   } else {
     pick(game, 'Follow the barrow road north');
@@ -1378,7 +1380,8 @@ test('Chapter 2: down Fen’s gully unseen, you overhear the Choir’s plan, the
   pick(game, 'Slip away');
   assertTrue(['cairnfield_slipped_away', 'rhosyn_lives'].every((f) => game.flags.includes(f)) && game.xp - xp === 700, 'and the fight’s 650 XP');
   assertTrue(pageText(game).includes('I do like clever') && memberOf(game, 'fen').approval === 1);
-  assertTrue(game.objective.startsWith('Go back to Bramblegate and rally help') && cards(game).length === 0);
+  assertTrue(game.objective === 'Go back to Bramblegate and rally help before the dark of the moon, three nights away.');
+  assertEqual(cards(game), ['Go back down the barrow road to Bramblegate'], 'on to beat 6');
 });
 
 test('Chapter 2: spotted in the heather, it’s a fight; Tobin yields after it and tells what he knows, and an acolyte who ran warns Vesk', async () => {
@@ -1448,7 +1451,11 @@ test('Chapter 2: if the Old Ford fell, the news goes to Varrow first; a companio
   const game = await atCairnfield('cairn-fell', { flags: ['ford_fell'] });
   assertEqual(cards(game), ['Carry the news down to Bramblegate']);
   pick(game, 'Carry the news down to Bramblegate');
-  assertTrue(speakersOf(game).includes('varrow') && pageText(game).includes("I can't spare you a single spear") && notes(game).some((n) => n.startsWith('A good place to stop')));
+  assertTrue(speakersOf(game).includes('varrow') && pageText(game).includes("I can't spare you a single spear"));
+  assertTrue(speakersOf(game).includes('crane'), 'then the temple, before the inn');
+  throughTheTemple(game);
+  assertTrue(notes(game).some((n) => n.startsWith('A good place to stop')));
+  pick(game, 'Go out into the town at first light');
   pick(game, 'Take the barrow road north again');
   assertTrue(pageText(game).includes('fresh graves on the north bank'));
   pick(game, 'Get some sleep');
@@ -1463,6 +1470,230 @@ test('Chapter 2: if the Old Ford fell, the news goes to Varrow first; a companio
   assertTrue(pageText(game).includes("Odda didn't get up") && pageText(game).includes("Bramblegate's temple"));
   pick(game, 'Let him go home');
   assertTrue(game.objective.startsWith('Make camp near Cairnfield'));
+});
+
+// ---- Chapter 2, beat 6: the temple's secret, and rallying help ----
+
+// Back from Cairnfield (the Old Ford held): a hero (a level 3 Champion unless given) with Odda
+// and Fen (unless false), at the start of the road home. fallen: companion ids who died.
+async function homeFromCairnfield(seed, { character = champion, flags = [], odda = true, fen = true, fallen = [], gold = 0 } = {}) {
+  const game = await storyGame(seed, character);
+  game.flags.push('knows_dark_of_moon', ...flags);
+  game.money = gold * 100;
+  if (odda) joinParty(game, 'odda');
+  if (fen) joinParty(game, 'fen');
+  for (const id of fallen) Object.assign(memberOf(game, id), { hp: 0, fallen: true });
+  game.page = jumpTo(game, 'ch2_homeward');
+  return game;
+}
+
+// Through the temple the quickest way (whatever the party): the rite if anyone needs it,
+// leave it until Crane comes to the inn, then decide what's to be done with him.
+function throughTheTemple(game, judgement = 'Help him make it right') {
+  if (cards(game).includes('Let him')) pick(game, 'Let him');
+  pick(game, 'Leave it, for now');
+  pick(game, judgement);
+}
+
+// From the temple's judgement to the next morning in the square.
+function toTheMorning(game, judgement = 'Help him make it right') {
+  pick(game, judgement);
+  pick(game, 'Go out into the town at first light');
+}
+
+test('Chapter 2: home from Cairnfield on the watch’s cart; at the temple, Odda asks for the barrow’s old survey, and the case is empty', async () => {
+  const game = await homeFromCairnfield('temple-home');
+  assertEqual(game.objective, 'Go back to Bramblegate and rally help before the dark of the moon, three nights away.');
+  pick(game, 'Go back down the barrow road');
+  assertEqual([currentLocation(game), currentTime(game)], ['Bramblegate, the temple', 'Dusk']);
+  assertTrue(pageText(game).includes('supply cart') && speakersOf(game).includes('pike') && speakersOf(game).includes('crane'));
+  assertTrue(pageText(game).includes('survey of the Kings') && pageText(game).includes('no dust in it'));
+  assertEqual(cards(game), ['Watch his face as he says it', "Let Odda ask to see the temple's books", "Catch Fen's eye, and nod at the iron chest", 'Leave it, for now']);
+  assertEqual(tagsOf(game)[0], 'check:insight:12');
+});
+
+test('Chapter 2: Odda’s right to see the books opens Crane’s ledger: the Choir’s three hundred gold went to the Free League (50 XP)', async () => {
+  const game = await homeFromCairnfield('temple-books', { flags: ['met_penhallow'] });
+  pick(game, 'Go back down the barrow road');
+  const xp = game.xp;
+  pick(game, "Let Odda ask to see the temple's books");
+  assertTrue(game.flags.includes('crane_secret_known') && game.xp - xp === 50);
+  assertTrue(pageText(game).includes('Received of the Choir of Ash') && pageText(game).includes("Free League's counting-house") && pageText(game).includes('Factor Penhallow'));
+  assertTrue(pageText(game).includes('the answer was here all along') && pageText(game).includes('three hundred anything'), 'Odda and Fen take it in');
+  assertEqual(cards(game), ['Take the ledger to Reeve Corbin', "Let Odda decide what's to be done", "Tell him his secret's safe with you, for a price", 'Help him make it right']);
+  assertEqual(tagsOf(game), ['drive:justice', 'drive:faith drive:kinship', 'drive:wealth', '']);
+});
+
+test('Chapter 2: letting Odda decide is a confession to the whole town, and the ward-word; Odda +2, and a Faith hero is inspired', async () => {
+  const game = await homeFromCairnfield('temple-confess', { character: lifeCleric });
+  pick(game, 'Go back down the barrow road');
+  pick(game, 'Catch Fen');
+  assertTrue(pageText(game).includes("No, it isn't") && memberOf(game, 'fen').approval === 1, 'Fen likes clever');
+  game.inspiration = false;
+  pick(game, "Let Odda decide what's to be done");
+  assertTrue(notes(game).includes('That’s your Drive (Faith) talking. You gain Heroic Inspiration.') && game.flags.includes('crane_confessed') && memberOf(game, 'odda').approval === 2);
+  assertTrue(pageText(game).includes('The roof is better') && speakersOf(game).includes('morwen') && pageText(game).includes('Ysolde the Binder'));
+  assertTrue(game.flags.includes('knows_ward_word') && missingMiller(game).includes('ward-word') && missingMiller(game).includes('Ysolde'));
+  assertTrue(deeds(game).includes('Prior Crane told all Bramblegate'));
+  assertTrue(notes(game).some((n) => n.startsWith('A good place to stop')) && cards(game)[0] === 'Go out into the town at first light', 'then a night at the inn');
+});
+
+test('Chapter 2: taking the ledger to the reeve jails Crane without the ward-word, for 25 gold and the Regency’s favour; Odda and Fen think less of you', async () => {
+  const game = await homeFromCairnfield('temple-reeve');
+  pick(game, 'Go back down the barrow road');
+  pick(game, "Let Odda ask to see the temple's books");
+  const money = game.money;
+  game.inspiration = false;
+  pick(game, 'Take the ledger to Reeve Corbin');
+  assertTrue(notes(game).includes('That’s your Drive (Justice) talking. You gain Heroic Inspiration.'), 'Wren’s Drive is Justice');
+  assertTrue(['crane_exposed', 'regency_favour'].every((f) => game.flags.includes(f)) && !game.flags.includes('knows_ward_word'));
+  assertEqual([game.money - money, memberOf(game, 'odda').approval, memberOf(game, 'fen').approval], [2500, -1, -1]);
+  assertTrue(speakersOf(game).includes('corbin') && pageText(game).includes('He was ours to judge') && pageText(game).includes("won't say it"));
+});
+
+test('Chapter 2: blackmailing Crane pays fifty gold of the Choir’s money and the ward-word; Odda −2', async () => {
+  const game = await homeFromCairnfield('temple-blackmail');
+  pick(game, 'Go back down the barrow road');
+  pick(game, "Let Odda ask to see the temple's books");
+  const money = game.money;
+  pick(game, "Tell him his secret's safe with you");
+  assertTrue(['crane_blackmailed', 'knows_ward_word'].every((f) => game.flags.includes(f)));
+  assertEqual([game.money - money, memberOf(game, 'odda').approval, memberOf(game, 'fen').approval], [5000, -2, 0]);
+  assertTrue(pageText(game).includes('with her back to the door') && deeds(game).includes('Took fifty gold from Prior Crane'));
+});
+
+test('Chapter 2: helping Crane make it right gives the ward-word; Odda and Fen both like it', async () => {
+  const game = await homeFromCairnfield('temple-amends', { fen: false });
+  pick(game, 'Go back down the barrow road');
+  assertTrue(!cards(game).some((c) => c.startsWith('Catch Fen')), 'no Fen, no picked chest');
+  pick(game, "Let Odda ask to see the temple's books");
+  pick(game, 'Help him make it right');
+  assertTrue(['crane_made_amends', 'knows_ward_word'].every((f) => game.flags.includes(f)) && memberOf(game, 'odda').approval === 1);
+  assertTrue(pageText(game).includes("Ysolde. I don't know whose") && pageText(game).includes('very nearly a blessing'));
+});
+
+test('Chapter 2: if you’ve seen Crane’s face before, no roll; a missed Insight leaves the other ways, and leaving it brings him to the inn', async () => {
+  const seen = await homeFromCairnfield('temple-seen', { flags: ['crane_knows_the_map'] });
+  pick(seen, 'Go back down the barrow road');
+  assertEqual(cards(seen)[0], "Tell him you've seen his face whenever the Kings' Barrow comes up");
+  assertEqual(tagsOf(seen)[0], '');
+  pick(seen, "Tell him you've seen his face");
+  assertTrue(pageText(seen).includes("in the Choir's hymnal") && pageText(seen).includes('Received of the Choir of Ash'));
+
+  const alone = await homeFromCairnfield('temple-alone', { character: lifeCleric, odda: false, fen: false });
+  pick(alone, 'Go back down the barrow road');
+  assertTrue(pageText(alone).includes("you'd rather not go in blind"));
+  assertEqual(cards(alone), ['Watch his face as he says it', 'Leave it, for now']);
+  forceNextD20(1);
+  pick(alone, 'Watch his face');
+  revealAll(alone);
+  assertTrue(pageText(alone).includes('better at it than you'));
+  assertEqual(cards(alone), ['Leave it, for now'], 'never a dead end');
+  pick(alone, 'Leave it, for now');
+  assertTrue(currentLocation(alone) === 'Bramblegate, the Tallow and Thistle' && pageText(alone).includes('ledger under his arm') && alone.flags.includes('crane_secret_known'));
+  assertEqual(cards(alone), ['Take the ledger to Reeve Corbin', "Tell him his secret's safe with you, for a price", 'Help him make it right'], 'no Odda to decide');
+});
+
+test('Chapter 2: without Fen, a hero with Thieves’ Tools can pick the Prior’s chest; a slip, and he breaks down anyway', async () => {
+  const game = await homeFromCairnfield('temple-pick', { character: rogue3, fen: false });
+  pick(game, 'Go back down the barrow road');
+  assertTrue(cards(game).includes("Pick the iron chest's lock while he's looking at the map case") && tagsOf(game).includes('check:thieves-tools:13'));
+  game.rng = scriptedThen([1], 'temple-pick');
+  pick(game, 'Pick the iron chest');
+  revealAll(game);
+  assertTrue(pageText(game).includes('sees what you') && pageText(game).includes('as if his legs have given way') && game.flags.includes('crane_secret_known'));
+});
+
+test('Chapter 2: a companion who died lies before the altar flame; Crane gives the great candle, and they live again', async () => {
+  const game = await homeFromCairnfield('temple-raise', { fallen: ['odda', 'fen'] });
+  pick(game, 'Go back down the barrow road');
+  assertTrue(pageText(game).includes('Odda and Fen lie side by side') && pageText(game).includes("It's the least I owe"));
+  assertEqual(cards(game), ['Let him']);
+  pick(game, 'Let him');
+  assertTrue(notes(game).includes('Odda lives again, at full Hit Points.') && notes(game).includes('Fen lives again, at full Hit Points.'));
+  for (const id of ['odda', 'fen']) {
+    const member = memberOf(game, id);
+    assertEqual([member.fallen, member.hp], [false, memberMaxHp(game, member)], id);
+  }
+  assertTrue(['flame_spent', 'odda_raised', 'fen_raised'].every((f) => game.flags.includes(f)));
+  assertTrue(pageText(game).includes('Who put out the Flame?') && pageText(game).includes('who was dead until a few minutes ago'));
+  assertTrue(cards(game).includes("Let Odda ask to see the temple's books"), 'her hook goes on');
+  pick(game, "Let Odda ask to see the temple's books");
+  assertTrue(pageText(game).includes('cold stub of the great candle'));
+});
+
+test('Chapter 2: in the morning Varrow’s watch will hold the outer cairns (all three lived at the ford), Nettle’s goblins will come, Nan sells potions, and Lark sees you off', async () => {
+  const flags = ['ford_held', 'varrow_holds_cairns', 'goblins_at_mill', 'owe_nettle', 'tobin_to_varrow', 'lark_apprentice'];
+  const game = await homeFromCairnfield('rally-all', { flags, gold: 60 });
+  pick(game, 'Go back down the barrow road');
+  pick(game, "Let Odda ask to see the temple's books");
+  toTheMorning(game);
+  assertEqual([currentLocation(game), currentTime(game)], ['Bramblegate, the square', 'Morning']);
+  assertTrue(pageText(game).includes('The dark of the moon is tomorrow night'));
+  assertEqual(cards(game), ['Ask Captain Varrow for the watch', 'Go out to Dunn\'s Mill, and ask Mother Nettle for help', "Visit Nan Burdock's stall", "Take the barrow road north, to the Kings' Barrow"]);
+  pick(game, 'Ask Captain Varrow');
+  assertTrue(pageText(game).includes("I'll not hang a child") && pageText(game).includes('outer cairns') && game.flags.includes('varrow_rallied'));
+  assertTrue(missingMiller(game).includes('Captain Varrow will hold the outer cairns'));
+  pick(game, 'Go out to Dunn');
+  assertTrue(speakersOf(game).includes('nettle') && pageText(game).includes('Nettle does not forget'));
+  assertEqual(cards(game), ['Promise her Brackenhollow is hers again, after', "Tell her it isn't yours to promise, but you'll speak for her"]);
+  pick(game, 'Tell her it isn');
+  assertTrue(game.flags.includes('nettle_rallied') && !game.flags.includes('promised_nettle_warren') && memberOf(game, 'odda').approval === 2, 'Odda likes honesty');
+  pick(game, 'Visit Nan');
+  assertTrue(speakersOf(game).includes('nan') && cards(game)[0] === 'Buy a Potion of Healing');
+  pick(game, 'Buy a Potion of Healing');
+  assertTrue(game.inventory.some((i) => i.id === 'potion-of-healing') && !cards(game).includes('Buy a Potion of Healing'), 'ten gold left');
+  pick(game, 'Back to the square');
+  assertEqual(cards(game), ["Visit Nan Burdock's stall", "Take the barrow road north, to the Kings' Barrow"]);
+  pick(game, 'Take the barrow road north');
+  assertTrue(speakersOf(game).includes('lark') && pageText(game).includes('a pack on her back'));
+  assertTrue(game.objective.startsWith('Take the barrow road north, make camp near Cairnfield') && cards(game).length === 0);
+});
+
+test('Chapter 2: if only some of the watch lived, Varrow takes talking round (Persuasion 15 if he was wary); if he won’t, he keeps them home', async () => {
+  const wary = await homeFromCairnfield('rally-wary', { character: lifeCleric, flags: ['ford_held', 'varrow_wary'] });
+  pick(wary, 'Go back down the barrow road');
+  pick(wary, "Let Odda ask to see the temple's books");
+  toTheMorning(wary, 'Take the ledger to Reeve Corbin');
+  assertEqual(cards(wary), ['Ask Captain Varrow for the watch', "Visit Nan Burdock's stall", "Take the barrow road north, to the Kings' Barrow"], 'no goblins at the mill');
+  pick(wary, 'Ask Captain Varrow');
+  assertTrue(pageText(wary).includes("the Prior's in the cell next door") && pageText(wary).includes('I lost people at that ford'));
+  assertEqual(tagsOf(wary)[0], 'check:persuasion:15');
+  forceNextD20(1);
+  pick(wary, 'Ask him to hold the outer cairns');
+  revealAll(wary);
+  assertTrue(pageText(wary).includes('Somebody has to hold this town') && !wary.flags.includes('varrow_holds_cairns'));
+
+  const approving = await homeFromCairnfield('rally-approves', { flags: ['ford_held', 'varrow_approves'] });
+  pick(approving, 'Go back down the barrow road');
+  pick(approving, "Let Odda ask to see the temple's books");
+  toTheMorning(approving);
+  pick(approving, 'Ask Captain Varrow');
+  assertEqual(tagsOf(approving)[0], 'check:persuasion:12');
+  forceNextD20(20);
+  pick(approving, 'Ask him to hold the outer cairns');
+  revealAll(approving);
+  assertTrue(['varrow_holds_cairns', 'varrow_rallied'].every((f) => approving.flags.includes(f)) && pageText(approving).includes('every one of them'));
+});
+
+test('Chapter 2: if the Old Ford fell, the temple comes before Cairnfield: Odda, who fell at the ford, is raised; in the morning Nettle, then north', async () => {
+  const game = await atCairnfield('fell-temple', { flags: ['ford_fell', 'odda_fell_at_the_ford', 'goblins_at_mill'] });
+  Object.assign(memberOf(game, 'odda'), { hp: 0, fallen: true });
+  pick(game, 'Carry the news down to Bramblegate');
+  assertTrue(speakersOf(game).includes('varrow') && pageText(game).includes('lies Odda Brasswick'));
+  pick(game, 'Let him');
+  assertTrue(!memberOf(game, 'odda').fallen && game.flags.includes('odda_raised'));
+  pick(game, "Let Odda ask to see the temple's books");
+  toTheMorning(game);
+  assertEqual(cards(game), ['Go out to Dunn\'s Mill, and ask Mother Nettle for help', "Visit Nan Burdock's stall", 'Take the barrow road north again'], 'Varrow has no spears to spare');
+  pick(game, 'Go out to Dunn');
+  assertTrue(pageText(game).includes("you're going there next"));
+  pick(game, 'Promise her');
+  assertTrue(pageText(game).includes('Goblins hear singing a long way off'), 'they don’t know the date yet');
+  assertTrue(['nettle_rallied', 'promised_nettle_warren'].every((f) => game.flags.includes(f)));
+  pick(game, 'Take the barrow road north again');
+  assertTrue(pageText(game).includes('Bring him home') && pageText(game).includes('fresh graves on the north bank'));
+  assertTrue(speakersOf(game).includes('odda') || pageText(game).includes('Odda brews tea'), 'Odda comes north with you');
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

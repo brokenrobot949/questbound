@@ -5,9 +5,11 @@
 //
 //   scene       the knot the story stopped in (a page's scene)
 //   continueAt  the knot or stitch the story goes on from now
+//   unlessFlag  (optional) a hero with this story flag stays put: their path through the
+//               scene still ends the story today
 //
 // Add a line whenever a slice turns a "-> END" into the next scene. A scene that still ends
-// the story today must not be listed.
+// the story today must not be listed, unless unlessFlag picks out the path that does.
 
 export const storyContinues = [
   // Chapter 1 ended with Lark's knock at the door; Chapter 2 begins the next morning.
@@ -18,4 +20,7 @@ export const storyContinues = [
   { scene: 'ch2_stocks', continueAt: 'ch2_old_ford', source: 'original' },
   // Then at the aim north from the Old Ford.
   { scene: 'ch2_old_ford', continueAt: 'ch2_cairnfield', source: 'original' },
+  // Then at the aim back to Bramblegate after Cairnfield. If the Old Ford fell, the party went
+  // to Bramblegate before Cairnfield, and that path still stops there (the eve of the barrow).
+  { scene: 'ch2_cairnfield', continueAt: 'ch2_homeward', unlessFlag: 'ford_fell', source: 'original' },
 ];
