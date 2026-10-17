@@ -21,7 +21,7 @@
 //   so their reinforcements can follow; or flood it back (vault_flooded), which fills the
 //   Choir's crawl (no reinforcements), but you take the long way round, the builders' old drain,
 //   and arrive later. Both are for the chantry to use. Garrick goes up to wait at the gate.
-// The story stops there for now; beat 5, the Chantry of Ash, comes next.
+// Then beat 5, the Chantry of Ash (ch3-chantry.ink).
 
 === ch3_vault ===
 ~ set_objective("Go down into the deep barrow, find Garrick at the sluices, and stop the Choir's hymn.")
@@ -212,5 +212,4 @@ Up on the landing, Garrick shows you a slab that swings aside on a pin. Behind i
 }
 "You bring yourselves back," Garrick says. "Lark'll never forgive me otherwise." And he climbs away up the stair, still white with flour, until the dark takes him. #speaker:garrick
 ~ quest_note("missing-miller", "Garrick Dunn is free, and waiting at the great gate of the Kings' Barrow.")
-~ set_objective("Go down to the Chantry of Ash, and stop Cantor Vesk's hymn. (The rest of Act I is still being written.)")
--> END
+-> ch3_chantry

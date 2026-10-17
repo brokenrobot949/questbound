@@ -17,7 +17,9 @@
 //   hero         where the hero starts; monsters: each one and where it starts ({ x, y }),
 //                with a name if it has its own (Mother Nettle)
 //   allies       creatures who fight on the hero's side, played by the game: { id, monster,
-//                name, pos } (the Old Ford's soldiers, as Guards). They hold their ground, as a
+//                name, pos } (the Old Ford's soldiers, as Guards). With bondName: true, they're
+//                called by the name the player gave their Bond (the Rival). With ifFlag, they're
+//                only there when that story flag is set. They hold their ground, as a
 //                companion on Hold does, and the foes go for them too. They don't count
 //                towards the difficulty, and at 0 Hit Points they die. The story hears how
 //                many lived, and which (allies_standing() and ally_standing(id) in
@@ -39,7 +41,15 @@
 //                square (or the nearest free one), coming "from" somewhere ("the moor"). With
 //                unlessFlag set in the story (Captain Varrow's watch holding the outer cairns),
 //                they never come. The battle screen says they're coming, and when. They don't
-//                count towards the difficulty, and a fight with them is played by hand.
+//                count towards the difficulty, and a fight with them is played by hand. Each
+//                one can have a name ("Sister Rhosyn"), and an ifFlag: then they only come if
+//                that story flag is set
+//   callByName   a foe the hero can call by its true name, if the story taught it to them:
+//                { monster, name, ifFlag, range (feet), goesFor (a foe's name), action, what,
+//                call, heard }. Calling uses the hero's action, and works while that foe is on
+//                its feet and within range: it remembers who it was, and fights on the hero's
+//                side as an ally, going after goesFor (then the nearest foe). The battle screen
+//                shows action (with what under it); the fight log says call, then heard
 //   escape       squares a fleeing monster can leave the fight by (it flees once Bloodied,
 //                at half its Hit Points or fewer)
 //   whileHeroDown  what each monster does on its turn while the hero lies at 0 Hit Points
@@ -106,6 +116,21 @@ const roadLegend = {
   o: { terrain: 'obstacle', tile: 'grass', decor: 'boulder' },
   g: { terrain: 'floor', tile: 'dirt', decor: 'goblin-body' },
   b: { terrain: 'floor', tile: 'grass', decor: 'bones' },
+};
+
+// Dame Aveline's name, from the oath-wall in the Hall of Champions (Chapter 3). Called by it,
+// the risen champion remembers her oath ("I will keep it below until I am called by name") and
+// turns on the Cantor who sang her up.
+const avelinesName = {
+  monster: 'wight',
+  name: 'Aveline',
+  ifFlag: 'read_the_oath_wall',
+  range: 30,
+  goesFor: 'Cantor Vesk',
+  action: 'Call her by name: “Aveline!”',
+  what: 'She may remember her oath, and turn on Vesk. She has to be within 30 feet to hear you',
+  call: 'You call her by her name, the one on the oath-wall: “Aveline! First of the sworn!”',
+  heard: 'Dame Aveline stops with her sword raised. Something moves behind the dark of her helm, slow as a memory, and she turns, and goes for Cantor Vesk!',
 };
 
 export const encounters = [
@@ -447,6 +472,67 @@ export const encounters = [
       { x: 7, y: 10 },
     ],
     whileHeroDown: '{name} leaves you where you lie. The Choir has a use for you at the wheel.',
+    source: 'original',
+  },
+  // The Chantry of Ash (beat 5), the boss fight (Rob, Oct 16, 2026). Cantor Vesk (a Cultist
+  // Fanatic) sings at the altar, Dame Aveline (a Wight) stands up out of her tomb beside him,
+  // and two of his dead stand between. Unless the hymn is broken, it raises another Zombie on
+  // round 3. A hero who read her name on the oath-wall can call her by it: she remembers her
+  // oath, and turns on Vesk. A Rival freed at the wheel fights beside the party (a Bandit
+  // Captain, holding their ground). Two ways in:
+  //   chantry       the fast way, down the stair in the drained vault. The Choir follows it
+  //                 down behind the party on round 3, led by Sister Rhosyn if she lives.
+  //   chantry-late  the long way round, out of the old drain in the left wall: no
+  //                 reinforcements (the flooded vault cut them off), but the hymn is further
+  //                 along, and a third Zombie is up already.
+  {
+    id: 'chantry',
+    name: 'The Chantry of Ash',
+    difficulty: 'High (Cantor Vesk, a Wight and two Zombies are 1,250 XP; for a level 4 party of three, Moderate is 1,125 and High 1,500. Unless the hymn is broken, another Zombie rises on round 3, and two acolytes, with Sister Rhosyn if she lives, come down the stair behind you)',
+    sizedFor: { level: 4, party: 3 },
+    byHand: true,
+    map: { dungeon: 'deep-barrow', room: 'chantry' },
+    hero: { x: 3, y: 1 },
+    monsters: [
+      { monster: 'cultist-fanatic', name: 'Cantor Vesk', pos: { x: 3, y: 9 } },
+      { monster: 'wight', name: 'Dame Aveline', pos: { x: 4, y: 9 } },
+      { monster: 'zombie', pos: { x: 1, y: 6 } },
+      { monster: 'zombie', pos: { x: 6, y: 6 } },
+    ],
+    allies: [{ id: 'rival', monster: 'bandit-captain', bondName: true, ifFlag: 'rival_freed', pos: { x: 4, y: 1 } }],
+    hymn: { singer: 'cultist-fanatic', rises: { monster: 'zombie', pos: { x: 2, y: 7 } }, round: 3, from: 'the ash' },
+    reinforcements: {
+      round: 3,
+      monsters: [
+        { monster: 'cultist-fanatic', name: 'Sister Rhosyn', pos: { x: 3, y: 0 }, ifFlag: 'rhosyn_lives' },
+        { monster: 'cultist', name: 'Choir Acolyte', pos: { x: 4, y: 0 } },
+        { monster: 'cultist', name: 'Choir Acolyte', pos: { x: 3, y: 0 } },
+      ],
+      from: 'the stair',
+    },
+    callByName: avelinesName,
+    whileHeroDown: '{name} leaves you lying in the ash. The hymn matters more than you do.',
+    source: 'original',
+  },
+  {
+    id: 'chantry-late',
+    name: 'The Chantry of Ash',
+    difficulty: 'High (Cantor Vesk, a Wight and three Zombies are 1,300 XP; for a level 4 party of three, Moderate is 1,125 and High 1,500. Unless the hymn is broken, another Zombie rises on round 3)',
+    sizedFor: { level: 4, party: 3 },
+    byHand: true,
+    map: { dungeon: 'deep-barrow', room: 'chantry' },
+    hero: { x: 1, y: 3 },
+    monsters: [
+      { monster: 'cultist-fanatic', name: 'Cantor Vesk', pos: { x: 3, y: 9 } },
+      { monster: 'wight', name: 'Dame Aveline', pos: { x: 4, y: 9 } },
+      { monster: 'zombie', pos: { x: 1, y: 6 } },
+      { monster: 'zombie', pos: { x: 6, y: 6 } },
+      { monster: 'zombie', pos: { x: 3, y: 5 } },
+    ],
+    allies: [{ id: 'rival', monster: 'bandit-captain', bondName: true, ifFlag: 'rival_freed', pos: { x: 1, y: 4 } }],
+    hymn: { singer: 'cultist-fanatic', rises: { monster: 'zombie', pos: { x: 2, y: 7 } }, round: 3, from: 'the ash' },
+    callByName: avelinesName,
+    whileHeroDown: '{name} leaves you lying in the ash. The hymn matters more than you do.',
     source: 'original',
   },
 ];

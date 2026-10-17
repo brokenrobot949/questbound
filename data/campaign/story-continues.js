@@ -33,4 +33,6 @@ export const storyContinues = [
   { scene: 'ch3_gate', continueAt: 'ch3_hall', source: 'original' },
   // Then at the open oath-wall; the flooded vault lies at the foot of the stair.
   { scene: 'ch3_hall', continueAt: 'ch3_vault', source: 'original' },
+  // Then in the flooded vault, drained or flooded back; the Chantry of Ash lies below.
+  { scene: 'ch3_vault', continueAt: 'ch3_chantry', source: 'original' },
 ];

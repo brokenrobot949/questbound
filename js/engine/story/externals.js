@@ -337,6 +337,11 @@ export function bindExternals(story, runtime) {
   // e.g. { foe_escaped("cultist"): He got away. }. monster is an id from data/srd/monsters.js.
   story.BindExternalFunction('foe_escaped', (id) => Boolean(runtime.game.lastBattle && (runtime.game.lastBattle.escaped || []).includes(id)), false);
 
+  // foe_turned(monster): true if the hero called a foe of that kind by its name in the last
+  // fight, and it turned to their side (the encounter's callByName), e.g.
+  //   { foe_turned("wight"): She remembered her oath. }
+  story.BindExternalFunction('foe_turned', (id) => Boolean(runtime.game.lastBattle && (runtime.game.lastBattle.turned || []).includes(id)), false);
+
   // allies_standing(): how many of the allies who fought beside the party in the last fight
   // (an encounter's allies: the Old Ford's soldiers) came through it alive, won or lost, e.g.
   //   { allies_standing() == 3: All three of them are still on their feet. }

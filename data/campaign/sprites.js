@@ -38,6 +38,8 @@ export const sprites = {
   'cultist-fanatic': { sheet: 'player', col: 7, row: 3 }, // a red-hooded figure, face in shadow
   'animated-armor': { sheet: 'humanoid', col: 3, row: 4 }, // plate and a closed helm, sword and shield
   'ogre-zombie': { sheet: 'undead', col: 6, row: 0 }, // a great hulking zombie
+  wight: { sheet: 'undead', col: 1, row: 2 }, // a skeletal knight in blue and gold
+  cantor: { sheet: 'humanoid', col: 2, row: 7 }, // Cantor Vesk: a heavy hooded figure in grey
 };
 
 // Floor tiles and things that stand on them. alpha (0 to 1) draws a picture faded, and
@@ -94,6 +96,9 @@ export const tiles = {
   'sluice-wheel': { sheet: 'effect', col: 4, row: 24 },
   'sluice-gate': { sheet: 'decor', col: 1, row: 21 },
   'stair-down': { sheet: 'tile', col: 1, row: 1 },
+  // The Chantry of Ash: the Choir's altar, and the slab of Dame Aveline's tomb.
+  altar: { sheet: 'decor', col: 0, row: 20 },
+  'tomb-slab': { sheet: 'decor', col: 2, row: 20 },
 };
 
 // Walls join up with their neighbours. Each wall style is a block of tiles in DawnLike's

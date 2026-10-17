@@ -167,6 +167,8 @@ export const people = [
     look: { skin: 'peach', hairStyle: 'cropped', hairColor: 'blonde', beard: true, outfit: 'white', accent: 'brown', headgear: 'none' },
     source: 'original',
   },
+  { id: 'vesk', name: 'Cantor Vesk', sprite: 'cantor', source: 'original' }, // the gravedigger who sings the dead awake
+  { id: 'aveline', name: 'Dame Aveline', sprite: 'wight', source: 'original' }, // the first queen's champion, risen
 
   // ---- The hero's Bond, when they turn up in person ----
   {

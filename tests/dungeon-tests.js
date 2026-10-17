@@ -6,7 +6,7 @@ import { createRng } from '../js/engine/rules/rng.js';
 import { forceNextD20 } from '../js/engine/rules/dice.js';
 import { isStandable, parseMap } from '../js/engine/combat/grid.js';
 import * as fight from '../js/engine/combat/battle.js';
-import { besideEntry, dungeonRows, enterRoom, findDungeon, parseRoomTag, roomFigures } from '../js/engine/world/dungeons.js';
+import { besideEntry, dungeonRows, enterRoom, findDungeon, parseRoomTag, roomEntry, roomFigures } from '../js/engine/world/dungeons.js';
 import { sprites, tiles } from '../data/campaign/sprites.js';
 import { people } from '../data/campaign/people.js';
 import { joinParty, memberMaxHp, memberOf } from '../js/engine/character/party.js';
@@ -43,12 +43,18 @@ function gameFor(character, seed = 'dungeon') {
 test('Maps: every room’s band, entrance and doorways fit its dungeon’s map', () => {
   for (const dungeon of dungeons) {
     const map = parseMap(dungeon.rows, dungeon.legend);
+    // The map as first drawn, and as each of its rooms' changes leaves it (a doorway can be shut
+    // until the room changes: the stair under the vault's water).
+    const changed = dungeon.rooms.flatMap((r) => (r.changes || []).map((c) => parseMap(dungeonRows(dungeon, c.on), dungeon.legend)));
+    const openSometime = (pos) => [map, ...changed].some((m) => isStandable(m, pos));
     for (const room of dungeon.rooms) {
       const [first, last] = room.rows;
       assertTrue(first >= 0 && last < map.height && first < last, `${room.id}: rows`);
-      assertTrue(room.entry.y >= first && room.entry.y <= last && isStandable(map, room.entry), `${room.id}: entry`);
+      for (const entry of [room.entry, ...(room.entryWhen || []).map((e) => e.pos)]) {
+        assertTrue(entry.y >= first && entry.y <= last && isStandable(map, entry), `${room.id}: entry`);
+      }
       for (const [to, squares] of Object.entries(room.exits)) {
-        for (const pos of squares) assertTrue((pos.y === first || pos.y === last) && isStandable(map, pos), `${room.id} → ${to}: doorway`);
+        for (const pos of squares) assertTrue((pos.y === first || pos.y === last) && openSometime(pos), `${room.id} → ${to}: doorway`);
       }
     }
   }
@@ -2269,7 +2275,8 @@ test('The deep barrow: the vault drains to silt and a stair, or floods to the la
   const deep = findDungeon('deep-barrow');
   assertEqual(dungeonRows(deep, ['rival_taken']), deep.rows, 'as first drawn');
   const drained = parseMap(dungeonRows(deep, ['vault_drained']), deep.legend);
-  assertEqual([drained.cells[6][3].decor, drained.cells[6][3].terrain, drained.cells[3][3].terrain, drained.cells[8][3].decor], ['stair-down', 'floor', 'floor', 'sluice-wheel']);
+  assertEqual([drained.cells[10][3].decor, drained.cells[10][3].terrain, drained.cells[3][3].terrain, drained.cells[8][3].decor], ['stair-down', 'floor', 'floor', 'sluice-wheel']);
+  assertEqual(parseMap(deep.rows, deep.legend).cells[10][3].terrain, 'water', 'the stair is under the water until then');
   const flooded = parseMap(dungeonRows(deep, ['vault_flooded']), deep.legend);
   assertEqual([flooded.cells[1][3].terrain, flooded.cells[2][3].terrain, flooded.cells[5][1].terrain, flooded.cells[10][7].terrain], ['floor', 'difficult', 'water', 'water']);
   for (const room of deep.rooms) {
@@ -2364,9 +2371,9 @@ test('Chapter 3: the Choir beaten at the wheel: Garrick freed with Lark’s news
   pick(game, 'Drain the vault');
   assertTrue(game.flags.includes('vault_drained') && !game.flags.includes('vault_flooded'));
   assertTrue(['a stair cut in the rock', 'Whoever comes down from the low door after you', "If we're not back by dawn", 'You bring yourselves back'].every((s) => pageText(game).includes(s)));
-  assertEqual([cards(game), game.objective], [[], "Go down to the Chantry of Ash, and stop Cantor Vesk's hymn. (The rest of Act I is still being written.)"]);
+  assertEqual([cards(game), tagsOf(game), game.objective], [['Go down the stair in the drained vault'], ['go:chantry'], "Go down to the Chantry of Ash, and stop Cantor Vesk's hymn."]);
   assertTrue(missingMiller(game).includes('waiting at the great gate'));
-  assertEqual(parseMap(dungeonRows(findDungeon('deep-barrow'), game.flags), findDungeon('deep-barrow').legend).cells[6][3].decor, 'stair-down', 'the stair shows on the map');
+  assertEqual(parseMap(dungeonRows(findDungeon('deep-barrow'), game.flags), findDungeon('deep-barrow').legend).cells[10][3].decor, 'stair-down', 'the stair shows on the map');
 });
 
 test('Chapter 3: flooding the vault back fills the Choir’s crawl, and the long way round is the builders’ old drain; the watch sees Garrick home', async () => {
@@ -2379,7 +2386,7 @@ test('Chapter 3: flooding the vault back fills the Choir’s crawl, and the long
   pick(game, 'Flood it back');
   assertTrue(game.flags.includes('vault_flooded') && !game.flags.includes('vault_drained'));
   assertTrue(['full to the roof', 'Nobody is coming down from the low door now', 'the long way round', "Captain Varrow's watch is out on the cairns"].every((s) => pageText(game).includes(s)));
-  assertEqual(cards(game), []);
+  assertEqual(cards(game), ["Take the long way round, through the builders' old drain"]);
   assertEqual(roomFigures(vaultRoom(), game.flags), [], 'the water takes the fallen, and the wheel is empty');
 });
 
@@ -2399,6 +2406,194 @@ test('Chapter 3: beaten at the wheel, you wake chained to it and robbed; Fen sli
   pick(alone, 'Go down the stair');
   settleVault(alone, 'Attack them from the landing', { won: false });
   assertTrue(pageText(alone).includes('Give it a kick') && pageText(alone).includes('Odda walks the wheel behind you') && !pageText(alone).includes('the cheap stuff'));
+});
+
+// ---- Chapter 3, beat 5: the Chantry of Ash ----
+
+const chantryRoom = () => findDungeon('deep-barrow').rooms.find((r) => r.id === 'chantry');
+
+// A fight in the chantry with these story flags, the hero (Sable Rook's rival unless given)
+// going first.
+function chantryFight(encounterId, flags = [], character = sable, seed = 'chantry') {
+  const game = gameFor(character, seed);
+  game.flags = flags;
+  forceNextD20(20);
+  fight.startBattle(game, encounterId, 0);
+  return game;
+}
+
+test('Wight: SRD 5.2.1’s stat block, two Necrotic Sword or Bow attacks a turn; Life Drain isn’t played yet', () => {
+  const wight = monsters.find((m) => m.id === 'wight');
+  assertEqual([wight.ac, wight.hp.average, wight.speed, wight.initiative, wight.cr, wight.xp, wight.multiattack], [14, 82, 30, 4, '3', 700, 2]);
+  assertEqual(wight.attacks.map((a) => [a.id, a.kind, a.bonus, a.damage.dice, a.damage.bonus, a.damage.type, a.damage.plus.dice, a.damage.plus.type]), [
+    ['necrotic-sword', 'melee', 4, '1d8', 2, 'slashing', '1d8', 'necrotic'],
+    ['necrotic-bow', 'ranged', 4, '1d8', 2, 'piercing', '1d8', 'necrotic'],
+  ]);
+  assertEqual([wight.resistances, wight.immunities, wight.conditionImmunities, wight.type, wight.source], [['necrotic'], ['poison'], ['exhaustion', 'poisoned'], 'Undead', 'SRD 5.2.1']);
+  assertTrue(Boolean(sprites[wight.sprite]) && wight.variant.includes('Life Drain'));
+});
+
+test('The Chantry of Ash: Vesk, Dame Aveline and the dead are High; Vesk sings, and the Choir follows you down the drained stair', () => {
+  const game = chantryFight('chantry', ['vault_drained']);
+  assertEqual(fight.enemies(game.battle).map((c) => c.name), ['Cantor Vesk', 'Dame Aveline', 'Zombie 1', 'Zombie 2']);
+  const xp = ['chantry', 'chantry-late'].map((id) => encounterXp(encounters.find((e) => e.id === id)));
+  assertEqual([xp, xp.map((n) => ratingFor(n, partyBudget(4, 3)))], [[1250, 1300], ['High', 'High']]);
+  assertEqual(fight.objectiveText(game.battle), 'Two Choir Acolytes are coming from the stair: they arrive at the start of round 3.');
+  assertEqual(fight.battleMap(game.battle).cells[0][3].decor, 'stair-down', 'the drained vault’s stair, at the top of the fight');
+  assertEqual(fight.combatantById(game.battle, 'rival'), undefined, 'no Rival unless freed');
+  game.hp = 300; // so the hero is still standing to watch
+  fight.endHeroTurn(game);
+  fight.endHeroTurn(game);
+  assertTrue(said(game, 'Out of the dark from the stair come Choir Acolyte 1 and Choir Acolyte 2, and join the fight!'), logText(game));
+  assertTrue(said(game, 'drags itself up out of the ash'), logText(game));
+});
+
+test('The Chantry of Ash: Sister Rhosyn leads the Choir down if she lives, and your freed Rival fights beside you, by name', () => {
+  const game = chantryFight('chantry', ['vault_drained', 'rhosyn_lives', 'rival_freed']);
+  assertEqual(fight.objectiveText(game.battle), 'Sister Rhosyn and two Choir Acolytes are coming from the stair: they arrive at the start of round 3.');
+  const rival = fight.combatantById(game.battle, 'rival');
+  assertEqual([rival.name, rival.side, rival.ally, rival.monsterId, rival.pos], ['Sable Rook', 'hero', true, 'bandit-captain', { x: 4, y: 1 }]);
+  game.hp = 300;
+  fight.endHeroTurn(game);
+  fight.endHeroTurn(game);
+  assertTrue(said(game, 'come Sister Rhosyn, Choir Acolyte 1 and Choir Acolyte 2'), logText(game));
+});
+
+test('The Chantry of Ash, the long way round: out of the drain in the left wall, nobody behind you, but a third Zombie is up already', () => {
+  const game = chantryFight('chantry-late', ['vault_flooded', 'rhosyn_lives']);
+  assertEqual([fight.heroCombatant(game.battle).pos, game.battle.reinforcements, fight.enemies(game.battle).length], [{ x: 1, y: 3 }, null, 5]);
+  assertEqual(fight.battleMap(game.battle).cells[0][3].terrain, 'water', 'the flooded vault above');
+  assertEqual(fight.objectiveText(game.battle), 'The hymn: unless the singer is stopped, another Zombie rises at the start of round 3. Hurting the singer may break it.');
+});
+
+test('The Chantry of Ash: a hero who read the oath-wall calls Dame Aveline by name within 30 feet, and she turns on Vesk', () => {
+  assertEqual(fight.nameCall(chantryFight('chantry', ['vault_drained'])), null, 'never learned her name');
+  const game = chantryFight('chantry', ['vault_drained', 'read_the_oath_wall']);
+  const call = fight.nameCall(game);
+  assertEqual([call.action, call.target.name, call.problem], ['Call her by name: “Aveline!”', 'Dame Aveline', 'Dame Aveline is too far away to hear you: get within 30 feet.']);
+  fight.heroCombatant(game.battle).pos = { x: 4, y: 4 }; // 25 feet from her
+  assertEqual(fight.nameCall(game).problem, null);
+  fight.heroCallByName(game);
+  const aveline = fight.combatantById(game.battle, 'wight-1');
+  assertEqual([aveline.side, aveline.ally, aveline.turned, game.battle.turnState.action], ['hero', true, true, true]);
+  assertTrue(said(game, 'Aveline! First of the sworn!') && said(game, 'goes for Cantor Vesk!'), logText(game));
+  assertEqual(fight.nameCall(game), null, 'once is enough');
+  game.hp = 300;
+  fight.endHeroTurn(game);
+  const swings = game.battle.log.filter((e) => e.roll && e.roll.kind === 'attack' && e.text.startsWith('Dame Aveline'));
+  assertTrue(swings.length > 0 && swings.every((e) => e.text.includes('Cantor Vesk')), logText(game));
+  for (const foe of fight.enemies(game.battle)) foe.hp = 0;
+  game.battle.outcome = 'victory';
+  fight.finishBattle(game);
+  assertEqual(game.lastBattle.turned, ['wight']);
+});
+
+test('The deep barrow: the chantry below the vault, the long way round in by the old drain, and Vesk, Aveline and the dead where the fights start them', () => {
+  const room = chantryRoom();
+  assertEqual([room.rows, roomEntry(room, []), roomEntry(room, ['vault_flooded'])], [[10, 21], { x: 3, y: 11 }, { x: 1, y: 13 }]);
+  const late = roomFigures(room, ['vault_flooded']);
+  for (const id of ['chantry', 'chantry-late']) {
+    for (const { pos } of encounters.find((e) => e.id === id).monsters) assertTrue(late.some((f) => f.pos.x === pos.x && f.pos.y === pos.y + room.rows[0]), `${id}: someone at ${pos.x},${pos.y}`);
+  }
+  assertEqual(roomFigures(room, []).length, 4, 'the third Zombie only once you arrive late');
+  assertEqual(roomFigures(room, ['chantry_won', 'aveline_rested']).filter((f) => !f.fallen), [], 'all of them down');
+});
+
+// At the foot of the flooded vault, ready to go down to the chantry (a level 4 Champion with Odda
+// and Fen unless given), with the vault drained unless the flags say flooded.
+async function atTheChantry(seed, { character = champion4, flags = [], odda = true, fen = true } = {}) {
+  const game = await atTheDarkMoon(seed, { character, flags: flags.includes('vault_flooded') ? flags : ['vault_drained', ...flags], odda, fen });
+  game.page = jumpTo(game, 'ch3_chantry');
+  return game;
+}
+
+// Settles the chantry fight from the choice starting `start`: won or lost.
+function settleChantry(game, start, { won = true, setUp = () => {} } = {}) {
+  const choice = game.story.currentChoices.find((c) => c.text.startsWith(start) && (c.tags || []).some((t) => t.startsWith('combat:chantry')));
+  if (!choice) throw new Error(`No fight "${start}": ${cards(game).join(' / ')}`);
+  startFight(game, choice);
+  setUp(game);
+  if (won) for (const foe of fight.enemies(game.battle)) foe.hp = 0;
+  else game.hp = 0;
+  game.battle.outcome = won ? 'victory' : 'defeat';
+  game.page = continueAfterBattle(game);
+}
+
+test('Chapter 3: down the drained stair into the Chantry of Ash: Vesk singing, Aveline rising, and a chance to creep down unseen', async () => {
+  const game = await atTheChantry('chantry-stair', { character: sable, flags: ['read_the_oath_wall', 'rival_freed'] });
+  assertEqual([cards(game), tagsOf(game), game.objective], [['Go down the stair in the drained vault'], ['go:chantry'], "Go down to the Chantry of Ash, and stop Cantor Vesk's hymn."]);
+  pick(game, 'Go down the stair');
+  assertEqual([currentDungeon(game).room, currentLocation(game)], ['chantry', "The Kings' Barrow, the Chantry of Ash"]);
+  const text = pageText(game);
+  assertTrue(['Cantor Vesk', 'Two of the dead', 'something sits up in it', 'You know her. AVELINE', "That's no Choir dead", 'The singer\'s mine', 'Nobody has'].every((s) => text.includes(s)), text);
+  assertTrue(['odda_at_the_chantry', 'fen_at_the_chantry'].every((f) => game.flags.includes(f)) && speakersOf(game).includes('rival'));
+  assertEqual([cards(game), tagsOf(game)], [['Creep down the last steps while he sings', 'Charge down into the ash'], ['check:stealth:13', 'combat:chantry']]);
+  forceNextD20(20);
+  pick(game, 'Creep down');
+  revealAll(game);
+  assertEqual([cards(game), tagsOf(game)], [['Strike before they see you'], ['combat:chantry surprise']]);
+
+  const warned = await atTheChantry('chantry-warned', { flags: ['vault_acolyte_fled'] });
+  pick(warned, 'Go down the stair');
+  assertTrue(pageText(warned).includes('There you are') && speakersOf(warned).includes('vesk') && !pageText(warned).includes('You know her'));
+  assertEqual([cards(warned), tagsOf(warned)], [['Fight'], ['combat:chantry']]);
+});
+
+test('Chapter 3: the long way round: a roof fall in the old drain, then out behind the Choir’s backs for a surprise attack, late', async () => {
+  const game = await atTheChantry('chantry-drain', { character: juniper, flags: ['vault_flooded'] }); // no Guidance or Tactical Mind to change the check
+  assertEqual(cards(game), ["Take the long way round, through the builders' old drain"]);
+  pick(game, 'Take the long way round');
+  assertEqual([cards(game), tagsOf(game)], [['Squeeze through the gap at the top', 'Shift the fallen stones, and shore up the roof'], ['check:acrobatics:12', 'check:athletics:12']]);
+  game.hp = 30;
+  game.rng = scriptedThen([1, 3, 4], 'chantry-drain'); // the check fails; 2d6 of 3 and 4
+  pick(game, 'Squeeze through');
+  revealAll(game);
+  assertTrue(notes(game).includes('You take 7 bludgeoning damage (2d6: 3, 4).') && game.hp === 23, notes(game).join(' / '));
+  assertTrue(['the roof comes down on your back', 'crawl on', "you're late", 'Three of the dead', 'Nobody is looking at the drain'].every((s) => pageText(game).includes(s)), pageText(game));
+  assertEqual([currentDungeon(game).room, cards(game), tagsOf(game)], ['chantry', ['Drop down from the drain and strike before they turn'], ['combat:chantry-late surprise']]);
+});
+
+test('Chapter 3: called by name, Aveline lies down at rest (her 700 XP); your Rival stands; Vesk lies dying, reaching for the gold on her breast', async () => {
+  const game = await atTheChantry('chantry-rests', { character: sable, flags: ['read_the_oath_wall', 'rival_freed', 'swore_the_oath'] });
+  pick(game, 'Go down the stair');
+  const xp = game.xp;
+  settleChantry(game, 'Charge down', {
+    setUp: (g) => Object.assign(fight.combatantById(g.battle, 'wight-1'), { side: 'hero', ally: true, turned: true }),
+  });
+  assertTrue(['chantry_won', 'aveline_rested'].every((f) => game.flags.includes(f)) && !game.flags.includes('aveline_destroyed') && game.xp - xp === 700);
+  const text = pageText(game);
+  assertTrue(['"Called," she says', 'Hold the door', "That's that settled", 'lies on the altar steps', 'The Sleeping King', 'the gold on her breast'].every((s) => text.includes(s)), text);
+  assertTrue(speakersOf(game).includes('aveline') && deeds(game).includes('Called Dame Aveline'));
+  assertEqual([cards(game), game.objective], [[], 'See what Cantor Vesk was reaching for. (The rest of Act I is still being written.)']);
+  assertEqual(roomFigures(chantryRoom(), game.flags).filter((f) => !f.fallen), [], 'all of them down');
+});
+
+test('Chapter 3: not called, Aveline is destroyed; a Rival cut down lives, badly hurt; a companion who falls is noted', async () => {
+  const game = await atTheChantry('chantry-destroyed', { character: sable, flags: ['rival_freed'] });
+  pick(game, 'Go down the stair');
+  settleChantry(game, 'Charge down', {
+    setUp: (g) => {
+      fight.combatantById(g.battle, 'rival').hp = 0;
+      fight.combatantById(g.battle, 'fen').state = 'dead';
+      Object.assign(memberOf(g, 'fen'), { hp: 0, fallen: true });
+    },
+  });
+  assertTrue(['chantry_won', 'aveline_destroyed', 'rival_wounded', 'fen_fell_in_the_chantry'].every((f) => game.flags.includes(f)) && !game.flags.includes('aveline_rested'));
+  assertTrue(['the dark goes out of her helm', 'She deserved better than him', 'find a pulse', 'Fen lies small and still in the ash'].every((s) => pageText(game).includes(s)), pageText(game));
+});
+
+test('Chapter 3: beaten in the chantry, Aveline remembers by herself and cuts Vesk down; you wake in the ash, robbed', async () => {
+  const game = await atTheChantry('chantry-mercy', { character: sable, flags: ['vault_flooded', 'rival_freed'] });
+  game.money = 2500;
+  pick(game, 'Take the long way round');
+  forceNextD20(20);
+  pick(game, 'Shift the fallen stones');
+  revealAll(game);
+  settleChantry(game, 'Drop down', { won: false });
+  assertTrue(['chantry_fates_mercy', 'aveline_rested'].every((f) => game.flags.includes(f)) && !game.flags.includes('chantry_won') && game.money === 0);
+  assertTrue(['the sword comes down on the Cantor instead', 'with your purse', 'She did it', 'lies on the altar steps'].every((s) => pageText(game).includes(s)), pageText(game));
+  assertTrue(!pageText(game).includes("That's that settled"), 'no victory talk after a defeat');
+  assertTrue(game.hp === fight.maxHpOf(game, { id: 'hero' }) && notes(game).some((n) => n.startsWith('A good place to stop')));
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

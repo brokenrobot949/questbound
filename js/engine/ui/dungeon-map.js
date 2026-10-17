@@ -8,7 +8,7 @@
 // the story moves them on. The hero's companions stand beside the hero.
 
 import { parseMap } from '../combat/grid.js';
-import { besideEntry, dungeonRows, findDungeon, findRoom, roomFigures } from '../world/dungeons.js';
+import { besideEntry, dungeonRows, findDungeon, findRoom, roomEntry, roomFigures } from '../world/dungeons.js';
 import { drawCell, drawTile, frameSquare, loadArt, pixelScale, sizeCanvas, spriteImage, blit, TILE } from './tile-art.js';
 import { sprites, tiles } from '../../../data/campaign/sprites.js';
 import { findPerson, personSprite } from './speakers.js';
@@ -116,12 +116,13 @@ export async function showDungeonMap({ container, state, flags = [], hero, party
       if (!picture) throw new Error(`Unknown sprite for a figure in ${dungeon.name}: ${figure.sprite}`);
       drawTile(ctx, art, picture, figure.pos.x, figure.pos.y - view.first, size, 0, how);
     }
-    // The hero at the room's entry, and their companions on the free squares beside them.
-    const spots = besideEntry(map, room, roomFigures(room, flags).map((f) => f.pos), partyImages.length);
+    // The hero where they came in, and their companions on the free squares beside them.
+    const entry = roomEntry(room, flags);
+    const spots = besideEntry(map, room, roomFigures(room, flags).map((f) => f.pos), partyImages.length, entry);
     partyImages.forEach((image, i) => {
       if (spots[i]) blit(ctx, image, 0, 0, spots[i].x, spots[i].y - view.first, size);
     });
-    blit(ctx, heroImage, 0, 0, room.entry.x, room.entry.y - view.first, size);
+    blit(ctx, heroImage, 0, 0, entry.x, entry.y - view.first, size);
     const ways = lit.length ? ` Lit doorways lead on: ${[...new Set(doors.map((d) => findRoom(state.id, d.room).name))].join(', ')}.` : '';
     const here = [...new Set(roomFigures(room, flags).filter((f) => !f.fallen && f.name).map((f) => f.name))];
     const company = here.length ? ` Here: ${here.join(', ')}.` : '';

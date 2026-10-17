@@ -67,29 +67,44 @@ export function roomFigures(room, flags) {
     }));
 }
 
-// Where the hero's companions stand in a room: the free squares nearest its entry, in the
-// order they joined, as at the start of a fight (combat/battle.js). map: the dungeon's parsed
-// map (combat/grid.js). taken: squares someone already stands on. Only the room's own squares
-// count. Returns up to `count` squares.
-export function besideEntry(map, room, taken, count) {
-  const isTaken = (pos) => taken.some((t) => t.x === pos.x && t.y === pos.y) || (pos.x === room.entry.x && pos.y === room.entry.y);
+// Where the hero stands on arriving in a room: its entry, or somewhere else once a story flag
+// says they came another way (room.entryWhen: the long way round into the chantry).
+export function roomEntry(room, flags = []) {
+  const other = (room.entryWhen || []).find((e) => e.on.some((flag) => flags.includes(flag)));
+  return other ? other.pos : room.entry;
+}
+
+// Where the hero's companions stand in a room: the free squares nearest where the hero
+// arrived (entry: roomEntry), in the order they joined, as at the start of a fight
+// (combat/battle.js). map: the dungeon's parsed map (combat/grid.js). taken: squares someone
+// already stands on. Only the room's own squares count. Returns up to `count` squares.
+export function besideEntry(map, room, taken, count, entry = room.entry) {
+  const isTaken = (pos) => taken.some((t) => t.x === pos.x && t.y === pos.y) || (pos.x === entry.x && pos.y === entry.y);
   const free = [];
   for (let y = room.rows[0]; y <= room.rows[1]; y++) {
     for (let x = 0; x < map.width; x++) if (isStandable(map, { x, y }) && !isTaken({ x, y })) free.push({ x, y });
   }
-  free.sort((a, b) => squaresBetween(a, room.entry) - squaresBetween(b, room.entry) || a.y - b.y || a.x - b.x);
+  free.sort((a, b) => squaresBetween(a, entry) - squaresBetween(b, entry) || a.y - b.y || a.x - b.x);
   return free.slice(0, count);
 }
 
 // The rows and legend of a fight's map: its own map, or a room's band of a dungeon map
-// (encounter.map = { dungeon, room }), so the fight happens where the hero is standing.
-export function encounterRows(encounter) {
+// (encounter.map = { dungeon, room }), so the fight happens where the hero is standing, as the
+// story has left it (flags: a drained vault's stair, say; see dungeonRows).
+export function encounterRows(encounter, flags = []) {
   const { map } = encounter;
   if (!map.dungeon) return { rows: map.rows, legend: map.legend };
   const dungeon = findDungeon(map.dungeon);
   const room = findRoom(map.dungeon, map.room);
   if (!room) throw new Error(`Unknown room for ${encounter.id}: ${map.dungeon}/${map.room}`);
-  return { rows: dungeon.rows.slice(room.rows[0], room.rows[1] + 1), legend: dungeon.legend };
+  return { rows: dungeonRows(dungeon, flags).slice(room.rows[0], room.rows[1] + 1), legend: dungeon.legend };
+}
+
+// The story flags that change how a fight's map looks: the ones its dungeon's rooms change on.
+export function mapFlagsFor(encounter, flags = []) {
+  if (!encounter.map.dungeon) return [];
+  const watched = findDungeon(encounter.map.dungeon).rooms.flatMap((r) => (r.changes || []).flatMap((c) => c.on));
+  return flags.filter((flag) => watched.includes(flag));
 }
 
 // Checks a saved dungeon state, for loading saves.

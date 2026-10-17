@@ -632,6 +632,14 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       if (why) card.title = why;
       other.list.append(card);
     }
+    // Calling a foe by its true name, if the story taught it (Dame Aveline, in the chantry).
+    const call = fight.nameCall(game);
+    if (call) {
+      const card = actionCard(call.action, call.what, () => act(() => fight.heroCallByName(game)));
+      card.disabled = Boolean(call.problem);
+      if (call.problem) card.title = call.problem;
+      other.list.append(card);
+    }
     // Fighters from level 2: Action Surge, once the turn's action is used.
     const surges = featureUsesMax(game.character, 'action-surge');
     if (surges) {

@@ -12,8 +12,10 @@
 //                deathSaves, as the hero's below, and concentration, as the hero's below;
 //                their Hit Points are on game.party, see character/party.js), allies who
 //                aren't in the party (side 'hero', ally true, with a monster's stat block,
-//                monsterId, hp and maxHp, played by the game: the Old Ford's soldiers), and
-//                the foes
+//                monsterId, hp and maxHp, played by the game: the Old Ford's soldiers, or a
+//                foe the hero called by name, turned true), and the foes
+//   absentOnlookers, mapFlags  who of the encounter's onlookers isn't there (their indices),
+//                and the story flags that change its map, as they were when the fight began
 //   turnState    { movementLeft, action, bonus, disengaged, savageUsed, surged, athleteMove,
 //                slotSpent, light, extraUsed } for the current turn: surged after Action
 //                Surge; athleteMove is the free move Remarkable Athlete gives straight after a
@@ -55,15 +57,16 @@
 //   outcome      null while fighting, then 'victory' or 'defeat'; xp: earned on victory. When
 //                the fight is over, game.lastBattle remembers { encounterId, outcome, escaped:
 //                the monster ids that fled, alliesAlive: the ids of the allies who lived, if
-//                any fought }
+//                any fought, turned: the monster ids of foes the hero called by name, if any }
 //   surprise     true if the hero caught the foes unawares (they rolled Initiative with
 //                Disadvantage)
 //   sneakAttackTurn  { combatant id: 'round:turn' }: the turn each Rogue last dealt Sneak
 //                Attack (once a turn); a plain 'round:turn' in older saves was the hero's
 //   hymn         for an encounter with a hymn: { singing, risen } (see encounters.js)
-//   reinforcements  for an encounter with reinforcements: { coming: true } until they arrive,
-//                then { coming: false }; null if none are coming (the encounter has none, or
-//                its unlessFlag was set when the fight began)
+//   reinforcements  for an encounter with reinforcements: { coming: true, absent: the indices
+//                of those whose ifFlag wasn't set } until they arrive, then { coming: false };
+//                null if none are coming (the encounter has none, or its unlessFlag was set when
+//                the fight began)
 //   practice     only in debug mode's practice fights: the hero's and party's state before it,
 //                put back when it ends (story/story-runner.js); choiceIndex is null
 // A foe that flees the fight is marked escaped, and its hp set to 0 so it no longer counts.
@@ -89,7 +92,7 @@ import { fightingMembers, memberGame, memberMaxHp, memberOf } from '../character
 import { companionTurn } from './companion-ai.js';
 import { SQUARE_FEET, cellAt, feetBetween, inBounds, isAdjacent, isStandable, key, lineBlock, parseMap, reachableSquares, squaresBetween, stepCost } from './grid.js';
 import { areaSquares, DIRECTIONS, findDirection, lineOfEffect } from './areas.js';
-import { encounterRows } from '../world/dungeons.js';
+import { encounterRows, mapFlagsFor } from '../world/dungeons.js';
 import {
   attackRoll,
   damageAfterResistance,
@@ -107,17 +110,19 @@ export const findEncounter = (id) => encounters.find((e) => e.id === id) || null
 export const findMonster = (id) => monsters.find((m) => m.id === id) || null;
 
 const maps = new Map();
-// The encounter's map, parsed once: its own, or its room of a dungeon. Onlookers (goblins
+// The encounter's map, parsed once: its own, or its room of a dungeon, as the story had left it
+// when the fight began (battle.mapFlags: the drained vault's stair, say). Onlookers (goblins
 // watching a duel, Lark on her ledge) stand in the way like any obstacle. A person onlooker
 // isn't a picture on the map: the battle screen draws them as they look in scenes. An onlooker
 // who isn't there in this fight (battle.absentOnlookers, see onlookersAbsent) leaves their
 // square as it was.
 export function battleMap(battle) {
   const absent = battle.absentOnlookers || [];
-  const key = `${battle.encounterId}|${absent.join(',')}`;
+  const mapFlags = battle.mapFlags || [];
+  const key = `${battle.encounterId}|${absent.join(',')}|${mapFlags.join(',')}`;
   if (!maps.has(key)) {
     const encounter = findEncounter(battle.encounterId);
-    const { rows, legend } = encounterRows(encounter);
+    const { rows, legend } = encounterRows(encounter, mapFlags);
     const map = parseMap(rows, legend);
     (encounter.onlookers || []).forEach(({ decor, pos }, i) => {
       if (absent.includes(i)) return;
@@ -351,8 +356,9 @@ function rescene(game) {
 // ---- Starting ----
 
 // The standable square nearest `near` that nobody stands on, or null.
-function freeSquareNear(encounterId, combatants, near, absentOnlookers = []) {
-  const map = battleMap({ encounterId, absentOnlookers });
+// setting: { encounterId, absentOnlookers, mapFlags }, as on the battle (see battleMap).
+function freeSquareNear(setting, combatants, near) {
+  const map = battleMap(setting);
   const taken = (pos) => combatants.some((c) => c.pos.x === pos.x && c.pos.y === pos.y);
   const squares = [];
   for (let y = 0; y < map.height; y++) for (let x = 0; x < map.width; x++) squares.push({ x, y });
@@ -379,7 +385,9 @@ export function startBattle(game, encounterId, choiceIndex, { surprise = false, 
   }
   const numbered = {};
   const named = {};
-  const absentOnlookers = onlookersAbsent(encounter, game.flags);
+  const flags = game.flags || [];
+  const absentOnlookers = onlookersAbsent(encounter, flags);
+  const mapFlags = mapFlagsFor(encounter, flags);
   const combatants = [{ id: 'hero', side: 'hero', name: game.character.name, pos: { ...encounter.hero } }];
   for (const entry of encounter.monsters) {
     const { monster: id, pos } = entry;
@@ -390,16 +398,19 @@ export function startBattle(game, encounterId, choiceIndex, { surprise = false, 
     const name = counts[base] > 1 ? `${base} ${named[base]}` : base;
     combatants.push({ id: `${id}-${numbered[id]}`, side: 'enemy', name, monsterId: id, pos: { ...pos }, hp: monster.hp.average, maxHp: monster.hp.average });
   }
-  // Allies who fight on the hero's side, played by the game (the Old Ford's soldiers).
-  (encounter.allies || []).forEach(({ id: allyId, monster: id, pos, name }, i) => {
+  // Allies who fight on the hero's side, played by the game (the Old Ford's soldiers; the Rival,
+  // by the name the player gave them, if the story freed them).
+  (encounter.allies || []).forEach(({ id: allyId, monster: id, pos, name, bondName, ifFlag }, i) => {
+    if (ifFlag && !flags.includes(ifFlag)) return;
     const monster = findMonster(id);
     if (!monster) throw new Error(`Unknown monster: ${id}`);
-    combatants.push({ id: allyId || `ally-${i + 1}`, side: 'hero', ally: true, name: name || monster.name, monsterId: id, pos: { ...pos }, hp: monster.hp.average, maxHp: monster.hp.average });
+    const bond = bondName && game.character.bond && game.character.bond.name;
+    combatants.push({ id: allyId || `ally-${i + 1}`, side: 'hero', ally: true, name: bond || name || monster.name, monsterId: id, pos: { ...pos }, hp: monster.hp.average, maxHp: monster.hp.average });
   });
   // Companions start on the free squares nearest the hero.
   for (const member of fightingMembers(game)) {
     const name = memberGame(game, member).character.name.split(' ')[0];
-    const pos = freeSquareNear(encounterId, combatants, encounter.hero, absentOnlookers);
+    const pos = freeSquareNear({ encounterId, absentOnlookers, mapFlags }, combatants, encounter.hero);
     if (!pos) break;
     combatants.push({ id: member.id, side: 'hero', companion: true, name, pos, state: member.hp > 0 ? 'up' : 'down', deathSaves: { successes: 0, failures: 0 } });
   }
@@ -407,6 +418,7 @@ export function startBattle(game, encounterId, choiceIndex, { surprise = false, 
     encounterId,
     choiceIndex,
     absentOnlookers,
+    mapFlags,
     round: 1,
     order: [],
     turn: 0,
@@ -422,7 +434,7 @@ export function startBattle(game, encounterId, choiceIndex, { surprise = false, 
     surprise,
     sneakAttackTurn: null,
     hymn: encounter.hymn ? { singing: true, risen: false } : null,
-    reinforcements: reinforcementsDue(game, encounter) ? { coming: true } : null,
+    reinforcements: reinforcementsDue(game, encounter) ? { coming: true, absent: reinforcementsAbsent(encounter, flags) } : null,
     concentration: null,
   };
   if (practice) game.battle.practice = practice;
@@ -562,29 +574,48 @@ function hymnHurt(game, singer, taken) {
 
 // ---- Reinforcements ----
 
-// Whether an encounter's reinforcements will come: it has some, and its unlessFlag (if any)
-// isn't one of the story's flags (Captain Varrow's watch holding the outer cairns).
+// Which of an encounter's reinforcements won't come, given the story flags: those with an
+// ifFlag that isn't set (Sister Rhosyn, if she died at Cairnfield). Their indices.
+function reinforcementsAbsent(encounter, flags = []) {
+  return ((encounter.reinforcements && encounter.reinforcements.monsters) || []).flatMap((m, i) => (m.ifFlag && !flags.includes(m.ifFlag) ? [i] : []));
+}
+
+// Whether an encounter's reinforcements will come: it has some (with their flags set), and its
+// unlessFlag (if any) isn't one of the story's flags (Captain Varrow's watch holding the outer
+// cairns).
 function reinforcementsDue(game, encounter) {
   const coming = encounter.reinforcements;
-  return Boolean(coming) && !(coming.unlessFlag && (game.flags || []).includes(coming.unlessFlag));
+  const flags = game.flags || [];
+  return Boolean(coming) && !(coming.unlessFlag && flags.includes(coming.unlessFlag)) && reinforcementsAbsent(encounter, flags).length < coming.monsters.length;
+}
+
+// The reinforcements that are coming in this fight (not the absent ones).
+function reinforcementsComing(battle) {
+  const absent = (battle.reinforcements && battle.reinforcements.absent) || [];
+  return findEncounter(battle.encounterId).reinforcements.monsters.filter((m, i) => !absent.includes(i));
 }
 
 // At the start of their round, the reinforcements join the fight: each at its square, or the
-// nearest free one around it. They take their turns after everyone else's.
+// nearest free one around it. They take their turns after everyone else's. One with a name of
+// its own keeps it ("Sister Rhosyn"); two or more who share one are numbered, as the rest are.
 function reinforcementsArrive(game) {
   const battle = game.battle;
   const coming = findEncounter(battle.encounterId).reinforcements;
   if (!battle.reinforcements || !battle.reinforcements.coming || battle.round < coming.round) return;
+  const arriving = reinforcementsComing(battle);
   battle.reinforcements = { coming: false };
   const blocked = blockedFor(game, { side: 'enemy' });
   const map = battleMap(battle);
   const arrived = [];
-  for (const { monster: id, pos } of coming.monsters) {
+  for (const { monster: id, pos, name: own } of arriving) {
     const spot = [pos, ...STEPS_AROUND.map(([dx, dy]) => ({ x: pos.x + dx, y: pos.y + dy }))].find((p) => isStandable(map, p) && !blocked(p));
     if (!spot) continue;
     const monster = findMonster(id);
     const count = battle.combatants.filter((c) => c.monsterId === id).length + 1;
-    const foe = { id: `${id}-${count}`, side: 'enemy', name: `${monster.name} ${count}`, monsterId: id, pos: { ...spot }, hp: monster.hp.average, maxHp: monster.hp.average };
+    let name = `${monster.name} ${count}`;
+    if (own && arriving.filter((m) => m.name === own).length === 1) name = own;
+    else if (own) name = `${own} ${battle.combatants.filter((c) => c.name.startsWith(`${own} `)).length + 1}`;
+    const foe = { id: `${id}-${count}`, side: 'enemy', name, monsterId: id, pos: { ...spot }, hp: monster.hp.average, maxHp: monster.hp.average };
     battle.combatants.push(foe);
     battle.order.push(foe.id);
     arrived.push(foe.name);
@@ -592,13 +623,21 @@ function reinforcementsArrive(game) {
   if (arrived.length) log(game, `Out of the dark from ${coming.from} come ${namesText(arrived)}, and join the fight!`);
 }
 
-const NUMBER_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six'];
+const NUMBER_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six'];
 
 // "Two Zombies are coming from the moor: they arrive at the start of round 3."
-function reinforcementsText(coming) {
-  const count = coming.monsters.length;
-  const names = [...new Set(coming.monsters.map((m) => findMonster(m.monster).name))];
-  const what = names.length === 1 ? `${NUMBER_WORDS[count] || count} ${names[0]}${count === 1 ? '' : 's'}` : namesText(coming.monsters.map((m) => `a ${findMonster(m.monster).name}`));
+// "Sister Rhosyn and two Choir Acolytes are coming from the stair: …"
+function reinforcementsText(coming, arriving) {
+  const count = arriving.length;
+  const groups = [];
+  for (const m of arriving) {
+    const base = m.name || findMonster(m.monster).name;
+    const group = groups.find((g) => g.base === base);
+    if (group) group.count += 1;
+    else groups.push({ base, count: 1, own: Boolean(m.name) });
+  }
+  const one = (g) => (g.own ? g.base : `a ${g.base}`);
+  const what = groups.length === 1 && !groups[0].own ? `${NUMBER_WORDS[count] || count} ${groups[0].base}${count === 1 ? '' : 's'}` : namesText(groups.map((g) => (g.count === 1 ? one(g) : `${NUMBER_WORDS[g.count] || g.count} ${g.base}s`)));
   return `${what.charAt(0).toUpperCase()}${what.slice(1)} ${count === 1 ? 'is' : 'are'} coming from ${coming.from}: ${count === 1 ? 'it arrives' : 'they arrive'} at the start of round ${coming.round}.`;
 }
 
@@ -610,7 +649,7 @@ export function objectiveText(battle) {
     const standing = allies.filter((c) => c.hp > 0).length;
     return `${encounter.allyObjective}: ${standing} of ${allies.length} still standing.`;
   }
-  if (battle.reinforcements && battle.reinforcements.coming) return reinforcementsText(encounter.reinforcements);
+  if (battle.reinforcements && battle.reinforcements.coming) return reinforcementsText(encounter.reinforcements, reinforcementsComing(battle));
   const hymn = encounter.hymn;
   if (!hymn || !battle.hymn) return '';
   if (battle.hymn.risen) return 'The hymn is finished.';
@@ -1797,6 +1836,45 @@ export function heroHelp(game, targetId) {
   log(game, `You give ${c.name} first aid (Medicine): ${c.name} is Stable.`, { roll });
 }
 
+// ---- Calling a foe by its true name (the Chantry of Ash) ----
+// An encounter's callByName (encounters.js): a hero who learned the name (its ifFlag) can use
+// their action to call the foe it belongs to, while that foe is on its feet and within range.
+// It remembers who it was, and fights on the hero's side from then on, as an ally (turned:
+// true), going after its old master (goesFor) and then the nearest foe (turnedAllyTurn).
+
+// The call the hero could make: { action, what, target, problem } (problem says why not now),
+// or null if this fight has none, the hero never learned the name, or there's nobody left to
+// call.
+export function nameCall(game) {
+  const battle = game.battle;
+  const call = battle && findEncounter(battle.encounterId).callByName;
+  if (!call || !(game.flags || []).includes(call.ifFlag)) return null;
+  const target = enemies(battle).find((c) => c.monsterId === call.monster && c.hp > 0 && !c.escaped);
+  if (!target) return null;
+  let problem = null;
+  if (!isHeroTurn(game)) problem = "It isn't your turn.";
+  else if (battle.turnState.action) problem = 'You have already used your action this turn.';
+  else if (feetBetween(heroCombatant(battle).pos, target.pos) > call.range) problem = `${target.name} is too far away to hear you: get within ${call.range} feet.`;
+  return { action: call.action, what: call.what, target, problem };
+}
+
+export function heroCallByName(game) {
+  requireHeroTurn(game);
+  const call = nameCall(game);
+  if (!call) throw new Error('There is nobody here to call by name.');
+  if (call.problem) throw new Error(call.problem);
+  heroUseAction(game, 'call her by name');
+  const battle = game.battle;
+  const { callByName } = findEncounter(battle.encounterId);
+  const c = call.target;
+  Object.assign(c, { side: 'hero', ally: true, turned: true });
+  // Whatever her old side's fight had put on her (a distraction, Vex, Turn Undead) is over.
+  battle.effects = battle.effects.filter((e) => e.target !== c.id || e.kind === 'prone');
+  log(game, callByName.call);
+  log(game, callByName.heard);
+  return checkEnd(game);
+}
+
 function heroUseAction(game, name) {
   requireHeroTurn(game);
   if (game.battle.turnState.action) throw new Error(`You have already used your action, so you can't ${name}.`);
@@ -2868,6 +2946,7 @@ function allyTurn(game, c) {
     log(game, hasEffect(battle, c.id, 'paralyzed') ? `${c.name} is Paralyzed, and can't move or act.` : `${c.name} can't act.`);
     return;
   }
+  if (c.turned) return turnedAllyTurn(game, c);
   const monster = findMonster(c.monsterId);
   const melee = monsterAttackOptions(monster).find((o) => o.how === 'melee' && !o.alone);
   const besideFoes = () => enemies(battle).filter((e) => e.hp > 0 && isAdjacent(e.pos, c.pos)).sort((a, b) => a.hp - b.hp);
@@ -2883,6 +2962,43 @@ function allyTurn(game, c) {
     battle.effects.push({ kind: 'dodging', target: c.id, endsOn: c.id });
     log(game, `${c.name} braces and holds the line (Dodge): attacks on them have Disadvantage until their next turn.`);
   }
+}
+
+// A foe turned to the hero's side (called by its name: see heroCallByName) doesn't hold its
+// ground: it goes after its old master (the encounter's callByName.goesFor), and once they've
+// fallen, the nearest foe. It moves (Dashing if it can't reach), and attacks as it always did:
+// its Multiattack, in melee.
+function turnedAllyTurn(game, c) {
+  const battle = game.battle;
+  const monster = findMonster(c.monsterId);
+  const call = findEncounter(battle.encounterId).callByName;
+  const foes = enemies(battle).filter((e) => e.hp > 0 && !e.escaped);
+  if (!foes.length) return checkEnd(game);
+  const master = call && foes.find((e) => e.name === call.goesFor);
+  const target = master || foes.sort((a, b) => squaresBetween(c.pos, a.pos) - squaresBetween(c.pos, b.pos) || a.hp - b.hp)[0];
+  const melee = monsterAttackOptions(monster).find((o) => o.how === 'melee' && !o.alone);
+  const strike = () => {
+    for (let i = 0; i < (monster.multiattack || 1); i++) {
+      if (battle.outcome || target.hp <= 0 || c.hp <= 0) break;
+      performAttack(game, c, target, melee);
+    }
+    return checkEnd(game);
+  };
+  if (isAdjacent(c.pos, target.pos)) return strike();
+  const map = battleMap(battle);
+  const crawling = isProne(battle, c.id);
+  const reach = reachableSquares(map, c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling });
+  const closest = [...reach.values()].filter((s) => isAdjacent(s.pos, target.pos)).sort((a, b) => a.cost - b.cost)[0];
+  if (closest) {
+    moveAlong(game, c, closest.path);
+    if (battle.outcome || c.hp <= 0) return checkEnd(game);
+    return strike();
+  }
+  battle.turnState.movementLeft += speedOf(game, c);
+  const farther = reachableSquares(map, c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling });
+  const nearest = [...farther.values()].sort((a, b) => squaresBetween(a.pos, target.pos) - squaresBetween(b.pos, target.pos) || a.cost - b.cost)[0];
+  if (nearest && nearest.path.length) moveAlong(game, c, nearest.path);
+  return checkEnd(game);
 }
 
 // ---- A companion's turn ----
@@ -3103,6 +3219,9 @@ export function finishBattle(game) {
   // Which allies came through it alive (the Old Ford's soldiers), for the story.
   const allies = allyCombatants(battle);
   if (allies.length) game.lastBattle.alliesAlive = allies.filter((c) => c.hp > 0).map((c) => c.id);
+  // Foes the hero called by name, who turned to their side (Dame Aveline).
+  const turned = battle.combatants.filter((c) => c.turned).map((c) => c.monsterId);
+  if (turned.length) game.lastBattle.turned = turned;
   game.battle = null;
   return { outcome: battle.outcome, choiceIndex: battle.choiceIndex };
 }

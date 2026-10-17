@@ -18,6 +18,7 @@ INCLUDE act-1/ch2-eve.ink
 INCLUDE act-1/ch3-barrow-gate.ink
 INCLUDE act-1/ch3-hall.ink
 INCLUDE act-1/ch3-vault.ink
+INCLUDE act-1/ch3-chantry.ink
 
 // Where play begins: Chapter 1, on the road to Bramblegate.
 -> ch1_arrival

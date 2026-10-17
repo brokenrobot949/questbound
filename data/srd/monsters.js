@@ -175,6 +175,38 @@ export const monsters = [
     text: 'Undead Fortitude. If damage reduces the zombie to 0 Hit Points, it makes a Constitution saving throw (DC 5 plus the damage taken) unless the damage is Radiant or from a Critical Hit. On a successful save, the zombie drops to 1 Hit Point instead.',
     source: 'SRD 5.2.1',
   },
+  // Dame Aveline, the first queen's champion, sung up out of her tomb in the Chantry of Ash
+  // (Chapter 3).
+  {
+    id: 'wight',
+    name: 'Wight',
+    size: 'medium',
+    type: 'Undead',
+    ac: 14, // Studded Leather Armor
+    hp: { average: 82, dice: '11d8 + 33' },
+    speed: 30,
+    abilities: { strength: 15, dexterity: 14, constitution: 16, intelligence: 10, wisdom: 13, charisma: 15 },
+    saves: { strength: 2, dexterity: 2, constitution: 3, intelligence: 0, wisdom: 1, charisma: 2 },
+    initiative: 4,
+    skills: { perception: 3, stealth: 4 },
+    resistances: ['necrotic'],
+    immunities: ['poison'],
+    conditionImmunities: ['exhaustion', 'poisoned'],
+    darkvision: 60,
+    passivePerception: 13,
+    cr: '3',
+    xp: 700,
+    multiattack: 2,
+    attacks: [
+      { id: 'necrotic-sword', name: 'Necrotic Sword', kind: 'melee', bonus: 4, reach: 5, damage: { dice: '1d8', bonus: 2, type: 'slashing', plus: { dice: '1d8', type: 'necrotic' } } },
+      { id: 'necrotic-bow', name: 'Necrotic Bow', kind: 'ranged', bonus: 4, range: [150, 600], damage: { dice: '1d8', bonus: 2, type: 'piercing', plus: { dice: '1d8', type: 'necrotic' } } },
+    ],
+    behaviour: 'brute',
+    sprite: 'wight',
+    variant: 'Life Drain (in place of one attack: a DC 13 Constitution save or 1d8 + 2 Necrotic damage, and the Hit Point maximum drops by as much) isn’t played yet: the game has no way to lower a Hit Point maximum. Sunlight Sensitivity doesn’t come up under the barrow.',
+    text: 'Multiattack. The wight makes two attacks, using Necrotic Sword or Necrotic Bow in any combination. Necrotic Sword. Melee Attack Roll: +4, reach 5 ft. Hit: 6 (1d8 + 2) Slashing damage plus 4 (1d8) Necrotic damage. Necrotic Bow. Ranged Attack Roll: +4, range 150/600 ft. Hit: 6 (1d8 + 2) Piercing damage plus 4 (1d8) Necrotic damage.',
+    source: 'SRD 5.2.1',
+  },
   // The flooded vault under the Kings' Barrow (Chapter 3): it wades in the black water.
   {
     id: 'ogre-zombie',

@@ -9,8 +9,11 @@
 //     rows           [first, last]: the band of map rows the room covers, walls included
 //                    (neighbouring rooms share the row their doorway is in)
 //     entry          where the hero stands on arriving ({ x, y } on the whole map)
+//     entryWhen      somewhere else they arrive, once a story flag is set:
+//                    [{ on: [flags], pos }] (the long way round into the chantry)
 //     exits          doorways: { room-id: [{ x, y }, …] }; a choice tagged #go:room-id lights
-//                    them up, and tapping one takes that choice
+//                    them up, and tapping one takes that choice. A doorway can be shut until
+//                    the room changes (the stair under the vault's water: see changes)
 //     figures        who the hero finds in the room, drawn on the map:
 //                      sprite   a picture from data/campaign/sprites.js (sprites or tiles)
 //                      person   or someone from data/campaign/people.js, drawn as they look
@@ -130,6 +133,11 @@ const deepLegend = {
   w: { terrain: 'obstacle', tile: 'dirt', decor: 'sluice-wheel' },
   h: { terrain: 'obstacle', tile: 'dirt', decor: 'sluice-gate' },
   v: { terrain: 'floor', tile: 'dirt', decor: 'stair-down' },
+  // The Chantry of Ash: old bones in the ash, the Choir's altar, and the open slab of Dame
+  // Aveline's tomb.
+  x: { terrain: 'floor', tile: 'crypt-floor', decor: 'bones' },
+  A: { terrain: 'obstacle', tile: 'crypt-floor', decor: 'altar' },
+  T: { terrain: 'obstacle', tile: 'crypt-floor', decor: 'tomb-slab' },
 };
 
 // The vault's foes lie where they fell once beaten, sink once it's flooded, and are gone if
@@ -137,6 +145,12 @@ const deepLegend = {
 const vaultFoesFallen = ['vault_won'];
 const vaultFoesGone = ['vault_fates_mercy', 'vault_flooded'];
 const atTheWheel = ['garrick_freed'];
+
+// In the chantry, Vesk and his dead lie where they fell once beaten (or once Aveline strikes
+// him down, if the party lost: Fate's Mercy). Dame Aveline lies down again, destroyed or at
+// rest.
+const chantryFoesFallen = ['chantry_won', 'chantry_fates_mercy'];
+const avelineDown = ['aveline_destroyed', 'aveline_rested'];
 
 export const dungeons = [
   {
@@ -437,7 +451,24 @@ export const dungeons = [
       'S==~~==S',
       'S__Wg__S',
       'S______S',
-      'SSSSSS__',
+      // The vault's foot (row 10), shared with the chantry below: the sluice's outflow in the
+      // middle, where the stair down is once the vault is drained, and the Choir's crawl at
+      // the right.
+      'SSS~~S__',
+      // The Chantry of Ash (rows 10–21): the stair comes down into it at the top. The old
+      // drain, the long way round, comes out of the left wall (row 13). Pillars, ash and old
+      // bones, the Choir's altar near the foot, and Dame Aveline's open tomb behind it.
+      'S______S',
+      'S_S__S_S',
+      '_______S',
+      'S_S__S_S',
+      'S______S',
+      'S_x__x_S',
+      'S______S',
+      'S__AA__S',
+      'S______S',
+      'S__TT__S',
+      'SSSSSSSS',
     ],
     legend: deepLegend,
     rooms: [
@@ -446,17 +477,19 @@ export const dungeons = [
         name: 'The flooded vault',
         rows: [0, 10],
         entry: { x: 3, y: 1 },
-        exits: {},
-        // Drained, the channel is silt with a stair going down it. Flooded back, the water
-        // covers everything but the landing, and fills the Choir's passage.
+        // The stair down to the chantry, under the water until the vault is drained.
+        exits: { chantry: [{ x: 3, y: 10 }, { x: 4, y: 10 }] },
+        // Drained, the channel is silt, and the outflow at its foot is a stair going down.
+        // Flooded back, the water covers everything but the landing, and fills the Choir's
+        // passage.
         changes: [
           {
             on: ['vault_drained'],
-            rows: ['SSS__SSS', 'S______S', 'S______S', 'S::::::S', 'S::::::S', 'S______S', 'S::vv::S', 'S::::::S', 'S__wh__S', 'S______S', 'SSSSSS__'],
+            rows: ['SSS__SSS', 'S______S', 'S______S', 'S::::::S', 'S::::::S', 'S______S', 'S::::::S', 'S::::::S', 'S__wh__S', 'S______S', 'SSSvvS__'],
           },
           {
             on: ['vault_flooded'],
-            rows: ['SSS__SSS', 'S______S', 'S======S', 'S~~~~~~S', 'S~~~~~~S', 'S~~~~~~S', 'S~~~~~~S', 'S~~~~~~S', 'S~~Wg~~S', 'S~~~~~~S', 'SSSSSS~~'],
+            rows: ['SSS__SSS', 'S______S', 'S======S', 'S~~~~~~S', 'S~~~~~~S', 'S~~~~~~S', 'S~~~~~~S', 'S~~~~~~S', 'S~~Wg~~S', 'S~~~~~~S', 'SSS~~S~~'],
           },
         ],
         // The Choir at the wheel, where the fight (vault-wheel) starts them: the acolyte who
@@ -472,6 +505,25 @@ export const dungeons = [
           { sprite: 'cultist', pos: { x: 6, y: 9 }, name: 'Choir acolytes', fallenOn: vaultFoesFallen, goneOn: vaultFoesGone },
           { person: 'garrick', pos: { x: 2, y: 8 }, name: 'Garrick Dunn, chained to the wheel', goneOn: atTheWheel },
           { person: 'rival', pos: { x: 5, y: 8 }, name: 'your rival, chained to the wheel', shownOn: ['rival_taken'], goneOn: atTheWheel },
+        ],
+      },
+      {
+        id: 'chantry',
+        name: 'The Chantry of Ash',
+        rows: [10, 21],
+        entry: { x: 3, y: 11 },
+        // The long way round comes out of the old drain in the left wall.
+        entryWhen: [{ on: ['vault_flooded'], pos: { x: 1, y: 13 } }],
+        exits: { vault: [{ x: 3, y: 10 }, { x: 4, y: 10 }] },
+        // Where the fights (chantry, chantry-late) start them: Cantor Vesk at the altar, Dame
+        // Aveline risen beside him, and the dead he has sung up. Arriving late (the long way
+        // round), one more of the dead is up already.
+        figures: [
+          { sprite: 'cantor', pos: { x: 3, y: 19 }, name: 'Cantor Vesk', fallenOn: chantryFoesFallen },
+          { sprite: 'wight', pos: { x: 4, y: 19 }, name: 'Dame Aveline', fallenOn: avelineDown },
+          { sprite: 'zombie', pos: { x: 1, y: 16 }, name: 'the dead', fallenOn: chantryFoesFallen },
+          { sprite: 'zombie', pos: { x: 6, y: 16 }, name: 'the dead', fallenOn: chantryFoesFallen },
+          { sprite: 'zombie', pos: { x: 3, y: 15 }, name: 'the dead', shownOn: ['vault_flooded'], fallenOn: chantryFoesFallen },
         ],
       },
     ],

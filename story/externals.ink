@@ -161,6 +161,11 @@ EXTERNAL combat_won()
 // hero strikes first, unseen: the foes roll Initiative with Disadvantage.
 EXTERNAL foe_escaped(monster)
 
+// foe_turned(monster): true if, in the last fight, the hero called a foe of that kind by its
+// name (an encounter's callByName) and it turned to fight on their side, e.g.
+//   { foe_turned("wight"): Dame Aveline remembered her oath. }
+EXTERNAL foe_turned(monster)
+
 // allies_standing(): how many allies who fought beside the party in the last fight (an
 // encounter's allies, such as the Old Ford's soldiers) came through it alive, won or lost:
 //   { allies_standing() == 3: All three are still on their feet. }
