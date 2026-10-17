@@ -18,6 +18,8 @@ export const sheets = {
   map: ['assets/dawnlike/Objects/Map0.png'],
   effect: ['assets/dawnlike/Objects/Effect0.png'],
   door: ['assets/dawnlike/Objects/Door0.png'],
+  trap: ['assets/dawnlike/Objects/Trap0.png'],
+  tile: ['assets/dawnlike/Objects/Tile.png'],
 };
 
 // Monsters and other creatures.
@@ -35,6 +37,7 @@ export const sprites = {
   guard: { sheet: 'player', col: 1, row: 3 }, // a soldier in grey mail
   'cultist-fanatic': { sheet: 'player', col: 7, row: 3 }, // a red-hooded figure, face in shadow
   'animated-armor': { sheet: 'humanoid', col: 3, row: 4 }, // plate and a closed helm, sword and shield
+  'ogre-zombie': { sheet: 'undead', col: 6, row: 0 }, // a great hulking zombie
 };
 
 // Floor tiles and things that stand on them. alpha (0 to 1) draws a picture faded, and
@@ -81,6 +84,16 @@ export const tiles = {
   campfire: { sheet: 'effect', col: 1, row: 21 },
   // Chapter 3: the Kings' Barrow's great gate, a sealing stone between grey stone doorposts.
   'sealing-stone': { sheet: 'door', col: 0, row: 1 },
+  // The upper barrow: a pressure plate once it's found (a dart on a plate), and the shut way
+  // through the oath-wall (a sealed door in a gilt frame).
+  'dart-plate': { sheet: 'trap', col: 1, row: 0 },
+  'oath-door': { sheet: 'door', col: 4, row: 1 },
+  // The deep barrow: the great sluice wheel in the flooded vault (DawnLike has no water wheel,
+  // so a segmented blue ring stands in for it), the iron grille of its sluice gate, and the
+  // stair down that the water hid until the vault is drained.
+  'sluice-wheel': { sheet: 'effect', col: 4, row: 24 },
+  'sluice-gate': { sheet: 'decor', col: 1, row: 21 },
+  'stair-down': { sheet: 'tile', col: 1, row: 1 },
 };
 
 // Walls join up with their neighbours. Each wall style is a block of tiles in DawnLike's

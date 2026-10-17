@@ -8,7 +8,7 @@
 // the story moves them on. The hero's companions stand beside the hero.
 
 import { parseMap } from '../combat/grid.js';
-import { besideEntry, findDungeon, findRoom, roomFigures } from '../world/dungeons.js';
+import { besideEntry, dungeonRows, findDungeon, findRoom, roomFigures } from '../world/dungeons.js';
 import { drawCell, drawTile, frameSquare, loadArt, pixelScale, sizeCanvas, spriteImage, blit, TILE } from './tile-art.js';
 import { sprites, tiles } from '../../../data/campaign/sprites.js';
 import { findPerson, personSprite } from './speakers.js';
@@ -26,10 +26,13 @@ function personImage(id) {
   return personImages.get(id);
 }
 
+// The map as the story has left it (a drained vault, say), parsed once for each way it looks.
 const parsed = new Map();
-function dungeonMap(dungeon) {
-  if (!parsed.has(dungeon.id)) parsed.set(dungeon.id, parseMap(dungeon.rows, dungeon.legend));
-  return parsed.get(dungeon.id);
+function dungeonMap(dungeon, flags) {
+  const rows = dungeonRows(dungeon, flags);
+  const key = `${dungeon.id}:${rows.join('/')}`;
+  if (!parsed.has(key)) parsed.set(key, parseMap(rows, dungeon.legend));
+  return parsed.get(key);
 }
 
 // The rows a room covers, inclusive.
@@ -44,7 +47,7 @@ const inRoom = (room, y) => y >= room.rows[0] && y <= room.rows[1];
 export async function showDungeonMap({ container, state, flags = [], hero, party = [], doors = [], onGo, stillWanted = () => true }) {
   const dungeon = findDungeon(state.id);
   const room = findRoom(state.id, state.room);
-  const map = dungeonMap(dungeon);
+  const map = dungeonMap(dungeon, flags);
   const art = await loadArt();
   if (!stillWanted()) return;
   const heroImage = spriteImage(hero, hero.frames[0]);

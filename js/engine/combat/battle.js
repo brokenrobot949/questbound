@@ -109,18 +109,30 @@ export const findMonster = (id) => monsters.find((m) => m.id === id) || null;
 const maps = new Map();
 // The encounter's map, parsed once: its own, or its room of a dungeon. Onlookers (goblins
 // watching a duel, Lark on her ledge) stand in the way like any obstacle. A person onlooker
-// isn't a picture on the map: the battle screen draws them as they look in scenes.
+// isn't a picture on the map: the battle screen draws them as they look in scenes. An onlooker
+// who isn't there in this fight (battle.absentOnlookers, see onlookersAbsent) leaves their
+// square as it was.
 export function battleMap(battle) {
-  if (!maps.has(battle.encounterId)) {
+  const absent = battle.absentOnlookers || [];
+  const key = `${battle.encounterId}|${absent.join(',')}`;
+  if (!maps.has(key)) {
     const encounter = findEncounter(battle.encounterId);
     const { rows, legend } = encounterRows(encounter);
     const map = parseMap(rows, legend);
-    for (const { decor, pos } of encounter.onlookers || []) {
+    (encounter.onlookers || []).forEach(({ decor, pos }, i) => {
+      if (absent.includes(i)) return;
       map.cells[pos.y][pos.x] = { ...map.cells[pos.y][pos.x], terrain: 'obstacle', ...(decor ? { decor } : {}) };
-    }
-    maps.set(battle.encounterId, map);
+    });
+    maps.set(key, map);
   }
-  return maps.get(battle.encounterId);
+  return maps.get(key);
+}
+
+// Which of an encounter's onlookers aren't there, given the story flags: the ones with an
+// ifFlag that isn't set (the hero's Rival, chained at the sluice wheel only if the Choir took
+// them). Their indices in encounter.onlookers.
+export function onlookersAbsent(encounter, flags = []) {
+  return (encounter.onlookers || []).flatMap((o, i) => (o.ifFlag && !flags.includes(o.ifFlag) ? [i] : []));
 }
 
 export const combatantById = (battle, id) => battle.combatants.find((c) => c.id === id);
@@ -339,8 +351,8 @@ function rescene(game) {
 // ---- Starting ----
 
 // The standable square nearest `near` that nobody stands on, or null.
-function freeSquareNear(encounterId, combatants, near) {
-  const map = battleMap({ encounterId });
+function freeSquareNear(encounterId, combatants, near, absentOnlookers = []) {
+  const map = battleMap({ encounterId, absentOnlookers });
   const taken = (pos) => combatants.some((c) => c.pos.x === pos.x && c.pos.y === pos.y);
   const squares = [];
   for (let y = 0; y < map.height; y++) for (let x = 0; x < map.width; x++) squares.push({ x, y });
@@ -367,6 +379,7 @@ export function startBattle(game, encounterId, choiceIndex, { surprise = false, 
   }
   const numbered = {};
   const named = {};
+  const absentOnlookers = onlookersAbsent(encounter, game.flags);
   const combatants = [{ id: 'hero', side: 'hero', name: game.character.name, pos: { ...encounter.hero } }];
   for (const entry of encounter.monsters) {
     const { monster: id, pos } = entry;
@@ -386,13 +399,14 @@ export function startBattle(game, encounterId, choiceIndex, { surprise = false, 
   // Companions start on the free squares nearest the hero.
   for (const member of fightingMembers(game)) {
     const name = memberGame(game, member).character.name.split(' ')[0];
-    const pos = freeSquareNear(encounterId, combatants, encounter.hero);
+    const pos = freeSquareNear(encounterId, combatants, encounter.hero, absentOnlookers);
     if (!pos) break;
     combatants.push({ id: member.id, side: 'hero', companion: true, name, pos, state: member.hp > 0 ? 'up' : 'down', deathSaves: { successes: 0, failures: 0 } });
   }
   game.battle = {
     encounterId,
     choiceIndex,
+    absentOnlookers,
     round: 1,
     order: [],
     turn: 0,
@@ -601,10 +615,12 @@ export function objectiveText(battle) {
   if (!hymn || !battle.hymn) return '';
   if (battle.hymn.risen) return 'The hymn is finished.';
   if (!battle.hymn.singing) return 'The hymn is broken. No more of the dead will rise here.';
-  // "A second Skeleton" when it's the only one of its kind; "another Zombie" when there are more.
+  // "A Zombie" when none started the fight; "a second Skeleton" when it's the only one of its
+  // kind; "another Zombie" when there are more.
   const kind = findMonster(hymn.rises.monster).name;
   const already = encounter.monsters.filter((m) => m.monster === hymn.rises.monster).length;
-  return `The hymn: unless the singer is stopped, ${already === 1 ? 'a second' : 'another'} ${kind} rises at the start of round ${hymn.round}. Hurting the singer may break it.`;
+  const which = ['a', 'a second'][already] || 'another';
+  return `The hymn: unless the singer is stopped, ${which} ${kind} rises at the start of round ${hymn.round}. Hurting the singer may break it.`;
 }
 
 // Plays every enemy, ally and companion turn (and a downed hero's death saves) until the hero

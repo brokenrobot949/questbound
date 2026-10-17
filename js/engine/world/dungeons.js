@@ -36,13 +36,27 @@ export function enterRoom(state, where) {
   };
 }
 
+// The rows of a dungeon's map as the story has left them. A room with changes
+// ([{ on: [flags], rows }]) is drawn with that change's rows, which cover its whole band, once
+// any of its flags is set: the flooded vault, drained or flooded back. The first change whose
+// flag is set wins. (Fights use the map as first drawn: see encounterRows.)
+export function dungeonRows(dungeon, flags = []) {
+  const rows = [...dungeon.rows];
+  for (const room of dungeon.rooms) {
+    const change = (room.changes || []).find((c) => c.on.some((flag) => flags.includes(flag)));
+    if (change) rows.splice(room.rows[0], change.rows.length, ...change.rows);
+  }
+  return rows;
+}
+
 // Who the hero finds in a room, given the story flags: [{ sprite, person, pos, name, lying,
 // fallen }] (sprite or person is null). Anyone who has left (a goneOn flag is set) isn't
-// there; anyone who fell (a fallenOn flag is set) lies where they fell.
+// there; anyone who fell (a fallenOn flag is set) lies where they fell; anything only found
+// later (shownOn) isn't there until one of its flags is set.
 export function roomFigures(room, flags) {
   const anySet = (list) => (list || []).some((flag) => flags.includes(flag));
   return (room.figures || [])
-    .filter((figure) => !anySet(figure.goneOn))
+    .filter((figure) => !anySet(figure.goneOn) && (!figure.shownOn || anySet(figure.shownOn)))
     .map((figure) => ({
       sprite: figure.sprite || null,
       person: figure.person || null,

@@ -19,7 +19,7 @@ import { longRestRecovery } from '../character/resources.js';
 import { approve, feeling, findCompanion, inParty, joinParty, leaveParty, memberGame, memberOf, PARTY_LIMIT, partyLongRest, raiseMember } from '../character/party.js';
 import { xpForLevel } from '../character/level-up.js';
 import { tacticalMind } from '../character/features.js';
-import { takeDamage } from '../character/hazards.js';
+import { findTrap, springTrap, takeDamage, trapDamageDice } from '../character/hazards.js';
 import { dmNotes } from '../../../data/campaign/dm-voice.js';
 
 export function bindExternals(story, runtime) {
@@ -396,6 +396,29 @@ export function bindExternals(story, runtime) {
       const { game } = runtime;
       const { outcome } = takeDamage(game, dice, type, {
         onDamage: (rolls, taken) => note(game, dmNotes.damageTaken, { damage: taken, type, dice, rolls: rolls.join(', ') }),
+        onDying: () => note(game, dmNotes.blackedOut),
+      });
+      if (outcome === 'woke') note(game, dmNotes.cameRound);
+      if (outcome === 'dead') note(game, dmNotes.fellDead);
+      return outcome;
+    },
+    false,
+  );
+
+  // spring_trap(id): a trap from data/srd/traps.js springs on the hero, outside a fight, e.g.
+  // ~ temp darts = spring_trap("poisoned-darts"). They make its saving throw (shown as a roll);
+  // on a failure it strikes them, and the damage works as for take_damage. Returns "safe"
+  // (the save succeeded), or take_damage's "up", "woke" or "dead" (go to Fate's Mercy).
+  story.BindExternalFunction(
+    'spring_trap',
+    (id) => {
+      const { game } = runtime;
+      const trap = findTrap(id);
+      if (!trap) throw new Error(`Unknown trap: ${id}`);
+      const sides = trapDamageDice(trap, game.character.level).split('d')[1];
+      const { outcome } = springTrap(game, trap, {
+        onHits: (hits) => note(game, dmNotes.trapStruck, { hits, what: hits === 1 ? trap.one : trap.many }),
+        onDamage: (rolls, taken) => note(game, dmNotes.damageTaken, { damage: taken, type: trap.damage.type, dice: `${rolls.length}d${sides}`, rolls: rolls.join(', ') }),
         onDying: () => note(game, dmNotes.blackedOut),
       });
       if (outcome === 'woke') note(game, dmNotes.cameRound);

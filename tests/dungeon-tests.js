@@ -6,11 +6,11 @@ import { createRng } from '../js/engine/rules/rng.js';
 import { forceNextD20 } from '../js/engine/rules/dice.js';
 import { isStandable, parseMap } from '../js/engine/combat/grid.js';
 import * as fight from '../js/engine/combat/battle.js';
-import { besideEntry, enterRoom, findDungeon, parseRoomTag, roomFigures } from '../js/engine/world/dungeons.js';
+import { besideEntry, dungeonRows, enterRoom, findDungeon, parseRoomTag, roomFigures } from '../js/engine/world/dungeons.js';
 import { sprites, tiles } from '../data/campaign/sprites.js';
 import { people } from '../data/campaign/people.js';
 import { joinParty, memberMaxHp, memberOf } from '../js/engine/character/party.js';
-import { takeDamage } from '../js/engine/character/hazards.js';
+import { findTrap, springTrap, takeDamage, trapDamageDice } from '../js/engine/character/hazards.js';
 import { startingInventory } from '../js/engine/character/inventory.js';
 import { freshResources } from '../js/engine/character/resources.js';
 import { dungeons } from '../data/campaign/dungeons.js';
@@ -1934,7 +1934,7 @@ test('Chapter 3: with Vesk warned and no goblins, his lookout hammers on the sto
   assertEqual(tagsOf(game), ['check:religion:13 drive:faith', 'check:history:13 drive:knowledge', 'combat:barrow-gate']);
 });
 
-test('Chapter 3: the ward-word, and the guardians kneel and roll the stone aside: the fight’s 400 XP, and the story stops at the open gate', async () => {
+test('Chapter 3: the ward-word, and the guardians kneel and roll the stone aside: the fight’s 400 XP, and a stair goes down from the open gate', async () => {
   const game = await atTheDarkMoon('gate-word', { flags: ['knows_ward_word', 'varrow_rallied'] });
   toTheGate(game);
   const xp = game.xp;
@@ -1942,7 +1942,7 @@ test('Chapter 3: the ward-word, and the guardians kneel and roll the stone aside
   assertTrue(['between the two guardians', '"Ysolde," you say', 'go down on one knee', 'You said it like you meant it', 'swings round on a hidden pivot', 'a stair goes down into the dark', 'After you'].every((s) => pageText(game).includes(s)));
   assertTrue(['gate_ward_word', 'gate_guardians_knelt', 'gate_opened'].every((f) => game.flags.includes(f)) && game.xp - xp === 400);
   assertTrue(deeds(game).includes('they knelt') && missingMiller(game).includes('great gate of the Kings'));
-  assertEqual([cards(game), game.objective], [[], "Go down into the Kings' Barrow, find Garrick, and stop the Choir's hymn. (The rest of Act I is still being written.)"]);
+  assertEqual([cards(game), tagsOf(game), game.objective], [['Go down the stair into the dark'], ['go:corridor'], "Go down into the Kings' Barrow, find Garrick, and stop the Choir's hymn."]);
   assertEqual(roomFigures(gateRoom(), game.flags).map((f) => [f.sprite, f.fallen]), [['animated-armor', false], ['animated-armor', false]], 'the stone is gone from the map; the guardians stand');
 });
 
@@ -2010,7 +2010,395 @@ test('Chapter 3: beaten at the gate, you wake robbed at the edge of the forecour
   assertTrue(['gate_fates_mercy', 'gate_guardians_knelt', 'gate_opened'].every((f) => game.flags.includes(f)) && game.money === 0);
   assertTrue(['They keep the door', 'Odda and Fen lie beside you', 'a goblin giggles', 'getting up again counts', 'swings round on a hidden pivot'].every((s) => pageText(game).includes(s)));
   assertTrue(notes(game).some((n) => n.startsWith('A good place to stop')) && game.hp === fight.maxHpOf(game, { id: 'hero' }));
+  assertEqual(cards(game), ['Go down the stair into the dark']);
+});
+
+// ---- Chapter 3, beat 3: the Hall of Champions ----
+
+const darts = findTrap('poisoned-darts');
+const barrowRoom = (id) => findDungeon('kings-barrow').rooms.find((r) => r.id === id);
+// A level 4 Champion, so Odda is level 4 too, with Detect Magic prepared.
+const champion4 = { ...champion, level: 4, hitPointRolls: [null, null, null] };
+
+test('Poisoned Darts: SRD 5.2.1’s trap, a DC 13 Dexterity save or 1d3 darts of 1d6 Poison each, and more at higher levels', () => {
+  assertEqual([darts.save, darts.hits, darts.damage, darts.detect, darts.source], [{ ability: 'dexterity', dc: 13 }, '1d3', { dice: '1d6', type: 'poison' }, { skill: 'perception', dc: 15 }, 'SRD 5.2.1']);
+  assertEqual([1, 4, 5, 10, 11, 16, 17, 20].map((level) => trapDamageDice(darts, level)), ['1d6', '1d6', '2d6', '2d6', '4d6', '4d6', '7d6', '7d6']);
+});
+
+test('Traps: make the save and nothing strikes you; fail it and each dart does its damage, halved for a Dwarf', () => {
+  const safe = gameFor(wren);
+  const hp = safe.hp;
+  safe.rng = scriptedRng([20]);
+  const dodged = springTrap(safe, darts);
+  assertEqual([dodged.outcome, dodged.hits, safe.hp], ['safe', 0, hp]);
+  assertEqual(safe.pending.map((p) => [p.result.kind, p.result.label, p.result.target.value, p.result.success]), [['save', 'Poisoned Darts (Dexterity save)', 13, true]]);
+  assertTrue(safe.pending[0].result.modifiers.every((m) => m.source === 'Dexterity saving throw'), 'the hero’s Dexterity save, shown in full');
+
+  const struck = gameFor(wren);
+  struck.hp = 20;
+  struck.rng = scriptedRng([1, 3, 4, 5, 6]); // the save fails; three darts, for 4, 5 and 6
+  let told = null;
+  const hit = springTrap(struck, darts, { onHits: (n) => (told = n) });
+  assertEqual([hit.outcome, hit.hits, told, struck.hp], ['up', 3, 3, 5]);
+
+  const dwarfHero = gameFor({ ...wren, speciesId: 'dwarf' });
+  dwarfHero.hp = 20;
+  dwarfHero.rng = scriptedRng([1, 3, 4, 5, 6]);
+  springTrap(dwarfHero, darts);
+  assertEqual(dwarfHero.hp, 13, 'a Dwarf resists Poison: 15 damage halves to 7');
+});
+
+test('The upper barrow: the gate, the crowned passage, the hall and the oath-wall; the plates show once found, and the oath-wall’s door goes once it opens', () => {
+  const barrow = findDungeon('kings-barrow');
+  assertEqual(barrow.rooms.map((r) => [r.id, r.rows]), [['forecourt', [0, 8]], ['corridor', [8, 15]], ['hall', [15, 24]], ['oath-wall', [24, 29]]]);
+  assertEqual(barrowRoom('corridor').name, 'The crowned passage', 'the map’s title doesn’t give the darts away');
+  const map = parseMap(barrow.rows, barrow.legend);
+  assertEqual(map.cells.flat().filter((cell) => cell.decor === 'bier').length, 5, 'five champions’ tombs');
+  const passage = barrowRoom('corridor');
+  assertEqual(roomFigures(passage, ['gate_opened']), [], 'no plates to see until you find them');
+  assertEqual(roomFigures(passage, ['darts_sprung']).map((f) => [f.sprite, f.pos.x, f.pos.y]), [['dart-plate', 3, 12], ['dart-plate', 4, 13], ['dart-plate', 3, 14]]);
+  assertEqual(roomFigures(passage, ['darts_spotted']).length, 3);
+  assertEqual(roomFigures(barrowRoom('oath-wall'), []).map((f) => f.sprite), ['oath-door', 'oath-door']);
+  assertEqual(roomFigures(barrowRoom('oath-wall'), ['oath_wall_opened']), []);
+});
+
+// Through the great gate by the ward-word, and down the stair into the crowned passage (a level
+// 3 Champion unless given, with Odda and Fen unless false).
+async function atTheHall(seed, { character = champion, flags = [], odda = true, fen = true } = {}) {
+  const game = await atTheDarkMoon(seed, { character, flags: ['knows_ward_word', 'varrow_rallied', ...flags], odda, fen });
+  toTheGate(game);
+  pick(game, 'Speak the ward-word');
+  pick(game, 'Go down the stair');
+  return game;
+}
+
+// Searches the passage (a natural 20 finds the plates), and goes on into the hall.
+function intoTheHall(game) {
+  forceNextD20(20);
+  pick(game, 'Search the floor and walls');
+  revealAll(game);
+  pick(game, 'Go on into the hall');
+}
+
+test('Chapter 3: down the stair into the crowned passage; searching finds the dart plates, and you step round them', async () => {
+  const game = await atTheHall('hall-search');
+  assertEqual(currentDungeon(game), { id: 'kings-barrow', room: 'corridor', explored: ['forecourt', 'corridor'] });
+  assertEqual([currentLocation(game), game.objective], ["The Kings' Barrow, the crowned passage", "Go down into the Kings' Barrow, find Garrick, and stop the Choir's hymn."]);
+  assertTrue(['a skeleton lies on its face', 'Something small and dark sticks out', 'They die facing the treasure'].every((s) => pageText(game).includes(s)), pageText(game));
+  assertEqual([cards(game), tagsOf(game)], [['Search the floor and walls before you go on', 'Walk on down the passage'], ['check:perception:15', '']], 'no Mage Hand for a Champion');
+  const xp = game.xp;
+  forceNextD20(20);
+  pick(game, 'Search the floor and walls');
+  revealAll(game);
+  assertTrue(game.flags.includes('darts_spotted') && !game.flags.includes('darts_sprung') && game.xp - xp === 50);
+  assertTrue(pageText(game).includes('three flagstones that sit a hair proud') && pageText(game).includes('setting their feet exactly where you set yours'));
+  assertEqual([cards(game), tagsOf(game)], [['Go on into the hall'], ['go:hall']]);
+  assertEqual(roomFigures(barrowRoom('corridor'), game.flags).length, 3, 'the plates show on the map');
+});
+
+test('Chapter 3: walk on and a plate goes off: the darts’ Dexterity save, then 1d3 darts of Poison, or nothing if you throw yourself flat', async () => {
+  const game = await atTheHall('hall-darts');
+  game.hp = 30;
+  game.rng = scriptedThen([2, 2, 3, 4], 'hall-darts'); // the save fails; two darts, for 3 and 4
+  pick(game, 'Walk on down the passage');
+  revealAll(game);
+  assertTrue(game.flags.includes('darts_sprung') && !game.flags.includes('darts_spotted') && game.hp === 23, `${game.hp}`);
+  assertEqual(game.page.beats.filter((b) => b.type === 'roll').map((b) => b.result.label), ['Poisoned Darts (Dexterity save)']);
+  assertTrue(notes(game).includes('Struck by 2 darts.') && notes(game).includes('You take 7 poison damage (2d6: 3, 4).'), notes(game).join(' / '));
+  assertTrue(['sinks under your boot', 'sting like hornets', 'you can see the rest'].every((s) => pageText(game).includes(s)));
+  assertEqual(cards(game), ['Go on into the hall']);
+  assertEqual(roomFigures(barrowRoom('corridor'), game.flags).length, 3, 'now you know where they are');
+
+  const flat = await atTheHall('hall-darts-flat');
+  const hp = flat.hp;
+  forceNextD20(20);
+  pick(flat, 'Walk on down the passage');
+  revealAll(flat);
+  assertTrue(pageText(flat).includes('You throw yourself flat') && flat.hp === hp && !notes(flat).some((n) => n.startsWith('Struck by')));
+});
+
+test('Chapter 3: struck down by the darts with nobody to help, three failed death saves are Fate’s Mercy: you wake hours later on the stair', async () => {
+  const game = await atTheHall('hall-darts-mercy');
+  game.hp = 1;
+  game.rng = scriptedThen([2, 1, 6, 1, 1], 'hall-darts-mercy'); // the save fails; one dart for 6; two natural 1s
+  pick(game, 'Walk on down the passage');
+  revealAll(game);
+  assertTrue(game.flags.includes('darts_fates_mercy') && game.hp === fight.maxHpOf(game, { id: 'hero' }), 'a long rest');
+  assertTrue(notes(game).includes('Darkness takes you.') && notes(game).some((n) => n.startsWith('A good place to stop')));
+  assertTrue(['Odda has been praying over you, and Fen swearing at you', "Don't do that again", 'Hours have gone', 'you can see the rest'].every((s) => pageText(game).includes(s)));
+  assertTrue(deeds(game).includes('struck down by poisoned darts'));
+  assertEqual(cards(game), ['Go on into the hall']);
+});
+
+test('Chapter 3: a Mage Hand sent down the passage sets the darts off where you would have been, with no roll', async () => {
+  const game = await atTheHall('hall-mage-hand', { character: juniper, odda: false, fen: false });
+  assertEqual(cards(game), ['Search the floor and walls before you go on', 'Send a Mage Hand down the passage ahead of you', 'Walk on down the passage']);
+  const hp = game.hp;
+  pick(game, 'Send a Mage Hand');
+  assertTrue(game.flags.includes('darts_spotted') && game.hp === hp && !game.page.beats.some((b) => b.type === 'roll'));
+  assertTrue(pageText(game).includes('patting the floor ahead of it') && pageText(game).includes('nothing so much as clicks'));
+});
+
+test('Chapter 3: the Hall of Champions: five tombs and their gold, and Odda’s Detect Magic shows every one is a ward', async () => {
+  const game = await atTheHall('hall-wards', { character: champion4, flags: ['knows_oath_wards'] });
+  intoTheHall(game);
+  assertEqual([currentDungeon(game).room, currentLocation(game)], ['hall', "The Kings' Barrow, the Hall of Champions"]);
+  assertTrue(['There are five of them', 'gold glints on every tomb', 'Every one of them a seal', "I'm only looking"].every((s) => pageText(game).includes(s)), pageText(game));
+  assertEqual(cards(game), ['Ask Odda to look at the tombs with Detect Magic', "Take the grave goods: the champions won't miss them", 'Go to the carved wall at the end of the hall']);
+  assertEqual(tagsOf(game), ['spell:detect-magic by:odda', 'drive:wealth', 'go:oath-wall']);
+  pick(game, 'Ask Odda');
+  assertTrue(game.flags.includes('saw_oath_wards') && pageText(game).includes('Every tomb glows') && pageText(game).includes('the oaths are still holding'));
+  assertTrue(notes(game).some((n) => n.startsWith('Odda casts Detect Magic')), notes(game).join(' / '));
+  assertEqual(cards(game), ["Take the grave goods: the champions won't miss them", 'Go to the carved wall at the end of the hall'], 'once is enough');
+});
+
+test('Chapter 3: robbing the champions’ graves is fifty gold and a Wealth moment; Odda minds, and the wards go out', async () => {
+  const game = await atTheHall('hall-loot', { character: champion4 });
+  intoTheHall(game);
+  assertTrue(pageText(game).includes('the old lists of my order say'), 'Odda without the Old Ford’s lesson');
+  const money = game.money;
+  pick(game, 'Take the grave goods');
+  assertTrue(game.flags.includes('looted_the_champions') && game.money - money === 5000);
+  assertEqual(memberOf(game, 'odda').approval, -1);
+  assertTrue(['stamped with a little crown', 'the hymn under the floor swells', "you've picked their pockets", "for once he doesn't make a joke"].every((s) => pageText(game).includes(s)));
+  assertTrue(!cards(game).some((c) => c.startsWith('Take the grave goods')), 'once');
+  pick(game, 'Ask Odda');
+  assertTrue(pageText(game).includes('The tombs are dark') && pageText(game).includes('still glows'));
+});
+
+test('Chapter 3: the oath-wall: reading it learns the seven champions, Aveline first, and speaking the oath opens the way down', async () => {
+  const game = await atTheHall('hall-oath', { flags: ['read_the_oath_stone'] });
+  intoTheHall(game);
+  pick(game, 'Go to the carved wall');
+  assertEqual([currentDungeon(game).room, currentLocation(game)], ['oath-wall', "The Kings' Barrow, the oath-wall"]);
+  assertTrue(pageText(game).includes('framed in tarnished gilt') && !pageText(game).includes('every letter of it glows'));
+  assertEqual(cards(game), ['Read the names and oaths, from what you know of the old court', 'Read the names and oaths by the wards worked into the words']);
+  assertEqual(tagsOf(game), ['check:history:13 drive:knowledge', 'check:arcana:13 drive:knowledge']);
+  const xp = game.xp;
+  forceNextD20(20);
+  pick(game, 'Read the names and oaths, from what');
+  revealAll(game);
+  assertTrue(game.flags.includes('read_the_oath_wall') && game.xp - xp === 100);
+  const text = pageText(game);
+  assertTrue(['and squint', 'AVELINE, FIRST OF THE SWORN', 'UNTIL I AM CALLED BY NAME', 'You know that name', 'until the dead lifted the stone', 'INGRITH HAMMERFALL OF EMBERDEEP', 'DAME MAUD HAWKRIDGE', 'whose words they were', 'SPEAK IT, SWORN, AND PASS'].every((s) => text.includes(s)), text);
+  assertTrue(missingMiller(game).includes('Dame Aveline') && game.flags.includes('odda_saw_ingriths_oath'));
+  assertEqual(cards(game), ['Swear it, and mean it', 'Say the words']);
+  pick(game, 'Swear it');
+  assertTrue(['swore_the_oath', 'oath_wall_opened'].every((f) => game.flags.includes(f)));
+  assertTrue(['you mean every word', 'the gilt-framed panel folds back', "It's always down", 'like a great wheel turning'].every((s) => pageText(game).includes(s)));
+  assertEqual([cards(game), game.objective], [['Go down the stair into the deep barrow'], "Go down into the deep barrow, find Garrick at the sluices, and stop the Choir's hymn."]);
+  assertEqual(roomFigures(barrowRoom('oath-wall'), game.flags), [], 'the way through is open on the map');
+});
+
+test('Chapter 3: the oath-wall reads easier for a Sage or in the wards’ glow, Comprehend Languages reads it all, and a bad reading opens it without the names', async () => {
+  const sage = await atTheHall('hall-sage', { character: juniper, odda: false, fen: false });
+  intoTheHall(sage);
+  pick(sage, 'Go to the carved wall');
+  assertEqual(cards(sage), ['Read the wall with Comprehend Languages', 'Read the names and oaths, from what you know of the old court', 'Read the names and oaths by the wards worked into the words']);
+  assertEqual(tagsOf(sage).slice(1), ['check:history:10 drive:knowledge', 'check:arcana:10 drive:knowledge'], 'a Sage');
+  pick(sage, 'Read the wall with Comprehend Languages');
+  assertTrue(sage.flags.includes('read_the_oath_wall') && pageText(sage).includes('swim and settle') && !pageText(sage).includes('whose words they were'), 'no Odda to know the words');
+  assertTrue(pageText(sage).includes('for seven names. And Aveline') && !pageText(sage).includes('You know that name'), 'never read the capstone at the Old Ford');
+  assertTrue(!sage.page.beats.some((b) => b.type === 'roll'));
+
+  const glow = await atTheHall('hall-glow', { character: champion4 });
+  intoTheHall(glow);
+  pick(glow, 'Ask Odda');
+  pick(glow, 'Go to the carved wall');
+  assertTrue(pageText(glow).includes('every letter of it glows'));
+  assertEqual(tagsOf(glow), ['check:history:10 drive:knowledge', 'check:arcana:10 drive:knowledge'], 'in the wards’ glow');
+  forceNextD20(20);
+  pick(glow, 'Read the names and oaths by the wards');
+  revealAll(glow);
+  assertTrue(pageText(glow).includes('like gold thread') && glow.flags.includes('read_the_oath_wall'));
+
+  const lost = await atTheHall('hall-lost', { character: lifeCleric, fen: false });
+  intoTheHall(lost);
+  assertTrue(cards(lost).includes('Look at the tombs with Detect Magic') && !cards(lost).some((c) => c.startsWith('Ask Odda')), 'the hero’s own Detect Magic');
+  pick(lost, 'Go to the carved wall');
+  forceNextD20(1);
+  pick(lost, 'Read the names and oaths by the wards');
+  revealAll(lost);
+  assertTrue(!lost.flags.includes('read_the_oath_wall') && pageText(lost).includes('The old court hand beats you') && pageText(lost).includes('SPEAK IT, SWORN, AND PASS'));
+  assertTrue(!missingMiller(lost).includes('Aveline'), 'her name isn’t learned');
+  pick(lost, 'Say the words');
+  assertTrue(lost.flags.includes('oath_wall_opened') && !lost.flags.includes('swore_the_oath'));
+  assertEqual(cards(lost), ['Go down the stair into the deep barrow']);
+});
+
+// ---- Chapter 3, beat 4: the flooded vault ----
+
+const vaultRoom = () => findDungeon('deep-barrow').rooms.find((r) => r.id === 'vault');
+const sable = { ...champion4, bond: { type: 'rival', name: 'Sable Rook' } };
+
+test('Ogre Zombie: SRD 5.2.1’s stat block, a 2d8 + 4 Slam and Undead Fortitude; Large, but one square on the grid for now', () => {
+  const ogre = monsters.find((m) => m.id === 'ogre-zombie');
+  assertEqual([ogre.size, ogre.ac, ogre.hp.average, ogre.speed, ogre.initiative, ogre.cr, ogre.xp], ['large', 8, 85, 30, -2, '2', 450]);
+  assertEqual(ogre.attacks, [{ id: 'slam', name: 'Slam', kind: 'melee', bonus: 6, reach: 5, damage: { dice: '2d8', bonus: 4, type: 'bludgeoning' } }]);
+  assertEqual([ogre.traits, ogre.immunities, ogre.conditionImmunities, ogre.type, ogre.source], [['undead-fortitude'], ['poison'], ['exhaustion', 'poisoned'], 'Undead', 'SRD 5.2.1']);
+  assertTrue(Boolean(sprites[ogre.sprite]) && ogre.variant.includes('one square'));
+});
+
+test('The flooded vault: an Ogre Zombie, a Ghoul and five acolytes are Moderate, and the one at the wheel sings a Zombie up out of the black water', () => {
+  const game = warrenFight('vault-wheel', champion);
+  assertEqual(fight.enemies(game.battle).map((c) => c.name), ['Choir Acolyte 1', 'Ogre Zombie', 'Ghoul', 'Choir Acolyte 2', 'Choir Acolyte 3', 'Choir Acolyte 4', 'Choir Acolyte 5']);
+  const vault = encounters.find((e) => e.id === 'vault-wheel');
+  assertEqual([encounterXp(vault), ratingFor(encounterXp(vault), partyBudget(4, 3))], [775, 'Moderate']);
+  const map = fight.battleMap(game.battle);
+  assertEqual([map.cells[3][3].terrain, map.cells[3][2].terrain, map.cells[5][3].terrain, map.cells[8][3].decor, map.cells[8][4].decor], ['water', 'difficult', 'floor', 'sluice-wheel', 'sluice-gate']);
+  assertEqual(fight.objectiveText(game.battle), 'The hymn: unless the singer is stopped, a Zombie rises at the start of round 3. Hurting the singer may break it.');
+  game.hp = 300; // so the hero is still standing to watch
+  fight.endHeroTurn(game);
+  fight.endHeroTurn(game);
+  assertTrue(said(game, 'Zombie 1 drags itself up out of the black water'), logText(game));
+});
+
+test('The flooded vault: the Rival stands chained at the wheel only if the Choir took them; Garrick always does', () => {
+  const alone = warrenFight('vault-wheel', champion);
+  const map = fight.battleMap(alone.battle);
+  assertEqual([alone.battle.absentOnlookers, map.cells[8][2].terrain, map.cells[8][5].terrain], [[1], 'obstacle', 'floor']);
+  const taken = gameFor(champion, 'vault-rival');
+  taken.flags = ['rival_taken'];
+  forceNextD20(20);
+  fight.startBattle(taken, 'vault-wheel', 0);
+  assertEqual([taken.battle.absentOnlookers, fight.battleMap(taken.battle).cells[8][5].terrain], [[], 'obstacle']);
+  assertEqual(fight.battleMap(alone.battle).cells[8][5].terrain, 'floor', 'each fight keeps its own map');
+});
+
+test('The deep barrow: the vault drains to silt and a stair, or floods to the landing; the Choir and Garrick stand where the fight starts them', () => {
+  const deep = findDungeon('deep-barrow');
+  assertEqual(dungeonRows(deep, ['rival_taken']), deep.rows, 'as first drawn');
+  const drained = parseMap(dungeonRows(deep, ['vault_drained']), deep.legend);
+  assertEqual([drained.cells[6][3].decor, drained.cells[6][3].terrain, drained.cells[3][3].terrain, drained.cells[8][3].decor], ['stair-down', 'floor', 'floor', 'sluice-wheel']);
+  const flooded = parseMap(dungeonRows(deep, ['vault_flooded']), deep.legend);
+  assertEqual([flooded.cells[1][3].terrain, flooded.cells[2][3].terrain, flooded.cells[5][1].terrain, flooded.cells[10][7].terrain], ['floor', 'difficult', 'water', 'water']);
+  for (const room of deep.rooms) {
+    for (const change of room.changes || []) {
+      assertEqual(change.rows.length, room.rows[1] - room.rows[0] + 1, `${room.id}: a change covers the room's band`);
+      assertTrue(change.rows.every((row) => row.length === deep.rows[0].length && [...row].every((letter) => deep.legend[letter])), `${room.id}: every square has a picture`);
+    }
+  }
+  const vault = vaultRoom();
+  const here = roomFigures(vault, []);
+  assertEqual(here.map((f) => f.person || f.sprite), ['cultist', 'ogre-zombie', 'ghoul', 'cultist', 'cultist', 'cultist', 'cultist', 'garrick'], 'no Rival unless the Choir took them');
+  const withRival = roomFigures(vault, ['rival_taken']);
+  assertTrue(withRival.some((f) => f.person === 'rival'));
+  const fightStart = encounters.find((e) => e.id === 'vault-wheel');
+  for (const { pos } of [...fightStart.monsters, ...fightStart.onlookers]) assertTrue(withRival.some((f) => f.pos.x === pos.x && f.pos.y === pos.y), `someone stands at ${pos.x},${pos.y}`);
+  assertEqual(roomFigures(vault, ['vault_won', 'garrick_freed']).filter((f) => !f.fallen), [], 'the Choir lies where it fell, and the wheel is empty');
+  assertEqual(roomFigures(vault, ['vault_fates_mercy', 'garrick_freed']), [], 'gone down to their rite');
+});
+
+// At the top of the stair down from the oath-wall (a level 4 Champion unless given, with Odda
+// and Fen unless false).
+async function atTheVault(seed, { character = champion4, flags = [], odda = true, fen = true } = {}) {
+  const game = await atTheDarkMoon(seed, { character, flags, odda, fen });
+  game.page = jumpTo(game, 'ch3_vault');
+  return game;
+}
+
+// Settles the fight at the wheel from the choice starting `start`: won or lost.
+function settleVault(game, start, { won = true, setUp = () => {} } = {}) {
+  const choice = game.story.currentChoices.find((c) => c.text.startsWith(start) && (c.tags || []).includes('combat:vault-wheel'));
+  if (!choice) throw new Error(`No fight "${start}": ${cards(game).join(' / ')}`);
+  startFight(game, choice);
+  setUp(game);
+  if (won) for (const foe of fight.enemies(game.battle)) foe.hp = 0;
+  else game.hp = 0;
+  game.battle.outcome = won ? 'victory' : 'defeat';
+  game.page = continueAfterBattle(game);
+}
+
+test('Chapter 3: down the stair from the oath-wall to the flooded vault, where Garrick and the Rival walk the Choir’s wheel', async () => {
+  const game = await atTheVault('vault-arrive', { character: sable, flags: ['rival_taken'] });
+  assertEqual([cards(game), game.objective], [['Go down the stair into the deep barrow'], "Go down into the deep barrow, find Garrick at the sluices, and stop the Choir's hymn."]);
+  pick(game, 'Go down the stair');
+  assertEqual([currentDungeon(game), currentLocation(game)], [{ id: 'deep-barrow', room: 'vault', explored: ['vault'] }, "The Kings' Barrow, the flooded vault"]);
+  const text = pageText(game);
+  assertTrue(['half full of black water', 'Garrick Dunn', 'walks Sable Rook, looking furious about it', 'something that was an ogre once', "That's the raising hymn", 'Thank the Flame'].every((s) => text.includes(s)), text);
+  assertEqual([cards(game), tagsOf(game)], [["Creep down off the landing while they're busy at the wheel", 'Attack them from the landing'], ['check:stealth:12', 'combat:vault-wheel']]);
+  assertTrue(['odda_at_the_vault', 'fen_at_the_vault'].every((f) => game.flags.includes(f)));
+  forceNextD20(20);
+  pick(game, 'Creep down');
+  revealAll(game);
+  assertTrue(pageText(game).includes('before anyone at the wheel knows you'));
+  assertEqual([cards(game), tagsOf(game)], [['Strike before they see you'], ['combat:vault-wheel surprise']]);
+});
+
+test('Chapter 3: a slip on the landing is the fight without surprise; a Minor Illusion’s splash gets you down unseen', async () => {
+  const clumsy = await atTheVault('vault-seen', { character: lifeCleric });
+  pick(clumsy, 'Go down the stair');
+  assertTrue(!pageText(clumsy).includes('walks Sable Rook') && !pageText(clumsy).includes('On the far side of the wheel'), 'no Rival');
+  forceNextD20(1);
+  pick(clumsy, 'Creep down');
+  revealAll(clumsy);
+  assertTrue(pageText(clumsy).includes('Down there! On the landing!'));
+  assertEqual([cards(clumsy), tagsOf(clumsy)], [['Fight'], ['combat:vault-wheel']]);
+
+  const trickster = await atTheVault('vault-illusion', { character: juniper, odda: false, fen: false });
+  pick(trickster, 'Go down the stair');
+  assertTrue(cards(trickster).includes('Make a great splash at the far end of the vault') && tagsOf(trickster).includes('spell:minor-illusion'));
+  pick(trickster, 'Make a great splash');
+  assertTrue(!trickster.page.beats.some((b) => b.type === 'roll') && pageText(trickster).includes('Every head at the wheel turns'));
+  assertEqual(cards(trickster), ['Strike before they see you']);
+});
+
+test('Chapter 3: the Choir beaten at the wheel: Garrick freed with Lark’s news, the Rival freed, and an acolyte who ran will warn the Cantor', async () => {
+  const game = await atTheVault('vault-won', { character: sable, flags: ['rival_taken', 'rival_offered_truce', 'lark_apprentice', 'found_garrick_neckerchief'] });
+  pick(game, 'Go down the stair');
+  settleVault(game, 'Attack them from the landing', {
+    setUp: (g) => {
+      fight.enemies(g.battle).find((c) => c.monsterId === 'cultist').escaped = true;
+      fight.combatantById(g.battle, 'fen').state = 'dead';
+      Object.assign(memberOf(g, 'fen'), { hp: 0, fallen: true });
+    },
+  });
+  assertTrue(['vault_won', 'garrick_freed', 'rival_freed', 'vault_acolyte_fled', 'fen_fell_in_the_vault'].every((f) => game.flags.includes(f)) && !game.flags.includes('odda_fell_in_the_vault'));
+  const text = pageText(game);
+  const said = ['goes over backwards', 'running feet', 'Fen lies on the gantry', 'carry the fallen up onto the landing', 'The key to the chains', "she's decided she's my apprentice", 'Course she has', 'I tied it there', 'Sable Rook rubs their wrists', 'I should have said yes', 'Three days', "There's a stair under that water", 'Flood it, and nobody comes at our backs'];
+  assertTrue(said.every((s) => text.includes(s)), said.filter((s) => !text.includes(s)).join(' / '));
+  assertTrue(!text.includes('Drain it, and we') && speakersOf(game).includes('garrick') && speakersOf(game).includes('rival'), 'Fen has nothing to say');
+  assertTrue(missingMiller(game).includes('Sable Rook is free') && deeds(game).includes('freed Garrick Dunn'));
+  assertEqual(cards(game), ['Drain the vault, and take the quick way down', 'Flood it back, cut the Choir off, and take the long way round']);
+  assertEqual(roomFigures(vaultRoom(), game.flags).filter((f) => !f.fallen), [], 'the Choir lies where it fell, and the wheel is empty');
+  pick(game, 'Drain the vault');
+  assertTrue(game.flags.includes('vault_drained') && !game.flags.includes('vault_flooded'));
+  assertTrue(['a stair cut in the rock', 'Whoever comes down from the low door after you', "If we're not back by dawn", 'You bring yourselves back'].every((s) => pageText(game).includes(s)));
+  assertEqual([cards(game), game.objective], [[], "Go down to the Chantry of Ash, and stop Cantor Vesk's hymn. (The rest of Act I is still being written.)"]);
+  assertTrue(missingMiller(game).includes('waiting at the great gate'));
+  assertEqual(parseMap(dungeonRows(findDungeon('deep-barrow'), game.flags), findDungeon('deep-barrow').legend).cells[6][3].decor, 'stair-down', 'the stair shows on the map');
+});
+
+test('Chapter 3: flooding the vault back fills the Choir’s crawl, and the long way round is the builders’ old drain; the watch sees Garrick home', async () => {
+  const game = await atTheVault('vault-flood', { flags: ['varrow_rallied', 'lark_stays_home'] });
+  pick(game, 'Go down the stair');
+  settleVault(game, 'Attack them from the landing');
+  assertTrue(!game.flags.includes('vault_acolyte_fled') && !game.flags.includes('rival_freed'));
+  assertTrue(pageText(game).includes("she's promised me she'll stay there") && !pageText(game).includes('rubs their wrists') && !pageText(game).includes('neckerchief'));
+  assertTrue(pageText(game).includes('Drain it, and we') && pageText(game).includes('Flood it, and nobody'));
+  pick(game, 'Flood it back');
+  assertTrue(game.flags.includes('vault_flooded') && !game.flags.includes('vault_drained'));
+  assertTrue(['full to the roof', 'Nobody is coming down from the low door now', 'the long way round', "Captain Varrow's watch is out on the cairns"].every((s) => pageText(game).includes(s)));
   assertEqual(cards(game), []);
+  assertEqual(roomFigures(vaultRoom(), game.flags), [], 'the water takes the fallen, and the wheel is empty');
+});
+
+test('Chapter 3: beaten at the wheel, you wake chained to it and robbed; Fen slips the chains, or Garrick’s loose pin does', async () => {
+  const game = await atTheVault('vault-mercy');
+  game.money = 2500;
+  pick(game, 'Go down the stair');
+  settleVault(game, 'Attack them from the landing', { won: false });
+  assertTrue(['vault_fates_mercy', 'garrick_freed'].every((f) => game.flags.includes(f)) && !game.flags.includes('vault_won') && game.money === 0);
+  assertTrue(game.hp === fight.maxHpOf(game, { id: 'hero' }) && notes(game).some((n) => n.startsWith('A good place to stop')));
+  assertTrue(['You come to walking', 'Odda and Fen walk the wheel behind you', "They've gone down to their rite", 'the cheap stuff', 'Over my dead body'].every((s) => pageText(game).includes(s)), pageText(game));
+  assertTrue(!pageText(game).includes('The key to the chains') && !pageText(game).includes('Give it a kick'));
+  assertEqual(roomFigures(vaultRoom(), game.flags), [], 'the Choir took its dead down to the rite');
+  assertEqual(cards(game), ['Drain the vault, and take the quick way down', 'Flood it back, cut the Choir off, and take the long way round']);
+
+  const alone = await atTheVault('vault-mercy-alone', { fen: false });
+  pick(alone, 'Go down the stair');
+  settleVault(alone, 'Attack them from the landing', { won: false });
+  assertTrue(pageText(alone).includes('Give it a kick') && pageText(alone).includes('Odda walks the wheel behind you') && !pageText(alone).includes('the cheap stuff'));
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

@@ -32,7 +32,7 @@
 // Losing is Fate's Mercy: the guardians lay the party out at the edge of the forecourt (they keep
 // the door; they don't kill), and somebody goes through your pockets. When you come back, they
 // kneel: whatever test the first queen set at her door, getting up again seems to count.
-// The story stops at the open gate for now; beat 3, the Hall of Champions, comes next.
+// Through the open gate, beat 3: the Hall of Champions (ch3-hall.ink).
 
 === ch3_dark_moon ===
 ~ set_objective("Go down into the Kings' Barrow tonight, under the dark of the moon.")
@@ -334,5 +334,4 @@ Beyond the stone a stair goes down into the dark, and the singing comes up it to
 { companion_alive("odda"):
     Odda touches the carved crowns on the lintel as she passes under them, the way you'd touch a shrine.
 }
-~ set_objective("Go down into the Kings' Barrow, find Garrick, and stop the Choir's hymn. (The rest of Act I is still being written.)")
--> END
+-> ch3_hall

@@ -29,4 +29,8 @@ export const storyContinues = [
   { scene: 'ch2_cairnfield', continueAt: 'ch2_eve', source: 'original' },
   // Then at dawn after the eve of the barrow; Chapter 3 begins that day.
   { scene: 'ch2_eve', continueAt: 'ch3_dark_moon', source: 'original' },
+  // Then at the open great gate of the Kings' Barrow; the Hall of Champions lies beyond it.
+  { scene: 'ch3_gate', continueAt: 'ch3_hall', source: 'original' },
+  // Then at the open oath-wall; the flooded vault lies at the foot of the stair.
+  { scene: 'ch3_hall', continueAt: 'ch3_vault', source: 'original' },
 ];

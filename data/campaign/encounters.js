@@ -26,7 +26,8 @@
 //                "Keep the watch alive: 3 of 3 still standing."
 //   onlookers    figures who watch but don't fight: { decor, pos }, or someone from
 //                data/campaign/people.js: { person, pos, lying }. They stand in the way, and
-//                nobody fights them
+//                nobody fights them. With ifFlag, they're only there when that story flag is
+//                set (the hero's Rival, chained at the sluice wheel if the Choir took them)
 //   hymn         a monster sings while it fights (the Ashen Choir): { singer: monster id,
 //                rises: { monster, pos }, round, from }. Unless the singing stops first, the
 //                monster rises at pos at the start of that round, up out of `from` ("the
@@ -409,6 +410,43 @@ export const encounters = [
       unlessFlag: 'varrow_rallied',
     },
     whileHeroDown: '{name} stands over you, as still as if it had never moved.',
+    source: 'original',
+  },
+  // The flooded vault (beat 4): the Choir's acolytes keep Garrick Dunn at the great sluice
+  // wheel, with a Ghoul and an Ogre Zombie in the black water (Rob, Oct 16, 2026). A deep
+  // channel splits the vault, so the shallows either side and the gantry across them are the
+  // only ways down from the landing. The acolyte at the wheel sings: unless the hymn is broken,
+  // a Zombie climbs out of the black water on round 3. Bloodied acolytes run for the Choir's
+  // own passage, at the bottom right. Garrick, and the Rival if the Choir took them, are
+  // chained either side of the wheel, out of the fight.
+  {
+    id: 'vault-wheel',
+    name: 'The Black Water at the Sluice Wheel',
+    difficulty: 'Moderate (an Ogre Zombie, a Ghoul and five acolytes are 775 XP; for a level 4 party of three, Low is 750 and Moderate 1,125. Unless the hymn is broken, a Zombie rises on round 3)',
+    sizedFor: { level: 4, party: 3 },
+    byHand: true,
+    map: { dungeon: 'deep-barrow', room: 'vault' },
+    hero: { x: 3, y: 1 },
+    monsters: [
+      // The first acolyte is the one who sings, beside the wheel.
+      { monster: 'cultist', name: 'Choir Acolyte', pos: { x: 3, y: 9 } },
+      { monster: 'ogre-zombie', pos: { x: 5, y: 6 } },
+      { monster: 'ghoul', pos: { x: 2, y: 5 } },
+      { monster: 'cultist', name: 'Choir Acolyte', pos: { x: 1, y: 8 } },
+      { monster: 'cultist', name: 'Choir Acolyte', pos: { x: 6, y: 8 } },
+      { monster: 'cultist', name: 'Choir Acolyte', pos: { x: 1, y: 9 } },
+      { monster: 'cultist', name: 'Choir Acolyte', pos: { x: 6, y: 9 } },
+    ],
+    onlookers: [
+      { person: 'garrick', pos: { x: 2, y: 8 } },
+      { person: 'rival', pos: { x: 5, y: 8 }, ifFlag: 'rival_taken' },
+    ],
+    hymn: { singer: 'cultist', rises: { monster: 'zombie', pos: { x: 2, y: 3 } }, round: 3, from: 'the black water' },
+    escape: [
+      { x: 6, y: 10 },
+      { x: 7, y: 10 },
+    ],
+    whileHeroDown: '{name} leaves you where you lie. The Choir has a use for you at the wheel.',
     source: 'original',
   },
 ];

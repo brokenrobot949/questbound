@@ -157,6 +157,17 @@ export const people = [
     source: 'original',
   },
 
+  // ---- The Kings' Barrow (Chapter 3) ----
+  {
+    id: 'garrick',
+    name: 'Garrick Dunn', // the miller, Lark's father: big, floury, and nine days at the Choir's wheel
+    species: 'human',
+    size: 'medium',
+    armor: null,
+    look: { skin: 'peach', hairStyle: 'cropped', hairColor: 'blonde', beard: true, outfit: 'white', accent: 'brown', headgear: 'none' },
+    source: 'original',
+  },
+
   // ---- The hero's Bond, when they turn up in person ----
   {
     id: 'rival',

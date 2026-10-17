@@ -120,9 +120,10 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     return companionArt.get(c.id);
   };
   // People watching from the side who aren't in the fight (Lark on her ledge), drawn as they
-  // look in scenes.
+  // look in scenes, unless they aren't there this time (battle.absentOnlookers).
+  const absent = game.battle.absentOnlookers || [];
   const people = (fight.findEncounter(game.battle.encounterId).onlookers || [])
-    .filter((o) => o.person)
+    .filter((o, i) => o.person && !absent.includes(i))
     .map((o) => {
       const sprite = personSprite(findPerson(o.person));
       return { pos: o.pos, lying: Boolean(o.lying), image: spriteImage(sprite, sprite.frames[0]) };

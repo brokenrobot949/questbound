@@ -137,6 +137,14 @@ EXTERNAL dislikes_you(id)
 // "dead" (send the story to Fate's Mercy).
 EXTERNAL take_damage(dice, type)
 
+// spring_trap(id): a trap from data/srd/traps.js springs on the hero, outside a fight, as the
+// rules give it: they make its saving throw (the player sees the roll), and on a failure it
+// strikes them, e.g.
+//   ~ temp darts = spring_trap("poisoned-darts")
+// Damage works as for take_damage. Returns "safe" (they made the save, and nothing struck
+// them), "up", "woke" or "dead" (send the story to Fate's Mercy).
+EXTERNAL spring_trap(id)
+
 // Fights: a choice tagged #combat:encounter-id (from data/campaign/encounters.js) starts a
 // fight on the battle grid. The choice's content runs once the fight is over, and
 // combat_won() says how it went:

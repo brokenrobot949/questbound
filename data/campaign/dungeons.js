@@ -21,6 +21,11 @@
 //                      lying    true if they lie down (Lark, Paralyzed on her ledge)
 //                      goneOn   story flags: once any is set, they've left (fled, scattered)
 //                      fallenOn story flags: once any is set, they lie where they fell
+//                      shownOn  story flags: drawn only once any is set (a trap's pressure
+//                               plates, once they're found)
+//     changes        how the room looks once the story changes it: [{ on: [flags], rows }],
+//                    rows covering the room's whole band, drawn once any of the flags is set
+//                    (the flooded vault, drained or flooded back). Fights use the first rows.
 //
 // The party: companions with the hero stand beside them on the map, on the free squares
 // nearest the room's entry, as they do at the start of a fight.
@@ -92,14 +97,46 @@ const barrowLegend = {
   k: { terrain: 'floor', tile: 'crypt-floor', decor: 'skull' },
   // The barrow's face, and the doorway of the great gate. The sealing stone that shuts it is a
   // figure in the room (below), gone once the gate opens; in the fight at the gate it stands in
-  // the way (encounters.js).
+  // the way (encounters.js). The way through the oath-wall is drawn the same way.
   S: { terrain: 'wall', wall: 'stone' },
   G: { terrain: 'floor', tile: 'crypt-floor' },
+  // Inside: the champions' tombs in the Hall of Champions.
+  B: { terrain: 'obstacle', tile: 'crypt-floor', decor: 'bier' },
 };
 
 // The guardians lie where they fell once beaten, and the sealing stone is gone once it opens.
 const guardiansBeaten = ['gate_guardians_destroyed'];
 const gateOpen = ['gate_opened'];
+// The dart corridor's pressure plates show once they're found, or once one goes off under you
+// (then you know to look for the rest). The oath-wall's door is gone once it opens.
+const platesFound = ['darts_spotted', 'darts_sprung'];
+const oathWallOpen = ['oath_wall_opened'];
+
+// The deep barrow (Chapter 3): the barrow's lower level, a map of its own. The stair down from
+// the oath-wall comes out on a landing above the flooded vault.
+const deepLegend = {
+  S: { terrain: 'wall', wall: 'stone' },
+  _: { terrain: 'floor', tile: 'crypt-floor' },
+  // The vault's black water: deep in the channel down its middle (nobody can wade in), and
+  // shallow either side of it (difficult ground).
+  '~': { terrain: 'water', tile: 'deep-water' },
+  '=': { terrain: 'difficult', tile: 'ford' },
+  // The great sluice wheel at the foot of the channel, and the iron grille of its sluice gate.
+  W: { terrain: 'obstacle', tile: 'deep-water', decor: 'sluice-wheel' },
+  g: { terrain: 'obstacle', tile: 'deep-water', decor: 'sluice-gate' },
+  // Drained (see the vault's changes): silt where the water was, the wheel and gate standing
+  // dry, and the stair down that the water hid.
+  ':': { terrain: 'floor', tile: 'dirt' },
+  w: { terrain: 'obstacle', tile: 'dirt', decor: 'sluice-wheel' },
+  h: { terrain: 'obstacle', tile: 'dirt', decor: 'sluice-gate' },
+  v: { terrain: 'floor', tile: 'dirt', decor: 'stair-down' },
+};
+
+// The vault's foes lie where they fell once beaten, sink once it's flooded, and are gone if
+// they won (down to the Choir's rite). Garrick and the Rival leave the wheel once freed.
+const vaultFoesFallen = ['vault_won'];
+const vaultFoesGone = ['vault_fates_mercy', 'vault_flooded'];
+const atTheWheel = ['garrick_freed'];
 
 export const dungeons = [
   {
@@ -299,6 +336,35 @@ export const dungeons = [
       'M_k__x_M',
       'MM____MM',
       'SSSGGSSS',
+      // The dart corridor (rows 8–15): the stair down from the gate, then a straight passage
+      // carved with crowns, with an old tomb robber's bones halfway along. Its pressure plates
+      // are figures (below), drawn once they're found.
+      'SSS__SSS',
+      'SSS__SSS',
+      'SSS_xSSS',
+      'SSS__SSS',
+      'SSS__SSS',
+      'SSS__SSS',
+      'SSS__SSS',
+      // The Hall of Champions (rows 15–24): five champions' tombs between the pillars, Dame
+      // Maud's just inside the door she watched.
+      'S____B_S',
+      'S______S',
+      'SB____BS',
+      'SS____SS',
+      'SB____BS',
+      'SS____SS',
+      'S______S',
+      'S______S',
+      'SSS__SSS',
+      // The oath-wall (rows 24–29): the champions' names and oaths carved across the far wall,
+      // and the way down to the deep barrow through it, shut by a door until the oath is
+      // spoken (a figure, below).
+      'SS____SS',
+      'S______S',
+      'S______S',
+      'SS____SS',
+      'SSSGGSSS',
     ],
     legend: barrowLegend,
     rooms: [
@@ -307,7 +373,7 @@ export const dungeons = [
         name: 'The great gate',
         rows: [0, 8],
         entry: { x: 3, y: 0 },
-        exits: {},
+        exits: { corridor: [{ x: 3, y: 8 }, { x: 4, y: 8 }] },
         // The sealing stone in the doorway, and the two guardians either side of it: where the
         // fight (barrow-gate) starts them.
         figures: [
@@ -315,6 +381,97 @@ export const dungeons = [
           { sprite: 'sealing-stone', pos: { x: 4, y: 8 }, name: 'the sealing stone', goneOn: gateOpen },
           { sprite: 'animated-armor', pos: { x: 2, y: 7 }, name: 'two suits of armour', fallenOn: guardiansBeaten },
           { sprite: 'animated-armor', pos: { x: 5, y: 7 }, name: 'two suits of armour', fallenOn: guardiansBeaten },
+        ],
+      },
+      {
+        id: 'corridor',
+        name: 'The crowned passage', // the dart corridor, though nothing says so until it's found
+        rows: [8, 15],
+        entry: { x: 3, y: 9 },
+        exits: { forecourt: [{ x: 3, y: 8 }, { x: 4, y: 8 }], hall: [{ x: 3, y: 15 }, { x: 4, y: 15 }] },
+        // The pressure plates, once they're found or one goes off: the first is the one a hero
+        // who walks on steps on.
+        figures: [
+          { sprite: 'dart-plate', pos: { x: 3, y: 12 }, name: 'pressure plates', shownOn: platesFound },
+          { sprite: 'dart-plate', pos: { x: 4, y: 13 }, name: 'pressure plates', shownOn: platesFound },
+          { sprite: 'dart-plate', pos: { x: 3, y: 14 }, name: 'pressure plates', shownOn: platesFound },
+        ],
+      },
+      {
+        id: 'hall',
+        name: 'The Hall of Champions',
+        rows: [15, 24],
+        entry: { x: 3, y: 16 },
+        exits: { corridor: [{ x: 3, y: 15 }, { x: 4, y: 15 }], 'oath-wall': [{ x: 3, y: 24 }, { x: 4, y: 24 }] },
+      },
+      {
+        id: 'oath-wall',
+        name: 'The oath-wall',
+        rows: [24, 29],
+        entry: { x: 3, y: 25 },
+        exits: { hall: [{ x: 3, y: 24 }, { x: 4, y: 24 }] },
+        // The shut way through the wall, gone once the oath is spoken.
+        figures: [
+          { sprite: 'oath-door', pos: { x: 3, y: 29 }, name: 'the oath-wall', goneOn: oathWallOpen },
+          { sprite: 'oath-door', pos: { x: 4, y: 29 }, name: 'the oath-wall', goneOn: oathWallOpen },
+        ],
+      },
+    ],
+    source: 'original',
+  },
+  {
+    id: 'deep-barrow',
+    name: 'The deep barrow',
+    rows: [
+      // The flooded vault (rows 0–10): the stair from the oath-wall comes down onto a landing
+      // at the top. A deep channel runs down the middle, with shallows either side and a stone
+      // gantry across it, to the great sluice wheel and its gate at the foot. The Choir's own
+      // passage, from their low door, comes in at the bottom right.
+      'SSS__SSS',
+      'S______S',
+      'S______S',
+      'S==~~==S',
+      'S==~~==S',
+      'S______S',
+      'S==~~==S',
+      'S==~~==S',
+      'S__Wg__S',
+      'S______S',
+      'SSSSSS__',
+    ],
+    legend: deepLegend,
+    rooms: [
+      {
+        id: 'vault',
+        name: 'The flooded vault',
+        rows: [0, 10],
+        entry: { x: 3, y: 1 },
+        exits: {},
+        // Drained, the channel is silt with a stair going down it. Flooded back, the water
+        // covers everything but the landing, and fills the Choir's passage.
+        changes: [
+          {
+            on: ['vault_drained'],
+            rows: ['SSS__SSS', 'S______S', 'S______S', 'S::::::S', 'S::::::S', 'S______S', 'S::vv::S', 'S::::::S', 'S__wh__S', 'S______S', 'SSSSSS__'],
+          },
+          {
+            on: ['vault_flooded'],
+            rows: ['SSS__SSS', 'S______S', 'S======S', 'S~~~~~~S', 'S~~~~~~S', 'S~~~~~~S', 'S~~~~~~S', 'S~~~~~~S', 'S~~Wg~~S', 'S~~~~~~S', 'SSSSSS~~'],
+          },
+        ],
+        // The Choir at the wheel, where the fight (vault-wheel) starts them: the acolyte who
+        // sings beside it, four more on the platform, a Ghoul on the gantry and the Ogre Zombie
+        // in the shallows. Garrick and the Rival are chained either side of the wheel.
+        figures: [
+          { sprite: 'cultist', pos: { x: 3, y: 9 }, name: 'Choir acolytes', fallenOn: vaultFoesFallen, goneOn: vaultFoesGone },
+          { sprite: 'ogre-zombie', pos: { x: 5, y: 6 }, name: 'an Ogre Zombie', fallenOn: vaultFoesFallen, goneOn: vaultFoesGone },
+          { sprite: 'ghoul', pos: { x: 2, y: 5 }, name: 'a Ghoul', fallenOn: vaultFoesFallen, goneOn: vaultFoesGone },
+          { sprite: 'cultist', pos: { x: 1, y: 8 }, name: 'Choir acolytes', fallenOn: vaultFoesFallen, goneOn: vaultFoesGone },
+          { sprite: 'cultist', pos: { x: 6, y: 8 }, name: 'Choir acolytes', fallenOn: vaultFoesFallen, goneOn: vaultFoesGone },
+          { sprite: 'cultist', pos: { x: 1, y: 9 }, name: 'Choir acolytes', fallenOn: vaultFoesFallen, goneOn: vaultFoesGone },
+          { sprite: 'cultist', pos: { x: 6, y: 9 }, name: 'Choir acolytes', fallenOn: vaultFoesFallen, goneOn: vaultFoesGone },
+          { person: 'garrick', pos: { x: 2, y: 8 }, name: 'Garrick Dunn, chained to the wheel', goneOn: atTheWheel },
+          { person: 'rival', pos: { x: 5, y: 8 }, name: 'your rival, chained to the wheel', shownOn: ['rival_taken'], goneOn: atTheWheel },
         ],
       },
     ],
