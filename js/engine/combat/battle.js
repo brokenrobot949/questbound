@@ -13,7 +13,9 @@
 //                their Hit Points are on game.party, see character/party.js), allies who
 //                aren't in the party (side 'hero', ally true, with a monster's stat block,
 //                monsterId, hp and maxHp, played by the game: the Old Ford's soldiers, or a
-//                foe the hero called by name, turned true), and the foes
+//                foe the hero called by name, turned true), and the foes (a foe that casts
+//                spells also has spellsCast, { spell id: times cast in this fight }, and
+//                concentration, as a companion's; none in older saves, which means none)
 //   absentOnlookers, mapFlags  who of the encounter's onlookers isn't there (their indices),
 //                and the story flags that change its map, as they were when the fight began
 //   turnState    { movementLeft, action, bonus, disengaged, savageUsed, surged, athleteMove,
@@ -23,7 +25,9 @@
 //                turn); light, the Light weapon the hero attacked with (which opens the Light
 //                property's extra attack), and extraUsed once that extra attack is made;
 //                moved once the hero has walked a square; steadyAim after Steady Aim (Speed 0
-//                for the rest of the turn), and aimed while its Advantage is still to use
+//                for the rest of the turn), and aimed while its Advantage is still to use;
+//                commanded, { word, by }, when this turn must obey a Command ('grovel' or
+//                'halt', see "Spell conditions")
 //   effects      [{ kind, target, endsOn, endsAt, fromRound, concentration, dc, untilRound }]:
 //                'dodging', 'slowed', 'no-reactions', 'no-healing', 'shield' and 'helped'
 //                (the Help action's distraction, by: the helper) last until the start of
@@ -78,7 +82,7 @@
 
 import { encounters } from '../../../data/campaign/encounters.js';
 import { monsters } from '../../../data/srd/monsters.js';
-import { d20Test, retarget, startD20Count, stopD20Count } from '../rules/d20-test.js';
+import { d20Test, rerollKept, retarget, startD20Count, stopD20Count } from '../rules/d20-test.js';
 import { rollDice, rollDie } from '../rules/dice.js';
 import { abilityModifier, armorClass, findAbility, findClass, hasFeature, initiative as heroInitiative, savingThrow, speed as heroSpeed } from '../character/sheet.js';
 import { abilityCheck } from '../rules/ability-check.js';
@@ -209,7 +213,13 @@ export const isProne = (battle, id) => hasEffect(battle, id, 'prone');
 //   'turned'     Turn Undead (a Cleric's Channel Divinity): Frightened and Incapacitated for
 //                a minute, moving as far from the hero as it can on its turns. Damage ends it,
 //                and so does the hero dropping to 0 Hit Points.
-//   'grovel'     Command: on its next turn it falls Prone, and its turn ends
+//   'grovel'     Command: on its next turn it falls Prone, and its turn ends (by: who spoke
+//                the command; none means the hero). A foe's Command can say it to the party
+//   'halt'       Command, from a foe: on its next turn it doesn't move and takes no action or
+//                Bonus Action, so the turn passes
+//   A foe's Hold Person ('paralyzed', concentration, by: the foe) works on the party as the
+//   hero's works on foes: a Wisdom save at the end of each of their turns ends it. The battle
+//   screen calls it Held (conditionsOf adds 'held').
 //   'blinded'    Blindness/Deafness: its attack rolls have Disadvantage and attacks against it
 //                Advantage, and it can't make Opportunity Attacks (it can't see you go). A
 //                Constitution save at the end of each of its turns ends it; so does a minute.
@@ -235,11 +245,17 @@ const autoFails = (battle, c, abilityId) => isHelpless(battle, c.id) && ['streng
 // companion such as Odda (effect.by).
 const WARDS = ['blessed', 'sanctuary', 'shield-of-faith', 'resisting'];
 
-// Conditions on a creature, for the battle screen: e.g. ['asleep', 'poisoned'].
-const SHOWN = ['drowsy', 'asleep', 'paralyzed', 'turned', 'blinded', 'grovel', 'baned', 'poisoned', 'outlined', 'guided', 'vexed', 'sapped', 'slowed', 'hidden', 'shield', 'shield-of-faith', 'dodging', 'blessed', 'sanctuary', 'resisting', 'helped'];
+// Conditions on a creature, for the battle screen: e.g. ['asleep', 'poisoned']. Paralyzed by
+// Hold Person (a spell held up by Concentration, not a Ghoul's Claw) adds 'held'.
+const SHOWN = ['drowsy', 'asleep', 'paralyzed', 'turned', 'blinded', 'grovel', 'halt', 'baned', 'poisoned', 'outlined', 'guided', 'vexed', 'sapped', 'slowed', 'hidden', 'shield', 'shield-of-faith', 'dodging', 'blessed', 'sanctuary', 'resisting', 'helped'];
 export function conditionsOf(battle, id) {
-  return SHOWN.filter((kind) => hasEffect(battle, id, kind));
+  const kinds = SHOWN.filter((kind) => hasEffect(battle, id, kind));
+  if (battle.effects.some((e) => e.target === id && e.kind === 'paralyzed' && e.concentration)) kinds.push('held');
+  return kinds;
 }
+
+// The words of Command a creature can be told to obey on its next turn.
+const COMMANDS = ['grovel', 'halt'];
 
 // Can this creature take a reaction now (an Opportunity Attack, Redirect Attack)?
 function canReact(game, c) {
@@ -261,9 +277,10 @@ function baneOf(game, c) {
 }
 
 // Reactions the game takes for the hero: Shield, cast when it would turn a hit into a miss,
-// and Hellish Rebuke, cast with its free use when a foe hurts the hero. The Settings screen
-// turns each on or off (see setReactionPolicy).
-const reactionPolicy = { shield: true, rebuke: true };
+// Hellish Rebuke, cast with its free use when a foe hurts the hero, and spending Heroic
+// Inspiration to reroll a failed save against a foe's Hold Person (inspiration). The Settings
+// screen turns each on or off (see setReactionPolicy).
+const reactionPolicy = { shield: true, rebuke: true, inspiration: true };
 export function setReactionPolicy(policy) {
   Object.assign(reactionPolicy, policy);
 }
@@ -330,8 +347,8 @@ export function battleScene(game) {
     actor: battle.order.length ? battle.order[battle.turn] : null,
     heroState: battle.heroState,
     concentration: battle.concentration ? battle.concentration.name : null,
-    // Spiritual Weapons in the fight, the hero's and a companion's: { by, pos }.
-    weapons: battle.effects.filter((e) => e.kind === 'spiritual-weapon').map((e) => ({ by: e.target, pos: { ...e.pos } })),
+    // Spiritual Weapons in the fight, the party's and a foe's: { by, pos, foe }.
+    weapons: battle.effects.filter((e) => e.kind === 'spiritual-weapon').map((e) => ({ by: e.target, pos: { ...e.pos }, foe: Boolean(combatantById(battle, e.target) && combatantById(battle, e.target).side === 'enemy') })),
     units: battle.combatants.map((c) => ({
       id: c.id,
       pos: { ...c.pos },
@@ -341,7 +358,8 @@ export function battleScene(game) {
       prone: isProne(battle, c.id),
       conditions: conditionsOf(battle, c.id),
       escaped: Boolean(c.escaped),
-      concentrating: c.companion && c.concentration ? c.concentration.name : null,
+      // What a companion or a foe is concentrating on (the hero's is concentration above).
+      concentrating: !isHero(c) && c.concentration ? c.concentration.name : null,
     })),
   };
 }
@@ -484,8 +502,14 @@ function beginTurn(game) {
   const c = currentCombatant(battle);
   battle.effects = battle.effects.filter((e) => e.endsOn !== c.id || e.endsAt === 'end');
   battle.reactionsUsed = battle.reactionsUsed.filter((id) => id !== c.id);
-  battle.turnState = { movementLeft: speedOf(game, c), action: false, bonus: false, disengaged: false, savageUsed: false, surged: false, athleteMove: 0, slotSpent: false, light: null, extraUsed: false, moved: false, steadyAim: false, aimed: false };
+  battle.turnState = { movementLeft: speedOf(game, c), action: false, bonus: false, disengaged: false, savageUsed: false, surged: false, athleteMove: 0, slotSpent: false, light: null, extraUsed: false, moved: false, steadyAim: false, aimed: false, commanded: null };
   log(game, isHero(c) ? 'Your turn.' : `${c.name}'s turn.`, { turnOf: c.id });
+  // A Command spoken to it ends now: this turn obeys it, unless it can't act anyway.
+  const command = battle.effects.find((e) => e.target === c.id && COMMANDS.includes(e.kind));
+  if (command) {
+    battle.effects = battle.effects.filter((e) => !(e.target === c.id && COMMANDS.includes(e.kind)));
+    if (upright(game, c) && !isIncapacitated(battle, c.id)) battle.turnState.commanded = { word: command.kind, by: command.by || 'hero' };
+  }
   const ward = battle.effects.find((e) => e.target === c.id && e.kind === 'sanctuary');
   if (ward && battle.round >= ward.untilRound) {
     battle.effects.splice(battle.effects.indexOf(ward), 1);
@@ -674,11 +698,12 @@ function runEnemyTurns(game) {
     } else if (c.ally) {
       allyTurn(game, c);
     } else if (c.companion) {
-      if (c.state === 'up') companionTurn(game, c);
+      if (c.state === 'up' && !obeyCommand(game, c)) companionTurn(game, c);
     } else if (battle.heroState === 'up') {
-      // A Paralyzed hero can't move or act: their turn passes.
-      if (!isIncapacitated(battle, c.id)) return;
-      log(game, 'You’re Paralyzed: you can’t move or act this turn.');
+      // A hero obeying a foe's Command, or Paralyzed, can't move or act: their turn passes.
+      const obeyed = obeyCommand(game, c);
+      if (!obeyed && !isIncapacitated(battle, c.id)) return;
+      if (!obeyed) log(game, 'You’re Paralyzed: you can’t move or act this turn.');
     }
     if (battle.outcome) return;
     advanceTurn(game);
@@ -986,21 +1011,22 @@ function weaponSquare(game, target, from) {
   return free[0] || { ...target.pos };
 }
 
-// Casting Spiritual Weapon puts it beside the foe; striking with it later moves it there.
-// Either way it makes a melee spell attack from its square. caster: the hero, or a companion.
-// Returns { critical }.
+// Casting Spiritual Weapon puts it beside the target; striking with it later moves it there.
+// Either way it makes a melee spell attack from its square. caster: the hero, a companion, or
+// a foe (a Cultist Fanatic, whose option says how its weapon looks). Returns { critical }.
 function spiritStrike(game, option, target, caster = heroCombatant(game.battle)) {
   const battle = game.battle;
   const you = isHero(caster);
+  const whom = isHero(target) ? 'you' : target.name;
   let weapon = spiritualWeapon(battle, caster.id);
   const pos = weaponSquare(game, target, weapon ? weapon.pos : caster.pos);
   if (!weapon) {
     weapon = { kind: 'spiritual-weapon', target: caster.id, by: caster.id, endsOn: null, concentration: true, pos, damage: option.damage, modifiers: option.modifiers };
     battle.effects.push(weapon);
-    log(game, `${you ? 'You cast' : `${caster.name} casts`} Spiritual Weapon: a spectral mace of light flickers into being beside ${target.name}.`);
+    log(game, `${you ? 'You cast' : `${caster.name} casts`} Spiritual Weapon: ${option.look || 'a spectral mace of light'} flickers into being beside ${whom}.`);
   } else {
     weapon.pos = pos;
-    log(game, `${you ? 'Your' : `${caster.name}'s`} Spiritual Weapon sweeps across to ${target.name}.`);
+    log(game, `${you ? 'Your' : `${caster.name}'s`} Spiritual Weapon sweeps across to ${whom}.`);
   }
   return performAttack(game, { ...caster, pos }, target, { ...option, how: 'melee', reach: 5, origin: null, name: 'Spiritual Weapon' });
 }
@@ -1240,7 +1266,8 @@ function performAttack(game, attacker, target, option) {
   const plus = extraDamage(game, option.damage.plus, critical);
   const plusText = plus ? ` plus ${plus.text}` : '';
   log(game, `${improved || (critical ? 'Critical hit! ' : '')}${how}: ${damageText(damage, option.damage.dice)} damage${plusText}${savaged}.`, { roll });
-  applyDamage(game, target, damage.total, { type: damage.type, critical, plus, from: attacker });
+  // (A Spiritual Weapon strikes from its own square: the damage is still from its caster.)
+  applyDamage(game, target, damage.total, { type: damage.type, critical, plus, from: combatantById(battle, attacker.id) || attacker });
   if (option.rider && target.hp > 0) addRider(game, attacker, target, option);
   if (option.onHit && !battle.outcome) onHitCondition(game, attacker, target, option.onHit);
   if (ours && option.mastery) masteryOnHit(game, attacker, target, option, damageDealt(target, damage.total, damage.type) > 0);
@@ -1500,6 +1527,9 @@ function takeHit(game, target, amount, { type, critical = false, plus = null }) 
     }
     target.hp = Math.max(0, target.hp - taken);
     if (target.hp === 0) log(game, target.ally ? `${target.name} falls, and doesn't get up.` : `${target.name} falls.`);
+    // A foe's Concentration: it ends if the foe falls; otherwise damage means a save to keep it.
+    if (target.hp === 0 && target.concentration) endConcentration(game, target, `${target.concentration.name} ends with ${target.name}.`);
+    else if (taken > 0 && target.concentration) concentrationCheck(game, target, taken);
     if (taken > 0) hymnHurt(game, target, taken);
     // Damage ends Sleep on a creature, and Turn Undead.
     if (taken > 0 && target.hp > 0) wake(game, target, `${target.name} wakes with a start.`);
@@ -2016,16 +2046,23 @@ function partySave(game, c, abilityId, dc, label) {
   return d20Test({ rng: game.rng, kind: 'save', label: `${label} (${c.name}'s ${ability.name} save)`, modifiers, target: { type: 'DC', value: dc } });
 }
 
-// Concentration: each caster in the party (the hero, or a companion such as Odda) holds one
-// spell at a time. Starting another, dropping to 0 Hit Points, or failing a Constitution save
-// after taking damage (DC 10 or half the damage, up to 30) ends it, and with it every effect
-// it holds up (the effects that caster cast with concentration true).
+// Concentration: each caster (the hero, a companion such as Odda, or a foe that casts spells:
+// a Cultist Fanatic) holds one spell at a time. Starting another, dropping to 0 Hit Points,
+// being Incapacitated, or failing a Constitution save after taking damage (DC 10 or half the
+// damage, up to 30) ends it, and with it every effect it holds up (the effects that caster
+// cast with concentration true).
 
-// What this one of the party is concentrating on: { spellId, name }, or null.
+// What this caster is concentrating on: { spellId, name }, or null.
 export const concentrationOf = (battle, c) => (isHero(c) ? battle.concentration : c.concentration) || null;
 
 // Who holds up a Concentration effect: its caster's id (older saves have none: the hero).
 const holderOf = (effect) => effect.by || 'hero';
+
+// True if this creature's Concentration holds someone on the other side Paralyzed (a Fanatic's
+// Hold Person on one of the party): hurting it may break the spell.
+export function holdingSomeone(battle, c) {
+  return battle.effects.some((e) => e.kind === 'paralyzed' && e.concentration && holderOf(e) === c.id && (combatantById(battle, e.target) || {}).side !== c.side);
+}
 
 function setConcentration(battle, c, value) {
   if (isHero(c)) battle.concentration = value;
@@ -2040,30 +2077,38 @@ function startConcentration(game, option, caster = heroCombatant(game.battle)) {
   setConcentration(battle, caster, { spellId: option.spellId, name });
 }
 
+// Anyone in the party a foe's Hold Person held is free when it ends: "You can move again."
 function endConcentration(game, caster, why, roll = null) {
   const battle = game.battle;
   if (!concentrationOf(battle, caster)) return;
   setConcentration(battle, caster, null);
-  battle.effects = battle.effects.filter((e) => !(e.concentration && holderOf(e) === caster.id));
-  log(game, why, roll ? { roll } : {});
+  const ending = battle.effects.filter((e) => e.concentration && holderOf(e) === caster.id);
+  battle.effects = battle.effects.filter((e) => !ending.includes(e));
+  const freed = ending.filter((e) => e.kind === 'paralyzed').map((e) => combatantById(battle, e.target)).filter((c) => c && c.side === 'hero' && upright(game, c));
+  const free = freed.map((c) => (isHero(c) ? ' You can move again.' : ` ${c.name} can move again.`)).join('');
+  log(game, why + free, roll ? { roll } : {});
 }
 
-// A Concentration spell that no longer holds anyone has nothing left to do, and ends.
+// A Concentration spell that no longer holds anyone has nothing left to do, and ends. (A foe's
+// ends quietly: its Hold Person ends when the one it held breaks free, which the log has said.)
 function tidyConcentration(game) {
   const battle = game.battle;
+  const holding = (c) => battle.effects.some((e) => e.concentration && holderOf(e) === c.id);
   for (const c of partyCombatants(battle)) {
     const held = concentrationOf(battle, c);
-    if (held && !battle.effects.some((e) => e.concentration && holderOf(e) === c.id)) endConcentration(game, c, `${held.name} holds nobody now, and ends.`);
+    if (held && !holding(c)) endConcentration(game, c, `${held.name} holds nobody now, and ends.`);
   }
+  for (const c of enemies(battle)) if (c.concentration && !holding(c)) c.concentration = null;
 }
 
 // Damage to someone concentrating: a Constitution save to keep it.
 function concentrationCheck(game, c, damage) {
   const name = concentrationOf(game.battle, c).name;
   const dc = Math.min(30, Math.max(10, Math.floor(damage / 2)));
-  const save = partySave(game, c, 'constitution', dc, 'Concentration');
+  const foe = c.side === 'enemy';
+  const save = foe ? { ...foeSave(game, c, 'constitution', dc), label: `Concentration (${c.name}'s Constitution save)` } : partySave(game, c, 'constitution', dc, 'Concentration');
   const you = isHero(c);
-  if (save.success) log(game, you ? `You hold your concentration on ${name}.` : `${c.name} holds their concentration on ${name}.`, { roll: save });
+  if (save.success) log(game, you ? `You hold your concentration on ${name}.` : `${c.name} holds ${foe ? 'its' : 'their'} concentration on ${name}.`, { roll: save });
   else endConcentration(game, c, you ? `Your concentration breaks: ${name} ends.` : `${c.name}'s concentration breaks: ${name} ends.`, save);
 }
 
@@ -2081,14 +2126,17 @@ function applyCondition(game, target, kind, extra = {}) {
   battle.effects.push({ kind, target: target.id, endsOn: null, ...extra });
   if (kind === 'paralyzed' && target.side === 'hero') {
     const until = extra.endsAt === 'end' ? (isHero(target) ? ' until the end of your next turn' : ' until the end of their next turn') : '';
-    if (isHero(target)) log(game, `You're Paralyzed${until}: you can't move or act, attacks against you have Advantage, and a hit from within 5 feet is a Critical Hit.`);
-    else log(game, `${target.name} is Paralyzed${until}: they can't move or act, attacks against them have Advantage, and a hit from within 5 feet is a Critical Hit.`);
+    // A foe's Hold Person: a Wisdom save at the end of each of their turns can break it.
+    const again = extra.concentration ? ` A Wisdom save at the end of each of ${isHero(target) ? 'your' : 'their'} turns can break it.` : '';
+    if (isHero(target)) log(game, `You're Paralyzed${until}: you can't move or act, attacks against you have Advantage, and a hit from within 5 feet is a Critical Hit.${again}`);
+    else log(game, `${target.name} is Paralyzed${until}: they can't move or act, attacks against them have Advantage, and a hit from within 5 feet is a Critical Hit.${again}`);
   } else if (kind === 'paralyzed') {
     log(game, `${target.name} is Paralyzed: it can't move or act, attacks against it have Advantage, and a hit from within 5 feet is a Critical Hit.`);
   }
-  // Concentration ends for anyone Incapacitated.
-  const held = target.side === 'hero' && INCAPACITATING.includes(kind) ? concentrationOf(battle, target) : null;
-  if (held) endConcentration(game, target, isHero(target) ? `You can't hold your concentration: ${held.name} ends.` : `${target.name} can't hold their concentration: ${held.name} ends.`);
+  // Concentration ends for anyone Incapacitated (a foe's too: the hero's Hold Person on a
+  // Fanatic frees whoever it held).
+  const held = INCAPACITATING.includes(kind) ? concentrationOf(battle, target) : null;
+  if (held) endConcentration(game, target, isHero(target) ? `You can't hold your concentration: ${held.name} ends.` : `${target.name} can't hold ${target.side === 'enemy' ? 'its' : 'their'} concentration: ${held.name} ends.`);
   if (kind === 'drowsy') log(game, `${target.name}'s eyes droop: too drowsy to act until the end of its next turn, when it must save again or fall asleep.`);
   if (kind === 'outlined') {
     log(game, isHero(target) ? 'Violet light outlines you: attacks against you have Advantage.' : `Violet light outlines ${target.name}: attacks against ${target.side === 'hero' ? 'them' : 'it'} have Advantage.`);
@@ -2132,6 +2180,22 @@ function endOfTurn(game, c) {
   const numb = battle.effects.find((e) => ending(e) && e.kind === 'paralyzed' && e.target === c.id);
   battle.effects = battle.effects.filter((e) => !ending(e));
   if (numb && upright(game, c)) log(game, isHero(c) ? 'The numbness fades: you can move again.' : `The numbness fades: ${c.name} can move again.`);
+  // Held by a foe's Hold Person: a Wisdom save at the end of each of their turns.
+  if (isPartyMember(c)) {
+    const holds = battle.effects.filter((e) => e.target === c.id && e.kind === 'paralyzed' && e.concentration);
+    for (const effect of holds) {
+      const caster = combatantById(battle, holderOf(effect));
+      const save = partySave(game, c, 'wisdom', effect.dc, `${caster ? `${caster.name}'s ` : ''}Hold Person`);
+      if (save.success) {
+        battle.effects.splice(battle.effects.indexOf(effect), 1);
+        log(game, isHero(c) ? 'You break free of Hold Person, and can move again.' : `${c.name} breaks free of Hold Person, and can move again.`, { roll: save });
+      } else {
+        log(game, isHero(c) ? 'You strain against the spell, and stay held.' : `${c.name} strains against the spell, and stays held.`, { roll: save });
+      }
+    }
+    if (holds.length) tidyConcentration(game);
+    return;
+  }
   if (c.side !== 'enemy' || c.hp <= 0) return;
   // Blindness/Deafness: a Constitution save at the end of each of its turns.
   const blind = battle.effects.find((e) => e.target === c.id && e.kind === 'blinded');
@@ -2817,24 +2881,17 @@ export function heroDrinkPotion(game, targetId = 'hero') {
 //   coward      fights like a brute, but flees once Bloodied (at half its Hit Points or
 //               fewer) if the encounter has a way out (its escape squares)
 // It goes after the nearest of the party on their feet (chooseTarget). A Prone monster stands
-// up first. A monster singing a hymn does nothing but sing. A Ghoul rakes with its Claw while
-// its target can still be Paralyzed, and bites twice (its Multiattack) once they are. The foes so far don't attack anyone
-// who's down: with nobody left standing, each encounter says what they do instead (its
-// whileHeroDown line).
+// up first. A monster singing a hymn does nothing but sing. A monster that casts spells (a
+// Cultist Fanatic) casts what it can first (see "A foe's spells" below). A Ghoul rakes with
+// its Claw while its target can still be Paralyzed, and bites twice (its Multiattack) once
+// they are. The foes so far don't attack anyone who's down: with nobody left standing, each
+// encounter says what they do instead (its whileHeroDown line).
 function enemyTurn(game, c) {
   const battle = game.battle;
   const monster = findMonster(c.monsterId);
   const encounter = findEncounter(battle.encounterId);
   // Commanded to grovel: it falls Prone, and its turn ends (unless it can't act anyway).
-  const grovel = battle.effects.find((e) => e.target === c.id && e.kind === 'grovel');
-  if (grovel) {
-    battle.effects.splice(battle.effects.indexOf(grovel), 1);
-    if (!isIncapacitated(battle, c.id)) {
-      knockProne(game, c);
-      log(game, `${c.name} obeys your command: it throws itself flat on the ground and grovels.`);
-      return;
-    }
-  }
+  if (obeyCommand(game, c)) return;
   // Turned: it can't act, and moves as far from the hero as it can.
   if (hasEffect(battle, c.id, 'turned')) return fleeFromHero(game, c);
   // Asleep, drowsy or held by Hold Person: no actions at all.
@@ -2867,6 +2924,38 @@ function enemyTurn(game, c) {
   if (monster.behaviour === 'coward' && encounter.escape && c.hp <= c.maxHp / 2) return flee(game, c, encounter.escape);
   // A hidden hero, with nobody else to fight, has to be found before anyone can attack them.
   if (!target) return searchForHidden(game, c);
+  if (monster.spellcasting) return casterTurn(game, c);
+  return weaponTurn(game, c, target);
+}
+
+// A Command it must obey on this turn (turnState.commanded, taken up as the turn began):
+// Grovel, it falls Prone and its turn ends; Halt, it doesn't move and takes no action or Bonus
+// Action, so its turn passes. True if the turn went on obeying.
+function obeyCommand(game, c) {
+  const battle = game.battle;
+  const command = battle.turnState.commanded;
+  if (!command) return false;
+  battle.turnState.commanded = null;
+  const speaker = command.by === 'hero' ? null : combatantById(battle, command.by);
+  const whose = speaker ? `${speaker.name}'s` : 'your';
+  const foe = c.side === 'enemy';
+  if (command.word === 'grovel') {
+    knockProne(game, c);
+    if (isHero(c)) log(game, `You obey ${whose} command: you throw yourself flat on the ground and grovel, and your turn ends.`);
+    else log(game, `${c.name} obeys ${whose} command: ${foe ? 'it throws itself flat on the ground and grovels' : 'they throw themselves flat on the ground and grovel'}.`);
+  } else if (isHero(c)) {
+    log(game, `You obey ${whose} command to halt: you stand rooted to the spot, and don't move or act this turn.`);
+  } else {
+    log(game, `${c.name} obeys ${whose} command to halt, and stands rooted to the spot, doing nothing this turn.`);
+  }
+  return true;
+}
+
+// A foe's attacks with its weapons, by its behaviour: it closes in and strikes (its
+// Multiattack), or shoots, or Dashes nearer.
+function weaponTurn(game, c, target) {
+  const battle = game.battle;
+  const monster = findMonster(c.monsterId);
   const options = monsterAttackOptions(monster);
   const melee = options.find((o) => o.how === 'melee' && !o.alone);
   const ranged = options.find((o) => o.how === 'ranged' && !o.alone);
@@ -2930,8 +3019,189 @@ function flee(game, c, exits) {
     c.escaped = true;
     c.hp = 0;
     log(game, `${c.name} flees into the dark and is gone.`);
+    if (c.concentration) endConcentration(game, c, `${c.concentration.name} ends with ${c.name} gone.`);
   }
   return checkEnd(game);
+}
+
+// ---- A foe's spells (a Cultist Fanatic's Spellcasting; SRD 5.2.1) ----
+// A foe with spellcasting (data/srd/monsters.js) casts at the party, the hero and their
+// companions (never at allies), in this order (Rob, Oct 17, 2026):
+//   1. Hold Person first, with its action, while it has the day's use and isn't concentrating:
+//      at the one of the party its side is fighting (a foe beside them, itself included), or
+//      else the nearest, the hero first of equals; someone it can see within 60 feet who isn't
+//      Paralyzed already. On a failed Wisdom save they're Held (Paralyzed) while it
+//      concentrates, saving again at the end of each of their turns.
+//   2. Its Bonus Action: Spiritual Weapon. While its weapon lasts it strikes with it, moving it
+//      up to 20 feet first. With none, and not concentrating (no Hold Person going), it
+//      summons one beside someone within 60 feet, while it has a use left. The weapon goes for
+//      whoever it has Advantage against (the Held, the Prone), then the most hurt.
+//   3. Its action, if Hold Person didn't take it: Command, while it has a use left, at someone
+//      else it can see within 60 feet who isn't Paralyzed or commanded already, chosen as for
+//      Hold Person. The word is "Grovel" if one of its side is beside them (so it can strike
+//      them while they're down), otherwise "Halt". Once its spells are spent, or nobody's in
+//      reach of them, it fights with its weapons, as any foe does.
+//   After casting with its action it closes in on whoever it holds (or the nearest of your
+//   side), unless one of your side is beside it already.
+// A singer singing the hymn casts nothing (enemyTurn). Each spell's uses are for the day, and a
+// Fanatic is fresh in each fight it's in (spellsCast). Saves use its spell save DC; its
+// Spiritual Weapon attacks with its spell attack bonus, for the spell's 1d8 plus its
+// spellcasting modifier in Force damage. Damage to it means a Constitution save to keep its
+// Concentration (concentrationCheck), so hurting it can free whoever it holds. When the hero
+// fails their first save against Hold Person with Heroic Inspiration in hand, the game spends
+// it to roll again (unless Settings say not to: setReactionPolicy).
+
+// How many more times today this foe can cast a spell.
+function spellLeft(c, spellId) {
+  const spellcasting = findMonster(c.monsterId).spellcasting;
+  const spell = spellcasting && spellcasting.spells.find((s) => s.id === spellId);
+  return spell ? spell.perDay - ((c.spellsCast || {})[spellId] || 0) : 0;
+}
+
+function spendSpell(c, spellId) {
+  c.spellsCast = { ...(c.spellsCast || {}), [spellId]: ((c.spellsCast || {})[spellId] || 0) + 1 };
+}
+
+// Who of the party a foe's spell can be aimed at: on their feet, not hidden, and someone it can
+// see within range.
+function spellTargets(game, c, range) {
+  const battle = game.battle;
+  return partyCombatants(battle).filter((p) => upright(game, p) && !hiddenOf(battle, p.id) && feetBetween(c.pos, p.pos) <= range && sees(game, c, p));
+}
+
+// True if one of the foes (on its feet, and able to act) is beside this one of the party.
+const foeBeside = (game, p) => enemies(game.battle).some((e) => e.hp > 0 && !isIncapacitated(game.battle, e.id) && isAdjacent(e.pos, p.pos));
+
+// A foe's spell goes first at whoever its side is fighting, then at the nearest; the hero
+// first of equals.
+function castingOrder(game, c, list) {
+  return [...list].sort((a, b) => Number(foeBeside(game, b)) - Number(foeBeside(game, a)) || squaresBetween(c.pos, a.pos) - squaresBetween(c.pos, b.pos) || Number(isHero(b)) - Number(isHero(a)));
+}
+
+function casterTurn(game, c) {
+  const battle = game.battle;
+  const turn = battle.turnState;
+  const going = () => !battle.outcome && c.hp > 0;
+  if (spellLeft(c, 'hold-person') > 0 && !concentrationOf(battle, c)) {
+    const reach = spellTargets(game, c, findSpell('hold-person').combat.range).filter((p) => !hasEffect(battle, p.id, 'paralyzed'));
+    const [target] = castingOrder(game, c, reach);
+    if (target) foeHoldPerson(game, c, target);
+  }
+  if (going()) foeWeapon(game, c);
+  if (going() && !turn.action && spellLeft(c, 'command') > 0) {
+    const reach = spellTargets(game, c, findSpell('command').combat.range).filter((p) => !hasEffect(battle, p.id, 'paralyzed') && !COMMANDS.some((word) => hasEffect(battle, p.id, word)));
+    const [target] = castingOrder(game, c, reach);
+    if (target) foeCommand(game, c, target);
+  }
+  if (!going()) return checkEnd(game);
+  if (!turn.action) {
+    const target = chooseTarget(game, c);
+    return target ? weaponTurn(game, c, target) : checkEnd(game);
+  }
+  closeIn(game, c);
+  return checkEnd(game);
+}
+
+// Hold Person, a foe's action: a Wisdom save, or the target is Held while it concentrates.
+function foeHoldPerson(game, c, target) {
+  const battle = game.battle;
+  const { saveDc } = findMonster(c.monsterId).spellcasting;
+  const you = isHero(target);
+  battle.turnState.action = true;
+  spendSpell(c, 'hold-person');
+  log(game, `${c.name} raises a hand towards ${you ? 'you' : target.name} and casts Hold Person.`);
+  let save = partySave(game, target, 'wisdom', saveDc, `${c.name}'s Hold Person`);
+  // Heroic Inspiration, spent for the hero at once on their first save (Settings can say not to).
+  if (you && !save.success && game.inspiration && reactionPolicy.inspiration) {
+    log(game, 'Your limbs begin to lock. You spend your Heroic Inspiration, and roll the save again.', { roll: save });
+    game.inspiration = false;
+    save = rerollKept(game.rng, save);
+  }
+  if (save.success) {
+    log(game, you ? 'You shake off the spell.' : `${target.name} shakes off the spell.`, { roll: save });
+    return;
+  }
+  log(game, you ? 'You fail the Wisdom save.' : `${target.name} fails the Wisdom save.`, { roll: save });
+  startConcentration(game, { spellId: 'hold-person' }, c);
+  applyCondition(game, target, 'paralyzed', { concentration: true, by: c.id, dc: saveDc });
+}
+
+// Command, a foe's action: a Wisdom save, or on their next turn the target obeys its word.
+function foeCommand(game, c, target) {
+  const battle = game.battle;
+  const { saveDc, spells } = findMonster(c.monsterId).spellcasting;
+  const words = spells.find((s) => s.id === 'command').words;
+  const word = foeBeside(game, target) && words.includes('grovel') ? 'grovel' : words.includes('halt') ? 'halt' : words[0];
+  const you = isHero(target);
+  battle.turnState.action = true;
+  spendSpell(c, 'command');
+  const said = `${c.name} points at ${you ? 'you' : target.name} and casts Command: “${word === 'grovel' ? 'Grovel' : 'Halt'}!”`;
+  const save = partySave(game, target, 'wisdom', saveDc, `${c.name}'s Command`);
+  if (save.success) {
+    log(game, `${said} ${you ? 'You resist the word.' : `${target.name} resists the word.`}`, { roll: save });
+    return;
+  }
+  battle.effects.push({ kind: word, target: target.id, endsOn: null, by: c.id });
+  const obey = word === 'grovel' ? 'throw yourself down and grovel' : 'stand still and do nothing';
+  log(game, `${said} ${you ? `On your next turn you must ${obey}.` : `On their next turn ${target.name} must ${obey.replace('yourself', 'themselves')}.`}`, { roll: save });
+}
+
+// A foe's Spiritual Weapon, with its Bonus Action: it strikes with the one it has, or summons
+// one if it isn't concentrating on anything and has a use left.
+function foeWeapon(game, c) {
+  const battle = game.battle;
+  const weapon = spiritualWeapon(battle, c.id);
+  if (!weapon && (concentrationOf(battle, c) || spellLeft(c, 'spiritual-weapon') <= 0)) return;
+  const standing = partyCombatants(battle).filter((p) => upright(game, p) && !hiddenOf(battle, p.id));
+  // Summoned within 60 feet of it (beside the target), or moved up to 20 feet to strike.
+  const range = findSpell('spiritual-weapon').combat.range;
+  const reach = weapon ? standing.filter((p) => feetBetween(weapon.pos, p.pos) <= 25) : standing.filter((p) => feetBetween(c.pos, p.pos) <= range + 5 && sees(game, c, p));
+  if (!reach.length) return;
+  const option = weapon ? { name: 'Spiritual Weapon', source: 'spell', how: 'spirit-strike', damage: weapon.damage, modifiers: weapon.modifiers } : foeWeaponOption(c);
+  const edge = (p) => attackConditions(game, { ...c, pos: weaponSquare(game, p, weapon ? weapon.pos : c.pos) }, p, { ...option, how: 'melee' });
+  const better = (p) => {
+    const { advantage, disadvantage } = edge(p);
+    return advantage.length && !disadvantage.length ? 1 : 0;
+  };
+  const [target] = [...reach].sort((a, b) => better(b) - better(a) || hpOf(game, a) - hpOf(game, b) || Number(isHero(b)) - Number(isHero(a)));
+  battle.turnState.bonus = true;
+  if (!weapon) {
+    spendSpell(c, 'spiritual-weapon');
+    startConcentration(game, { spellId: 'spiritual-weapon' }, c);
+  }
+  spiritStrike(game, option, target, c);
+  checkEnd(game);
+}
+
+// The attack of a foe's Spiritual Weapon: its spell attack bonus, and 1d8 plus its
+// spellcasting modifier in Force damage. look: how the fight log describes it.
+function foeWeaponOption(c) {
+  const monster = findMonster(c.monsterId);
+  const { ability, attackBonus, spells } = monster.spellcasting;
+  const { damage } = findSpell('spiritual-weapon').combat;
+  return {
+    name: 'Spiritual Weapon',
+    source: 'spell',
+    spellId: 'spiritual-weapon',
+    how: 'spirit',
+    look: spells.find((s) => s.id === 'spiritual-weapon').look,
+    modifiers: [{ label: 'Spell attack', value: attackBonus, source: `${c.name}'s Spellcasting` }],
+    damage: { dice: damage.dice, bonus: abilityModifier(monster.abilities[ability]), type: damage.type },
+  };
+}
+
+// After casting with its action, a foe moves up to strike next turn: beside whoever it holds,
+// or else its target, unless one of the hero's side is beside it already. It doesn't Dash.
+function closeIn(game, c) {
+  const battle = game.battle;
+  if (battle.combatants.some((p) => p.side === 'hero' && upright(game, p) && isAdjacent(p.pos, c.pos))) return;
+  const held = battle.effects.find((e) => e.kind === 'paralyzed' && e.concentration && holderOf(e) === c.id);
+  const target = (held && combatantById(battle, held.target)) || chooseTarget(game, c);
+  if (!target) return;
+  const reach = [...reachableSquares(battleMap(battle), c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling: isProne(battle, c.id) }).values()].filter((s) => s.path.length);
+  const beside = reach.filter((s) => isAdjacent(s.pos, target.pos)).sort((a, b) => a.cost - b.cost)[0];
+  const toward = beside || reach.sort((a, b) => squaresBetween(a.pos, target.pos) - squaresBetween(b.pos, target.pos) || a.cost - b.cost)[0];
+  if (toward && squaresBetween(toward.pos, target.pos) < squaresBetween(c.pos, target.pos)) moveAlong(game, c, toward.path);
 }
 
 // ---- An ally's turn ----

@@ -11,6 +11,7 @@ const DEFAULTS = {
   battleSpeed: 'normal', // how fast turns play out in a fight: 'slow', 'normal' or 'fast'
   autoShield: true, // cast the Shield spell by itself when it would turn a hit into a miss
   autoRebuke: true, // cast Hellish Rebuke (its free use) by itself when a foe hurts you
+  autoInspiration: true, // spend Heroic Inspiration to reroll a failed save against a foe's Hold Person
   checkDifficulty: 'word', // how hard a check looks before it's rolled: 'word', 'number' or 'hidden'
 };
 

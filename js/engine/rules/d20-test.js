@@ -127,6 +127,36 @@ export function d20Test({
   };
 }
 
+// A check or save rolled again straight away with Heroic Inspiration, when the game spends it
+// for the hero (a failed save against a foe's Hold Person: see combat/battle.js). The kept die
+// is rolled again, with the same dice (debug mode can force it); with two dice, the better (or
+// worse) is kept again. The modifiers and the DC stay as they were.
+export function rerollKept(rng, result) {
+  if (result.kind === 'attack') throw new Error('rerollKept is for checks and saves');
+  const forced = takeForcedD20();
+  const face = forced === null ? rollDie(rng, 20) : forced;
+  const dice = [...result.dice];
+  const index = result.keptIndex;
+  dice[index] = face;
+  let keptIndex = 0;
+  if (result.mode === 'advantage' && dice[1] > dice[0]) keptIndex = 1;
+  if (result.mode === 'disadvantage' && dice[1] < dice[0]) keptIndex = 1;
+  const natural = dice[keptIndex];
+  const total = natural + result.modifierTotal;
+  const success = result.target ? total >= result.target.value : null;
+  return {
+    ...result,
+    dice,
+    forced: result.forced || forced !== null,
+    rerolled: { index, from: result.dice[index], to: face },
+    keptIndex,
+    natural,
+    total,
+    success,
+    outcome: success === null ? null : success ? 'success' : 'failure',
+  };
+}
+
 // The same roll judged against a new target number: no new dice. For a target that changes
 // after the roll is seen, as when the Shield spell raises AC against an attack that hit. A
 // natural 20 or 1 on an attack still decides it whatever the number.

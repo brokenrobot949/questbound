@@ -7,9 +7,10 @@
 //   hold        doesn't move; fights only what they can reach from where they stand, or Dodges
 // Whatever the tactic, a companion first helps anyone in the party at 0 Hit Points (the hero
 // first): a healing spell if they have one, or else Spare the Dying, or the Help action's
-// Medicine check (DC 10) to stabilise them. Next, a friend Paralyzed by a Ghoul's Claw (or
-// Blinded or Poisoned) is freed with Lesser Restoration, if they have it. Support also heals
-// anyone Bloodied (at half their Hit Points or fewer).
+// Medicine check (DC 10) to stabilise them. Next, a friend Paralyzed (by a Ghoul's Claw, or a
+// Fanatic's Hold Person), Blinded or Poisoned is freed with Lesser Restoration, if they have
+// it. Support also heals anyone Bloodied (at half their Hit Points or fewer). When they attack,
+// a foe holding one of the party with Hold Person is worth three times as much to hurt (weighUp).
 // A spellcaster (Odda) opens a real fight with a Concentration spell, chosen by tactic (the
 // tactic's concentrate list): a fight whose foes still standing are worth at least a Low
 // fight for the party (realFight), and only if they'd still have a spell slot left for
@@ -51,6 +52,7 @@ import {
   findMonster,
   friendProblem,
   heroCombatant,
+  holdingSomeone,
   hpOf,
   inRange,
   isHero,
@@ -263,7 +265,9 @@ function attacks(game, c, { extra = false } = {}) {
 }
 
 // Every attack on every foe still standing, with the damage it would do on average (counting
-// the chance it hits, and Sneak Attack): [{ option, foe, value, preview }].
+// the chance it hits, and Sneak Attack): [{ option, foe, value, preview }]. A foe holding one of
+// the party with its Concentration (a Fanatic's Hold Person) counts three times over: hurting
+// it may break the spell and free them, which is worth more than a few Hit Points elsewhere.
 function weighUp(game, c, options) {
   const list = [];
   for (const option of options) {
@@ -271,7 +275,8 @@ function weighUp(game, c, options) {
       const preview = attackPreview(game, option.id, foe.id, c.id);
       if (!preview || preview.invalid) continue;
       const sneak = preview.sneak ? averageOf({ dice: preview.sneak, bonus: 0 }) : 0;
-      list.push({ option, foe, value: preview.chance * (averageOf(option.damage) + sneak), preview });
+      const worth = holdingSomeone(game.battle, foe) ? 3 : 1;
+      list.push({ option, foe, value: worth * preview.chance * (averageOf(option.damage) + sneak), preview });
     }
   }
   return list;

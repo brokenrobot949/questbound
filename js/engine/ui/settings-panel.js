@@ -38,6 +38,11 @@ const OPTIONS = [
     hint: 'If you have Hellish Rebuke, the game casts it with its free use (once per Long Rest) the first time a foe within 60 feet hurts you in a fight. It never spends your spell slots.',
   },
   {
+    name: 'autoInspiration',
+    label: 'Spend Inspiration against Hold Person',
+    hint: 'If a foe casts Hold Person on you and you fail the save while you have Heroic Inspiration, the game spends it to roll the save again. Turn this off to keep it for later.',
+  },
+  {
     name: 'battleSpeed',
     label: 'Battle speed',
     hint: 'How quickly each turn of a fight plays out. Skip shows the rest of a turn at once.',
@@ -52,7 +57,7 @@ const OPTIONS = [
 // Puts the settings into effect. Call at startup and after any change.
 export function applySettings() {
   document.documentElement.dataset.narration = getSetting('plainNarration') ? 'plain' : 'pixel';
-  setReactionPolicy({ shield: getSetting('autoShield'), rebuke: getSetting('autoRebuke') });
+  setReactionPolicy({ shield: getSetting('autoShield'), rebuke: getSetting('autoRebuke'), inspiration: getSetting('autoInspiration') });
 }
 
 // onClose(): the player pressed Done.

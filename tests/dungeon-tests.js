@@ -1344,11 +1344,223 @@ test('Cairnfield: Rhosyn sings, the acolytes are numbered, and unless the hymn b
   assertEqual(fight.objectiveText(game.battle), 'The hymn is finished.');
 });
 
-test('Cairnfield: Sister Rhosyn is a Cultist Fanatic with her Pact Blade, her spells noted as left out for now', () => {
+test('Cairnfield: Sister Rhosyn is a Cultist Fanatic, with her Pact Blade and SRD 5.2.1’s Spellcasting', () => {
   const fanatic = monsters.find((m) => m.id === 'cultist-fanatic');
   assertEqual([fanatic.ac, fanatic.hp.average, fanatic.xp, fanatic.saves.wisdom], [13, 44, 450, 4]);
   assertEqual(fanatic.attacks[0].damage, { dice: '1d8', bonus: 2, type: 'slashing', plus: { dice: '2d6', type: 'necrotic' } });
-  assertTrue(fanatic.variant.includes('Hold Person') && Boolean(sprites[fanatic.sprite]));
+  const { ability, saveDc, attackBonus, atWill, spells } = fanatic.spellcasting;
+  assertEqual([ability, saveDc, attackBonus, atWill], ['wisdom', 12, 4, ['light', 'thaumaturgy']]);
+  assertEqual(spells.map((s) => [s.id, s.perDay, Boolean(s.bonusAction)]), [['hold-person', 1, false], ['command', 2, false], ['spiritual-weapon', 2, true]]);
+  assertEqual(spells.find((s) => s.id === 'command').words, ['grovel', 'halt']);
+  assertTrue(fanatic.variant.includes('Grovel and Halt') && Boolean(sprites[fanatic.sprite]));
+});
+
+// ---- A foe's spells: the Cultist Fanatic (Sister Rhosyn) ----
+
+// Sister Rhosyn at Cairnfield with her hymn broken, at `at` (two squares above the hero at
+// (3, 8) unless given), every other foe out of it, and Odda or Fen at their squares if given.
+// It's the hero's turn, then Rhosyn's, then any companions'. spent: the spells she has cast
+// already today ({ 'hold-person': 1 }). The hero has Hit Points to spare, to watch a few rounds.
+function fanaticFight({ character = champion, seed = 'fanatic', at = { x: 3, y: 6 }, odda = null, fen = null, spent = {}, inspiration = false } = {}) {
+  const game = { ...gameFor(character, seed), party: [], inspiration };
+  if (odda) joinParty(game, 'odda');
+  if (fen) joinParty(game, 'fen');
+  forceNextD20(20);
+  fight.startBattle(game, 'cairnfield-camp', 0);
+  const battle = game.battle;
+  const rhosyn = fight.combatantById(battle, 'cultist-fanatic-1');
+  for (const foe of fight.enemies(battle)) if (foe !== rhosyn) foe.hp = 0;
+  battle.hymn = { singing: false, risen: false };
+  Object.assign(rhosyn, { pos: { ...at }, spellsCast: { ...spent } });
+  fight.heroCombatant(battle).pos = { x: 3, y: 8 };
+  if (odda) fight.combatantById(battle, 'odda').pos = { ...odda };
+  if (fen) fight.combatantById(battle, 'fen').pos = { ...fen };
+  battle.order = ['hero', rhosyn.id, ...(odda ? ['odda'] : []), ...(fen ? ['fen'] : [])];
+  battle.turn = 0;
+  game.hp = 300;
+  return { game, rhosyn };
+}
+
+// The scene just after a log line (who stood where, and how), for a line written this visit.
+const sceneAt = (entry) => fight.replayOf(entry).scene;
+const unitIn = (scene, id) => scene.units.find((u) => u.id === id);
+const apart = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+// The lines starting with these words, in order, from the first: their indices (-1 if missing).
+function linesInOrder(game, starts) {
+  const log = game.battle.log;
+  let from = 0;
+  return starts.map((start) => {
+    const i = log.findIndex((e, n) => n >= from && e.text.startsWith(start));
+    if (i >= 0) from = i + 1;
+    return i;
+  });
+}
+
+test('Fanatic: Hold Person on you, the save in full; Held, you lose your turns until a Wisdom save at the end of one breaks it', () => {
+  const { game, rhosyn } = fanaticFight();
+  game.rng = scriptedThen([2, 15], 'held'); // your save against it: a 2; at the end of your next turn, a 15
+  fight.endHeroTurn(game);
+  const steps = linesInOrder(game, ['Sister Rhosyn raises a hand towards you and casts Hold Person', 'You fail the Wisdom save', "You're Paralyzed: you can't move or act", 'You’re Paralyzed: you can’t move or act this turn', 'You break free of Hold Person, and can move again', 'Sister Rhosyn casts Spiritual Weapon']);
+  assertTrue(steps.every((i) => i >= 0), `${steps} ${logText(game)}`);
+  const log = game.battle.log;
+  const save = log[steps[1]].roll;
+  assertEqual([save.label, save.kind, save.target.value, save.natural, save.success], ["Sister Rhosyn's Hold Person (Wisdom save)", 'save', 12, 2, false]);
+  assertTrue(save.modifiers.some((m) => m.source === 'Wisdom saving throw'), 'your Wisdom save, shown in full');
+  assertTrue(log[steps[2]].text.endsWith('A Wisdom save at the end of each of your turns can break it.'));
+  const held = sceneAt(log[steps[2]]);
+  assertTrue(['held', 'paralyzed'].every((kind) => unitIn(held, 'hero').conditions.includes(kind)), 'Held, in the turn order');
+  assertEqual(unitIn(held, rhosyn.id).concentrating, 'Hold Person');
+  const lost = sceneAt(log[steps[3]]);
+  assertEqual(apart(unitIn(lost, 'hero').pos, unitIn(lost, rhosyn.id).pos), 1, 'she closed in after casting');
+  const again = log[steps[4]].roll;
+  assertEqual([again.label, again.natural, again.success], ["Sister Rhosyn's Hold Person (Wisdom save)", 15, true]);
+  assertEqual(rhosyn.spellsCast['hold-person'], 1, 'once a day');
+});
+
+test('Fanatic: Hold Person on Odda, the nearest; hurting Rhosyn can break her Concentration and free Odda, and so does felling her', () => {
+  const heldOdda = () => {
+    const { game, rhosyn } = fanaticFight({ at: { x: 4, y: 4 }, odda: { x: 4, y: 6 } });
+    game.rng = scriptedThen([2, 3], 'odda-held'); // Odda's save: a 2; at the end of her turn: a 3
+    fight.endHeroTurn(game);
+    return { game, rhosyn };
+  };
+  const { game, rhosyn } = heldOdda();
+  assertTrue(said(game, 'Sister Rhosyn raises a hand towards Odda and casts Hold Person') && said(game, 'Odda is Paralyzed'), logText(game));
+  const strain = game.battle.log.find((e) => e.text === 'Odda strains against the spell, and stays held.');
+  assertEqual(strain.roll.label, "Sister Rhosyn's Hold Person (Odda's Wisdom save)");
+  assertTrue(fight.isHeroTurn(game) && fight.conditionsOf(game.battle, 'odda').includes('held'));
+  assertTrue(fight.holdingSomeone(game.battle, rhosyn) && rhosyn.concentration.name === 'Hold Person');
+  // You hit her for 15 (DC 10 to keep it), and her Constitution save is a 2 + 1.
+  rhosyn.pos = { x: 3, y: 7 };
+  game.rng = scriptedThen([15, 6, 6, 6, 6, 2], 'odda-freed');
+  fight.heroAttack(game, 'greatsword-melee', rhosyn.id);
+  const broke = game.battle.log.find((e) => e.text.startsWith("Sister Rhosyn's concentration breaks"));
+  assertEqual(broke.text, "Sister Rhosyn's concentration breaks: Hold Person ends. Odda can move again.");
+  assertEqual([broke.roll.label, broke.roll.target.value, broke.roll.success], ["Concentration (Sister Rhosyn's Constitution save)", 10, false]);
+  assertTrue(!fight.conditionsOf(game.battle, 'odda').includes('paralyzed') && rhosyn.concentration === null && !fight.holdingSomeone(game.battle, rhosyn));
+  // Felling her ends it too.
+  const second = heldOdda();
+  Object.assign(second.rhosyn, { pos: { x: 3, y: 7 }, hp: 1 });
+  forceNextD20(15);
+  fight.heroAttack(second.game, 'greatsword-melee', second.rhosyn.id);
+  assertTrue(said(second.game, 'Hold Person ends with Sister Rhosyn. Odda can move again.'), logText(second.game));
+  assertTrue(!fight.conditionsOf(second.game.battle, 'odda').includes('paralyzed'));
+});
+
+test('Fanatic: Command says “Halt!” to you from afar and “Grovel!” from beside you; either way your turn is lost', () => {
+  const { game, rhosyn } = fanaticFight({ spent: { 'hold-person': 1, 'spiritual-weapon': 2 } });
+  game.rng = scriptedThen([3, 3], 'command'); // both your saves against it fail
+  fight.endHeroTurn(game);
+  const steps = linesInOrder(game, [
+    'Sister Rhosyn points at you and casts Command: “Halt!” On your next turn you must stand still and do nothing.',
+    'Your turn.',
+    "You obey Sister Rhosyn's command to halt: you stand rooted to the spot, and don't move or act this turn.",
+    'Sister Rhosyn points at you and casts Command: “Grovel!” On your next turn you must throw yourself down and grovel.',
+    'Your turn.',
+    "You obey Sister Rhosyn's command: you throw yourself flat on the ground and grovel, and your turn ends.",
+  ]);
+  assertTrue(steps.every((i) => i >= 0) && steps[2] === steps[1] + 1 && steps[5] === steps[4] + 1, `${steps} ${logText(game)}`);
+  const log = game.battle.log;
+  const save = log[steps[0]].roll;
+  assertEqual([save.label, save.target.value, save.success], ["Sister Rhosyn's Command (Wisdom save)", 12, false]);
+  assertTrue(unitIn(sceneAt(log[steps[0]]), 'hero').conditions.includes('halt') && unitIn(sceneAt(log[steps[3]]), 'hero').conditions.includes('grovel'), 'Commanded, in the turn order');
+  assertTrue(fight.isHeroTurn(game) && fight.isProne(game.battle, 'hero'), 'you grovelled, and are still on the ground');
+  assertEqual(rhosyn.spellsCast.command, 2, 'twice a day');
+  assertTrue(said(game, 'Sister Rhosyn attacks you with Pact Blade') || said(game, 'Sister Rhosyn hits you with Pact Blade'), 'its spells spent, its blade');
+});
+
+test('Fanatic: Command on Odda: she halts, and her turn passes', () => {
+  const { game } = fanaticFight({ at: { x: 4, y: 4 }, odda: { x: 4, y: 6 }, spent: { 'hold-person': 1, 'spiritual-weapon': 2 } });
+  game.rng = scriptedThen([2], 'odda-halts');
+  fight.endHeroTurn(game);
+  const steps = linesInOrder(game, ['Sister Rhosyn points at Odda and casts Command: “Halt!” On their next turn Odda must stand still and do nothing.', "Odda's turn.", "Odda obeys Sister Rhosyn's command to halt, and stands rooted to the spot, doing nothing this turn.", 'Round 2.']);
+  assertTrue(steps.every((i) => i >= 0) && steps[2] === steps[1] + 1 && steps[3] === steps[2] + 1, `${steps} ${logText(game)}`);
+});
+
+test('Fanatic: Spiritual Weapon, a Bonus Action: a blade of ash beside you, +4 to hit for 1d8 + 2 Force, striking each turn while she concentrates', () => {
+  const { game, rhosyn } = fanaticFight({ spent: { 'hold-person': 1, command: 2 } });
+  game.rng = scriptedThen([15, 5], 'blade'); // its attack: a 15 (19 against your AC 17), and 1d8 = 5
+  fight.endHeroTurn(game);
+  const steps = linesInOrder(game, ['Sister Rhosyn casts Spiritual Weapon: a spectral blade of grey ash flickers into being beside you.', 'Spiritual Weapon hits you: 1d8 (5) + 2 = 7 force damage.']);
+  assertTrue(steps.every((i) => i >= 0) && steps[1] === steps[0] + 1, `${steps} ${logText(game)}`);
+  const roll = game.battle.log[steps[1]].roll;
+  assertEqual([roll.kind, roll.modifiers, roll.target.type], ['attack', [{ label: 'Spell attack', value: 4, source: "Sister Rhosyn's Spellcasting" }], 'AC']);
+  assertTrue(said(game, 'Sister Rhosyn attacks you with Pact Blade') || said(game, 'Sister Rhosyn hits you with Pact Blade'), 'and her action still for her blade');
+  assertEqual([rhosyn.concentration.name, rhosyn.spellsCast['spiritual-weapon']], ['Spiritual Weapon', 1]);
+  assertEqual(fight.battleScene(game).weapons.map((w) => [w.by, w.foe]), [[rhosyn.id, true]], 'drawn on the grid as a foe’s');
+  fight.endHeroTurn(game);
+  assertTrue(said(game, "Sister Rhosyn's Spiritual Weapon sweeps across to you."), logText(game));
+  // Break her Concentration, and the blade is gone.
+  rhosyn.pos = { x: 3, y: 7 };
+  game.rng = scriptedThen([15, 6, 6, 6, 6, 2], 'blade-broken');
+  fight.heroAttack(game, 'greatsword-melee', rhosyn.id);
+  assertTrue(said(game, "Sister Rhosyn's concentration breaks: Spiritual Weapon ends.") && fight.battleScene(game).weapons.length === 0, logText(game));
+});
+
+test('Fanatic: fail your first save against Hold Person with Heroic Inspiration, and the game spends it to roll again (Settings can say not to)', () => {
+  const { game } = fanaticFight({ inspiration: true });
+  game.rng = scriptedThen([2, 17], 'inspired'); // a 2, then the reroll: a 17
+  fight.endHeroTurn(game);
+  const line = game.battle.log.find((e) => e.text === 'You shake off the spell.');
+  assertEqual([line.roll.natural, line.roll.success, line.roll.rerolled], [17, true, { index: 0, from: 2, to: 17 }]);
+  assertTrue(said(game, 'Your limbs begin to lock. You spend your Heroic Inspiration, and roll the save again.') && game.inspiration === false);
+  fight.setReactionPolicy({ inspiration: false });
+  try {
+    const { game: kept } = fanaticFight({ inspiration: true, seed: 'kept' });
+    kept.rng = scriptedThen([2, 17], 'kept'); // the 2 stands; the 17 is the save at the end of your turn
+    fight.endHeroTurn(kept);
+    assertTrue(said(kept, 'You fail the Wisdom save') && !said(kept, 'Heroic Inspiration') && kept.inspiration === true, logText(kept));
+  } finally {
+    fight.setReactionPolicy({ inspiration: true });
+  }
+});
+
+test('Fanatic: Odda frees you from Hold Person with Lesser Restoration, and Rhosyn’s spell ends', () => {
+  const { game, rhosyn } = fanaticFight({ odda: { x: 2, y: 8 } });
+  game.rng = scriptedThen([2], 'restored'); // your save fails
+  fight.endHeroTurn(game);
+  assertTrue(said(game, 'Odda casts Lesser Restoration on you, with a touch: you are no longer Paralyzed.'), logText(game));
+  assertTrue(fight.isHeroTurn(game) && !fight.conditionsOf(game.battle, 'hero').includes('paralyzed') && rhosyn.concentration === null);
+});
+
+test('Companions: Fen shoots the Fanatic holding you, though a Zombie would be easier to hit', () => {
+  const firstShot = (holding) => {
+    const { game, rhosyn } = fanaticFight({ at: { x: 4, y: 3 }, fen: { x: 4, y: 9 }, seed: 'fen-aims' });
+    Object.assign(fight.combatantById(game.battle, 'zombie-1'), { hp: 22, pos: { x: 5, y: 3 } });
+    game.battle.order = ['hero', 'fen']; // (neither foe takes a turn here)
+    if (holding) {
+      game.battle.effects.push({ kind: 'paralyzed', target: 'hero', endsOn: null, concentration: true, by: rhosyn.id, dc: 12 });
+      rhosyn.concentration = { spellId: 'hold-person', name: 'Hold Person' };
+    }
+    game.rng = scriptedThen(holding ? [2] : [], 'fen-aims'); // your save against it fails
+    fight.endHeroTurn(game);
+    const shot = game.battle.log.find((e) => e.text.includes('with Shortbow'));
+    return shot ? shot.text : 'no shot';
+  };
+  assertTrue(firstShot(false).includes('Zombie 1'), 'the easier mark');
+  assertTrue(firstShot(true).includes('Sister Rhosyn'), 'breaking her Concentration would free you');
+});
+
+test('Fanatic: Rhosyn casts nothing while she sings; once the hymn is done, she does', () => {
+  const game = warrenFight('cairnfield-camp', champion, 'singing');
+  game.hp = 400;
+  for (let i = 0; i < 4 && !game.battle.outcome; i++) fight.endHeroTurn(game);
+  const log = game.battle.log.map((e) => e.text);
+  const hymn = log.findIndex((t) => t.includes('drags itself up out of the opened barrow'));
+  const cast = log.findIndex((t) => ['Sister Rhosyn raises a hand', 'Sister Rhosyn points at', 'Sister Rhosyn casts'].some((s) => t.startsWith(s)));
+  assertTrue(hymn >= 0 && cast > hymn, `${hymn} ${cast} ${log.join(' / ')}`);
+});
+
+test('The Chantry of Ash: Cantor Vesk casts once his hymn is done, and Sister Rhosyn as soon as she comes down the stair', () => {
+  const game = chantryFight('chantry', ['vault_drained', 'rhosyn_lives']);
+  game.hp = 600;
+  for (let i = 0; i < 4 && !game.battle.outcome; i++) fight.endHeroTurn(game);
+  const log = game.battle.log.map((e) => e.text);
+  const casts = (name) => log.findIndex((t) => [`${name} raises a hand`, `${name} points at`, `${name} casts`].some((s) => t.startsWith(s)));
+  const hymn = log.findIndex((t) => t.includes('drags itself up out of the ash'));
+  const arrived = log.findIndex((t) => t.includes('come Sister Rhosyn'));
+  assertTrue(hymn >= 0 && casts('Cantor Vesk') > hymn, `Vesk: ${hymn} ${casts('Cantor Vesk')}`);
+  assertTrue(arrived >= 0 && casts('Sister Rhosyn') > arrived, `Rhosyn: ${arrived} ${casts('Sister Rhosyn')} ${log.join(' / ')}`);
 });
 
 test('Chapter 2: from the ford the barrow road climbs onto the moor; a night in a sheepfold, and a word with Fen or Odda', async () => {

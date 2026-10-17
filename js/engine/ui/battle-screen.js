@@ -81,7 +81,8 @@ const CONDITION_WORDS = [
   ['paralyzed', 'Paralyzed'],
   ['turned', 'Turned'],
   ['blinded', 'Blinded'],
-  ['grovel', 'Commanded'],
+  ['grovel', 'Commanded: Grovel'],
+  ['halt', 'Commanded: Halt'],
   ['baned', 'Baned'],
   ['poisoned', 'Poisoned'],
   ['outlined', 'Outlined'],
@@ -462,7 +463,10 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       if (unit.concentrating) notes.push(`${c.name} concentrating on ${unit.concentrating}`);
     }
     if (scene.concentration) notes.push(`Concentrating on ${scene.concentration}`);
-    if (heroConditions.includes('paralyzed')) notes.push('Paralyzed: you can’t move or act');
+    if (heroConditions.includes('held')) notes.push('Held by Hold Person: you can’t move or act, until a Wisdom save at the end of your turn breaks it');
+    else if (heroConditions.includes('paralyzed')) notes.push('Paralyzed: you can’t move or act');
+    if (heroConditions.includes('grovel')) notes.push('Commanded: on your turn you’ll grovel, and the turn ends');
+    if (heroConditions.includes('halt')) notes.push('Commanded: on your turn you’ll halt, and do nothing');
     if (heroConditions.includes('blessed')) notes.push('Blessed: +1d4 to attacks and saves');
     if (heroConditions.includes('sanctuary')) notes.push('Sanctuary: foes must save to attack you');
     if (heroConditions.includes('shield')) notes.push('Shield up: +5 AC');
@@ -494,8 +498,11 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
           if (unit.escaped) tags.push('fled');
           else if (c.side === 'hero' && down) tags.push(STATE_WORDS[unit.state]);
           else if (!down) {
-            for (const [kind, word] of CONDITION_WORDS) if (conditions.includes(kind)) tags.push(word);
+            // Paralyzed by Hold Person shows as Held.
+            for (const [kind, word] of CONDITION_WORDS) if (conditions.includes(kind)) tags.push(kind === 'paralyzed' && conditions.includes('held') ? 'Held' : word);
             if (unit.prone && !conditions.includes('asleep')) tags.push('Prone');
+            // What a foe is concentrating on (hurting it may end it).
+            if (c.side === 'enemy' && unit.concentrating) tags.push(`concentrating on ${unit.concentrating}`);
           }
           const label = tags.length ? `${name} (${tags.join(', ')})` : name;
           return el('li', `battle-order-entry${unit.id === scene.actor ? ' is-current' : ''}${down ? ' is-down' : ''}`, label);
@@ -981,8 +988,8 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     blit(ctx, heroFrames[up ? frame : 0], 0, 0, heroAt.x, heroAt.y, size, { alpha: up ? faint : 0.5, lying: !up || hero.prone });
     drawHealthBar(ctx, heroAt, hero.hp / heroMaxHp(game), size, scale);
 
-    // Spiritual Weapon, hovering where it last struck.
-    for (const weapon of scene.weapons || []) drawPixels(ctx, SPECTRAL_WEAPON, weapon.pos, size, scale);
+    // Spiritual Weapon, hovering where it last struck: the party's of light, a foe's of ash.
+    for (const weapon of scene.weapons || []) drawPixels(ctx, weapon.foe ? ASH_BLADE : SPECTRAL_WEAPON, weapon.pos, size, scale);
 
     // Sleepers snore; whoever an aimed area would catch is framed in orange.
     for (const unit of scene.units) {
@@ -1088,6 +1095,30 @@ const SPECTRAL_WEAPON = {
     '................',
   ],
   colors: { L: 'rgba(150, 200, 255, 0.85)', W: '#f4f8ff', G: '#e8c860' },
+};
+
+// A foe's Spiritual Weapon (the Choir's Fanatics): a blade of grey ash with an ember glow, so
+// it can't be mistaken for one of yours.
+const ASH_BLADE = {
+  rows: [
+    '................',
+    '.............LL.',
+    '............LWWL',
+    '...........LWWL.',
+    '..........LWWL..',
+    '.........LWWL...',
+    '........LWWL....',
+    '.......LWWL.....',
+    '......LWWL......',
+    '..L..LWWL.......',
+    '..LLLWWL........',
+    '...LGGL.........',
+    '..LGGL..........',
+    '.LGGL...........',
+    '.LL.............',
+    '................',
+  ],
+  colors: { L: 'rgba(230, 80, 50, 0.8)', W: '#bdb6ad', G: '#5c4b44' },
 };
 
 // Draws a little picture (rows of colour letters, '.' see-through) over a square.

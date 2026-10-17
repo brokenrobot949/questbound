@@ -4,7 +4,7 @@
 import { test, assertEqual, assertTrue, assertThrows, scriptedRng, run } from './harness.js';
 import { createRng } from '../js/engine/rules/rng.js';
 import { forceNextD20, peekForcedD20, rollDie, rollDice } from '../js/engine/rules/dice.js';
-import { d20Test, startD20Count, stopD20Count } from '../js/engine/rules/d20-test.js';
+import { d20Test, rerollKept, startD20Count, stopD20Count } from '../js/engine/rules/d20-test.js';
 import { abilityCheck } from '../js/engine/rules/ability-check.js';
 import {
   abilityModifier,
@@ -306,6 +306,17 @@ test('Saving throw: reports success or failure', () => {
   const r = d20Test({ rng: scriptedRng([8]), kind: 'save', target: { type: 'DC', value: 13 } });
   assertEqual(r.outcome, 'failure');
   assertThrows(() => d20Test({ rng: scriptedRng([8]), kind: 'guess' }));
+});
+
+test('Heroic Inspiration, spent for you: a failed save rolled again keeps its modifiers and DC, and shows both faces', () => {
+  const save = d20Test({ rng: scriptedRng([4]), kind: 'save', label: 'Hold Person (Wisdom save)', modifiers: plusFive, target: { type: 'DC', value: 12 } });
+  const again = rerollKept(scriptedRng([9]), save);
+  assertEqual([again.natural, again.total, again.success, again.outcome, again.rerolled, again.label], [9, 14, true, 'success', { index: 0, from: 4, to: 9 }, 'Hold Person (Wisdom save)']);
+  // With Disadvantage the kept (lower) die is rolled again, and the lower is kept again.
+  const worse = d20Test({ rng: scriptedRng([3, 15]), kind: 'save', disadvantage: ['Poisoned'], target: { type: 'DC', value: 10 } });
+  const rerolled = rerollKept(scriptedRng([18]), worse);
+  assertEqual([rerolled.dice, rerolled.natural, rerolled.success], [[18, 15], 15, true]);
+  assertThrows(() => rerollKept(scriptedRng([9]), d20Test({ rng: scriptedRng([4]), kind: 'attack' })));
 });
 
 // ---- Ability checks from the character sheet ----

@@ -5,8 +5,9 @@
 //   in a scene  a failed check or save: Reroll, or Keep the roll, under the result
 //   in a fight  a missed attack roll on the hero's turn: Reroll above the actions, until they
 //               do anything else
-// Saves the hero makes during the foes' turns can't be rerolled yet: those turns are decided
-// before they play out on screen.
+// Saves the hero makes during the foes' turns can't be rerolled by choice: those turns are
+// decided before they play out on screen. One is rerolled for them instead: a failed first save
+// against a foe's Hold Person, when Settings allow (combat/battle.js, "A foe's spells").
 //
 // How it works: the game was kept as it was just before that choice or attack (an undo point,
 // save/undo.js). A reroll puts the game back, spends the Inspiration, and plays the moment

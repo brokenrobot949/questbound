@@ -38,6 +38,14 @@
 //                   (DC 5 + the damage) leaves it at 1 instead, unless the damage is Radiant or
 //                   from a Critical Hit
 //   bonusActions    e.g. 'nimble-escape' (Disengage or Hide as a Bonus Action)
+//   spellcasting    the spells it casts (a Cultist Fanatic's): { ability, saveDc, attackBonus,
+//                   atWill: spell ids it can always cast (none of them used in a fight yet),
+//                   spells: [{ id, perDay, bonusAction, words, look }] }. id is a spell in
+//                   data/srd/spells.js; perDay how many times a day it can cast it; bonusAction
+//                   for one cast as a Bonus Action (Spiritual Weapon); words, the words of
+//                   Command it uses ('grovel', 'halt'); look, what its Spiritual Weapon looks
+//                   like, for the fight log. How it chooses is in combat/battle.js ("A foe's
+//                   spells").
 //   behaviour       how it fights (original): 'brute' charges the nearest foe; 'skirmisher'
 //                   prefers its ranged attack when it can't reach you; 'coward' fights like a
 //                   brute but flees once Bloodied, if the fight has a way out. Whatever the
@@ -282,6 +290,7 @@ export const monsters = [
     source: 'SRD 5.2.1',
   },
   // Sister Rhosyn at Cairnfield (Chapter 2) leads the Choir's acolytes, and sings the dead up.
+  // Cantor Vesk in the Chantry of Ash (Chapter 3) is one too.
   {
     id: 'cultist-fanatic',
     name: 'Cultist Fanatic',
@@ -300,10 +309,23 @@ export const monsters = [
     attacks: [
       { id: 'pact-blade', name: 'Pact Blade', kind: 'melee', bonus: 4, reach: 5, damage: { dice: '1d8', bonus: 2, type: 'slashing', plus: { dice: '2d6', type: 'necrotic' } } },
     ],
+    // Spell save DC 12, +4 to hit with spell attacks (Wisdom 14). Its Spiritual Weapon strikes
+    // for 1d8 + 2 Force damage (1d8 plus its Wisdom modifier).
+    spellcasting: {
+      ability: 'wisdom',
+      saveDc: 12,
+      attackBonus: 4,
+      atWill: ['light', 'thaumaturgy'],
+      spells: [
+        { id: 'hold-person', perDay: 1 },
+        { id: 'command', perDay: 2, words: ['grovel', 'halt'] },
+        { id: 'spiritual-weapon', perDay: 2, bonusAction: true, look: 'a spectral blade of grey ash' },
+      ],
+    },
     behaviour: 'brute',
     sprite: 'cultist-fanatic',
-    variant: 'Her Spellcasting (Light and Thaumaturgy at will, Command twice a day, Hold Person once) and her Spiritual Weapon are left out until foes can cast spells, which comes with Chapter 3’s chantry fight (Rob, Oct 11, 2026). She fights with her Pact Blade, and at Cairnfield she sings the hymn that raises the dead.',
-    text: 'Pact Blade. Melee Attack Roll: +4, reach 5 ft. Hit: 6 (1d8 + 2) Slashing damage plus 7 (2d6) Necrotic damage.',
+    variant: 'Its Command uses only two of the spell’s words, Grovel and Halt (Rob, Oct 17, 2026): Approach and Flee would move you for it, and Drop needs weapons that can be dropped and picked up again. Light and Thaumaturgy, its at-will spells, have no use in a fight yet.',
+    text: 'Pact Blade. Melee Attack Roll: +4, reach 5 ft. Hit: 6 (1d8 + 2) Slashing damage plus 7 (2d6) Necrotic damage. Spellcasting. The cultist casts one of the following spells, using Wisdom as the spellcasting ability (spell save DC 12, +4 to hit with spell attacks): At Will: Light, Thaumaturgy. 2/Day: Command. 1/Day: Hold Person. Spiritual Weapon (2/Day; Bonus Action). The cultist casts the Spiritual Weapon spell, using the same spellcasting ability as Spellcasting.',
     source: 'SRD 5.2.1',
   },
   // ---- Chapter 2 ----
