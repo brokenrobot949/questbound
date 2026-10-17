@@ -2776,7 +2776,7 @@ test('Chapter 3: called by name, Aveline lies down at rest (her 700 XP); your Ri
   const text = pageText(game);
   assertTrue(['"Called," she says', 'Hold the door', "That's that settled", 'lies on the altar steps', 'The Sleeping King', 'the gold on her breast'].every((s) => text.includes(s)), text);
   assertTrue(speakersOf(game).includes('aveline') && deeds(game).includes('Called Dame Aveline'));
-  assertEqual([cards(game), game.objective], [[], 'See what Cantor Vesk was reaching for. (The rest of Act I is still being written.)']);
+  assertEqual([cards(game), game.objective], [['Kneel beside him, and hear him out', 'Get to the gold before he does', 'Stand back, and see what he does'], 'See what Cantor Vesk was reaching for.']);
   assertEqual(roomFigures(chantryRoom(), game.flags).filter((f) => !f.fallen), [], 'all of them down');
 });
 
@@ -2806,6 +2806,151 @@ test('Chapter 3: beaten in the chantry, Aveline remembers by herself and cuts Ve
   assertTrue(['the sword comes down on the Cantor instead', 'with your purse', 'She did it', 'lies on the altar steps'].every((s) => pageText(game).includes(s)), pageText(game));
   assertTrue(!pageText(game).includes("That's that settled"), 'no victory talk after a defeat');
   assertTrue(game.hp === fight.maxHpOf(game, { id: 'hero' }) && notes(game).some((n) => n.startsWith('A good place to stop')));
+});
+
+// ---- Chapter 3, beat 6: the first shard, and the way out ----
+
+// With Cantor Vesk dying at the altar after the chantry fight (a level 4 Champion with Odda and
+// Fen unless given; the vault drained unless the flags say flooded), at the choice of what to do
+// as he reaches for the gold. at: a stitch of ch3_shard to start from instead.
+async function atTheShard(seed, { character = champion4, flags = [], odda = true, fen = true, at = '' } = {}) {
+  const game = await atTheChantry(seed, { character, flags: ['chantry_won', ...flags], odda, fen });
+  game.page = jumpTo(game, at ? `ch3_shard.${at}` : 'ch3_shard');
+  return game;
+}
+
+// A companion who fell (died) earlier in the barrow.
+function fallen(game, id) {
+  Object.assign(memberOf(game, id), { hp: 0, fallen: true });
+}
+
+const shardCards = ["Lay it back on Dame Aveline's breast", 'Hold the shard over the dead Cantor, and make him answer', 'Get everyone out of here'];
+
+test('Chapter 3: the first shard: Vesk sings his last note, the gold flies to your hand and says your whole name as your Rival does, and you see the crown break', async () => {
+  const game = await atTheChantry('shard-called', { character: sable, flags: ['read_the_oath_wall', 'rival_freed'] });
+  pick(game, 'Go down the stair');
+  settleChantry(game, 'Charge down', {
+    setUp: (g) => Object.assign(fight.combatantById(g.battle, 'wight-1'), { side: 'hero', ally: true, turned: true }),
+  });
+  const approval = memberOf(game, 'odda').approval;
+  pick(game, 'Kneel beside him');
+  assertEqual(memberOf(game, 'odda').approval - approval, 1, 'mercy');
+  const text = pageText(game);
+  assertTrue(
+    ['Forty years I dug graves', 'the words her order says over the dying', 'one cracked note', "Under Dame Aveline's folded hands", 'not to the Cantor, but to you', 'Then he\'s gone',
+      'It says your name: Wren Ashdown, all of it, the way Sable Rook says it, as if it\'s a joke only they get.', 'Sable Rook is across the hall'].every((s) => text.includes(s)),
+    text,
+  );
+  assertEqual([cards(game), speakersOf(game)], [['Open your hand, and look at it'], ['vesk', 'vesk']]);
+  pick(game, 'Open your hand');
+  const vision = pageText(game);
+  assertTrue(
+    ['a crown half off his head', 'seven sparks', 'she looks straight at you', 'turned over in its sleep', "That isn't Choir work", "Why'd it go to you?", 'Of course it went to you'].every((s) => vision.includes(s)),
+    vision,
+  );
+  assertTrue(game.flags.includes('shard_names') && game.inventory.some((i) => i.id === 'shard-of-names') && notes(game).includes('You now have: The Shard of Names.'));
+  assertEqual(speakersOf(game), ['odda', 'fen', 'rival']);
+  assertTrue(deeds(game).includes('Caught a sliver of gold'));
+  assertEqual([cards(game), tagsOf(game)], [shardCards, ['', 'shard:names', '']]);
+});
+
+test('Chapter 3: the shard won’t stay with Aveline; held over the dead Cantor, it makes him answer, and it’s a flag for the Whisper', async () => {
+  const game = await atTheShard('shard-asked', { flags: ['aveline_destroyed'] }); // Wren, whose Bond is her sibling Kit
+  pick(game, 'Get to the gold');
+  const text = pageText(game);
+  assertTrue(['On Dame Aveline\'s breastplate', 'leaps the last inch into your hand', 'the way Kit Ashdown used to say it when you were small and in trouble'].every((s) => text.includes(s)), text);
+  assertTrue(!game.flags.includes('shard_names'), 'not until the vision');
+  pick(game, 'Open your hand');
+  const approval = memberOf(game, 'odda').approval;
+  pick(game, 'Lay it back');
+  assertTrue(game.flags.includes('tried_to_return_the_shard') && memberOf(game, 'odda').approval - approval === 1);
+  assertTrue(['back on Dame Aveline\'s breastplate', 'back in your palm', "It's chosen, then"].every((s) => pageText(game).includes(s)), pageText(game));
+  assertEqual(cards(game), shardCards.slice(1));
+  pick(game, 'Hold the shard');
+  assertTrue(game.flags.includes('asked_the_dead_cantor') && pageText(game).includes('"Who calls?"') && speakersOf(game).includes('vesk'));
+  assertEqual(cards(game), ['Ask him what the Sleeping King is', 'Ask him what the Choir was digging for', 'Let him rest'], 'who "she" is, once he speaks of her');
+  pick(game, 'Ask him what the Sleeping King is');
+  assertTrue(pageText(game).includes('He went to sleep with the crown on his head'));
+  pick(game, 'Ask him who');
+  assertTrue(pageText(game).includes('The Precentor. She was there when he went to sleep.'));
+  pick(game, 'Ask him what the Choir');
+  assertTrue(pageText(game).includes('The old dead remember where.'));
+  assertEqual(cards(game), ['Let him rest']);
+  pick(game, 'Let him rest');
+  assertTrue(['only a dead man', 'Horrible. But useful.', "Don't make a habit of that"].every((s) => pageText(game).includes(s)), pageText(game));
+  assertTrue(missingMiller(game).includes('The Precentor, who leads the Choir, was there') && deeds(game).includes('made him answer'));
+  assertEqual(cards(game), ['Get everyone out of here']);
+});
+
+test('Chapter 3: the way out: the barrow shudders again; up the drained stair, through the hall where the oaths hold, to Garrick at the gate at dawn', async () => {
+  const flags = ['aveline_rested', 'varrow_rallied', 'nettle_rallied', 'gate_guardians_knelt'];
+  const game = await atTheShard('shard-stair', { character: juniper, flags, at: 'with_the_shard' }); // no Guidance or Tactical Mind to change the check
+  pick(game, 'Get everyone out');
+  assertTrue(['turning for the stair', 'A pillar splits', '"Out," Odda says.'].every((s) => pageText(game).includes(s)), pageText(game));
+  assertEqual([cards(game), tagsOf(game), game.objective], [['Haul everyone up the stair before it goes', 'Dodge up the stair between the falling stones'], ['check:athletics:12', 'check:acrobatics:12'], "Get out of the Kings' Barrow."]);
+  forceNextD20(20);
+  pick(game, 'Haul everyone');
+  revealAll(game);
+  const climb = pageText(game);
+  assertTrue(['like a mule up a mountain', 'silt and puddles', 'The oaths are still holding', '"Thank you," Odda says to the tombs'].every((s) => climb.includes(s)), climb);
+  assertEqual([currentDungeon(game).room, cards(game)], ['hall', ['Go on up, through the crowned passage, and out']]);
+  pick(game, 'Go on up');
+  const text = pageText(game);
+  assertTrue(
+    ['climb the last stair into the open air', "It's dawn", 'stand on their plinths', "exactly where he said he'd wait", '"Is it done?"', "Varrow's watch are putting out their torches", 'goblin cheer', 'warm as a hand'].every((s) => text.includes(s)),
+    text,
+  );
+  assertTrue(!text.includes('carry the fallen home') && !text.includes('your rival'), 'nobody fell, and no Rival');
+  assertEqual([currentDungeon(game).id, currentDungeon(game).room, currentLocation(game), currentTime(game)], ['kings-barrow', 'forecourt', "The Kings' Barrow, the great gate", 'Dawn']);
+  assertEqual([cards(game), game.objective], [[], 'Take Garrick home to Bramblegate. (The rest of Act I is still being written.)']);
+  assertTrue(speakersOf(game).includes('garrick') && missingMiller(game).includes('Take him home to Lark'));
+});
+
+test('Chapter 3: the long way out, through the old drain: a falling stone, the fallen carried and a wounded Rival helped; the robbed hall shakes', async () => {
+  const flags = ['vault_flooded', 'aveline_destroyed', 'rival_freed', 'rival_wounded', 'odda_at_the_chantry', 'odda_fell_in_the_chantry', 'fen_fell_in_the_vault', 'looted_the_champions', 'gate_guardians_destroyed'];
+  const game = await atTheShard('shard-drain', { character: { ...juniper, bond: { type: 'rival', name: 'Sable Rook' } }, flags, at: 'with_the_shard' });
+  fallen(game, 'odda');
+  fallen(game, 'fen');
+  pick(game, 'Get everyone out');
+  assertTrue(['turning for the drain', 'You get her across your shoulders anyway', 'Sable Rook comes round as you haul them up'].every((s) => pageText(game).includes(s)), pageText(game));
+  assertTrue(!pageText(game).includes('"Out," Odda says'), 'Odda fell');
+  assertEqual([cards(game), tagsOf(game)], [['Heave the stones aside, and hold up the roof while everyone crawls through', 'Squeeze through ahead of the fall, and drag the others after you'], ['check:athletics:12', 'check:acrobatics:12']]);
+  game.hp = 30;
+  game.rng = scriptedThen([1, 3, 4], 'shard-drain'); // the check fails; 2d6 of 3 and 4
+  pick(game, 'Squeeze through');
+  revealAll(game);
+  assertTrue(notes(game).includes('You take 7 bludgeoning damage (2d6: 3, 4).') && game.hp === 23, notes(game).join(' / '));
+  const climb = pageText(game);
+  assertTrue(['the size of a bread oven', 'You get up anyway', 'The black water heaves', 'stop for the fallen you left there', "you don't look at them"].every((s) => climb.includes(s)), climb);
+  assertTrue(!climb.includes('The oaths are still holding'), 'the robbed tombs don’t hold');
+  pick(game, 'Go on up');
+  const text = pageText(game);
+  assertTrue(['lie in pieces', "You'll carry the fallen home to Bramblegate's temple", 'They are not fine'].every((s) => text.includes(s)), text);
+  assertTrue(!text.includes('the cloak lies where you left it'), 'nobody fell at the gate');
+  assertEqual(cards(game), []);
+});
+
+test('Chapter 3: struck down on the way out is Fate’s Mercy: carried up to the forecourt, your purse lost under the hill', async () => {
+  const game = await atTheShard('shard-mercy', { character: juniper, flags: ['aveline_rested'], fen: false, at: 'with_the_shard' });
+  game.money = 500;
+  game.hp = 1;
+  pick(game, 'Get everyone out');
+  game.rng = scriptedThen([1, 1, 1, 2, 2, 2], 'shard-mercy'); // the check fails; 2d6 of 1 and 1; three failed death saves
+  pick(game, 'Dodge up the stair');
+  revealAll(game);
+  assertTrue(['escape_fates_mercy'].every((f) => game.flags.includes(f)) && game.money === 0 && game.hp === fight.maxHpOf(game, { id: 'hero' }));
+  const text = pageText(game);
+  assertTrue(['Somebody carried you up out of the barrow', 'your purse came loose', 'Garrick Dunn looks at you'].every((s) => text.includes(s)), text);
+  assertTrue(!text.includes("exactly where he said he'd wait") && !text.includes('silt and puddles'), 'straight to the gate');
+  assertEqual([currentDungeon(game).room, cards(game)], ['forecourt', []]);
+});
+
+test('Chapter 3: a Dwarf feels where the stone will hold on the way out, with no roll', async () => {
+  const game = await atTheShard('shard-dwarf', { character: dwarf, flags: ['vault_flooded'], at: 'with_the_shard' });
+  pick(game, 'Get everyone out');
+  assertEqual(cards(game).length, 3);
+  pick(game, 'Feel where the stone will hold');
+  assertTrue(game.page.beats.every((b) => b.type !== 'roll') && pageText(game).includes('listened to stone') && pageText(game).includes('the landing above the flooded vault'));
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

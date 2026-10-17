@@ -12,7 +12,7 @@ import { d20Test } from '../rules/d20-test.js';
 import { canCastSpell, findSpell, preparePicks } from '../character/spells.js';
 import { castCostText, castInScene, guidanceModifiers, sceneCastCost, spellSaveDc } from '../character/casting.js';
 import { findAbility } from '../character/sheet.js';
-import { addItem, buyItem, canAfford, COPPER_PER, findItem, hasItem, moneyText, removeItem } from '../character/inventory.js';
+import { addItem, buyItem, canAfford, COPPER_PER, findItem, hasItem, hasShard, moneyText, removeItem } from '../character/inventory.js';
 import { findBond, findDrive } from '../character/creation.js';
 import { addDeed, findQuest, finishQuest, questNote, startQuest } from './journal.js';
 import { longRestRecovery } from '../character/resources.js';
@@ -316,6 +316,12 @@ export function bindExternals(story, runtime) {
   );
   story.BindExternalFunction('has_item', (id) => hasItem(runtime.game, id), false);
 
+  // has_shard(id): true while the hero carries that shard of the crown (an id from
+  // data/campaign/shards.js, such as "names"). A choice that uses its power is shown only with
+  // it, and tagged so the card shows the shard:
+  //   * {has_shard("names")} [Ask the dead man his name #shard:names]
+  story.BindExternalFunction('has_shard', (id) => hasShard(runtime.game, id), false);
+
   // take_item(item): one of an item leaves the pack: used up, eaten or handed over.
   // Check has_item first; taking something the hero doesn't have is a story bug.
   story.BindExternalFunction(
@@ -363,6 +369,10 @@ export function bindExternals(story, runtime) {
     false,
   );
   story.BindExternalFunction('bond_name', () => (runtime.game.character.bond && runtime.game.character.bond.name) || '', false);
+
+  // hero_name(): the hero's whole name, as the player gave it, to print in a scene:
+  // "It says your name: {hero_name()}."
+  story.BindExternalFunction('hero_name', () => runtime.game.character.name, false);
 
   // give_xp(n): the hero earns XP for a quest or discovery (fights give their own).
   story.BindExternalFunction(

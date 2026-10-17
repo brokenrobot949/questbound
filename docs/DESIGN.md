@@ -44,6 +44,7 @@ The DM is three engines working together: an authored story engine that runs scr
 | Species or background | "Dwarf — Judge the age of the stonework" | Unlocked by origin; no roll or lower DC |
 | Spell | "Speak with Animals — Question the stable cat" | Spends a slot, or ritual time |
 | Item | "Rope — Lower yourself into the well" | Requires or uses up the item |
+| Shard | "Shard of Names — Hold the shard over the dead Cantor, and make him answer" | Unlocked by carrying the shard; no roll, but it raises the Whisper |
 | Approach | "Attack · Sneak past · Parley" | Starts combat, stealth or a social scene |
 
 Options your character doesn't qualify for stay hidden, so scenes read naturally and a second character finds new paths.
@@ -550,7 +551,13 @@ The twist: the crown was never a symbol of peace. It was the lock on a prison be
 
 Each shard you carry offers a power, such as flight, foresight or a terrible word of command. Using it raises your Whisper, a hidden measure of the Unking's hold on you. A high Whisper unlocks dark options and closes others, and it shapes the ending.
 
-The Whisper is built in Phase 3 (Act II). Until then, a dark choice that would raise it sets a story flag, and the Whisper counts those flags when it's built (Rob, Oct 16, 2026). The first is robbing the champions' graves in the Kings' Barrow (`looted_the_champions`).
+The Whisper is built in Phase 3 (Act II). Until then, a dark choice that would raise it sets a story flag, and the Whisper counts those flags when it's built (Rob, Oct 16, 2026). The flags so far:
+
+- `looted_the_champions`: robbing the champions' graves in the Kings' Barrow (a dark choice).
+- `shard_names`: carrying the Shard of Names, from the end of Chapter 3 (the Whisper rises a little with every shard carried through a Long Rest).
+- `asked_the_dead_cantor`: using the Shard of Names to make dead Cantor Vesk answer (a shard's power).
+
+**Shards in play so far** (Rob, Oct 17, 2026). A shard is a quest item in the pack (`data/campaign/items.js`, listed in `data/campaign/shards.js`), and, like a spell, it's a key: a choice that uses its power shows only while you carry it, with the shard's name on the card ("Shard of Names"). Using it needs no roll. Each use is a flag of its own, listed above, until the Whisper is built. The Shard of Names (speak with the dead, learn a living creature's name) is the only one so far; its first use is at the altar where you find it.
 
 **Endings**
 
@@ -603,7 +610,7 @@ You play one character, but up to two companions can travel with you, chosen fro
 - **Joining and leaving:** a scene adds or removes a companion (`join_party`, `leave_party`), and the DM says so. Odda joins at Dunn's Mill at the start of Chapter 2, and goes down the ossuary with you (Rob, Oct 10, 2026). Fen joins in Bramblegate's market square, the moment you get him out of the stocks (Chapter 2, beat 3). If you sell him to the bounty hunters or leave him to them, he escapes and turns up later, sour, and can still join, with low approval (Rob, Oct 11, 2026): he's waiting at the Old Ford, joins to fight the dead beside you that night, and afterwards decides to come along. Debug mode can still add or remove either.
 - **Their spells in scenes:** a scene can ask a companion to cast a spell they have (`companion_can_cast`, `companion_cast`): Odda frees Lark with Lesser Restoration. The card says whose spell it is and what it costs them ("Odda's spell · Lesser Restoration · level 2 slot"), and it uses their slot, not yours.
 - **If a companion dies in a story fight,** the scene goes on without their lines (`companion_alive`). If Odda dies in the ossuary, Fen in the fight at the stocks, or either of them at the Old Ford or Cairnfield, the temple keeps them before the altar flame until they can be raised.
-- **The great candle** (Rob, Oct 12, 2026): when the party comes back to Bramblegate in Chapter 2 (beat 6), Prior Crane gives the temple's great candle for anyone lying there: once in its life it can call back someone who fell holding back the dark, and it burns out doing it. They live again with all their Hit Points, free (`raise_companion`). It's a story liberty, not the Raise Dead spell (which would cost about 2,500 gold at a temple, by the SRD's spellcasting services, and leave a −4 penalty that wears off with Long Rests). It's spent once used (`flame_spent`); a companion who dies after that waits for Act II's temples, and debug mode's Raise works meanwhile.
+- **The great candle** (Rob, Oct 12, 2026): when the party comes back to Bramblegate in Chapter 2 (beat 6), Prior Crane gives the temple's great candle for anyone lying there: once in its life it can call back someone who fell holding back the dark, and it burns out doing it. They live again with all their Hit Points, free (`raise_companion`). It's a story liberty, not the Raise Dead spell (which would cost about 2,500 gold at a temple, by the SRD's spellcasting services, and leave a −4 penalty that wears off with Long Rests). It's spent once used (`flame_spent`); a companion who dies after that waits for Act II's temples, and debug mode's Raise works meanwhile. Companions who fall in the Kings' Barrow are carried out and home to the temple (Rob, Oct 17, 2026), and at Chapter 3's feast the candle raises them if it hasn't been used (to be built with beat 7).
 - **Levels:** they're always your level. Their big picks are set for now: Odda takes the Life Domain at level 3, Fen the Thief. Each later level takes the fixed Hit Points, and their Hit Points rise when yours do.
   - **Level 4** (Rob, Oct 11, 2026): both take the Ability Score Improvement as +1 to their main score and +1 Constitution. Odda's Wisdom goes 17 to 18 (+4, spell save DC 14) and Fen's Dexterity 17 to 18 (+4), the same modifier +2 would give, and each gains 4 Hit Points from the Constitution (Odda 35, Fen 31 at level 4). Odda also learns Mending (her fourth cantrip) and prepares Detect Magic (her seventh spell), ready for the wards of the barrows.
 - **The Party section of the Sheet** shows each companion's portrait, Hit Points, likes and dislikes, full sheet and **tactic**:

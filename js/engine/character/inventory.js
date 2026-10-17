@@ -9,6 +9,7 @@
 import { equipment } from '../../../data/srd/equipment.js';
 import { armor, shield } from '../../../data/srd/armor.js';
 import { items as storyItems } from '../../../data/campaign/items.js';
+import { shards } from '../../../data/campaign/shards.js';
 import { findBackground, findClass } from './sheet.js';
 
 // Any item: armour, a Shield, other equipment, or one of the story's own items.
@@ -78,6 +79,18 @@ export function removeItem(inventory, id, quantity = 1) {
 
 export function hasItem(game, id) {
   return game.inventory.some((entry) => entry.id === id && entry.quantity > 0);
+}
+
+// A shard of the crown (data/campaign/shards.js), by id ("names"). An unknown id is a story bug.
+export function findShard(id) {
+  const shard = shards.find((s) => s.id === id);
+  if (!shard) throw new Error(`Unknown shard: ${id}`);
+  return shard;
+}
+
+// True while the hero carries that shard: its item is in the pack.
+export function hasShard(game, id) {
+  return hasItem(game, findShard(id).item);
 }
 
 export function priceOf(id) {

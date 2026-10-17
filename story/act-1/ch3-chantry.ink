@@ -19,8 +19,8 @@
 // Won: Aveline at rest (aveline_rested, the fight's 700 XP for her) or destroyed
 //   (aveline_destroyed); Vesk lies dying at the altar. Lost (Fate's Mercy): at the last,
 //   Aveline remembers by herself and strikes Vesk down; you wake in the ash, robbed.
-// The story stops with Vesk dying, reaching for the gold on Aveline's breast; beat 6, the
-// first shard, comes next.
+// The scene ends with Vesk dying, reaching for the gold on Aveline's breast; beat 6, the
+// first shard, follows (ch3_shard).
 
 === ch3_chantry ===
 ~ set_objective("Go down to the Chantry of Ash, and stop Cantor Vesk's hymn.")
@@ -228,13 +228,12 @@ Dame Aveline goes down in the ash at last, and the dark goes out of her helm lik
 }
 ->->
 
-// The end of the slice: Vesk dying at the altar.
+// Vesk dying at the altar; beat 6, the first shard, follows (ch3-shard.ink).
 = vesk_dying
 Cantor Vesk lies on the altar steps with his hymn-book open under his cheek. He's still breathing, just.
 "You don't understand," he whispers. "The Sleeping King. He's waiting. He only needs..." His big gravedigger's hand crawls across the ash, towards Aveline's tomb and the gold on her breast.
 ~ quest_note("missing-miller", "Cantor Vesk lies dying at the altar of the Chantry of Ash, reaching for the sliver of gold on Dame Aveline's breast.")
-~ set_objective("See what Cantor Vesk was reaching for. (The rest of Act I is still being written.)")
--> END
+-> ch3_shard
 
 // ---- Fate's Mercy: Aveline remembers by herself ----
 

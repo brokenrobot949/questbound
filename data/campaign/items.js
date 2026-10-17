@@ -15,6 +15,15 @@ export const items = [
     source: 'original',
   },
   {
+    id: 'shard-of-names',
+    name: 'The Shard of Names',
+    category: 'quest',
+    weight: 0,
+    cost: null,
+    text: 'A sliver of old gold no longer than your finger, warm as skin, with an edge that never quite cuts. It flew to your hand from Dame Aveline’s breast as Cantor Vesk died. It knows names: held over the dead, it lets them speak, and turned on the living, it tells you what they’re called. Sometimes, when it’s quiet, it says yours.',
+    source: 'original',
+  },
+  {
     id: 'goblin-tooth-charm',
     name: 'Goblin-tooth charm',
     category: 'trinket',

@@ -50,6 +50,9 @@ EXTERNAL has_drive(id)
 EXTERNAL has_bond(id)
 EXTERNAL bond_name()
 
+// hero_name(): the hero's whole name, as the player gave it: "It says your name: {hero_name()}."
+EXTERNAL hero_name()
+
 // drive_moment(id): call it inside a choice that fits a Drive. If it's the hero's Drive, they
 // gain Heroic Inspiration. Tag the choice too, so the card can show it:
 //   * [Take the job for the silver #drive:wealth]
@@ -87,6 +90,13 @@ EXTERNAL buy(item)
 // give_item(item): the hero is given one of an item, free. has_item(item): they carry one.
 EXTERNAL give_item(item)
 EXTERNAL has_item(item)
+
+// has_shard(id): true while the hero carries that shard of the crown (an id from
+// data/campaign/shards.js, such as "names"). Show a choice that uses its power only with it,
+// and tag it so the card shows the shard. Using a power raises the Whisper: until the Whisper is
+// built, set a flag of your own for the use, and list it in docs/DESIGN.md ("The Whisper").
+//   * {has_shard("names")} [Ask the dead man his name #shard:names]
+EXTERNAL has_shard(id)
 
 // take_item(item): one of an item leaves the pack (used up, eaten or handed over), and the
 // player is told. Only call it after has_item says the hero has one, e.g.

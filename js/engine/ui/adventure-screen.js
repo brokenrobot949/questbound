@@ -17,7 +17,7 @@ import { levelUpReady } from '../character/level-up.js';
 import { showBattle } from './battle-screen.js';
 import { showLevelUp } from './level-up-screen.js';
 import { sessionCard, whatNowBox } from './session-panels.js';
-import { COPPER_PER, moneyText, priceOf } from '../character/inventory.js';
+import { COPPER_PER, findShard, moneyText, priceOf } from '../character/inventory.js';
 import { findDrive } from '../character/creation.js';
 import {
   abilityModifierOf,
@@ -262,6 +262,7 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
       }
       if (tags.check) card.append(el('span', 'choice-tag', checkLabel(tags.check)));
       if (tags.spell) card.append(el('span', 'choice-tag', spellTag(game, tags.spell, tags.by)));
+      if (tags.shard) card.append(el('span', 'choice-tag', findShard(tags.shard).name));
       if (tags.buy) card.append(el('span', 'choice-tag', `Buy · ${moneyText(priceOf(tags.buy))}`));
       if (tags.pay) card.append(el('span', 'choice-tag', `Pay · ${moneyText(tags.pay * COPPER_PER.gp)}`));
       if (tags.combat) card.append(el('span', 'choice-tag is-fight', `${fightLabel(game, tags.combat)}${tags.surprise ? ' · Surprise attack' : ''}`));

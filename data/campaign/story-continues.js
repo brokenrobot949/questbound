@@ -35,4 +35,6 @@ export const storyContinues = [
   { scene: 'ch3_hall', continueAt: 'ch3_vault', source: 'original' },
   // Then in the flooded vault, drained or flooded back; the Chantry of Ash lies below.
   { scene: 'ch3_vault', continueAt: 'ch3_chantry', source: 'original' },
+  // Then with Cantor Vesk dying at the altar; the first shard comes to the hero's hand.
+  { scene: 'ch3_chantry', continueAt: 'ch3_shard', source: 'original' },
 ];
