@@ -420,6 +420,19 @@ body {
   color: var(--accent);
 }
 
+/* Two titles together (the act, then its first chapter) share one frame. */
+.story-heading:has(+ .story-heading) {
+  margin-bottom: 0;
+  padding-bottom: 4px;
+  border-bottom: none;
+}
+
+.story-heading + .story-heading {
+  margin-top: 0;
+  padding-top: 4px;
+  border-top: none;
+}
+
 .chosen-text {
   margin: 0 0 0.9em;
   color: var(--accent);
@@ -2310,6 +2323,7 @@ h3.debug-heading {
 }
 
 .session-card,
+.act-end-card,
 .what-now {
   display: flex;
   flex-direction: column;
@@ -2371,6 +2385,21 @@ h3.debug-heading {
 
 .session-recap-aim {
   margin: 0;
+}
+
+/* The card at the end of an act: what the act came to, then what comes next. */
+.act-end-facts {
+  margin: 0;
+  padding-left: 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.act-end-closing {
+  margin: 0;
+  font-style: italic;
+  color: var(--accent);
 }
 
 /* The Party section of the Sheet: each companion's portrait beside who they are. */

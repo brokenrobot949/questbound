@@ -5,7 +5,8 @@ import { test, assertEqual, assertTrue, run } from './harness.js';
 import { Compiler, CompilerOptions, JsonFileHandler } from '../vendor/ink-full.js';
 import { loadStory } from '../js/engine/story/ink-loader.js';
 import { bindExternals } from '../js/engine/story/externals.js';
-import { continueAfterBattle, jumpTo, listScenes, makeChoice, revealRoll, startFight } from '../js/engine/story/story-runner.js';
+import { continueAfterBattle, jumpTo, listScenes, makeChoice, revealRoll, startFight, startPractice } from '../js/engine/story/story-runner.js';
+import { actSummary, finishedAct } from '../js/engine/story/act-summary.js';
 import * as fight from '../js/engine/combat/battle.js';
 import { addItem, priceAt } from '../js/engine/character/inventory.js';
 import { joinParty, memberOf } from '../js/engine/character/party.js';
@@ -143,7 +144,7 @@ test('Chapter 1: the opening line follows the Drive, and the hero decides which 
   const wren = newGame(runtime, { slot: 1, seed: 'gate', character: testHero });
   assertTrue(cards(wren).includes("Show her your old regiment's token"), 'a Soldier has a token');
   const juniper = newGame(runtime, { slot: 1, seed: 'gate', character: juniperHero });
-  assertTrue(juniper.page.beats[0].text.startsWith('You came north for answers.'), 'Juniper’s Drive is Knowledge');
+  assertTrue(juniper.page.beats.find((b) => b.type === 'text' && !b.heading).text.startsWith('You came north for answers.'), 'Juniper’s Drive is Knowledge');
   assertTrue(!cards(juniper).some((t) => t.includes('token')), 'a Sage has no regiment');
   assertTrue(cards(juniper).includes('Make her lantern flame dance'), 'a Rock Gnome knows Prestidigitation');
 });
@@ -509,7 +510,7 @@ test('The last morning: Act I’s missed side quests wait in Bramblegate before 
   const heading = game.page.beats.find((b) => b.heading);
   assertEqual(heading && heading.text, 'End of Act I · The Barrow Dead');
   assertTrue(has(game, 'act_1_complete') && game.story.currentChoices.length === 0);
-  assertEqual(game.objective, 'Follow the shard south. (Act II is still being written.)');
+  assertEqual(game.objective, 'Follow the shard south.');
 });
 
 // ---- Act I's side quests: Chapter 2 ----
@@ -810,6 +811,73 @@ test('The Barrow-Wives: alone, with no shard, there are fewer ways in; Survival 
   pick(game, 'Say the words');
   assertTrue(has(game, 'west_wife_rested') && hasCloak(game) && pageText(game.page).includes('a grey hand comes back out of the dark'), 'the last to lie down');
   assertTrue(has(game, 'barrow_wives_done') && !pageText(game.page).includes('Odda'));
+});
+
+// ---- Getting Act I ready for its playtest ----
+
+// Wren as a level 5 Champion, as the barrow-wives' fight was checked with.
+const champion5 = {
+  ...testHero,
+  level: 5,
+  subclassId: 'champion',
+  hitPointRolls: [null, null, null, null],
+  classChoices: { ...testHero.classChoices, weaponMasteries: [...testHero.classChoices.weaponMasteries, 'longbow'] },
+  levelFeats: [{ level: 4, id: 'ability-score-improvement', increases: { strength: 1, constitution: 1 } }],
+};
+
+test('Title cards: Chapters 2 and 3 open with theirs (Chapter 1’s follows the act’s, at the north gate)', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'titles', character: testHero });
+  const headings = (page) => page.beats.filter((b) => b.heading).map((b) => b.text);
+  assertEqual(headings(game.page), ['Act I · The Barrow Dead', 'Chapter 1 · Bramblegate']);
+  game.page = jumpTo(game, 'ch2_morning');
+  assertEqual([headings(game.page), game.page.beats[0].heading], [['Chapter 2 · The Barrow Road'], true], 'the first thing on the page');
+  game.page = jumpTo(game, 'ch3_dark_moon');
+  assertEqual(headings(game.page), ["Chapter 3 · The Kings' Barrow"]);
+});
+
+test('XP at the highest level so far: the notes say it’s banked for the levels to come, and big numbers have commas', async () => {
+  const game = await atTheThreeWives('wives-banked', { flags: ['swore_the_oath'] });
+  pick(game, 'Go into the east barrow');
+  pick(game, 'Hold up the shard');
+  assertTrue(notesOn(game.page).includes('You gain 200 XP.'), 'below the highest level, the plain note');
+  game.character = structuredClone(champion5);
+  pick(game, 'Go into the west barrow');
+  pick(game, 'Raise your hand with hers');
+  assertTrue(notesOn(game.page).includes('You gain 200 XP, banked for the levels to come.'), notesOn(game.page).join(' / '));
+  pick(game, 'Go into the north barrow');
+  settleFight(game, 'Draw steel', { setUp: (g) => (g.battle.xp = 1250) });
+  assertTrue(notesOn(game.page).includes('Victory! You gain 1,250 XP, banked for the levels to come.'), notesOn(game.page).join(' / '));
+});
+
+test('Deaths: a lost fight counts one, for the playtest log; a practice fight doesn’t (dying outside a fight: the darts, in dungeon-tests.js)', async () => {
+  const game = await atTheThreeWives('wives-deaths');
+  assertEqual(game.deaths, 0);
+  pick(game, 'Go into the east barrow');
+  settleFight(game, 'Draw steel', { won: false });
+  assertEqual(game.deaths, 1, 'Fate’s Mercy');
+  startPractice(game, 'barrow-wife');
+  game.battle.outcome = 'defeat';
+  continueAfterBattle(game);
+  assertEqual(game.deaths, 1, 'practice doesn’t count');
+});
+
+test('The end of Act I: the card sums up the act (the hero, the days and sessions, the quests done, who came, the shard)', async () => {
+  const game = await atTheLastMorning('act-end', { flags: [...CHAPTER_1_DONE, ...CHAPTER_3_DONE, 'hanging_tree_done', 'hobs_ore_done', 'hob_reforged'] });
+  addItem(game.inventory, 'shard-of-names');
+  for (const id of ['missing-miller', 'goblin-bargain', 'millers-daughter', 'barrow-wives']) game.journal.quests.push({ id, status: 'done', day: 1, notes: [] });
+  game.journal.quests.push({ id: 'hobs-ore', status: 'active', day: 1, notes: [] });
+  memberOf(game, 'fen').fallen = true;
+  assertEqual(finishedAct(game), null, 'not over yet');
+  pick(game, 'Ride south');
+  const act = finishedAct(game);
+  assertEqual(act && act.id, 'act-1');
+  const summary = actSummary(game, act);
+  assertEqual([summary.title, summary.days, summary.sessions, summary.xp], ['Act I · The Barrow Dead', game.day, 1, game.xp]);
+  assertEqual([summary.questsDone, summary.questCount], [['The Missing Miller', 'Brackenhollow’s Bargain', 'The Miller’s Daughter', 'The Barrow-Wives'], 8], 'in the order of the quest list; Hob’s Ore isn’t done');
+  assertEqual(summary.companions, [{ name: 'Odda Brasswick', fallen: false }, { name: 'Fen Underbough', fallen: true }]);
+  assertEqual(summary.shards, ['Shard of Names']);
+  assertTrue(summary.closing.startsWith('Act II comes in a later update.'));
+  assertEqual(game.objective, 'Follow the shard south.');
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

@@ -82,7 +82,9 @@ test('New game: the story starts with the hero in session 1 at the north gate, o
   const runtime = await freshRuntime();
   const game = newGame(runtime, { slot: 1, seed: 'new', character: testHero });
   assertEqual([game.sessionCount, currentLocation(game), currentTime(game), game.day], [1, 'Bramblegate, north gate', 'Dusk', 1]);
-  assertEqual(game.page.beats[0].text, 'You came north to set things right. A town is being bled dry, and nobody important seems to care.', 'Wren’s Drive is Justice');
+  const [act, chapter, drive] = game.page.beats;
+  assertEqual([act, chapter], [{ type: 'text', text: 'Act I · The Barrow Dead', heading: true }, { type: 'text', text: 'Chapter 1 · Bramblegate', heading: true }], 'the title cards first');
+  assertEqual(drive.text, 'You came north to set things right. A town is being bled dry, and nobody important seems to care.', 'Wren’s Drive is Justice');
   assertEqual(game.story.currentChoices.length, 5, 'talk, bluster, lie, the Soldier’s token, or wait');
   assertTrue(game.character !== testHero, 'the hero should be a copy, not the data file itself');
   assertTrue(runtime.game === game, 'the new game should become the active game');
@@ -100,7 +102,7 @@ test('A save holds game state, Ink state, dice state, session count and last-pla
   const game = newGame(runtime, { slot: 2, seed: 'contents', character: testHero, now: new Date('2026-10-01T09:00:00Z') });
   const record = gameToSave(game, new Date('2026-10-06T12:00:00Z'));
   assertEqual(Object.keys(record).sort(), ['createdAt', 'game', 'ink', 'lastBackupSession', 'rng', 'savedAt', 'seed', 'sessionCount', 'slot', 'version']);
-  assertEqual(Object.keys(record.game).sort(), ['activeSpells', 'battle', 'canPrepare', 'character', 'day', 'dungeon', 'featureUses', 'flags', 'hp', 'hpMaxDrop', 'inspiration', 'inventory', 'journal', 'lastBattle', 'levelUp', 'location', 'money', 'objective', 'page', 'party', 'rollLog', 'session', 'slotsUsed', 'tempHp', 'time', 'undo', 'xp']);
+  assertEqual(Object.keys(record.game).sort(), ['activeSpells', 'battle', 'canPrepare', 'character', 'day', 'deaths', 'dungeon', 'featureUses', 'flags', 'hp', 'hpMaxDrop', 'inspiration', 'inventory', 'journal', 'lastBattle', 'levelUp', 'location', 'money', 'objective', 'page', 'party', 'rollLog', 'session', 'slotsUsed', 'tempHp', 'time', 'undo', 'xp']);
   assertEqual([record.version, record.slot, record.sessionCount, record.lastBackupSession], [SAVE_VERSION, 2, 1, 0]);
   assertEqual([record.createdAt, record.savedAt], ['2026-10-01T09:00:00.000Z', '2026-10-06T12:00:00.000Z']);
   assertTrue(record.rng.length === 4 && record.rng.every(Number.isInteger), 'dice state should be four whole numbers');
@@ -513,8 +515,8 @@ function memoryStorage() {
   return { getItem: (k) => (k in data ? data[k] : null), setItem: (k, v) => (data[k] = String(v)) };
 }
 
-function fakeGame(scene, { slot = 1, session = 1, level = 1, createdAt = '2026-10-06T10:00:00Z' } = {}) {
-  return { slot, createdAt, sessionCount: session, character: { name: 'Wren', level }, page: { scene } };
+function fakeGame(scene, { slot = 1, session = 1, level = 1, createdAt = '2026-10-06T10:00:00Z', deaths = 0 } = {}) {
+  return { slot, createdAt, sessionCount: session, character: { name: 'Wren', level }, page: { scene }, deaths };
 }
 
 const SECOND = 1000;
@@ -569,13 +571,53 @@ test('Playtest log: back to the title and straight back in is still one session'
 test('Playtest log: levels reached and deaths, per game', () => {
   const { tracker } = fakeTracker();
   tracker.startSession(fakeGame('gate', { session: 1, level: 1 }));
-  tracker.update(fakeGame('gate', { session: 1, level: 3 }));
-  tracker.recordDeath();
-  tracker.startSession(fakeGame('gate', { session: 2, level: 3 }));
+  tracker.update(fakeGame('gate', { session: 1, level: 3, deaths: 1 })); // a fight lost
+  tracker.startSession(fakeGame('gate', { session: 2, level: 3, deaths: 1 }));
+  tracker.update(fakeGame('gate', { session: 2, level: 3, deaths: 1 })); // the old death isn't this session's
   tracker.startSession(fakeGame('gate', { slot: 2, createdAt: '2026-10-07T10:00:00Z', level: 1 }));
   const s = summarizeLog(tracker.log);
   assertEqual([s.sessionCount, s.highestLevel, s.deaths, s.deathsPerSession], [3, 3, 1, 1 / 3]);
   assertEqual(s.games.map((g) => [g.slot, g.sessions, g.highestLevel, g.deaths]), [[1, 2, 3, 1], [2, 1, 1, 0]]);
+});
+
+test('Playtest log: deaths come from the game, so an undo takes one back, and an entry from before still counts', () => {
+  const { tracker } = fakeTracker();
+  tracker.startSession(fakeGame('gate', { deaths: 2 }));
+  tracker.update(fakeGame('gate', { deaths: 3 }));
+  assertEqual(tracker.current.deaths, 1);
+  tracker.update(fakeGame('gate', { deaths: 2 })); // a reroll's undo
+  assertEqual(tracker.current.deaths, 0);
+  delete tracker.current.deathsBefore; // an entry written before deaths were read from the game
+  tracker.current.deaths = 1;
+  tracker.startSession(fakeGame('gate', { deaths: 4 })); // the same session, picked up again
+  tracker.update(fakeGame('gate', { deaths: 5 }));
+  assertEqual(tracker.current.deaths, 2);
+});
+
+test('Playtest log: each game’s time in all, and in each chapter in the order played', () => {
+  const { tracker, clock } = fakeTracker();
+  const starts = [
+    { chapter: 'Chapter 1', scene: 'ch1_arrival' },
+    { chapter: 'Chapter 2', scene: 'ch2_morning' },
+    { chapter: 'The last morning', scene: 'act1_last_morning' },
+  ];
+  tracker.startSession(fakeGame('ch1_arrival'));
+  for (const [t, scene] of [[0, 'ch1_arrival'], [60, 'bramblegate'], [180, 'ch2_morning'], [200, 'bramblegate'], [260, 'act1_last_morning'], [270, 'bramblegate'], [300, 'side_cats']]) {
+    clock.t = t * SECOND;
+    tracker.update(fakeGame(scene));
+  }
+  clock.t = 330 * SECOND;
+  tracker.endSession();
+  tracker.startSession(fakeGame('gate', { slot: 2, createdAt: '2026-10-07T10:00:00Z' }));
+  tracker.update(fakeGame('gate', { slot: 2, createdAt: '2026-10-07T10:00:00Z' }));
+  clock.t = 340 * SECOND;
+  tracker.endSession();
+  const [first, second] = summarizeLog(tracker.log, starts).games;
+  assertEqual(first.playedMs, 330 * SECOND);
+  assertEqual(first.chapters, [{ chapter: 'Chapter 1', ms: 180 * SECOND }, { chapter: 'Chapter 2', ms: 80 * SECOND }, { chapter: 'The last morning', ms: 70 * SECOND }], 'the town square counts to whichever chapter it’s in');
+  assertEqual([second.playedMs, second.chapters], [10 * SECOND, [{ chapter: 'Chapter 1', ms: 10 * SECOND }]], 'before any chapter’s first scene: the first chapter');
+  assertEqual(summarizeLog(tracker.log).games[0].chapters, [], 'no chapters given, none worked out');
+  assertEqual(tracker.playedMs(fakeGame('gate')), 330 * SECOND, 'one game’s time, for the end of an act');
 });
 
 test('Playtest log: kept on the device, and a scene left open by a closed page is still counted', () => {
@@ -669,6 +711,26 @@ test('Migration: a version 18 hero’s Hit Point maximum has never been lowered,
   const save = migrateSave(v18, migrations, 19);
   assertEqual([save.version, save.game.hpMaxDrop, save.game.undo.state.hpMaxDrop, save.game.party], [19, 0, 0, party], 'a companion’s missing one means none');
   assertEqual(migrateSave({ version: 18, slot: 1, game: { undo: null } }, migrations, 19).game.undo, null);
+});
+
+test('Migration: a version 19 hero has no deaths counted yet, an aim at the end of Act I loses “still being written”, and it becomes version 20', () => {
+  const v19 = { version: 19, slot: 1, game: { objective: 'Follow the shard south. (Act II is still being written.)', undo: { kind: 'choice', state: { hp: 8 } } } };
+  const save = migrateSave(v19, migrations, 20);
+  assertEqual([save.version, save.game.deaths, save.game.undo.state.deaths, save.game.objective], [20, 0, 0, 'Follow the shard south.']);
+  const elsewhere = migrateSave({ version: 19, slot: 1, game: { objective: 'Find Lark Dunn.', undo: null } }, migrations, 20).game;
+  assertEqual([elsewhere.objective, elsewhere.undo], ['Find Lark Dunn.', null], 'any other aim is left alone');
+});
+
+test('Saves: the hero’s deaths are counted in the save, kept by an undo point, and checked', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'deaths', character: testHero });
+  assertEqual(game.deaths, 0, 'a new hero');
+  game.deaths = 2;
+  const record = throughJson(gameToSave(game));
+  assertEqual([record.game.deaths, loadGame(await freshRuntime(), throughJson(record)).deaths], [2, 2]);
+  assertTrue(PLAY_FIELDS.includes('deaths'), 'an undo point keeps it');
+  const bad = throughJson(record);
+  bad.game.deaths = -1;
+  assertThrows(() => validateSave(bad), 'deaths');
 });
 
 test('Saves: a Hit Point maximum lowered by Life Drain is saved, kept by an undo point, and checked', async () => {

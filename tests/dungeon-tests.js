@@ -2072,7 +2072,7 @@ test('Eve of the barrow: on the last watch the dead walk in with the last stones
   game.hp = 1;
   pick(game, 'Get some sleep');
   assertTrue(pageText(game).includes('Fen the second, and you the last') && pageText(game).includes('the singing starts up under the hill'));
-  assertTrue(notes(game).includes('A milestone: your XP rises to 2700, enough for level 4.') && notes(game).some((n) => n.startsWith('A good place to stop')));
+  assertTrue(notes(game).includes('A milestone: your XP rises to 2,700, enough for level 4.') && notes(game).some((n) => n.startsWith('A good place to stop')));
   assertEqual([game.xp, game.hp, currentTime(game)], [2700, fight.maxHpOf(game, { id: 'hero' }), 'Dawn']);
   assertEqual(game.objective, "Go down into the Kings' Barrow tonight, under the dark of the moon.");
   assertEqual(cards(game), ['Wait out the day, and go down to the barrow at nightfall'], 'and Chapter 3 begins');
@@ -2390,6 +2390,7 @@ test('Chapter 3: struck down by the darts with nobody to help, three failed deat
   revealAll(game);
   assertTrue(game.flags.includes('darts_fates_mercy') && game.hp === fight.maxHpOf(game, { id: 'hero' }), 'a long rest');
   assertTrue(notes(game).includes('Darkness takes you.') && notes(game).some((n) => n.startsWith('A good place to stop')));
+  assertEqual(game.deaths, 1, 'a death outside a fight counts, for the playtest log');
   assertTrue(['Odda has been praying over you, and Fen swearing at you', "Don't do that again", 'Hours have gone', 'you can see the rest'].every((s) => pageText(game).includes(s)));
   assertTrue(deeds(game).includes('struck down by poisoned darts'));
   assertEqual(cards(game), ['Go on into the hall']);
@@ -3149,7 +3150,7 @@ test('Chapter 3, beat 7: going up to bed without hearing Marchbank out, she stop
   assertEqual(heading, [{ type: 'text', text: 'End of Act I · The Barrow Dead', heading: true }]);
   assertTrue(game.flags.includes('act_1_complete') && !game.flags.includes('rival_left_bramblegate'));
   assertTrue(pageText(game).includes('Odda and Fen are arguing'), pageText(game));
-  assertEqual([cards(game), game.objective, currentTime(game)], [[], 'Follow the shard south. (Act II is still being written.)', 'Afternoon']);
+  assertEqual([cards(game), game.objective, currentTime(game)], [[], 'Follow the shard south.', 'Afternoon']);
 });
 
 test('Chapter 3, beat 7: the old woman with the owl says a few words if you go over, and you don’t answer the shard that night', async () => {

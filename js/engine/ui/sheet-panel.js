@@ -16,7 +16,7 @@ import { activeSpellIds, castFromSheet, lastsText, namesText, sheetSpells } from
 import { findSpell, preparePicks, togglePrepared } from '../character/spells.js';
 import { actionButton } from './backup-panels.js';
 import { featureUsesLeft, featureUsesMax, heroMaxHp, hpMaxDropOf, slotsAt, slotsLeft } from '../character/resources.js';
-import { levelUpReady, nextLevelXp } from '../character/level-up.js';
+import { levelUpReady, nextLevelXp, xpText } from '../character/level-up.js';
 import { heroSheet } from './hero-sheet.js';
 import { el } from './dom.js';
 import { chip, chipRow, expandable } from './widgets.js';
@@ -41,8 +41,8 @@ export function sheetPanel(game, { onCast = () => {}, note = null } = {}) {
   const next = nextLevelXp(character);
   let xpNote = ` (level ${character.level} is as high as the game goes for now)`;
   if (levelUpReady(game)) xpNote = ' (level up ready: see the Adventure tab)';
-  else if (next !== null) xpNote = ` (level ${character.level + 1} at ${next})`;
-  now.append(el('p', 'sheet-line', `XP: ${game.xp}${xpNote}`));
+  else if (next !== null) xpNote = ` (level ${character.level + 1} at ${xpText(next)})`;
+  now.append(el('p', 'sheet-line', `XP: ${xpText(game.xp)}${xpNote}`));
   const slotLevels = [1, 2, 3].filter((level) => slotsAt(character, level) > 0);
   if (slotLevels.length) {
     now.append(el('p', 'sheet-line', `Spell slots left: ${slotLevels.map((level) => `${slotsLeft(game, level)} of ${slotsAt(character, level)} level ${level}`).join(', ')}`));
@@ -54,7 +54,9 @@ export function sheetPanel(game, { onCast = () => {}, note = null } = {}) {
   ]) {
     if (featureUsesMax(character, id)) now.append(el('p', 'sheet-line', `${name}: ${featureUsesLeft(game, id)} of ${featureUsesMax(character, id)} left`));
   }
-  now.append(el('p', 'section-hint', 'A long rest brings back Hit Points, spell slots and every use of your features.'));
+  // With Life Drain on the hero, the hint says the Long Rest puts their maximum back too.
+  const restores = hpMaxDropOf(game) ? 'your full Hit Point maximum, Hit Points' : 'Hit Points';
+  now.append(el('p', 'section-hint', `A long rest brings back ${restores}, spell slots and every use of your features.`));
   panel.append(now);
   const party = partyBlock(game, () => {
     onCast(game);

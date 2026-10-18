@@ -74,6 +74,10 @@ test('Ready: level 5 (6,500 XP) is as far as the rules data goes for now', () =>
   assertEqual([next(1), next(2), next(3), next(4), next(5)], [300, 900, 2700, 6500, null]);
 });
 
+test('XP reads with commas: 6500 is “6,500”', () => {
+  assertEqual([0, 50, 999, 1250, 6500, 355000].map(levelUp.xpText), ['0', '50', '999', '1,250', '6,500', '355,000']);
+});
+
 // ---- Fighter ----
 
 test('Fighter 2: fixed Hit Points, Action Surge and Tactical Mind', () => {

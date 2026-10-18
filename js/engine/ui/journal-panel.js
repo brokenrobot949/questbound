@@ -2,6 +2,7 @@
 // with the in-game day, and a summary of each session played. The game writes it as you play.
 
 import { dayStamped, findQuest } from '../story/journal.js';
+import { xpText } from '../character/level-up.js';
 import { el } from './dom.js';
 
 export function journalPanel(game) {
@@ -56,7 +57,7 @@ function sessionEntry(summary) {
     item.append(list);
   }
   const gains = [];
-  if (summary.xp) gains.push(`${summary.xp} XP`);
+  if (summary.xp) gains.push(`${xpText(summary.xp)} XP`);
   if (summary.toLevel !== summary.fromLevel) gains.push(`reached level ${summary.toLevel}`);
   for (const id of summary.questsStarted) gains.push(`began ${findQuest(id).title}`);
   for (const id of summary.questsFinished) gains.push(`finished ${findQuest(id).title}`);

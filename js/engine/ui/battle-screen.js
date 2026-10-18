@@ -39,6 +39,8 @@ import { blit, drawCell, drawTile, frameSquare, loadArt, pixelScale, sizeCanvas,
 import { attackSummary, averageText } from './attack-text.js';
 import { rollLine, signedNumber } from './roll-format.js';
 import { skillBonus } from '../character/sheet.js';
+import { nextLevelXp, xpText } from '../character/level-up.js';
+import { dmNotes } from '../../../data/campaign/dm-voice.js';
 import { findPerson, personSprite } from './speakers.js';
 import { el, showFatalError } from './dom.js';
 
@@ -939,7 +941,9 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     const card = el('div', 'battle-outcome');
     const won = battle.outcome === 'victory';
     card.append(el('p', 'battle-outcome-title', won ? 'Victory!' : 'You have fallen…'));
-    let after = won ? `You gain ${battle.xp} XP.` : 'But this isn’t the end of your story.';
+    // At the highest level so far, the XP is banked for the levels to come.
+    const gained = nextLevelXp(game.character) === null ? dmNotes.xpGainedBanked : dmNotes.xpGained;
+    let after = won ? gained.replace('{xp}', xpText(battle.xp)) : 'But this isn’t the end of your story.';
     if (battle.practice) after = 'A practice fight (debug): it doesn’t count, so no XP, and everyone will be back as they were.';
     card.append(el('p', 'battle-help', after));
     card.append(

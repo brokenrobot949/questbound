@@ -125,7 +125,15 @@ async function start() {
   // sessionStart: { recap } when a new session begins (its title card shows), else null.
   function showAdventure(game, backupReminder = false, sessionStart = null) {
     tabs.show('adventure', { fresh: true });
-    adventure = startAdventureScreen({ game, root: document, onSave: autosave, backupReminder, sessionStart, onPageShown: () => tabs.refresh() });
+    adventure = startAdventureScreen({
+      game,
+      root: document,
+      onSave: autosave,
+      backupReminder,
+      sessionStart,
+      onPageShown: () => tabs.refresh(),
+      playedMs: (played) => tracker.playedMs(played),
+    });
     if (debugPanel) debugPanel.refresh();
   }
 

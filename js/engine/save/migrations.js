@@ -238,4 +238,16 @@ export const migrations = {
     const undo = game.undo && game.undo.state ? { ...game.undo, state: { ...game.undo.state, hpMaxDrop: 0 } } : game.undo;
     return { ...save, version: 19, game: { ...game, hpMaxDrop: 0, undo } };
   },
+
+  // Version 20 counts the hero's deaths (each a Fate's Mercy so far), for the playtest log;
+  // nothing counted them before, so it starts at 0. A game saved at the end of Act I loses
+  // "(Act II is still being written.)" from its aim. The undo point's copy of the game gets
+  // the count too.
+  19: (save) => {
+    const { game } = save;
+    const undo = game.undo && game.undo.state ? { ...game.undo, state: { ...game.undo.state, deaths: 0 } } : game.undo;
+    const oldAim = 'Follow the shard south. (Act II is still being written.)';
+    const objective = game.objective === oldAim ? 'Follow the shard south.' : game.objective;
+    return { ...save, version: 20, game: { ...game, deaths: 0, objective, undo } };
+  },
 };

@@ -17,7 +17,7 @@ import { findBond, findDrive } from '../character/creation.js';
 import { addDeed, findQuest, finishQuest, questNote, startQuest } from './journal.js';
 import { longRestRecovery } from '../character/resources.js';
 import { approve, feeling, findCompanion, inParty, joinParty, leaveParty, memberGame, memberOf, PARTY_LIMIT, partyLongRest, raiseMember } from '../character/party.js';
-import { xpForLevel } from '../character/level-up.js';
+import { nextLevelXp, xpForLevel, xpText } from '../character/level-up.js';
 import { tacticalMind } from '../character/features.js';
 import { findTrap, springTrap, takeDamage, trapDamageDice } from '../character/hazards.js';
 import { dmNotes } from '../../../data/campaign/dm-voice.js';
@@ -455,7 +455,8 @@ export function bindExternals(story, runtime) {
     (amount) => {
       if (!Number.isInteger(amount) || amount < 0) throw new Error(`give_xp needs a whole number, got ${amount}`);
       runtime.game.xp += amount;
-      note(runtime.game, dmNotes.xpGained, { xp: amount });
+      const banked = nextLevelXp(runtime.game.character) === null; // at the highest level so far
+      note(runtime.game, banked ? dmNotes.xpGainedBanked : dmNotes.xpGained, { xp: xpText(amount) });
     },
     false,
   );
@@ -470,7 +471,7 @@ export function bindExternals(story, runtime) {
       const needed = xpForLevel(level);
       if (game.xp >= needed) return;
       game.xp = needed;
-      note(game, dmNotes.xpMilestone, { xp: needed, level });
+      note(game, dmNotes.xpMilestone, { xp: xpText(needed), level });
     },
     false,
   );
@@ -489,7 +490,7 @@ export function bindExternals(story, runtime) {
         onDying: () => note(game, dmNotes.blackedOut),
       });
       if (outcome === 'woke') note(game, dmNotes.cameRound);
-      if (outcome === 'dead') note(game, dmNotes.fellDead);
+      if (outcome === 'dead') heroDied(game);
       return outcome;
     },
     false,
@@ -512,7 +513,7 @@ export function bindExternals(story, runtime) {
         onDying: () => note(game, dmNotes.blackedOut),
       });
       if (outcome === 'woke') note(game, dmNotes.cameRound);
-      if (outcome === 'dead') note(game, dmNotes.fellDead);
+      if (outcome === 'dead') heroDied(game);
       return outcome;
     },
     false,
@@ -595,6 +596,13 @@ function testName(id) {
 function note(game, template, values = {}) {
   const text = template.replace(/\{(\w+)\}/g, (_, key) => values[key] ?? '');
   game.pending.push({ type: 'note', text });
+}
+
+// The hero died outside a fight (a trap, a fall), and the story goes to Fate's Mercy. It
+// counts in game.deaths, as a lost fight does (combat/battle.js, finishBattle).
+function heroDied(game) {
+  game.deaths = (game.deaths || 0) + 1;
+  note(game, dmNotes.fellDead);
 }
 
 // A whole number of gold pieces from a scene, in copper; anything else is a story bug.

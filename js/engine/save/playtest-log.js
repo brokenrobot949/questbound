@@ -4,7 +4,8 @@
 //
 // Only active time counts: the clock stops while the game is off screen, and a gap of more
 // than IDLE_LIMIT_MS between actions counts as that limit (the phone was probably put down).
-// A "scene" is an Ink knot, such as ch1_arrival.
+// A "scene" is an Ink knot, such as ch1_arrival. Deaths are read from the game (game.deaths,
+// which counts lost fights and deaths outside them): a session's are the ones since it began.
 
 const KEY = 'questbound:playtest-log';
 export const IDLE_LIMIT_MS = 5 * 60 * 1000;
@@ -36,6 +37,8 @@ export class PlaytestTracker {
     const sameSession = latest && latest.gameId === gameId && latest.session === game.sessionCount;
     if (sameSession) {
       this.current = latest;
+      // An entry from before deaths were read from the game.
+      if (!Number.isInteger(latest.deathsBefore)) latest.deathsBefore = (game.deaths || 0) - latest.deaths;
     } else {
       this.endSession();
       this.current = {
@@ -49,6 +52,7 @@ export class PlaytestTracker {
         levelEnd: game.character.level,
         scenesVisited: 0,
         deaths: 0,
+        deathsBefore: game.deaths || 0, // the game's count when the session began
         openScene: null,
       };
       this.log.sessions.push(this.current);
@@ -70,6 +74,8 @@ export class PlaytestTracker {
       this.current.scenesVisited += 1;
     }
     this.current.levelEnd = game.character.level;
+    // (An undo can take a death back, so it's worked out afresh each time.)
+    this.current.deaths = Math.max(0, (game.deaths || 0) - this.current.deathsBefore);
     this.#save();
   }
 
@@ -94,11 +100,10 @@ export class PlaytestTracker {
     this.#save();
   }
 
-  // For later phases: call when the hero dies.
-  recordDeath() {
-    if (!this.current) return;
-    this.current.deaths += 1;
-    this.#save();
+  // How long this game has been played on this device, in ms (every session the log holds).
+  playedMs(game) {
+    const gameId = `${game.slot}:${game.createdAt}`;
+    return this.log.sessions.filter((s) => s.gameId === gameId).reduce((sum, s) => sum + s.activeMs, 0);
   }
 
   clear() {
@@ -121,7 +126,7 @@ export class PlaytestTracker {
   #closeScene() {
     const open = this.current && this.current.openScene;
     if (!open) return;
-    this.log.scenes.push({ scene: open.scene, ms: open.ms, slot: this.current.slot, session: this.current.session });
+    this.log.scenes.push({ scene: open.scene, ms: open.ms, slot: this.current.slot, session: this.current.session, gameId: this.current.gameId });
     trim(this.log.scenes, SCENE_LIMIT);
     this.current.openScene = null;
   }
@@ -130,7 +135,7 @@ export class PlaytestTracker {
   #closeDanglingScenes() {
     for (const session of this.log.sessions) {
       if (!session.openScene) continue;
-      this.log.scenes.push({ scene: session.openScene.scene, ms: session.openScene.ms, slot: session.slot, session: session.session });
+      this.log.scenes.push({ scene: session.openScene.scene, ms: session.openScene.ms, slot: session.slot, session: session.session, gameId: session.gameId });
       session.openScene = null;
     }
     trim(this.log.scenes, SCENE_LIMIT);
@@ -155,8 +160,9 @@ export class PlaytestTracker {
   }
 }
 
-// Averages for the debug panel.
-export function summarizeLog(log) {
+// Averages for the debug panel. chapterStarts: [{ chapter, scene }], the scene each chapter
+// begins in (js/engine/story/act-summary.js), to add up each game's time per chapter.
+export function summarizeLog(log, chapterStarts = []) {
   const sessions = log.sessions;
   const sessionMs = sessions.map((s) => s.activeMs);
 
@@ -173,12 +179,14 @@ export function summarizeLog(log) {
 
   const byGame = new Map();
   for (const s of sessions) {
-    const entry = byGame.get(s.gameId) || { hero: s.hero, slot: s.slot, sessions: 0, highestLevel: 0, deaths: 0 };
+    const entry = byGame.get(s.gameId) || { hero: s.hero, slot: s.slot, sessions: 0, playedMs: 0, highestLevel: 0, deaths: 0, chapters: [] };
     entry.sessions += 1;
+    entry.playedMs += s.activeMs;
     entry.highestLevel = Math.max(entry.highestLevel, s.levelEnd);
     entry.deaths += s.deaths;
     byGame.set(s.gameId, entry);
   }
+  for (const [gameId, entry] of byGame) entry.chapters = timeByChapter(log.scenes.filter((v) => v.gameId === gameId), chapterStarts);
 
   const deaths = sessions.reduce((sum, s) => sum + s.deaths, 0);
   const sceneMs = log.scenes.map((v) => v.ms);
@@ -194,6 +202,22 @@ export function summarizeLog(log) {
     deaths,
     deathsPerSession: sessions.length ? deaths / sessions.length : 0,
   };
+}
+
+// One game's scene visits, in the order they were played, added up by chapter: a visit to a
+// chapter's first scene starts it, and everything after counts to it until the next chapter
+// starts. Scenes before any start count to the first chapter. [{ chapter, ms }], in the order
+// the chapters were reached. (Visits recorded before scenes carried their game aren't counted.)
+function timeByChapter(visits, chapterStarts) {
+  if (!chapterStarts.length) return [];
+  const totals = new Map();
+  let chapter = chapterStarts[0].chapter;
+  for (const visit of visits) {
+    const start = chapterStarts.find((c) => c.scene === visit.scene);
+    if (start) chapter = start.chapter;
+    totals.set(chapter, (totals.get(chapter) || 0) + visit.ms);
+  }
+  return [...totals].map(([name, ms]) => ({ chapter: name, ms }));
 }
 
 // "4m 05s", "1h 02m" or "38s".

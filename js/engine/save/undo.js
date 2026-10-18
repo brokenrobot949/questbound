@@ -29,6 +29,7 @@ export const PLAY_FIELDS = [
   'tempHp',
   'activeSpells',
   'hpMaxDrop',
+  'deaths',
   'featureUses',
   'xp',
   'battle',

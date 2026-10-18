@@ -105,6 +105,7 @@ import { spellSaveDc } from '../character/casting.js';
 import { takeUndoPoint } from '../save/undo.js';
 import { hasItem, removeItem, wornItems } from '../character/inventory.js';
 import { fightingMembers, memberGame, memberMaxHp, memberOf } from '../character/party.js';
+import { xpText } from '../character/level-up.js';
 import { companionTurn } from './companion-ai.js';
 import { SQUARE_FEET, cellAt, feetBetween, inBounds, isAdjacent, isStandable, key, lineBlock, parseMap, passingThrough, reachableSquares, squaresBetween, stepCost } from './grid.js';
 import { areaSquares, DIRECTIONS, findDirection, lineOfEffect } from './areas.js';
@@ -4190,7 +4191,7 @@ function checkEnd(game) {
   if (enemies(battle).every((c) => c.hp <= 0)) {
     // Foes that fled are worth nothing.
     battle.xp = enemies(battle).filter((c) => !c.escaped).reduce((sum, c) => sum + findMonster(c.monsterId).xp, 0);
-    log(game, `Victory! The fight is over. (${battle.xp} XP)`);
+    log(game, `Victory! The fight is over. (${xpText(battle.xp)} XP)`);
     endBattle(game, 'victory');
     // Anyone left at 0 Hit Points is patched up, and comes to with 1.
     for (const p of partyCombatants(battle)) {
@@ -4214,6 +4215,9 @@ export function finishBattle(game) {
   const battle = game.battle;
   if (!battle || !battle.outcome) throw new Error('The fight is not over yet.');
   if (battle.outcome === 'victory') game.xp += battle.xp;
+  // A lost fight is a death (Fate's Mercy, so far): game.deaths counts them, for the playtest
+  // log. (A practice fight never gets here.)
+  if (battle.outcome === 'defeat') game.deaths = (game.deaths || 0) + 1;
   const escaped = enemies(battle).filter((c) => c.escaped).map((c) => c.monsterId);
   game.lastBattle = { encounterId: battle.encounterId, outcome: battle.outcome, escaped };
   // Which allies came through it alive (the Old Ford's soldiers), for the story.

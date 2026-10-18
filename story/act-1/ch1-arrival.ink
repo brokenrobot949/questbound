@@ -8,6 +8,9 @@
 // night under the eaves, and pale lights on the barrow hills (flag saw_barrow_light).
 
 === ch1_arrival ===
+// The title cards: the act, then the chapter (#heading).
+Act I · The Barrow Dead #heading
+Chapter 1 · Bramblegate #heading
 // The opening line ties to the hero's Drive.
 {has_drive("glory"): You came north for glory. Nobody ever wrote a song about someone who stayed home.}
 {has_drive("faith"): You came north for your faith. If the dead are walking, someone has to lay them back down.}

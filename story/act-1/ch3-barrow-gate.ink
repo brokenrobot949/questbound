@@ -35,6 +35,7 @@
 // Through the open gate, beat 3: the Hall of Champions (ch3-hall.ink).
 
 === ch3_dark_moon ===
+Chapter 3 · The Kings' Barrow #heading
 ~ set_objective("Go down into the Kings' Barrow tonight, under the dark of the moon.")
 * [Wait out the day, and go down to the barrow at nightfall]
     -> nightfall

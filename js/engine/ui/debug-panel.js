@@ -8,6 +8,7 @@ import { describeCharacter, findClass } from '../character/sheet.js';
 import { forceNextD20, peekForcedD20 } from '../rules/dice.js';
 import { getSetting, setSetting } from '../save/settings.js';
 import { formatDuration, summarizeLog } from '../save/playtest-log.js';
+import { chapterStarts } from '../story/act-summary.js';
 import { offlineReport } from '../save/offline.js';
 import { nextLevelXp } from '../character/level-up.js';
 import { equipment } from '../../../data/srd/equipment.js';
@@ -292,7 +293,7 @@ export function setupDebugPanel({ root, getGame, tracker, offline, actions }) {
   function playtestSection() {
     const section = el('section', 'debug-section');
     section.append(heading('Playtest log', 'h3'));
-    const s = summarizeLog(tracker.log);
+    const s = summarizeLog(tracker.log, chapterStarts);
     if (s.sessionCount === 0) {
       section.append(el('p', 'debug-note', 'Nothing recorded yet. Play a session and come back.'));
       return section;
@@ -317,11 +318,12 @@ export function setupDebugPanel({ root, getGame, tracker, offline, actions }) {
       section.append(table);
     }
 
+    // Each game: its total time (Act I aims at about 6 hours), then its time in each chapter.
     const games = el('ul', 'debug-facts');
     for (const g of s.games) {
-      games.append(
-        el('li', null, `${g.hero} (slot ${g.slot}): ${plural(g.sessions, 'session')}, reached level ${g.highestLevel}, ${plural(g.deaths, 'death')}`),
-      );
+      const item = el('li', null, `${g.hero} (slot ${g.slot}): ${formatDuration(g.playedMs)} played in ${plural(g.sessions, 'session')}, reached level ${g.highestLevel}, ${plural(g.deaths, 'death')}`);
+      if (g.chapters.length) item.append(el('br'), g.chapters.map((c) => `${c.chapter}: ${formatDuration(c.ms)}`).join(' · '));
+      games.append(item);
     }
     section.append(el('p', 'debug-label', 'By game'), games);
 

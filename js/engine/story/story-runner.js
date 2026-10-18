@@ -25,6 +25,7 @@ import { storyContinues } from '../../../data/campaign/story-continues.js';
 import { timePasses } from '../character/spell-effects.js';
 import { takeUndoPoint } from '../save/undo.js';
 import { startD20Count, stopD20Count } from '../rules/d20-test.js';
+import { nextLevelXp, xpText } from '../character/level-up.js';
 
 // How many rolls the roll log keeps in the save. Older ones drop off.
 export const ROLL_LOG_LIMIT = 200;
@@ -198,7 +199,9 @@ export function continueAfterBattle(game) {
   }
   const xp = game.battle.outcome === 'victory' ? game.battle.xp : 0;
   const { choiceIndex } = finishBattle(game);
-  if (xp) game.pending.push({ type: 'note', text: dmNotes.fightWon.replace('{xp}', xp) });
+  // At the highest level so far, the XP is banked for later levels, and the note says so.
+  const won = nextLevelXp(game.character) === null ? dmNotes.fightWonBanked : dmNotes.fightWon;
+  if (xp) game.pending.push({ type: 'note', text: won.replace('{xp}', xpText(xp)) });
   const choice = game.story.currentChoices[choiceIndex];
   if (!choice) throw new Error('The story moved on during the fight');
   return makeChoice(game, choice);

@@ -16,7 +16,8 @@ import { heroMaxHp } from '../character/resources.js';
 import { levelUpReady } from '../character/level-up.js';
 import { showBattle } from './battle-screen.js';
 import { showLevelUp } from './level-up-screen.js';
-import { sessionCard, whatNowBox } from './session-panels.js';
+import { actEndCard, sessionCard, whatNowBox } from './session-panels.js';
+import { actSummary, finishedAct } from '../story/act-summary.js';
 import { COPPER_PER, findShard, moneyText, priceAt, shopDiscounts, wornItems } from '../character/inventory.js';
 import { findDrive } from '../character/creation.js';
 import {
@@ -53,9 +54,11 @@ const TUMBLE_STEP_MS = 60;
 // sessionStart: { recap } when a new session begins, to open with its title card (recap is
 // from story/sessions.js, or null); null otherwise.
 // onPageShown(): called whenever new story has been shown (the Journal tab may have news).
+// playedMs(game): how long this game has been played, from the playtest log (0 if unknown),
+// for the card at the end of an act.
 // Returns { refresh() }: redraws the status line and hero strip (after a spell is cast from
 // the Sheet, say).
-export function startAdventureScreen({ game, root, onSave, backupReminder = false, sessionStart = null, onPageShown = () => {} }) {
+export function startAdventureScreen({ game, root, onSave, backupReminder = false, sessionStart = null, onPageShown = () => {}, playedMs = () => 0 }) {
   const narration = root.getElementById('narration');
   const choices = root.getElementById('choices');
   const notices = root.getElementById('notices');
@@ -92,6 +95,9 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
   // While the session card or the backup reminder is up, the view stays at the top so the
   // player sees it. It follows the story again once they answer it or play on.
   let holdView = backupReminder || Boolean(sessionStart);
+  // The fight choice just made ("▶ Fight"), shown above the fight. The page after the fight
+  // starts with it again, so this one goes once the fight is over.
+  let fightChoiceShown = null;
   const follow = (node) => {
     if (!holdView) scrollIntoView(node);
   };
@@ -229,6 +235,8 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
       onShown: updateStatus,
       onDone: () => {
         battleArea.replaceChildren();
+        if (fightChoiceShown) fightChoiceShown.remove();
+        fightChoiceShown = null;
         for (const node of narration.children) node.classList.add('is-past');
         try {
           game.page = continueAfterBattle(game);
@@ -293,7 +301,8 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
         showFatalError(error);
         return;
       }
-      narration.append(el('p', 'chosen-text', choice.text));
+      fightChoiceShown = el('p', 'chosen-text', choice.text);
+      narration.append(fightChoiceShown);
       onSave(game);
       showFight();
       return;
@@ -309,11 +318,17 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
   }
 
   // The story so far stops here. Your hero is saved at this point and carries on from it
-  // when the next part of the story arrives. (Debug mode can restart the story.)
+  // when the next part of the story arrives. (Debug mode can restart the story.) At the end of
+  // an act, a card sums the act up.
   function showEnd() {
-    const card = el('div', 'end-card');
-    card.append(el('p', 'end-text', 'That’s as far as the story goes for now. Your hero is saved here, and the tale picks up from this point in a later update.'));
-    choices.append(card);
+    const act = finishedAct(game);
+    if (act) {
+      choices.append(actEndCard(game, actSummary(game, act), playedMs(game)));
+    } else {
+      const card = el('div', 'end-card');
+      card.append(el('p', 'end-text', 'That’s as far as the story goes for now. Your hero is saved here, and the tale picks up from this point in a later update.'));
+      choices.append(card);
+    }
     follow(choices);
   }
 

@@ -77,6 +77,11 @@ export function nextLevelXp(character) {
   return xpForLevel(character.level + 1);
 }
 
+// XP as the player reads it, with commas: 6500 → "6,500".
+export function xpText(xp) {
+  return String(xp).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
 // True when the hero has the XP for their next level and isn't in a fight.
 export function levelUpReady(game) {
   const xp = nextLevelXp(game.character);

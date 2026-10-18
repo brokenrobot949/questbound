@@ -21,6 +21,7 @@
 // After Morwen's breakfast, the story goes on to Fen in the stocks (ch2-stocks.ink).
 
 === ch2_morning ===
+Chapter 2 · The Barrow Road #heading
 You sleep badly after that, and wake to grey light and rain on the shutters. Downstairs, the common room of the Tallow and Thistle smells of bacon. Morwen is standing at the foot of the stairs with a cup of tea gone cold in her hands. #location:Bramblegate, the Tallow and Thistle #time:Morning
 
 "Have you seen Lark?" she says. "She's been sleeping in my back room since Garrick went. Her bed's not been touched. And her da's hatchet is gone off its hook, and my good lantern with it." #speaker:morwen

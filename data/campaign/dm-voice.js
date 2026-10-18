@@ -50,6 +50,10 @@ export const dmNotes = {
   xpMilestone: 'A milestone: your XP rises to {xp}, enough for level {level}.',
   coinsLost: 'Your purse is gone.',
   fightWon: 'Victory! You gain {xp} XP.',
+  // The same, for a hero already at the highest level the game reaches so far: the XP still
+  // counts, for the levels that come later.
+  xpGainedBanked: 'You gain {xp} XP, banked for the levels to come.',
+  fightWonBanked: 'Victory! You gain {xp} XP, banked for the levels to come.',
   damageTaken: 'You take {damage} {type} damage ({dice}: {rolls}).',
   // A trap strikes ({hits} and {what}: "2" and "darts", from data/srd/traps.js).
   trapStruck: 'Struck by {hits} {what}.',

@@ -86,5 +86,5 @@ You take the south road out of Bramblegate a little after noon, with Marchbank's
 At the top of the first hill you look back. Bramblegate is small from here: smoke from Morwen's chimney, the temple's roof, and somebody up on the town wall who might be Lark, waving.
 ~ set_flag("act_1_complete")
 End of Act I · The Barrow Dead #heading
-~ set_objective("Follow the shard south. (Act II is still being written.)")
+~ set_objective("Follow the shard south.")
 -> END

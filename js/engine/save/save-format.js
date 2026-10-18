@@ -19,7 +19,9 @@
 //                  character/resources.js), tempHp and activeSpells (Temporary Hit Points
 //                  and spells on the hero; see character/spell-effects.js), hpMaxDrop (how far
 //                  the hero's Hit Point maximum is lowered until a Long Rest; see
-//                  character/resources.js), battle (a fight
+//                  character/resources.js), deaths (how many times the hero has died, in a
+//                  lost fight or outside one: each a Fate's Mercy so far; for the playtest
+//                  log and the end of an act), battle (a fight
 //                  in progress, or null; see
 //                  combat/battle.js), lastBattle ({ encounterId, outcome } of the last fight,
 //                  with escaped and alliesAlive when it had any: see combat/battle.js),
@@ -47,7 +49,7 @@ import { validateCharacter } from '../character/validate.js';
 import { undoOk } from './undo.js';
 import { partyProblems } from '../character/party.js';
 
-export const SAVE_VERSION = 19;
+export const SAVE_VERSION = 20;
 
 // runtime: { story, game } — the compiled story, and whichever game is being played.
 
@@ -72,6 +74,7 @@ export function newGame(runtime, { slot, seed, character, rngState = null, now =
     journal: newJournal(),
     ...startingInventory(character),
     ...freshResources(character),
+    deaths: 0,
     battle: null,
     lastBattle: null,
     levelUp: null,
@@ -120,6 +123,7 @@ export function gameToSave(game, now = new Date()) {
       tempHp: game.tempHp,
       activeSpells: game.activeSpells,
       hpMaxDrop: game.hpMaxDrop || 0,
+      deaths: game.deaths || 0,
       featureUses: game.featureUses,
       xp: game.xp,
       battle: game.battle,
@@ -164,6 +168,7 @@ export function loadGame(runtime, record) {
     tempHp: save.game.tempHp,
     activeSpells: save.game.activeSpells,
     hpMaxDrop: save.game.hpMaxDrop,
+    deaths: save.game.deaths,
     featureUses: save.game.featureUses,
     xp: save.game.xp,
     battle: save.game.battle,
@@ -239,6 +244,7 @@ export function validateSave(save) {
     if (!journalOk(game.journal)) problems.push('journal');
     problems.push(...inventoryProblems(game.money, game.inventory));
     problems.push(...resourceProblems(game));
+    if (!isWhole(game.deaths) || game.deaths < 0) problems.push('deaths');
     if (game.battle !== null && !battleOk(game.battle)) problems.push('fight in progress');
     if (game.lastBattle !== null && !(game.lastBattle && isText(game.lastBattle.outcome))) problems.push('last fight');
     if (game.levelUp !== null && !levelUpOk(game.levelUp)) problems.push('level-up in progress');
