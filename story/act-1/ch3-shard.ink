@@ -12,8 +12,8 @@
 //     will hold. A failure is 2d6 bludgeoning from a falling stone, and it always gets you out;
 //     three failed death saves are Fate's Mercy (escape_fates_mercy: carried out, robbed by the
 //     hill).
-//   At the gate, at dawn: Garrick, waiting, and whoever held the cairns. The story stops there
-//     for now, with the aim to take Garrick home; beat 7, Bramblegate's thanks, comes next.
+//   At the gate, at dawn: Garrick, waiting, and whoever held the cairns, and his question, "Is
+//     it done?", which beat 7 (ch3-homecoming.ink) answers on the way home.
 //   Companions who fell in the barrow, and a wounded Rival, are carried out, home to
 //     Bramblegate's temple. The great candle, if it isn't spent, is for beat 7.
 
@@ -306,7 +306,7 @@ Then it's the long stair up, until the open oath-wall lets you out among the cha
 You go through the crowned passage without needing to look where the plates are, and climb the last stair into the open air. #room:kings-barrow/forecourt #location:The Kings' Barrow, the great gate
 -> at_the_gate
 
-// The great gate, at dawn. The story stops here for now.
+// The great gate, at dawn.
 = at_the_gate
 The sky over the moor has gone the colour of pewter, and the hymn under the hill is silent at last. It's dawn. #time:Dawn
 { has_flag("gate_guardians_destroyed"):
@@ -342,5 +342,5 @@ The sky over the moor has gone the colour of pewter, and the hymn under the hill
 }
 In your pocket, the shard is warm as a hand, and quiet. For now.
 ~ quest_note("missing-miller", "Garrick Dunn is free, and out of the Kings' Barrow. Take him home to Lark.")
-~ set_objective("Take Garrick home to Bramblegate. (The rest of Act I is still being written.)")
--> END
+// Beat 7, Bramblegate's thanks (ch3-homecoming.ink), begins with the answer to Garrick.
+-> ch3_homecoming

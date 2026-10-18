@@ -382,7 +382,7 @@ test('Roll line names a Critical Hit', () => {
 });
 
 test('Ink tags: #check:persuasion:15 is a Persuasion check against DC 15; #location sets the place', () => {
-  const none = { check: null, spell: null, by: null, shard: null, location: null, time: null, drives: [], buy: null, pay: null, combat: null, surprise: false, go: null, room: null, speaker: null };
+  const none = { check: null, spell: null, by: null, shard: null, location: null, time: null, drives: [], buy: null, pay: null, combat: null, surprise: false, go: null, room: null, speaker: null, heading: false };
   assertEqual(parseTags(['check:persuasion:15']), { ...none, check: { testId: 'persuasion', dc: 15 } });
   assertEqual(parseTags(['shard:names']), { ...none, shard: 'names' }, 'a shard’s power');
   assertEqual(parseTags(['spell:light']).spell, 'light');
@@ -392,6 +392,7 @@ test('Ink tags: #check:persuasion:15 is a Persuasion check against DC 15; #locat
   assertEqual(parseTags(['time:Dusk', 'drive:wealth', 'buy:torch']), { ...none, time: 'Dusk', drives: ['wealth'], buy: 'torch' });
   assertEqual(parseTags(['drive:faith', 'drive:kinship']).drives, ['faith', 'kinship'], 'a choice that fits two Drives');
   assertEqual(parseTags(['pay:10']), { ...none, pay: 10 }, 'a fine of 10 gold');
+  assertEqual(parseTags(['heading']), { ...none, heading: true }, 'a title, such as the end of an act');
   assertEqual(parseTags(null), none);
 });
 

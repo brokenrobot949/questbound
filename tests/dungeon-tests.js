@@ -2872,6 +2872,8 @@ function fallen(game, id) {
 }
 
 const shardCards = ["Lay it back on Dame Aveline's breast", 'Hold the shard over the dead Cantor, and make him answer', 'Get everyone out of here'];
+// At the gate at dawn, the answers to Garrick's "Is it done?" (beat 7).
+const garrickAnswers = ["Tell him it's done", 'Show him what flew to your hand', "Tell him the singing's over, but you don't think it's done"];
 
 test('Chapter 3: the first shard: Vesk sings his last note, the gold flies to your hand and says your whole name as your Rival does, and you see the crown break', async () => {
   const game = await atTheChantry('shard-called', { character: sable, flags: ['read_the_oath_wall', 'rival_freed'] });
@@ -2949,7 +2951,7 @@ test('Chapter 3: the way out: the barrow shudders again; up the drained stair, t
   );
   assertTrue(!text.includes('carry the fallen home') && !text.includes('your rival'), 'nobody fell, and no Rival');
   assertEqual([currentDungeon(game).id, currentDungeon(game).room, currentLocation(game), currentTime(game)], ['kings-barrow', 'forecourt', "The Kings' Barrow, the great gate", 'Dawn']);
-  assertEqual([cards(game), game.objective], [[], 'Take Garrick home to Bramblegate. (The rest of Act I is still being written.)']);
+  assertEqual([cards(game), game.objective], [garrickAnswers, 'Take Garrick home to Bramblegate.']);
   assertTrue(speakersOf(game).includes('garrick') && missingMiller(game).includes('Take him home to Lark'));
 });
 
@@ -2974,7 +2976,7 @@ test('Chapter 3: the long way out, through the old drain: a falling stone, the f
   const text = pageText(game);
   assertTrue(['lie in pieces', "You'll carry the fallen home to Bramblegate's temple", 'They are not fine'].every((s) => text.includes(s)), text);
   assertTrue(!text.includes('the cloak lies where you left it'), 'nobody fell at the gate');
-  assertEqual(cards(game), []);
+  assertEqual(cards(game), garrickAnswers);
 });
 
 test('Chapter 3: struck down on the way out is Fate’s Mercy: carried up to the forecourt, your purse lost under the hill', async () => {
@@ -2989,7 +2991,7 @@ test('Chapter 3: struck down on the way out is Fate’s Mercy: carried up to the
   const text = pageText(game);
   assertTrue(['Somebody carried you up out of the barrow', 'your purse came loose', 'Garrick Dunn looks at you'].every((s) => text.includes(s)), text);
   assertTrue(!text.includes("exactly where he said he'd wait") && !text.includes('silt and puddles'), 'straight to the gate');
-  assertEqual([currentDungeon(game).room, cards(game)], ['forecourt', []]);
+  assertEqual([currentDungeon(game).room, cards(game)], ['forecourt', garrickAnswers]);
 });
 
 test('Chapter 3: a Dwarf feels where the stone will hold on the way out, with no roll', async () => {
@@ -2998,6 +3000,203 @@ test('Chapter 3: a Dwarf feels where the stone will hold on the way out, with no
   assertEqual(cards(game).length, 3);
   pick(game, 'Feel where the stone will hold');
   assertTrue(game.page.beats.every((b) => b.type !== 'roll') && pageText(game).includes('listened to stone') && pageText(game).includes('the landing above the flooded vault'));
+});
+
+// ---- Chapter 3, beat 7: Bramblegate's thanks, and the end of Act I ----
+
+// After the barrow, with the Shard of Names in the pack (a level 4 Champion with Odda and Fen
+// unless given): up the last stair onto the forecourt, at Garrick's "Is it done?" at the great
+// gate; or at another knot or stitch (at: 'ch3_feast').
+async function atTheHomecoming(seed, { character = champion4, flags = [], odda = true, fen = true, at = 'ch3_shard.into_the_air' } = {}) {
+  const game = await atTheDarkMoon(seed, { character, flags: ['chantry_won', 'aveline_rested', ...flags], odda, fen });
+  jumpTo(game, 'ch3_shard.the_vision'); // the shard goes in the pack
+  game.page = jumpTo(game, at);
+  return game;
+}
+
+// At the feast, after the tale and the toast, at the choices of who to see.
+function toTheFaces(game) {
+  pick(game, 'Eat, and then tell it');
+  pick(game, 'Drink to it');
+}
+
+const hasShard = (game) => game.inventory.some((i) => i.id === 'shard-of-names');
+
+test('Chapter 3, beat 7: Garrick’s answer, two days down the barrow road with the watch, and Lark at the north gate', async () => {
+  const game = await atTheHomecoming('home-road', { flags: ['varrow_rallied', 'nettle_rallied', 'cairnfield_won', 'lark_apprentice'] });
+  assertTrue(hasShard(game));
+  assertEqual([cards(game), game.objective, currentDungeon(game).room], [garrickAnswers, 'Take Garrick home to Bramblegate.', 'forecourt']);
+  pick(game, "Tell him it's done");
+  const road = pageText(game);
+  assertTrue(["I've a girl to see", 'the cold ashes of the Choir', 'Garrick talks about Lark', 'goblins melt away', 'turns out to cheer you over the river', 'Somebody is sitting on the mounting block'].every((s) => road.includes(s)), road);
+  assertTrue(!road.includes('litter') && !road.includes('leans on your shoulder'), 'nobody to carry');
+  assertEqual([currentDungeon(game).room, currentLocation(game), currentTime(game), cards(game)], [null, 'Bramblegate, north gate', 'Dusk', ['Walk the last of the way']], 'out of the barrow, and off its map');
+  pick(game, 'Walk the last of the way');
+  const gate = pageText(game);
+  assertTrue(['her father\'s hatchet lies in the road', 'With my hatchet', 'Somebody had to', 'Warden Pike has found something very interesting', 'Apprentice, is it'].every((s) => gate.includes(s)), gate);
+  assertEqual(speakersOf(game), ['garrick', 'lark', 'garrick']);
+  assertTrue(game.flags.includes('garrick_home') && deeds(game).includes('Brought Garrick Dunn home'));
+  assertEqual(cards(game), ['Go to the Tallow and Thistle'], 'nobody for the temple');
+});
+
+test('Chapter 3, beat 7: the great candle calls back the companions who fell in the barrow; with the Prior in the cells, Varrow brings him up to light it; the wounded Rival goes to the surgeon', async () => {
+  const flags = ['odda_fell_in_the_chantry', 'fen_fell_in_the_vault', 'crane_exposed', 'rival_freed', 'rival_wounded', 'ford_fell'];
+  const game = await atTheHomecoming('home-candle', { character: sable, flags });
+  fallen(game, 'odda');
+  fallen(game, 'fen');
+  pick(game, 'Show him what flew');
+  const road = pageText(game);
+  assertTrue(['Put it away', 'the Choir\'s empty tents', 'a litter of hazel poles', 'Sable Rook leans on your shoulder', 'new graves on the north bank'].every((s) => road.includes(s)), road);
+  pick(game, 'Walk the last of the way');
+  assertEqual(cards(game), ['Go up to the temple first']);
+  pick(game, 'Go up to the temple first');
+  const temple = pageText(game);
+  assertTrue(
+    ['two lay sisters', 'Prior Crane beside him in irons', 'awkwardly, in his irons', 'You lay the fallen before the altar flame', 'Oh, Jessamy', 'died for a draw', 'this time everybody knows what he means', 'forearms like a smith', 'They won\'t be.'].every((s) => temple.includes(s)),
+    temple,
+  );
+  assertEqual(speakersOf(game), ['varrow', 'crane', 'odda', 'fen', 'crane', 'rival']);
+  assertTrue(['flame_spent', 'odda_raised', 'fen_raised'].every((f) => game.flags.includes(f)));
+  assertTrue(['odda', 'fen'].every((id) => !memberOf(game, id).fallen && memberOf(game, id).hp === memberMaxHp(game, memberOf(game, id))), 'both alive, with all their Hit Points');
+  assertEqual(cards(game), ['Go down to the Tallow and Thistle']);
+});
+
+test('Chapter 3, beat 7: with the great candle spent, the fallen lie before the altar to wait; one who fell at the gate came home with the watch', async () => {
+  const game = await atTheHomecoming('home-waiting', { flags: ['flame_spent', 'fen_fell_at_the_gate', 'varrow_rallied', 'crane_made_amends'] });
+  fallen(game, 'fen');
+  pick(game, "Tell him the singing's over");
+  assertTrue(pageText(game).includes('Nothing ever is') && !pageText(game).includes('litter'), 'the watch carried Fen home from the gate that night');
+  pick(game, 'Walk the last of the way');
+  pick(game, 'Go up to the temple first');
+  const temple = pageText(game);
+  assertTrue(['Prior Crane is at the altar, and gets up', 'Fen lies before the altar flame', "The great candle's spent", 'nobody in Bramblegate will forget them'].every((s) => temple.includes(s)), temple);
+  assertTrue(!temple.includes('You lay the fallen') && !temple.includes('roars up white'), 'already there, and no candle');
+  assertTrue(memberOf(game, 'fen').fallen);
+});
+
+test('Chapter 3, beat 7: the feast: the tale, the reeve’s last 25 gold and The Missing Miller done, and two faces in the crowd', async () => {
+  const game = await atTheHomecoming('feast', { flags: ['goblins_at_mill', 'varrow_rallied', 'escape_fates_mercy'], at: 'ch3_feast' });
+  game.money = 0;
+  const xp = game.xp;
+  assertTrue(['a version of your story that has a dragon in it', 'an orderly queue for pie', 'the size of a cartwheel'].every((s) => pageText(game).includes(s)), pageText(game));
+  assertEqual([currentLocation(game), currentTime(game), cards(game)], ['Bramblegate, the Tallow and Thistle', 'Night', ['Eat, and then tell it']]);
+  pick(game, 'Eat, and then tell it');
+  assertTrue(['not to look at your pocket', 'until Morwen threatens them with a ladle', 'Twenty-five I paid', 'since the hill took the last of it', 'To the ones who came looking'].every((s) => pageText(game).includes(s)), pageText(game));
+  assertEqual([game.money, game.xp - xp, game.journal.quests.find((q) => q.id === 'missing-miller').status], [2500, 200, 'done']);
+  assertTrue(notes(game).includes('Quest complete: The Missing Miller.') && notes(game).some((n) => n.startsWith('A good place to stop')));
+  pick(game, 'Drink to it');
+  assertTrue(['the Regent\'s blue', 'an owl on her shoulder', 'looking straight at you'].every((s) => pageText(game).includes(s)), pageText(game));
+  assertEqual(cards(game), [
+    "See what the knight in the Regent's blue wants", 'Go over to the old woman with the owl', "Hold the shard, and ask it the old woman's name", 'Sit with Odda for a while', 'Find out what Fen is up to', 'Go up to bed',
+  ]);
+  assertEqual(tagsOf(game)[2], 'shard:names');
+});
+
+test('Chapter 3, beat 7: Knight-Captain Marchbank’s request: the shard won’t go to her; refuse, and a Free League courier slips you a letter', async () => {
+  const debtor = { ...champion4, bond: { type: 'debt', name: 'Hollis Grange' } };
+  const game = await atTheHomecoming('feast-marchbank', { character: debtor, flags: ['regency_favour', 'league_deal', 'looted_the_champions'], at: 'ch3_feast' });
+  toTheFaces(game);
+  pick(game, 'See what the knight');
+  const meeting = pageText(game);
+  assertTrue(['lets you come to her', 'Knight-Captain Beatrix Marchbank', 'Twice, and both times kindly', 'to be kept safe until the crown is mended'].every((s) => meeting.includes(s)), meeting);
+  assertEqual(cards(game), ["Tell her you'll bring it to Highcrown", "Tell her it isn't the Regent's to ask for", "Tell her you'll think about it", 'Hold the shard out to her, and let her take it']);
+  assertEqual(tagsOf(game).slice(0, 2), ['drive:glory', 'drive:freedom']);
+  pick(game, 'Hold the shard out');
+  assertTrue(game.flags.includes('marchbank_saw_it_return') && hasShard(game) && pageText(game).includes("That's going in my report"));
+  assertEqual(cards(game).length, 3);
+  const approval = memberOf(game, 'fen').approval;
+  pick(game, "Tell her it isn't");
+  assertTrue(['marchbank_refused', 'met_marchbank'].every((f) => game.flags.includes(f)) && memberOf(game, 'fen').approval - approval === 1);
+  assertTrue(['Or it.', 'Fen raises his cup', 'Beg pardon', 'a folded letter in your hand'].every((s) => pageText(game).includes(s)), pageText(game));
+  assertTrue(game.inventory.some((i) => i.id === 'league-letter') && speakersOf(game).includes('courier'));
+  assertTrue(!cards(game).some((c) => c.startsWith('See what the knight')) && cards(game).includes('Read the letter'));
+  pick(game, 'Read the letter');
+  const letter = pageText(game);
+  assertTrue(['a little gold ship', 'ask for Silas Dray', 'O. Kettering, Magister', 'Our arrangement stands', 'stamped with a crown', 'We have taken an interest in what you owe Hollis Grange', 'put a price on a thing in writing'].every((s) => letter.includes(s)), letter);
+});
+
+test('Chapter 3, beat 7: going up to bed without hearing Marchbank out, she stops you on the stair; that night the shard says your name, you reach level 5, and Act I ends with the shard pointing south', async () => {
+  const game = await atTheHomecoming('feast-night', { at: 'ch3_feast' }); // Wren, whose Bond is her sibling Kit
+  game.xp = 5000;
+  toTheFaces(game);
+  pick(game, 'Go up to bed');
+  assertTrue(['a hand in a steel gauntlet', 'Knight-Captain Beatrix Marchbank'].every((s) => pageText(game).includes(s)) && !pageText(game).includes('both times kindly'), pageText(game));
+  pick(game, "Tell her you'll think about it");
+  const night = pageText(game);
+  assertTrue(['asking again', 'Beg pardon', 'a hot brick in your bed', 'it says your name again', "It's Kit Ashdown's voice", 'something else is listening', "you can't remember whether you answered"].every((s) => night.includes(s)), night);
+  assertTrue(game.flags.includes('marchbank_put_off') && game.inventory.some((i) => i.id === 'league-letter'));
+  assertEqual([game.xp, cards(game)], [6500, ['Wake, and go down into the morning']]);
+  assertTrue(notes(game).some((n) => n.startsWith('A milestone') && n.includes('level 5')), notes(game).join(' / '));
+  assertTrue(deeds(game).includes('was feasted at the Tallow and Thistle'));
+  pick(game, 'Wake, and go down');
+  const morning = pageText(game);
+  assertTrue(['enormous', 'Have you thought?', 'Odda is packing, and Fen is eating', 'pointing south'].every((s) => morning.includes(s)), morning);
+  assertTrue(!morning.includes("Don't come after me"), 'no Rival');
+  const heading = game.page.beats.filter((b) => b.heading);
+  assertEqual(heading, [{ type: 'text', text: 'End of Act I · The Barrow Dead', heading: true }]);
+  assertTrue(game.flags.includes('act_1_complete') && !game.flags.includes('rival_left_bramblegate'));
+  assertEqual([cards(game), game.objective, currentTime(game)], [[], 'Follow the shard south. (Act II is still being written.)', 'Morning']);
+});
+
+test('Chapter 3, beat 7: the old woman with the owl says a few words if you go over, and you don’t answer the shard that night', async () => {
+  const game = await atTheHomecoming('feast-owl', { flags: ['tried_to_return_the_shard'], at: 'ch3_feast' });
+  toTheFaces(game);
+  pick(game, 'Go over to the old woman');
+  const words = pageText(game);
+  assertTrue(['smells faintly of mice', 'You tried to put it back', "don't answer it", 'a single grey feather'].every((s) => words.includes(s)), words);
+  assertTrue(speakersOf(game).every((s) => s === 'owl-woman') && game.flags.includes('met_hesper') && !game.flags.includes('named_hesper'));
+  assertTrue(!cards(game).some((c) => c.includes('old woman')), 'she’s gone');
+  pick(game, 'Go up to bed');
+  pick(game, "Tell her you'll bring it");
+  assertTrue(game.flags.includes('marchbank_agreed') && pageText(game).includes("you don't answer. It's harder than it ought to be."), pageText(game));
+});
+
+test('Chapter 3, beat 7: the shard learns the old woman’s name, Hesper Wildmoor, its second use and a flag for the Whisper; she tells you not to do it again', async () => {
+  const game = await atTheHomecoming('feast-hesper', { flags: ['asked_the_dead_cantor'], at: 'ch3_feast' });
+  toTheFaces(game);
+  pick(game, 'Hold the shard, and ask');
+  const text = pageText(game);
+  assertTrue(['like a fish coming up through dark water: Hesper Wildmoor', 'head snaps round', 'it learns you a little better', "That's twice now"].every((s) => text.includes(s)), text);
+  assertEqual(speakersOf(game), ['hesper', 'odda']);
+  assertTrue(['named_hesper', 'met_hesper'].every((f) => game.flags.includes(f)) && deeds(game).includes('learned her name: Hesper Wildmoor'));
+  assertTrue(!cards(game).some((c) => c.includes('old woman')));
+});
+
+test('Chapter 3, beat 7: an Odda who dislikes you stays for the shard; Fen’s arithmetic; Lark asks again; the Rival asks to hold the shard, and is gone by morning', async () => {
+  const game = await atTheHomecoming('feast-friends', { character: sable, flags: ['odda_means_to_go_home', 'lark_apprentice_later', 'rival_freed'], at: 'ch3_feast' });
+  memberOf(game, 'odda').approval = -3;
+  memberOf(game, 'fen').approval = -3;
+  toTheFaces(game);
+  assertTrue(cards(game).includes('Take a cup over to your rival, alone in the corner') && cards(game).includes('Answer the question Lark has been working up to all evening'));
+  pick(game, 'Sit with Odda');
+  assertTrue(['the one quiet corner', 'I meant it', "I'll not leave it alone with you", 'Don\'t take it for forgiveness'].every((s) => pageText(game).includes(s)) && game.flags.includes('odda_stays_for_the_shard'), pageText(game));
+  pick(game, 'Find out what Fen');
+  assertTrue(pageText(game).includes('Arithmetic') && pageText(game).includes('given three of it back'), pageText(game));
+  pick(game, 'Answer the question Lark');
+  assertEqual(cards(game), ['Take her on as your apprentice', 'Tell her the mill needs her more, for now']);
+  pick(game, 'Take her on');
+  assertTrue(game.flags.includes('lark_apprentice') && pageText(game).includes('Then we\'ll see'));
+  pick(game, 'Take a cup over to your rival');
+  assertTrue(pageText(game).includes('a play you\'d been left out of') && pageText(game).includes('I want to know why it was you'), pageText(game));
+  pick(game, 'Put it in their hand');
+  assertTrue(game.flags.includes('rival_held_the_shard') && hasShard(game) && pageText(game).includes('it isn\'t a good laugh'));
+  assertEqual(cards(game), ["See what the knight in the Regent's blue wants", 'Go over to the old woman with the owl', "Hold the shard, and ask it the old woman's name", 'Go up to bed']);
+  pick(game, 'See what the knight');
+  pick(game, "Tell her you'll bring it");
+  pick(game, 'Go up to bed');
+  assertTrue(pageText(game).includes("It's Sable Rook's voice, and it sounds as if it's laughing at you"), pageText(game));
+  pick(game, 'Wake, and go down');
+  assertTrue(['Your rival\'s place at the long table is empty', 'signed Sable Rook', 'Whenever you\'re ready'].every((s) => pageText(game).includes(s)) && game.flags.includes('rival_left_bramblegate'), pageText(game));
+});
+
+test('Chapter 3, beat 7: a wounded Rival asks for the shard from the temple’s infirmary', async () => {
+  const game = await atTheHomecoming('feast-wounded', { character: sable, flags: ['rival_freed', 'rival_wounded'], fen: false, at: 'ch3_feast' });
+  toTheFaces(game);
+  pick(game, 'Slip out to the temple');
+  assertTrue(pageText(game).includes('propped up on pillows') && currentLocation(game) === 'Bramblegate, the temple');
+  pick(game, 'Tell them no');
+  assertTrue(game.flags.includes('rival_refused_the_shard') && pageText(game).includes('Why would you.') && pageText(game).includes('back down the hill to the feast alone'));
+  assertEqual(currentLocation(game), 'Bramblegate, the Tallow and Thistle');
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

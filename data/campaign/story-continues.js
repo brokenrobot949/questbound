@@ -37,4 +37,6 @@ export const storyContinues = [
   { scene: 'ch3_vault', continueAt: 'ch3_chantry', source: 'original' },
   // Then with Cantor Vesk dying at the altar; the first shard comes to the hero's hand.
   { scene: 'ch3_chantry', continueAt: 'ch3_shard', source: 'original' },
+  // Then at the great gate at dawn, with Garrick asking "Is it done?"; beat 7 takes him home.
+  { scene: 'ch3_shard', continueAt: 'ch3_homecoming', source: 'original' },
 ];

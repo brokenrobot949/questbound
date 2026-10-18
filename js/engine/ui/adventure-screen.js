@@ -147,6 +147,7 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
     for (const beat of game.page.beats) {
       const speaker = beat.type === 'text' ? beat.speaker || null : null;
       if (beat.type === 'chosen') narration.append(el('p', 'chosen-text', beat.text));
+      else if (beat.type === 'text' && beat.heading) narration.append(el('h2', 'story-heading', beat.text));
       else if (beat.type === 'text' && speaker) narration.append(speechBlock(beat.text, speaker, { continued: speaker === lastSpeaker, hero: game.character }));
       else if (beat.type === 'text') narration.append(el('p', 'narration-text', beat.text));
       else if (beat.type === 'note') narration.append(el('p', 'dm-note', beat.text));

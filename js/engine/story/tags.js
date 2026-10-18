@@ -24,9 +24,11 @@
 //                                 dungeons.js); the map shows it. #room:none leaves the dungeon.
 //   #speaker:pike                 someone speaks in this line (an id from data/campaign/
 //                                 people.js); their portrait and name show beside it
+//   #heading                      the line is a title, such as "End of Act I · The Barrow
+//                                 Dead", shown as a heading instead of a paragraph
 
 export function parseTags(tags) {
-  const parsed = { check: null, spell: null, by: null, shard: null, location: null, time: null, drives: [], buy: null, pay: null, combat: null, surprise: false, go: null, room: null, speaker: null };
+  const parsed = { check: null, spell: null, by: null, shard: null, location: null, time: null, drives: [], buy: null, pay: null, combat: null, surprise: false, go: null, room: null, speaker: null, heading: false };
   for (const tag of tags || []) {
     const colon = tag.indexOf(':');
     const key = (colon < 0 ? tag : tag.slice(0, colon)).trim();
@@ -60,6 +62,8 @@ export function parseTags(tags) {
       parsed.room = value;
     } else if (key === 'speaker') {
       parsed.speaker = value;
+    } else if (key === 'heading') {
+      parsed.heading = true;
     }
   }
   return parsed;

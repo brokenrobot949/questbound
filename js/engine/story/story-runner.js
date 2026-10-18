@@ -9,6 +9,7 @@
 //   { type: 'text', text, speaker }        a paragraph of narration; speaker: who speaks in it
 //                                          (from a #speaker tag: an id in data/campaign/
 //                                          people.js), if anyone does
+//   { type: 'text', text, heading: true }  a title, such as the end of an act (#heading)
 //   { type: 'roll', result, revealed }     a d20 test; revealed once the player has tapped the die
 //   { type: 'note', text }                 a short DM note ("New quest: …"), from an external
 //   { type: 'location', value }            the hero moved (from a #location tag); not shown as text
@@ -52,7 +53,8 @@ export function runPage(game, leadBeats = []) {
       parseRoomTag(tags.room); // a typo in a room tag is a story bug: fail here, not later
       beats.push({ type: 'room', value: tags.room });
     }
-    if (text) beats.push(tags.speaker ? { type: 'text', text, speaker: tags.speaker } : { type: 'text', text });
+    if (text && tags.heading) beats.push({ type: 'text', text, heading: true });
+    else if (text) beats.push(tags.speaker ? { type: 'text', text, speaker: tags.speaker } : { type: 'text', text });
   }
   if (stoppingPoint) beats.push({ type: 'note', text: dmNotes.stoppingPoint });
   return { beats, scene: scene || currentKnot(story) };

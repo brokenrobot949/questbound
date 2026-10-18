@@ -170,6 +170,48 @@ export const people = [
   { id: 'vesk', name: 'Cantor Vesk', sprite: 'cantor', source: 'original' }, // the gravedigger who sings the dead awake
   { id: 'aveline', name: 'Dame Aveline', sprite: 'wight', source: 'original' }, // the first queen's champion, risen
 
+  // ---- Bramblegate's feast (Chapter 3, beat 7): the powers of Act II take notice ----
+  {
+    id: 'marchbank',
+    name: 'Knight-Captain Marchbank', // Beatrix Marchbank, of the Lord Regent's household
+    species: 'human',
+    size: 'medium',
+    armor: 'plate-armor',
+    look: { skin: 'umber', hairStyle: 'cropped', hairColor: 'grey', beard: false, outfit: 'blue', accent: 'white', headgear: 'none' },
+    source: 'original',
+  },
+  {
+    id: 'courier',
+    name: 'A courier', // the Free League's, in its black and yellow
+    species: 'human',
+    size: 'medium',
+    armor: null,
+    look: { skin: 'tan', hairStyle: 'tousled', hairColor: 'auburn', beard: false, outfit: 'black', accent: 'yellow', headgear: 'hood' },
+    source: 'original',
+  },
+  // Hesper Wildmoor of the Old Circle: "The old woman with the owl" until the shard tells you
+  // her name. The two entries look the same.
+  {
+    id: 'owl-woman',
+    name: 'The old woman with the owl',
+    species: 'human',
+    size: 'medium',
+    armor: null,
+    robe: true,
+    look: { skin: 'porcelain', hairStyle: 'long', hairColor: 'white', beard: false, outfit: 'brown', accent: 'green', headgear: 'none' },
+    source: 'original',
+  },
+  {
+    id: 'hesper',
+    name: 'Hesper Wildmoor',
+    species: 'human',
+    size: 'medium',
+    armor: null,
+    robe: true,
+    look: { skin: 'porcelain', hairStyle: 'long', hairColor: 'white', beard: false, outfit: 'brown', accent: 'green', headgear: 'none' },
+    source: 'original',
+  },
+
   // ---- The hero's Bond, when they turn up in person ----
   {
     id: 'rival',

@@ -405,6 +405,21 @@ body {
   color: var(--accent);
 }
 
+/* A title in the story, such as "End of Act I · The Barrow Dead" (#heading). */
+.story-heading {
+  margin: 1.2em 0;
+  padding: 14px 8px;
+  border-top: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent);
+  font-family: var(--font-heading);
+  font-size: var(--size-heading);
+  font-weight: normal;
+  line-height: 1.6;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
 .chosen-text {
   margin: 0 0 0.9em;
   color: var(--accent);
