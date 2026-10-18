@@ -3028,9 +3028,14 @@ test('Chapter 3, beat 7: Garrick’s answer, two days down the barrow road with 
   assertEqual([cards(game), game.objective, currentDungeon(game).room], [garrickAnswers, 'Take Garrick home to Bramblegate.', 'forecourt']);
   pick(game, "Tell him it's done");
   const road = pageText(game);
-  assertTrue(["I've a girl to see", 'the cold ashes of the Choir', 'Garrick talks about Lark', 'goblins melt away', 'turns out to cheer you over the river', 'Somebody is sitting on the mounting block'].every((s) => road.includes(s)), road);
+  assertTrue(["I've a girl to see", 'the cold ashes of the Choir', 'Garrick talks about Lark', 'goblins melt away', 'turns out to cheer you over the river'].every((s) => road.includes(s)), road);
   assertTrue(!road.includes('litter') && !road.includes('leans on your shoulder'), 'nobody to carry');
-  assertEqual([currentDungeon(game).room, currentLocation(game), currentTime(game), cards(game)], [null, 'Bramblegate, north gate', 'Dusk', ['Walk the last of the way']], 'out of the barrow, and off its map');
+  assertEqual([currentDungeon(game).room, currentLocation(game), cards(game)], [null, 'The Old Ford', ['Go on, south']], 'out of the barrow, and off its map');
+  pick(game, 'Go on, south');
+  const wives = pageText(game);
+  assertTrue(['three barrows on its crown', 'The Three Wives', 'They rose when the barrow shook', 'the carter, who has heard of the Wives too', 'Somebody is sitting on the mounting block'].every((s) => wives.includes(s)), wives);
+  assertTrue(game.flags.includes('saw_the_barrow_wives'), 'seen, for the last morning');
+  assertEqual([currentLocation(game), currentTime(game), cards(game)], ['Bramblegate, north gate', 'Dusk', ['Walk the last of the way']]);
   pick(game, 'Walk the last of the way');
   const gate = pageText(game);
   assertTrue(['her father\'s hatchet lies in the road', 'With my hatchet', 'Somebody had to', 'Warden Pike has found something very interesting', 'Apprentice, is it'].every((s) => gate.includes(s)), gate);
@@ -3047,6 +3052,8 @@ test('Chapter 3, beat 7: the great candle calls back the companions who fell in 
   pick(game, 'Show him what flew');
   const road = pageText(game);
   assertTrue(['Put it away', 'the Choir\'s empty tents', 'a litter of hazel poles', 'Sable Rook leans on your shoulder', 'new graves on the north bank'].every((s) => road.includes(s)), road);
+  pick(game, 'Go on, south');
+  assertTrue(pageText(game).includes('walks faster, and you go with him') && !pageText(game).includes('They rose'), 'on foot, with the ford fallen; Odda lies on the litter');
   pick(game, 'Walk the last of the way');
   assertEqual(cards(game), ['Go up to the temple first']);
   pick(game, 'Go up to the temple first');
@@ -3066,6 +3073,7 @@ test('Chapter 3, beat 7: with the great candle spent, the fallen lie before the 
   fallen(game, 'fen');
   pick(game, "Tell him the singing's over");
   assertTrue(pageText(game).includes('Nothing ever is') && !pageText(game).includes('litter'), 'the watch carried Fen home from the gate that night');
+  pick(game, 'Go on, south');
   pick(game, 'Walk the last of the way');
   pick(game, 'Go up to the temple first');
   const temple = pageText(game);

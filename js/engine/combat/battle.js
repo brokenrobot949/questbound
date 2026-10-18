@@ -96,17 +96,17 @@ import { encounters } from '../../../data/campaign/encounters.js';
 import { monsters } from '../../../data/srd/monsters.js';
 import { d20Test, rerollKept, retarget, startD20Count, stopD20Count } from '../rules/d20-test.js';
 import { rollDice, rollDie } from '../rules/dice.js';
-import { abilityModifier, abilityModifierOf, armorClass, findAbility, findClass, hasFeature, initiative as heroInitiative, proficiencyBonus, savingThrow, speed as heroSpeed } from '../character/sheet.js';
+import { abilityModifier, abilityModifierOf, armorClass, findAbility, findClass, hasFeature, initiative as heroInitiative, proficiencyBonus, savingThrow, speed as heroSpeed, wornSaveBonus } from '../character/sheet.js';
 import { abilityCheck } from '../rules/ability-check.js';
-import { heal, featureUsesLeft, heroMaxHp, slotsLeft, spendFeature, spendSlot } from '../character/resources.js';
+import { heal, featureUsesLeft, heroMaxHp, lowerMaxHp, slotsLeft, spendFeature, spendSlot } from '../character/resources.js';
 import { activeSpellIds, castFromSheet, lastsText, namesText, putSpellOn, regainText, soakDamage } from '../character/spell-effects.js';
 import { canCastSpell, findSpell, freeCastKey, freeCastsLeft } from '../character/spells.js';
 import { spellSaveDc } from '../character/casting.js';
 import { takeUndoPoint } from '../save/undo.js';
-import { hasItem, removeItem } from '../character/inventory.js';
+import { hasItem, removeItem, wornItems } from '../character/inventory.js';
 import { fightingMembers, memberGame, memberMaxHp, memberOf } from '../character/party.js';
 import { companionTurn } from './companion-ai.js';
-import { SQUARE_FEET, cellAt, feetBetween, inBounds, isAdjacent, isStandable, key, lineBlock, parseMap, reachableSquares, squaresBetween, stepCost } from './grid.js';
+import { SQUARE_FEET, cellAt, feetBetween, inBounds, isAdjacent, isStandable, key, lineBlock, parseMap, passingThrough, reachableSquares, squaresBetween, stepCost } from './grid.js';
 import { areaSquares, DIRECTIONS, findDirection, lineOfEffect } from './areas.js';
 import { encounterRows, mapFlagsFor } from '../world/dungeons.js';
 import {
@@ -775,12 +775,17 @@ function blockedFor(game, mover) {
   };
 }
 
+// A Specter's Incorporeal Movement: it drifts through creatures, walls and obstacles as if they
+// were difficult terrain (combat/grid.js).
+const isIncorporeal = (c) => !isPartyMember(c) && (findMonster(c.monsterId).traits || []).includes('incorporeal-movement');
+
 // Where a creature (a foe, an ally or a companion) can move this turn, with `feet` of movement
-// (what it has left, unless given): crawling if it's Prone, and slowed inside Spirit Guardians
-// if it's a foe. A Map of key(pos) → { pos, cost, path }.
+// (what it has left, unless given): crawling if it's Prone, slowed inside Spirit Guardians if
+// it's a foe, and through walls and people if it's incorporeal. A Map of key(pos) → { pos,
+// cost, path }.
 function reachFor(game, c, feet = game.battle.turnState.movementLeft) {
   const battle = game.battle;
-  return reachableSquares(battleMap(battle), c.pos, feet, blockedFor(game, c), { crawling: isProne(battle, c.id), slowAt: slowAtFor(game, c) });
+  return reachableSquares(battleMap(battle), c.pos, feet, blockedFor(game, c), { crawling: isProne(battle, c.id), slowAt: slowAtFor(game, c), incorporeal: isIncorporeal(c) });
 }
 
 // Where the hero can move now. Squares within a free move (Remarkable Athlete, Tactical Shift,
@@ -848,6 +853,7 @@ function moveAlong(game, mover, path, { free = false, freeFrom = 'Remarkable Ath
   const map = battleMap(battle);
   const crawling = isProne(battle, mover.id);
   const slowAt = slowAtFor(game, mover);
+  const incorporeal = isIncorporeal(mover);
   walking.set(battle, { id: mover.id, from: { ...mover.pos }, path: [] });
   try {
     for (const next of path) {
@@ -856,13 +862,15 @@ function moveAlong(game, mover, path, { free = false, freeFrom = 'Remarkable Ath
           if (foe.side === mover.side || !canReact(game, foe)) continue;
           if (mover.side === 'hero' && hiddenOf(battle, mover.id)) continue; // nobody sees a hidden one go
           if (clingOf(battle, foe.id)) continue; // a clinging Stirge can't strike at anyone
-          if (isAdjacent(foe.pos, mover.pos) && !isAdjacent(foe.pos, next)) {
+          // Leaving its reach (from beside it, or from its own square, for one passing through).
+          if (squaresBetween(foe.pos, mover.pos) <= 1 && squaresBetween(foe.pos, next) > 1) {
             opportunityAttack(game, foe, mover);
             if (battle.outcome || !upright(game, mover)) return;
           }
         }
       }
-      if (!free) battle.turnState.movementLeft -= stepCost(map, next, crawling, slowAt);
+      const through = incorporeal && passingThrough(map, next, blockedFor(game, mover));
+      if (!free) battle.turnState.movementLeft -= stepCost(map, next, crawling, slowAt, through);
       if (isHero(mover)) battle.turnState.moved = true; // (no Steady Aim after moving)
       const from = { ...mover.pos };
       mover.pos = { ...next };
@@ -1057,7 +1065,7 @@ function acOf(game, c) {
   const actor = actorGame(game, c);
   const shield = hasEffect(game.battle, c.id, 'shield') ? findSpell('shield').combat.acBonus : 0;
   const faith = hasEffect(game.battle, c.id, 'shield-of-faith') ? findSpell('shield-of-faith').combat.acBonus : 0;
-  return armorClass(actor.character, activeSpellIds(actor)).value + shield + faith;
+  return armorClass(actor.character, activeSpellIds(actor), wornItems(actor)).value + shield + faith;
 }
 
 // ---- Spiritual Weapon ----
@@ -1351,7 +1359,8 @@ function performAttack(game, attacker, target, option) {
   // A gnoll that hurts someone already Bloodied can Rampage (see "Rampage").
   const healthBefore = canRampage(game, attacker, target) ? healthOf(game, target) : null;
   // (A Spiritual Weapon strikes from its own square: the damage is still from its caster.)
-  applyDamage(game, target, amount, { type: damage.type, critical, plus, from: combatantById(battle, attacker.id) || attacker });
+  const taken = applyDamage(game, target, amount, { type: damage.type, critical, plus, from: combatantById(battle, attacker.id) || attacker });
+  if (option.drainsMax && taken > 0) lifeDrain(game, target, taken);
   if (option.rider && target.hp > 0) addRider(game, attacker, target, option);
   if (option.onHit && !battle.outcome) onHitCondition(game, attacker, target, option.onHit);
   if (option.attach && !battle.outcome) attach(game, attacker, target, option);
@@ -1648,20 +1657,23 @@ function monsterDamage(game, target, amount, type) {
 }
 
 // Damage of one type, plus any flat extra of another type (plus: { amount, type }). from: the
-// creature that dealt it, if it can be paid back (Hellish Rebuke).
+// creature that dealt it, if it can be paid back (Hellish Rebuke). Returns the damage taken,
+// after resistances, immunities and the like (Temporary Hit Points still count as taken).
 function applyDamage(game, target, amount, damage) {
   const before = isHero(target) ? game.hp + (game.tempHp || 0) : 0;
-  takeHit(game, target, amount, damage);
+  const taken = takeHit(game, target, amount, damage);
   rescene(game);
   if (isHero(target) && damage.from && game.hp + (game.tempHp || 0) < before) hellishRebuke(game, damage.from);
+  return taken;
 }
 
+// Returns the damage taken (see applyDamage).
 function takeHit(game, target, amount, { type, critical = false, plus = null, keepTurned = false }) {
   const battle = game.battle;
   if (target.companion) return companionHit(game, target, amount, { type, critical, plus });
   // A foe, or an ally: a monster's stat block.
   if (!isPartyMember(target)) {
-    if (target.hp <= 0) return;
+    if (target.hp <= 0) return 0;
     const monster = findMonster(target.monsterId);
     const taken = monsterDamage(game, target, amount, type) + (plus ? monsterDamage(game, target, plus.amount, plus.type) : 0);
     // Undead Fortitude: a Constitution save (DC 5 + the damage) to stay up at 1 Hit Point,
@@ -1672,7 +1684,7 @@ function takeHit(game, target, amount, { type, critical = false, plus = null, ke
         target.hp = 1;
         log(game, `${target.name} should fall, but doesn't: Undead Fortitude leaves it at 1 Hit Point.`, { roll: save });
         hymnHurt(game, target, taken);
-        return;
+        return taken;
       }
       log(game, `Undead Fortitude fails ${target.name}.`, { roll: save });
     }
@@ -1690,13 +1702,21 @@ function takeHit(game, target, amount, { type, critical = false, plus = null, ke
       battle.effects = battle.effects.filter((e) => !(e.target === target.id && e.kind === 'turned'));
       log(game, `The pain breaks Turn Undead’s hold on ${target.name}.`);
     }
-    return;
+    return taken;
   }
   const resisted = heroResistances(game.character);
   ({ amount, plus } = resistanceCut(game, target, amount, type, plus));
   const taken = damageAfterResistance(amount, type, resisted) + (plus ? damageAfterResistance(plus.amount, plus.type, resisted) : 0);
   if (taken < amount + (plus ? plus.amount : 0)) log(game, `You resist some of the damage: you take ${taken}.`);
   if (taken > 0) wake(game, target, stirText(battle, target, 'damage')); // (your own Hypnotic Pattern)
+  heroHit(game, target, taken, critical);
+  return taken;
+}
+
+// The hero takes damage (already cut by resistance): Temporary Hit Points first, then Hit
+// Points, and at 0 they fall; damage while down is a failed death save.
+function heroHit(game, target, taken, critical) {
+  const battle = game.battle;
   if (battle.heroState === 'up') {
     // Temporary Hit Points go first.
     const { soaked, rest } = soakDamage(game, taken);
@@ -1768,7 +1788,7 @@ function resistedType(game) {
 
 function deathSave(game) {
   const battle = game.battle;
-  const roll = d20Test({ rng: game.rng, kind: 'save', label: 'Death saving throw', target: { type: 'DC', value: 10 } });
+  const roll = d20Test({ rng: game.rng, kind: 'save', label: 'Death saving throw', modifiers: wornSaveBonus(wornItems(game)), target: { type: 'DC', value: 10 } });
   if (roll.natural === 20) {
     game.hp = 1;
     battle.heroState = 'up';
@@ -1813,15 +1833,23 @@ function checkLost(game) {
 // hero does (a natural 20 brings them back with 1 Hit Point; three failures, and they die).
 // Damage while down is a failed save, and damage of their whole maximum kills outright.
 
+// Returns the damage taken (see applyDamage).
 function companionHit(game, target, amount, { type, critical, plus }) {
-  const battle = game.battle;
-  const member = memberFor(game, target);
   const actor = actorGame(game, target);
   const resisted = heroResistances(actor.character);
   ({ amount, plus } = resistanceCut(game, target, amount, type, plus));
   const taken = damageAfterResistance(amount, type, resisted) + (plus ? damageAfterResistance(plus.amount, plus.type, resisted) : 0);
   if (taken < amount + (plus ? plus.amount : 0)) log(game, `${target.name} resists some of the damage, and takes ${taken}.`);
-  if (taken > 0) wake(game, target, stirText(battle, target, 'damage')); // (the hero's Hypnotic Pattern)
+  if (taken > 0) wake(game, target, stirText(game.battle, target, 'damage')); // (the hero's Hypnotic Pattern)
+  companionTakes(game, target, taken, critical);
+  return taken;
+}
+
+// A companion takes damage (already cut by resistance), as the hero does in heroHit.
+function companionTakes(game, target, taken, critical) {
+  const battle = game.battle;
+  const member = memberFor(game, target);
+  const actor = actorGame(game, target);
   if (target.state === 'up') {
     const { rest } = soakDamage(actor, taken);
     const overflow = rest - member.hp;
@@ -1850,7 +1878,7 @@ function companionHit(game, target, amount, { type, critical, plus }) {
 // A Blessed companion adds Bless's 1d4: a death save is a saving throw. (The hero can't be
 // Blessed at 0 Hit Points: their concentration ends as they fall.)
 function companionDeathSave(game, c) {
-  const roll = d20Test({ rng: game.rng, kind: 'save', label: `${c.name}'s death saving throw`, modifiers: blessing(game, c), target: { type: 'DC', value: 10 } });
+  const roll = d20Test({ rng: game.rng, kind: 'save', label: `${c.name}'s death saving throw`, modifiers: [...blessing(game, c), ...wornSaveBonus(wornItems(actorGame(game, c)))], target: { type: 'DC', value: 10 } });
   if (roll.natural === 20) {
     memberFor(game, c).hp = 1;
     c.state = 'up';
@@ -2210,7 +2238,7 @@ function breakSanctuary(game, c, why) {
 // A saving throw by the hero: to keep Concentration, or against their own Shatter.
 function heroSave(game, abilityId, dc, label) {
   const ability = findAbility(abilityId);
-  const modifiers = savingThrow(game.character, abilityId).parts.map((p) => ({ ...p, source: `${ability.name} saving throw` }));
+  const modifiers = savingThrow(game.character, abilityId, wornItems(game)).parts.map((p) => ({ ...p, source: `${ability.name} saving throw` }));
   modifiers.push(...blessing(game, heroCombatant(game.battle)));
   return d20Test({ rng: game.rng, kind: 'save', label: `${label} (${ability.name} save)`, modifiers, target: { type: 'DC', value: dc } });
 }
@@ -2219,7 +2247,7 @@ function heroSave(game, abilityId, dc, label) {
 function partySave(game, c, abilityId, dc, label) {
   if (isHero(c)) return heroSave(game, abilityId, dc, label);
   const ability = findAbility(abilityId);
-  const modifiers = savingThrow(actorGame(game, c).character, abilityId).parts.map((p) => ({ ...p, source: `${c.name}'s ${ability.name} saving throw` }));
+  const modifiers = savingThrow(actorGame(game, c).character, abilityId, wornItems(actorGame(game, c))).parts.map((p) => ({ ...p, source: `${c.name}'s ${ability.name} saving throw` }));
   modifiers.push(...blessing(game, c));
   return d20Test({ rng: game.rng, kind: 'save', label: `${label} (${c.name}'s ${ability.name} save)`, modifiers, target: { type: 'DC', value: dc } });
 }
@@ -3445,6 +3473,29 @@ export function heroPullOff(game, foeId) {
   if (!pick) throw new Error('There is nothing clinging to you, or to a friend beside you, to pull off.');
   heroUseAction(game, `pull ${pick.foe.name} off`);
   letGo(game, clingOf(battle, foeId), isHero(pick.host) ? `You tear ${pick.foe.name} off yourself.` : `You tear ${pick.foe.name} off ${pick.host.name}.`);
+}
+
+// ---- Life Drain (a Specter's; SRD 5.2.1) ----
+// The damage a Life Drain deals (after resistances, and counting what Temporary Hit Points took)
+// also lowers the target's Hit Point maximum by as much, until they finish a Long Rest
+// (character/resources.js, lowerMaxHp; the Sheet shows it). Hit Points above the new maximum
+// are lost, and anyone whose maximum reaches 0 dies (SRD 5.2.1, "Hit Point Maximum of 0"). An
+// ally (a monster's stat block) loses it for the rest of the fight.
+function lifeDrain(game, target, taken) {
+  const battle = game.battle;
+  if (stateOf(battle, target) === 'dead') return;
+  if (!isPartyMember(target)) {
+    target.maxHp = Math.max(0, target.maxHp - taken);
+    target.hp = Math.min(target.hp, target.maxHp);
+    log(game, `${target.name}'s Hit Point maximum drops by ${taken}, to ${target.maxHp}.`);
+    return;
+  }
+  const max = lowerMaxHp(actorGame(game, target), taken);
+  if (isHero(target)) log(game, `Life Drain: your Hit Point maximum drops by ${taken}, to ${max}, until you finish a Long Rest.`);
+  else log(game, `Life Drain: ${target.name}'s Hit Point maximum drops by ${taken}, to ${max}, until they finish a Long Rest.`);
+  if (max > 0 || battle.outcome) return;
+  if (isHero(target)) heroDies(game, 'Your Hit Point maximum is drained to nothing.');
+  else companionDies(game, target, `${target.name}'s Hit Point maximum is drained to nothing.`);
 }
 
 // ---- Rampage (a Gnoll Warrior's or a Giant Hyena's Bonus Action; SRD 5.2.1) ----

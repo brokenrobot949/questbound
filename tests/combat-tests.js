@@ -7,7 +7,7 @@ import { forceNextD20 } from '../js/engine/rules/dice.js';
 import { isStandable, lineBlock, parseMap, reachableSquares, squaresBetween, key } from '../js/engine/combat/grid.js';
 import { heroAttackOptions, hitChance, rollDamage } from '../js/engine/combat/attacks.js';
 import * as fight from '../js/engine/combat/battle.js';
-import { findItem, inventoryProblems, makeMagicWeapon, plainWeapons, startingInventory } from '../js/engine/character/inventory.js';
+import { addItem, findItem, inventoryProblems, makeMagicWeapon, plainWeapons, startingInventory, wornItems } from '../js/engine/character/inventory.js';
 import { freshResources } from '../js/engine/character/resources.js';
 import { monsters } from '../data/srd/monsters.js';
 import { quickStartHeroes } from '../data/campaign/quick-start.js';
@@ -20,8 +20,10 @@ import { validateCharacter } from '../js/engine/character/validate.js';
 import { attackSummary, averageDamage } from '../js/engine/ui/attack-text.js';
 import { attackToReroll, rerollAttack } from '../js/engine/rules/inspiration.js';
 import { canResolve, resolveFight, resolveLimit } from '../js/engine/combat/resolve.js';
-import { maxHp } from '../js/engine/character/resources.js';
-import { joinParty, memberOf, setTactic } from '../js/engine/character/party.js';
+import { heal, heroMaxHp, longRestRecovery, maxHp } from '../js/engine/character/resources.js';
+import { joinParty, memberMaxHp, memberOf, partyLongRest, setTactic } from '../js/engine/character/party.js';
+import { armorClass } from '../js/engine/character/sheet.js';
+import { encounters } from '../data/campaign/encounters.js';
 import { freeCastKey } from '../js/engine/character/spells.js';
 
 const wren = quickStartHeroes.find((h) => h.id === 'wren').character;
@@ -1403,6 +1405,142 @@ test('Allies: Dabbin, a Scout, holds the tail-board and shoots his longbow twice
   fight.endHeroTurn(game);
   assertEqual(battle.log.filter((e) => e.text.startsWith('Dabbin hits Gnoll Warrior 4 with Longbow')).length, 2);
   assertEqual([near.hp, dabbin.pos], [15, { x: 4, y: 5 }]);
+});
+
+// ---- The Specter (Chapter 3's side quest, The Barrow-Wives) ----
+
+// Wren at level 5 in a barrow on the Three Wives, against one barrow-wife (a Specter), with
+// any companions. Wren goes first, then the Specter. at: where the Specter starts (Wren is at
+// the passage's mouth, x 3, y 7).
+function specterFight({ party = [], seed = 'specter', at = null } = {}) {
+  const game = { ...gameFor(fighter5, seed), party: [] };
+  for (const id of party) joinParty(game, id);
+  game.rng = scriptedThen([20, ...Array(6).fill(1)], seed);
+  fight.startBattle(game, 'barrow-wife', 0);
+  const specter = fight.enemies(game.battle)[0];
+  if (at) specter.pos = at;
+  game.battle.order = ['hero', specter.id];
+  game.battle.turn = 0;
+  return game;
+}
+
+test('Specters: the Specter (SRD 5.2.1); a barrow-wife alone in her barrow is Low for a level 5 party of three', () => {
+  const specter = fight.findMonster('specter');
+  assertEqual([specter.xp, specter.ac, specter.hp.average, specter.speed, specter.fly, specter.attacks[0].damage.dice, specter.attacks[0].drainsMax], [200, 12, 22, 30, 50, '2d6', true]);
+  assertTrue(['bludgeoning', 'piercing', 'slashing'].every((t) => specter.resistances.includes(t)) && specter.immunities.includes('necrotic') && specter.traits.includes('incorporeal-movement'));
+  const game = specterFight({ party: ['odda', 'fen'] });
+  assertEqual(fight.enemies(game.battle).map((c) => [c.name, c.hp]), [['The barrow-wife', 22]]);
+  assertEqual(fightRating(game, 'barrow-wife').rating, 'Low');
+});
+
+test('Specters: Life Drain lowers your Hit Point maximum by the damage you take; healing stops there, and a Long Rest puts it back', () => {
+  const game = specterFight({ at: { x: 3, y: 6 } }); // beside Wren
+  const max = heroMaxHp(game);
+  game.rng = scriptedThen([18, 3, 4], 'drain'); // a hit (18 + 4), 2d6 3 + 4 = 7 Necrotic
+  fight.endHeroTurn(game);
+  assertTrue(said(game, `Life Drain: your Hit Point maximum drops by 7, to ${max - 7}, until you finish a Long Rest.`), game.battle.log.map((e) => e.text).join(' / '));
+  assertEqual([game.hp, game.hpMaxDrop, heroMaxHp(game), fight.maxHpOf(game, fight.heroCombatant(game.battle))], [max - 7, 7, max - 7, max - 7]);
+  assertEqual(heal(game, 50), 0, 'already at the lowered maximum');
+  longRestRecovery(game);
+  assertEqual([game.hpMaxDrop, game.hp, heroMaxHp(game)], [0, max, max]);
+});
+
+test('Specters: Temporary Hit Points take the blow, but the maximum still drops by all of it', () => {
+  const game = specterFight({ at: { x: 3, y: 6 } });
+  const max = heroMaxHp(game);
+  game.hp = max - 20; // well below the new maximum, so none is trimmed off
+  const hp = game.hp;
+  game.tempHp = 5;
+  game.rng = scriptedThen([18, 3, 4], 'drain-temp');
+  fight.endHeroTurn(game);
+  assertEqual([game.tempHp, game.hp, game.hpMaxDrop, heroMaxHp(game)], [0, hp - 2, 7, max - 7]);
+});
+
+test('Specters: Life Drain on a companion lowers their maximum too, until the party’s Long Rest', () => {
+  const game = specterFight({ party: ['odda'], at: { x: 3, y: 5 } });
+  const battle = game.battle;
+  const odda = fight.combatantById(battle, 'odda');
+  fight.heroCombatant(battle).pos = { x: 1, y: 2 }; // across the chamber: Odda is nearer
+  odda.pos = { x: 3, y: 6 };
+  const member = memberOf(game, 'odda');
+  const max = memberMaxHp(game, member);
+  game.rng = scriptedThen([18, 2, 3], 'drain-odda'); // 2 + 3 = 5 Necrotic
+  fight.endHeroTurn(game);
+  assertTrue(said(game, `Life Drain: ${odda.name}'s Hit Point maximum drops by 5, to ${max - 5}, until they finish a Long Rest.`), battle.log.map((e) => e.text).join(' / '));
+  assertEqual([member.hp, member.hpMaxDrop, memberMaxHp(game, member), fight.maxHpOf(game, odda)], [max - 5, 5, max - 5, max - 5]);
+  game.battle = null;
+  partyLongRest(game);
+  assertEqual([member.hpMaxDrop, member.hp], [0, max]);
+});
+
+test('Specters: a Hit Point maximum drained to 0 is death', () => {
+  const game = specterFight({ at: { x: 3, y: 6 } });
+  game.hpMaxDrop = heroMaxHp(game) - 7; // a maximum of 7
+  game.hp = 7;
+  game.rng = scriptedThen([18, 3, 4], 'drained');
+  fight.endHeroTurn(game);
+  assertTrue(said(game, 'Your Hit Point maximum is drained to nothing.'));
+  assertEqual([game.battle.heroState, game.battle.outcome, heroMaxHp(game)], ['dead', 'defeat', 0]);
+});
+
+test('Grid: an incorporeal Specter moves through walls and people as difficult terrain, never stopping inside them, and not into deep water', () => {
+  const walls = { '#': { terrain: 'wall' }, '.': { terrain: 'floor' }, w: { terrain: 'water' } };
+  const map = parseMap(['.#..', 'wwww'], walls);
+  const ghost = reachableSquares(map, { x: 0, y: 0 }, 15, () => null, { incorporeal: true });
+  assertEqual(ghost.get(key({ x: 2, y: 0 })).cost, 15, '10 feet through the wall, 5 out of it');
+  assertTrue(!ghost.has(key({ x: 1, y: 0 })), 'it doesn’t stop inside the wall');
+  assertTrue(!ghost.has(key({ x: 0, y: 1 })), 'not into deep water');
+  assertTrue(!reachableSquares(map, { x: 0, y: 0 }, 50).has(key({ x: 2, y: 0 })), 'a walker can’t get there');
+  const open = parseMap(['...'], walls);
+  const foe = (pos) => (pos.x === 1 ? 'enemy' : null);
+  const through = reachableSquares(open, { x: 0, y: 0 }, 15, foe, { incorporeal: true });
+  assertEqual([through.get(key({ x: 2, y: 0 })).cost, through.has(key({ x: 1, y: 0 }))], [15, false], 'through someone, as difficult terrain');
+  assertTrue(!reachableSquares(open, { x: 0, y: 0 }, 50, foe).has(key({ x: 2, y: 0 })), 'a walker can’t pass a foe');
+});
+
+test('Specters: a barrow-wife drifts through a wall to reach you', () => {
+  const wall = {
+    id: 'test-through-the-wall',
+    name: 'Through the wall',
+    difficulty: 'Low (a test)',
+    sizedFor: { level: 5, party: 1 },
+    map: { rows: ['#######', '#..#..#', '#######'], legend: { '#': { terrain: 'wall', wall: 'stone' }, '.': { terrain: 'floor', tile: 'crypt-floor' } } },
+    hero: { x: 1, y: 1 },
+    monsters: [{ monster: 'specter', pos: { x: 5, y: 1 } }],
+    source: 'original',
+  };
+  encounters.push(wall);
+  try {
+    const game = { ...gameFor(fighter5, 'through-the-wall'), party: [] };
+    game.rng = scriptedThen([20, 1], 'through-the-wall');
+    fight.startBattle(game, wall.id, 0);
+    const specter = fight.enemies(game.battle)[0];
+    game.battle.order = ['hero', specter.id];
+    game.battle.turn = 0;
+    game.rng = scriptedThen([1], 'through-the-wall-miss');
+    fight.endHeroTurn(game);
+    assertEqual(specter.pos, { x: 2, y: 1 }, 'beside Wren, on her side of the wall');
+    assertTrue(said(game, 'Specter attacks you with Life Drain, and misses.'), game.battle.log.map((e) => e.text).join(' / '));
+  } finally {
+    encounters.splice(encounters.indexOf(wall), 1);
+  }
+});
+
+test('Cloak of Protection: worn in a fight, +1 Armor Class against the barrow-wife, and +1 on a death save', () => {
+  const game = specterFight({ at: { x: 3, y: 6 } });
+  const ac = armorClass(game.character).value;
+  addItem(game.inventory, 'cloak-of-protection');
+  assertEqual(wornItems(game).map((i) => i.id), ['cloak-of-protection']);
+  game.rng = scriptedThen([1], 'cloak-miss');
+  fight.endHeroTurn(game);
+  const attack = game.battle.log.find((e) => e.roll && e.roll.kind === 'attack');
+  assertEqual(attack.roll.target, { type: 'AC', value: ac + 1 });
+  // At 1 Hit Point, the barrow-wife drops you (18 to hit, 3 + 4); then your death save, 9 + 1.
+  game.hp = 1;
+  game.rng = scriptedThen([18, 3, 4, 9], 'cloak-death-save');
+  fight.endHeroTurn(game);
+  const save = game.battle.log.find((e) => e.roll && e.roll.label === 'Death saving throw');
+  assertTrue(save.roll.modifiers.some((m) => m.label === 'Cloak of Protection' && m.value === 1) && save.roll.success, JSON.stringify(save.roll));
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

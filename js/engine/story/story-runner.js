@@ -176,7 +176,7 @@ export function startFight(game, choice) {
 // count: when it ends, the hero and the party are put back as they were (Hit Points, spell
 // slots, uses, spells on them, the pack, Heroic Inspiration), no XP is earned, and the story
 // is where it was.
-const PRACTICE_KEEPS = ['hp', 'tempHp', 'slotsUsed', 'featureUses', 'activeSpells', 'inventory', 'party', 'inspiration'];
+const PRACTICE_KEEPS = ['hp', 'tempHp', 'slotsUsed', 'featureUses', 'activeSpells', 'hpMaxDrop', 'inventory', 'party', 'inspiration'];
 export function startPractice(game, encounterId) {
   if (game.battle) throw new Error('Finish this fight first.');
   const before = {};

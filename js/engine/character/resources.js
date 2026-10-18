@@ -8,9 +8,12 @@
 //   game.xp           experience points
 //   game.tempHp       Temporary Hit Points (see character/spell-effects.js)
 //   game.activeSpells spells on the hero that last a while, e.g. Mage Armor
+//   game.hpMaxDrop    how far the hero's Hit Point maximum has been lowered (a Specter's Life
+//                     Drain), until their next Long Rest; 0 for none. A companion's is on their
+//                     place in the party (character/party.js), and a missing one means 0.
 //
-// A Long Rest brings all of them back (except XP), and ends Temporary Hit Points and the
-// spells on the hero.
+// A Long Rest brings all of them back (except XP), ends Temporary Hit Points and the spells on
+// the hero, and puts the Hit Point maximum back to normal.
 
 import { findClass, maxHitPoints } from './sheet.js';
 
@@ -23,14 +26,28 @@ export function aidBonus(game) {
   return (game.activeSpells || []).reduce((sum, spell) => sum + (spell.hpBonus || 0), 0);
 }
 
-// The hero's Hit Point maximum right now: the sheet's, plus Aid while it lasts.
+// How far the Hit Point maximum is lowered until the next Long Rest (Life Drain). game is the
+// hero's game, or a companion's (character/party.js, memberGame).
+export const hpMaxDropOf = (game) => game.hpMaxDrop || 0;
+
+// The hero's Hit Point maximum right now: the sheet's, plus Aid while it lasts, less any Life
+// Drain. Never below 0.
 export function heroMaxHp(game) {
-  return maxHp(game.character) + aidBonus(game);
+  return Math.max(0, maxHp(game.character) + aidBonus(game) - hpMaxDropOf(game));
+}
+
+// Life Drain: the Hit Point maximum drops by amount until the next Long Rest, and Hit Points
+// above the new maximum are lost. Returns the new maximum (at 0, they die: the caller says so).
+export function lowerMaxHp(game, amount) {
+  game.hpMaxDrop = hpMaxDropOf(game) + Math.max(0, amount);
+  const max = heroMaxHp(game);
+  game.hp = Math.min(game.hp, max);
+  return max;
 }
 
 // A hero who has just arrived: full Hit Points, nothing spent.
 export function freshResources(character) {
-  return { hp: maxHp(character), slotsUsed: [], featureUses: {}, xp: 0, tempHp: 0, activeSpells: [] };
+  return { hp: maxHp(character), slotsUsed: [], featureUses: {}, xp: 0, tempHp: 0, activeSpells: [], hpMaxDrop: 0 };
 }
 
 export function heal(game, amount) {
@@ -45,6 +62,7 @@ export function longRestRecovery(game) {
   game.featureUses = {};
   game.tempHp = 0;
   game.activeSpells = [];
+  game.hpMaxDrop = 0;
 }
 
 // Spell slots the class has at this spell level, and how many are left.
@@ -91,6 +109,7 @@ export function resourceProblems(state) {
   if (!state.featureUses || typeof state.featureUses !== 'object') problems.push('feature uses');
   if (!Number.isInteger(state.xp) || state.xp < 0) problems.push('XP');
   if (!Number.isInteger(state.tempHp) || state.tempHp < 0) problems.push('Temporary Hit Points');
+  if (!Number.isInteger(state.hpMaxDrop) || state.hpMaxDrop < 0) problems.push('the lowered Hit Point maximum');
   const lasting = ['long-rest', 'hour'];
   if (!Array.isArray(state.activeSpells) || !state.activeSpells.every((s) => s && typeof s.id === 'string' && lasting.includes(s.lasts))) {
     problems.push('spells on the hero');

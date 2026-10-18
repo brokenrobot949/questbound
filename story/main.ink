@@ -27,6 +27,7 @@ INCLUDE act-1/ch1-wolf-den.ink
 INCLUDE act-1/ch1-hobs-bet.ink
 INCLUDE act-1/ch2-hanging-tree.ink
 INCLUDE act-1/ch2-hobs-ore.ink
+INCLUDE act-1/ch3-barrow-wives.ink
 INCLUDE common/hobs-forge.ink
 
 // Where play begins: Chapter 1, on the road to Bramblegate.

@@ -40,8 +40,10 @@ import { expandable, mathsNumber } from './widgets.js';
 
 const capitalise = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 
-// spellsOn: ids of spells on the hero now (Mage Armor, Longstrider), which change AC and Speed.
-export function heroSheet(character, { spellsOn = [] } = {}) {
+// spellsOn: ids of spells on the hero now (Mage Armor, Longstrider), which change AC and Speed;
+// worn: the magic items they wear (character/inventory.js, wornItems), which can change AC and
+// saving throws.
+export function heroSheet(character, { spellsOn = [], worn = [] } = {}) {
   const sheet = el('div', 'hero-sheet');
   const option = speciesOption(character);
   const background = findBackground(character.backgroundId);
@@ -65,7 +67,7 @@ export function heroSheet(character, { spellsOn = [] } = {}) {
   sheet.append(
     grid('Combat', [
       mathsNumber({ label: 'Hit Points', stat: maxHitPoints(character) }),
-      mathsNumber({ label: 'Armor Class', stat: armorClass(character, spellsOn) }),
+      mathsNumber({ label: 'Armor Class', stat: armorClass(character, spellsOn, worn) }),
       mathsNumber({ label: 'Initiative', stat: initiative(character), format: signedNumber }),
       mathsNumber({ label: 'Speed', stat: speed(character, spellsOn), unit: ' ft' }),
       mathsNumber({ label: 'Proficiency', stat: { value: pb, parts: [{ label: `Level ${character.level}`, value: pb }] }, format: signedNumber }),
@@ -89,7 +91,7 @@ export function heroSheet(character, { spellsOn = [] } = {}) {
       abilities.map((a) =>
         mathsNumber({
           label: `${a.name}${saveProficiencies.includes(a.id) ? ' ●' : ''}`,
-          stat: savingThrow(character, a.id),
+          stat: savingThrow(character, a.id, worn),
           format: signedNumber,
         }),
       ),

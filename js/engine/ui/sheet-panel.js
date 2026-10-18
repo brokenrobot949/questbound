@@ -7,7 +7,7 @@
 // on.
 
 import { findBond, findDrive } from '../character/creation.js';
-import { findItem, itemText, moneyText } from '../character/inventory.js';
+import { findItem, itemText, moneyText, wornItems } from '../character/inventory.js';
 import { armorClass, describeCharacter, findArmor, findMastery, findWeapon, masteredWeapons } from '../character/sheet.js';
 import { heroAttackOptions } from '../combat/attacks.js';
 import { shield } from '../../../data/srd/armor.js';
@@ -15,7 +15,7 @@ import { attackSummary, sheetSpellText } from './attack-text.js';
 import { activeSpellIds, castFromSheet, lastsText, namesText, sheetSpells } from '../character/spell-effects.js';
 import { findSpell, preparePicks, togglePrepared } from '../character/spells.js';
 import { actionButton } from './backup-panels.js';
-import { featureUsesLeft, featureUsesMax, heroMaxHp, slotsAt, slotsLeft } from '../character/resources.js';
+import { featureUsesLeft, featureUsesMax, heroMaxHp, hpMaxDropOf, slotsAt, slotsLeft } from '../character/resources.js';
 import { levelUpReady, nextLevelXp } from '../character/level-up.js';
 import { heroSheet } from './hero-sheet.js';
 import { el } from './dom.js';
@@ -35,6 +35,7 @@ export function sheetPanel(game, { onCast = () => {}, note = null } = {}) {
   const now = el('section', 'sheet-block');
   now.append(el('h3', 'section-heading', 'Right now'));
   now.append(el('p', 'sheet-line', `Hit Points: ${game.hp} of ${heroMaxHp(game)}`));
+  if (hpMaxDropOf(game)) now.append(el('p', 'sheet-line', `Life Drain: your Hit Point maximum is ${hpMaxDropOf(game)} lower, until you finish a Long Rest`));
   if (game.tempHp) now.append(el('p', 'sheet-line', `Temporary Hit Points: ${game.tempHp} (lost first; gone after a Long Rest)`));
   for (const { id, lasts } of game.activeSpells || []) now.append(el('p', 'sheet-line', `On you: ${findSpell(id).name}, ${lastsText(lasts)}`));
   const next = nextLevelXp(character);
@@ -77,7 +78,7 @@ export function sheetPanel(game, { onCast = () => {}, note = null } = {}) {
   if (casting) panel.append(casting);
   panel.append(gearBlock(game));
 
-  panel.append(heroSheet(character, { spellsOn: activeSpellIds(game) }));
+  panel.append(heroSheet(character, { spellsOn: activeSpellIds(game), worn: wornItems(game) }));
 
   const drive = findDrive(character.drive);
   const bond = findBond(character.bond.type);
@@ -104,6 +105,7 @@ export function sheetPanel(game, { onCast = () => {}, note = null } = {}) {
     let label = itemText(entry);
     if (entry.id === character.armorId) label += ' (wearing)';
     else if (entry.id === shield.id && character.shield) label += ' (on your arm)';
+    else if (item.worn) label += ' (wearing)';
     pack.append(item.text ? expandable(label, item.text) : el('p', 'pack-item', label));
   }
   panel.append(pack);
@@ -112,15 +114,24 @@ export function sheetPanel(game, { onCast = () => {}, note = null } = {}) {
 
 // What the hero wears, and what they can attack with: each weapon (and attack spell) with its
 // chance to hit, damage and reach, the same numbers the battle screen shows.
+// What a worn magic item gives: "+1 Armor Class, +1 to every saving throw".
+function wornText(item) {
+  const gives = [];
+  if (item.worn.ac) gives.push(`+${item.worn.ac} Armor Class`);
+  if (item.worn.saves) gives.push(`+${item.worn.saves} to every saving throw`);
+  return gives.join(', ');
+}
+
 function gearBlock(game) {
   const { character } = game;
   const block = el('section', 'sheet-block');
   block.append(el('h3', 'section-heading', 'Armour and weapons'));
-  const ac = armorClass(character, activeSpellIds(game)).value;
+  const ac = armorClass(character, activeSpellIds(game), wornItems(game)).value;
   const worn = character.armorId ? findArmor(character.armorId) : null;
   const mageArmor = !worn && activeSpellIds(game).includes('mage-armor');
   block.append(el('p', 'sheet-line', `Wearing: ${worn ? worn.name : mageArmor ? 'no armour, but Mage Armor' : 'no armour'} (Armor Class ${ac})`));
   if (character.shield) block.append(el('p', 'sheet-line', `Shield: on your arm (+${shield.acBonus} Armor Class)`));
+  for (const item of wornItems(game)) block.append(el('p', 'sheet-line', `${item.name}: worn (${wornText(item)})`));
 
   const options = heroAttackOptions(game);
   const weapons = game.inventory.filter((entry) => entry.quantity > 0 && findItem(entry.id).category === 'weapon');
@@ -165,6 +176,7 @@ function partyBlock(game, onChange) {
     who.append(el('p', 'sheet-line', `${character.name} · ${describeCharacter(character)}`));
     const hp = member.fallen ? 'Fallen: they can be raised at a temple, or by a spell' : `Hit Points: ${member.hp} of ${memberMaxHp(game, member)}`;
     who.append(el('p', 'sheet-line', hp));
+    if (!member.fallen && hpMaxDropOf(member)) who.append(el('p', 'sheet-line', `Life Drain: ${character.name.split(' ')[0]}’s Hit Point maximum is ${hpMaxDropOf(member)} lower, until a Long Rest`));
     for (const { id, lasts } of member.activeSpells || []) who.append(el('p', 'sheet-line', `On ${character.name.split(' ')[0]}: ${findSpell(id).name}, ${lastsText(lasts)}`));
     who.append(el('p', 'section-hint', companion.summary));
     who.append(el('p', 'section-hint', `Likes ${companion.likes.join(', ')}. Dislikes ${companion.dislikes.join(', ')}.`));
@@ -190,7 +202,7 @@ function partyBlock(game, onChange) {
     const tactic = findTactic(member.tactic);
     block.append(el('p', 'section-hint', character.spells ? `${tactic.summary} ${tactic.spellNote}` : tactic.summary));
     const sheet = el('details', 'expandable');
-    sheet.append(el('summary', '', `${character.name.split(' ')[0]}’s sheet`), heroSheet(character, { spellsOn: (member.activeSpells || []).map((s) => s.id) }));
+    sheet.append(el('summary', '', `${character.name.split(' ')[0]}’s sheet`), heroSheet(character, { spellsOn: (member.activeSpells || []).map((s) => s.id), worn: wornItems(member) }));
     block.append(sheet);
   }
   return block;

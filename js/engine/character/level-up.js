@@ -59,7 +59,7 @@ import {
   SPELLCASTING_ABILITIES,
 } from './spells.js';
 import { LIST_ABILITY, spellTakenBy } from './creation.js';
-import { aidBonus, featureUsesMax, maxHp } from './resources.js';
+import { featureUsesMax, heroMaxHp, maxHp } from './resources.js';
 import { validateCharacter } from './validate.js';
 import { addDeed } from '../story/journal.js';
 import { memberMaxHp, partyLevelUp } from './party.js';
@@ -539,7 +539,7 @@ export function finishLevelUp(game) {
   const hpGained = maxHp(hero) - maxHp(game.character);
   const before = game.character.level;
   game.character = hero;
-  game.hp = Math.min(maxHp(hero) + aidBonus(game), Math.max(0, game.hp) + hpGained);
+  game.hp = Math.min(heroMaxHp(game), Math.max(0, game.hp) + hpGained);
   partyLevelUp(game, before); // companions level with the hero
   game.levelUp = null;
   addDeed(game, dmNotes.levelUpDeed.replace('{level}', hero.level));
@@ -578,7 +578,7 @@ export function lowerLevel(game, level) {
   game.character = hero;
   game.xp = xpForLevel(level);
   game.levelUp = null;
-  game.hp = Math.min(game.hp, maxHp(hero) + aidBonus(game));
+  game.hp = Math.min(game.hp, heroMaxHp(game));
   game.slotsUsed = [];
   for (const member of game.party || []) {
     member.hp = Math.min(member.hp, memberMaxHp(game, member));

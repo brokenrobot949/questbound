@@ -55,4 +55,13 @@ export const quests = [
     chapter: 2,
     source: 'original',
   },
+  // Chapter 3's side quest, seen on the walk home from the Kings' Barrow and offered on the last
+  // morning in Bramblegate.
+  {
+    id: 'barrow-wives',
+    title: 'The Barrow-Wives',
+    summary: 'Since the night the Kings’ Barrow shook, three grey women have stood keening on the Three Wives, the three opened barrows on a knoll above the barrow road. Warden Pike wants them laid to rest, or gone.',
+    chapter: 3,
+    source: 'original',
+  },
 ];

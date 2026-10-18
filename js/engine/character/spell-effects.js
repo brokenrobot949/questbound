@@ -27,6 +27,7 @@ import { findSpell, canCastSpell, freeCastKey, freeCastsLeft, spellAbility, spel
 import { heal, heroMaxHp, slotsAt, slotsLeft, spendSlot } from './resources.js';
 import { abilityModifierOf, armorClass, hasFeature, speed } from './sheet.js';
 import { findCompanion, fightingMembers, memberGame } from './party.js';
+import { wornItems } from './inventory.js';
 import { rollDice } from '../rules/dice.js';
 import { spells } from '../../../data/srd/spells.js';
 
@@ -156,7 +157,7 @@ export function putSpellOn(target, spell, extra = {}) {
   const view = target.game;
   view.activeSpells = [...(view.activeSpells || []).filter((s) => s.id !== spell.id), { id: spell.id, lasts: spell.combat.lasts, ...extra }];
   const whose = target.you ? 'your' : `${target.name}'s`;
-  if (spell.combat.self === 'mage-armor') return `${whose} Armor Class is now ${armorClass(view.character, activeSpellIds(view)).value}, ${lastsText(spell.combat.lasts)}`;
+  if (spell.combat.self === 'mage-armor') return `${whose} Armor Class is now ${armorClass(view.character, activeSpellIds(view), wornItems(view)).value}, ${lastsText(spell.combat.lasts)}`;
   if (spell.combat.self === 'longstrider') return `${whose} Speed is now ${speed(view.character, activeSpellIds(view)).value} feet, ${lastsText(spell.combat.lasts)}`;
   throw new Error(`Unknown lasting spell: ${spell.id}`);
 }

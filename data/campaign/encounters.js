@@ -160,6 +160,16 @@ const gorseLegend = {
   c: { terrain: 'floor', tile: 'wood-floor' }, // the cart's tail-board
 };
 
+// A barrow on the Three Wives (Chapter 3, The Barrow-Wives): a low passage from the knoll into
+// a round stone chamber, old bones on the floor, and the bier where the barrow-wife was laid.
+const wifeBarrowLegend = {
+  '#': { terrain: 'wall', wall: 'stone' },
+  '.': { terrain: 'floor', tile: 'crypt-floor' },
+  ',': { terrain: 'floor', tile: 'crypt-floor', decor: 'bones' },
+  k: { terrain: 'floor', tile: 'crypt-floor', decor: 'skull' },
+  B: { terrain: 'obstacle', tile: 'crypt-floor', decor: 'bier' },
+};
+
 // Dame Aveline's name, from the oath-wall in the Hall of Champions (Chapter 3). Called by it,
 // the risen champion remembers her oath ("I will keep it below until I am called by name") and
 // turns on the Cantor who sang her up.
@@ -689,6 +699,36 @@ export const encounters = [
       { monster: 'gnoll-warrior', pos: { x: 0, y: 3 } },
     ],
     whileHeroDown: '{name} rips open a sack of the cart’s oats and flings them about, laughing its horrible laugh.',
+    source: 'original',
+  },
+  // Chapter 3's side content: The Barrow-Wives. A barrow-wife the hero couldn't lay to rest (or
+  // drew steel on) rises off her bier and comes for them: one Specter, in the dark of her
+  // barrow. Each of the three barrows on the Three Wives is this map. It comes on the last
+  // morning of Act I, so it's sized for a level 5 party of three. Specters shrug off half of
+  // ordinary weapons' damage, drift through walls and people, and Life Drain lowers the Hit
+  // Point maximum until a Long Rest.
+  {
+    id: 'barrow-wife',
+    name: 'A Barrow-Wife',
+    difficulty: 'Low (one Specter is 200 XP; for a level 5 party of three, Low is 1,500)',
+    sizedFor: { level: 5, party: 3 },
+    map: {
+      rows: [
+        '########',
+        '##.BB.##',
+        '#,....k#',
+        '#..,...#',
+        '#.....,#',
+        '##,...##',
+        '###..###',
+        '###..###',
+        '###..###',
+      ],
+      legend: wifeBarrowLegend,
+    },
+    hero: { x: 3, y: 7 },
+    monsters: [{ monster: 'specter', name: 'The barrow-wife', pos: { x: 3, y: 2 } }],
+    whileHeroDown: '{name} drifts back to her bier, and stands over it, swaying, as if she has forgotten you too.',
     source: 'original',
   },
 ];

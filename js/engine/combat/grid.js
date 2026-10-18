@@ -3,6 +3,8 @@
 // difficult terrain costs 10. You can move through an ally's square but not an enemy's, and
 // you can't end your move in anyone's square. Walls, obstacles and deep water can't be entered,
 // and a diagonal step can't cut across the corner of one. Crawling costs 5 feet more a square.
+// An incorporeal creature (a Specter) passes through walls, obstacles and creatures as if they
+// were difficult terrain (see reachableSquares).
 
 export const SQUARE_FEET = 5;
 
@@ -83,8 +85,13 @@ const STEPS = [
 // crawling: a Prone creature crawls, and every square costs 5 feet more.
 // slowAt(pos): true where the creature's Speed is halved (a foe inside Spirit Guardians), so
 // moving into that square costs twice as much.
+// incorporeal: a Specter's Incorporeal Movement (SRD 5.2.1): it moves through other creatures,
+// walls and obstacles as if they were Difficult Terrain, and can cut corners, but not through
+// deep water or off the map. It never ends its move inside a wall or an obstacle (the SRD would
+// let it, at a cost of 1d10 Force damage; the game's foes never choose to), nor in someone's
+// square.
 // Returns a Map from key(pos) to { pos, cost (feet), path: [pos, …] (not including the start) }.
-export function reachableSquares(map, start, feet, blockedBy = () => null, { crawling = false, slowAt = null } = {}) {
+export function reachableSquares(map, start, feet, blockedBy = () => null, { crawling = false, slowAt = null, incorporeal = false } = {}) {
   const best = new Map([[key(start), { pos: start, cost: 0, path: [] }]]);
   const queue = [{ pos: start, cost: 0, path: [] }];
   while (queue.length) {
@@ -92,12 +99,12 @@ export function reachableSquares(map, start, feet, blockedBy = () => null, { cra
     const here = queue.shift();
     for (const [dx, dy] of STEPS) {
       const next = { x: here.pos.x + dx, y: here.pos.y + dy };
-      if (!isStandable(map, next)) continue;
-      if (dx && dy && (!isStandable(map, { x: here.pos.x + dx, y: here.pos.y }) || !isStandable(map, { x: here.pos.x, y: here.pos.y + dy }))) {
+      if (incorporeal ? !passable(map, next) : !isStandable(map, next)) continue;
+      if (!incorporeal && dx && dy && (!isStandable(map, { x: here.pos.x + dx, y: here.pos.y }) || !isStandable(map, { x: here.pos.x, y: here.pos.y + dy }))) {
         continue; // no cutting corners
       }
-      if (blockedBy(next) === 'enemy') continue;
-      const cost = here.cost + stepCost(map, next, crawling, slowAt);
+      if (!incorporeal && blockedBy(next) === 'enemy') continue;
+      const cost = here.cost + stepCost(map, next, crawling, slowAt, incorporeal && passingThrough(map, next, blockedBy));
       if (cost > feet) continue;
       const known = best.get(key(next));
       if (known && known.cost <= cost) continue;
@@ -106,15 +113,26 @@ export function reachableSquares(map, start, feet, blockedBy = () => null, { cra
       queue.push(step);
     }
   }
-  // Nobody can end their move in a square someone else is standing in.
-  for (const [k, step] of best) if (k !== key(start) && blockedBy(step.pos)) best.delete(k);
+  // Nobody can end their move in a square someone else is standing in, or inside a wall.
+  for (const [k, step] of best) if (k !== key(start) && (blockedBy(step.pos) || !isStandable(map, step.pos))) best.delete(k);
   return best;
+}
+
+// Squares an incorporeal creature can move into: anything on the map but deep water.
+const passable = (map, pos) => Boolean(cellAt(map, pos) && cellAt(map, pos).terrain !== 'water');
+
+// True if moving into this square takes an incorporeal creature through something: a wall, an
+// obstacle, or another creature (which costs as Difficult Terrain does).
+export function passingThrough(map, pos, blockedBy = () => null) {
+  return !isStandable(map, pos) || Boolean(blockedBy(pos));
 }
 
 // What it costs to move into a square: 5 feet, 10 in difficult terrain, and 5 more when
 // crawling (SRD 5.2.1, "Crawling": each foot costs 1 extra foot, 2 extra in difficult terrain);
 // all twice over where the creature's Speed is halved (slowAt, see reachableSquares).
-export function stepCost(map, pos, crawling = false, slowAt = null) {
-  const cost = ((cellAt(map, pos).terrain === 'difficult' ? 2 : 1) + (crawling ? 1 : 0)) * SQUARE_FEET;
+// difficult: true to count the square as difficult terrain whatever it is (an incorporeal
+// creature passing through a wall or someone).
+export function stepCost(map, pos, crawling = false, slowAt = null, difficult = false) {
+  const cost = ((difficult || cellAt(map, pos).terrain === 'difficult' ? 2 : 1) + (crawling ? 1 : 0)) * SQUARE_FEET;
   return slowAt && slowAt(pos) ? cost * 2 : cost;
 }

@@ -17,7 +17,7 @@ import { levelUpReady } from '../character/level-up.js';
 import { showBattle } from './battle-screen.js';
 import { showLevelUp } from './level-up-screen.js';
 import { sessionCard, whatNowBox } from './session-panels.js';
-import { COPPER_PER, findShard, moneyText, priceAt, shopDiscounts } from '../character/inventory.js';
+import { COPPER_PER, findShard, moneyText, priceAt, shopDiscounts, wornItems } from '../character/inventory.js';
 import { findDrive } from '../character/creation.js';
 import {
   abilityModifierOf,
@@ -80,7 +80,7 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
   const renderHeroStrip = () =>
     root
       .getElementById('hero-strip')
-      .replaceChildren(spriteCanvas(heroSprite(game.character), { scale: 2 }), el('span', 'hero-strip-text', heroSummary(game.character, activeSpellIds(game))));
+      .replaceChildren(spriteCanvas(heroSprite(game.character), { scale: 2 }), el('span', 'hero-strip-text', heroSummary(game.character, activeSpellIds(game), wornItems(game))));
   renderHeroStrip();
   root.getElementById('slot-note').textContent = `Slot ${game.slot} · Session ${game.sessionCount}`;
   narration.replaceChildren();
@@ -535,14 +535,14 @@ function spellTag(game, id, by = null) {
 
 // "Wren Ashdown · Human Fighter 1 · HP 12 · AC 17 · Str +3 Dex +1 … · Proficiency +2"
 // (HP here is the maximum; the status line shows what's left.) spellsOn: spells on the hero,
-// for Mage Armor's AC.
-function heroSummary(character, spellsOn = []) {
+// for Mage Armor's AC; worn: the magic items they wear (a Cloak of Protection).
+function heroSummary(character, spellsOn = [], worn = []) {
   const mods = abilities.map((a) => `${a.abbreviation} ${signedNumber(abilityModifierOf(character, a.id))}`);
   return [
     character.name,
     describeCharacter(character),
     `HP ${maxHitPoints(character).value}`,
-    `AC ${armorClass(character, spellsOn).value}`,
+    `AC ${armorClass(character, spellsOn, worn).value}`,
     mods.join(' '),
     `Proficiency +${proficiencyBonus(character.level)}`,
   ].join(' · ');

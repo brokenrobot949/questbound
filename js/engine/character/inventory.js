@@ -2,8 +2,9 @@
 //
 //   game.money       coins, counted in copper pieces (1 GP = 10 SP = 100 CP)
 //   game.inventory   [{ id, quantity }]: item ids from data/srd/equipment.js and armor.js,
-//                    magic weapons ("longsword-plus-1", see magicWeapon), and the story's own
-//                    items in data/campaign/items.js
+//                    Wondrous Items from data/srd/magic-items.js (a Cloak of Protection, see
+//                    wornItems), magic weapons ("longsword-plus-1", see magicWeapon), and the
+//                    story's own items in data/campaign/items.js
 //
 // Prices in the data are in coins ({ gp: 50 }); money is shown as gold, silver and copper.
 
@@ -15,12 +16,28 @@ import { shards } from '../../../data/campaign/shards.js';
 import { shops } from '../../../data/campaign/shops.js';
 import { findBackground, findClass } from './sheet.js';
 
-// Any item: armour, a Shield, other equipment, a magic weapon, or one of the story's own items.
+// Any item: armour, a Shield, other equipment, a Wondrous Item, a magic weapon, or one of the
+// story's own items.
 export function findItem(id) {
   if (id === shield.id) return { ...shield, category: 'shield' };
   const worn = armor.find((a) => a.id === id);
   if (worn) return { ...worn, category: 'armor', armorCategory: worn.category };
-  return equipment.find((e) => e.id === id) || storyItems.find((e) => e.id === id) || magicWeapon(id);
+  return equipment.find((e) => e.id === id) || storyItems.find((e) => e.id === id) || wondrousItem(id) || magicWeapon(id);
+}
+
+// ---- Wondrous Items (SRD 5.2.1): a Cloak of Protection ----
+// In the pack by their own id (data/srd/magic-items.js). Not for sale.
+function wondrousItem(id) {
+  const item = magicItems.find((m) => m.id === id && m.kind === 'wondrous');
+  return item ? { ...item, category: 'wondrous' } : null;
+}
+
+// The magic items someone wears: every worn item in their pack (a Cloak of Protection), attuned
+// as soon as they have it (data/srd/magic-items.js). game: the hero's, or a companion's
+// (character/party.js, memberGame). Armor Class and saving throws add what each gives
+// (character/sheet.js).
+export function wornItems(game) {
+  return (game.inventory || []).filter((entry) => entry.quantity > 0).map((entry) => findItem(entry.id)).filter((item) => item && item.worn);
 }
 
 // ---- Magic weapons (SRD 5.2.1, "Weapon, +1, +2, or +3") ----

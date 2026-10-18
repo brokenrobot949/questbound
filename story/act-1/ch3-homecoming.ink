@@ -12,7 +12,9 @@
 //     flag for the Whisper), and she tells you not to do it again.
 //   An Odda who dislikes you stays anyway, for the shard (odda_stays_for_the_shard).
 // The rest:
-//   The walk home with Garrick, and Lark at the north gate (garrick_home). If Lark was to ask
+//   The walk home with Garrick, past the Barrow-Wives keening on the Three Wives at dusk
+//     (saw_the_barrow_wives: the side quest comes on the last morning, ch3-barrow-wives.ink), and
+//     Lark at the north gate (garrick_home). If Lark was to ask
 //     again when her father was home, she asks at the feast (lark_apprentice, lark_stays_home).
 //   The temple, if anyone lies dead or the Rival is wounded: the great candle raises the dead if
 //     it isn't spent (flame_spent, odda_raised, fen_raised); if it is, they wait for Act II's
@@ -62,7 +64,24 @@ You go home the way you came: down off the moor, past {has_flag("cairnfield_won"
 - else:
     At the Old Ford the watch-post turns out to cheer you over the river, and puts you all on its supply cart for the rest of the way. #location:The Old Ford
 }
-On the second evening Bramblegate's roofs come up out of the dusk, with the smoke of every chimney going straight up into a still sky. Somebody is sitting on the mounting block by the north gate. #location:Bramblegate, north gate #time:Dusk
++ [Go on, south]
+    -> the_three_wives
+
+// The second evening, an hour short of Bramblegate: the Barrow-Wives, seen and passed by
+// (ch3-barrow-wives.ink: the side quest is on the last morning). Then the town at dusk.
+= the_three_wives
+~ set_flag("saw_the_barrow_wives")
+On the second evening, an hour short of Bramblegate, the road runs under a low green knoll with three barrows on its crown in a ring, their capstones gone like every other grave on the road. On each of them stands a grey woman, thin as smoke, swaying. The sound they make isn't singing, and it isn't weeping. You feel it in your teeth. #location:The barrow road, under the Three Wives #time:Dusk
+"The Three Wives," Garrick says, and doesn't look. "Gran always said, don't look at the Wives. There was never anything to look at. Not till now." #speaker:garrick
+{ companion_alive("odda"):
+    "They rose when the barrow shook," Odda says quietly. "I'd stake my order on it." #speaker:odda
+}
+{ has_flag("ford_fell"):
+    "Lark," Garrick says, as if that settles it, and walks faster, and you go with him. The keening follows you until the knoll is out of sight, and a little after.
+- else:
+    "Lark," Garrick says, as if that settles it, and the carter, who has heard of the Wives too, whips up the horse. The keening follows you until the knoll is out of sight, and a little after.
+}
+Bramblegate's roofs come up out of the dusk at last, with the smoke of every chimney going straight up into a still sky. Somebody is sitting on the mounting block by the north gate. #location:Bramblegate, north gate
 + [Walk the last of the way]
     -> lark_at_the_gate
 

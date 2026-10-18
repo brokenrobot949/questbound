@@ -228,4 +228,14 @@ export const migrations = {
     const undo = game.undo && game.undo.state ? { ...game.undo, state: upgrade(game.undo.state) } : game.undo;
     return { ...save, version: 18, game: { ...upgrade(game), undo } };
   },
+
+  // Version 19 adds the hero's lowered Hit Point maximum (a Specter's Life Drain, until the next
+  // Long Rest). Nothing had lowered one before it. (A companion's is on their place in the
+  // party, where a missing one means none, so the party needs nothing.) The undo point's copy
+  // of the game gets the same.
+  18: (save) => {
+    const { game } = save;
+    const undo = game.undo && game.undo.state ? { ...game.undo, state: { ...game.undo.state, hpMaxDrop: 0 } } : game.undo;
+    return { ...save, version: 19, game: { ...game, hpMaxDrop: 0, undo } };
+  },
 };

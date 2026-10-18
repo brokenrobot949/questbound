@@ -17,7 +17,9 @@
 //                  story/journal.js), money (in copper) and inventory (see
 //                  character/inventory.js), hp, slotsUsed, featureUses and xp (see
 //                  character/resources.js), tempHp and activeSpells (Temporary Hit Points
-//                  and spells on the hero; see character/spell-effects.js), battle (a fight
+//                  and spells on the hero; see character/spell-effects.js), hpMaxDrop (how far
+//                  the hero's Hit Point maximum is lowered until a Long Rest; see
+//                  character/resources.js), battle (a fight
 //                  in progress, or null; see
 //                  combat/battle.js), lastBattle ({ encounterId, outcome } of the last fight,
 //                  with escaped and alliesAlive when it had any: see combat/battle.js),
@@ -45,7 +47,7 @@ import { validateCharacter } from '../character/validate.js';
 import { undoOk } from './undo.js';
 import { partyProblems } from '../character/party.js';
 
-export const SAVE_VERSION = 18;
+export const SAVE_VERSION = 19;
 
 // runtime: { story, game } — the compiled story, and whichever game is being played.
 
@@ -117,6 +119,7 @@ export function gameToSave(game, now = new Date()) {
       slotsUsed: game.slotsUsed,
       tempHp: game.tempHp,
       activeSpells: game.activeSpells,
+      hpMaxDrop: game.hpMaxDrop || 0,
       featureUses: game.featureUses,
       xp: game.xp,
       battle: game.battle,
@@ -160,6 +163,7 @@ export function loadGame(runtime, record) {
     slotsUsed: save.game.slotsUsed,
     tempHp: save.game.tempHp,
     activeSpells: save.game.activeSpells,
+    hpMaxDrop: save.game.hpMaxDrop,
     featureUses: save.game.featureUses,
     xp: save.game.xp,
     battle: save.game.battle,

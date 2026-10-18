@@ -372,6 +372,7 @@ export function monsterAttackOptions(monster) {
       damage: { ...attack.damage, extraOnAdvantage: attack.advantageExtra || null },
       onHit: attack.onHit || null,
       attach: attack.attach || null, // clings on when it hits (a Stirge's Proboscis)
+      drainsMax: Boolean(attack.drainsMax), // lowers the Hit Point maximum (a Specter's Life Drain)
       alone: Boolean(attack.alone), // not part of its Multiattack: an action of its own
     };
     if (attack.kind === 'melee' || attack.kind === 'melee-or-ranged') {

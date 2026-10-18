@@ -25,9 +25,14 @@
 //                   at the start of each of its turns the one it clings to takes that damage. It
 //                   goes along when they move. It lets go if they drop to 0 Hit Points, or it
 //                   can't act; they, or anyone of their side beside them, can pull it off with
-//                   an action (combat/battle.js, "Clinging on") }
+//                   an action (combat/battle.js, "Clinging on"),
+//                   drainsMax: true for an attack whose damage also lowers the target's Hit
+//                   Point maximum by as much, until they finish a Long Rest (a Specter's Life
+//                   Drain; combat/battle.js, "Life Drain") }
 //   traits          rules the game plays, e.g. 'pack-tactics' (Advantage on attacks against a
-//                   creature with one of its allies, not Incapacitated, within 5 feet of it)
+//                   creature with one of its allies, not Incapacitated, within 5 feet of it),
+//                   'incorporeal-movement' (it moves through creatures, walls and obstacles as
+//                   if they were Difficult Terrain, though it never ends its move inside one)
 //   multiattack     how many attacks it makes with its action (1 if not given)
 //   reactions       e.g. 'redirect-attack' (when attacked, swap places with a Small or Medium
 //                   ally within 5 feet, who becomes the target instead), 'parry' (when a melee
@@ -221,7 +226,7 @@ export const monsters = [
     ],
     behaviour: 'brute',
     sprite: 'wight',
-    variant: 'Life Drain (in place of one attack: a DC 13 Constitution save or 1d8 + 2 Necrotic damage, and the Hit Point maximum drops by as much) isn’t played yet: the game has no way to lower a Hit Point maximum. Sunlight Sensitivity doesn’t come up under the barrow.',
+    variant: 'Life Drain (in place of one attack: a DC 13 Constitution save or 1d8 + 2 Necrotic damage, and the Hit Point maximum drops by as much) isn’t played yet: the game can lower a Hit Point maximum now (the Specter’s Life Drain, combat/battle.js), but it’s left out here so the chantry’s tested balance doesn’t move (Rob, Oct 18, 2026). Sunlight Sensitivity doesn’t come up under the barrow.',
     text: 'Multiattack. The wight makes two attacks, using Necrotic Sword or Necrotic Bow in any combination. Necrotic Sword. Melee Attack Roll: +4, reach 5 ft. Hit: 6 (1d8 + 2) Slashing damage plus 4 (1d8) Necrotic damage. Necrotic Bow. Ranged Attack Roll: +4, range 150/600 ft. Hit: 6 (1d8 + 2) Piercing damage plus 4 (1d8) Necrotic damage.',
     source: 'SRD 5.2.1',
   },
@@ -577,6 +582,38 @@ export const monsters = [
     behaviour: 'skirmisher',
     sprite: 'scout',
     text: 'Multiattack. The scout makes two attacks, using Shortsword and Longbow in any combination. Shortsword. Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage. Longbow. Ranged Attack Roll: +4, range 150/600 ft. Hit: 6 (1d8 + 2) Piercing damage.',
+    source: 'SRD 5.2.1',
+  },
+  // The Barrow-Wives (Chapter 3's side quest): three of the first queen's sworn, risen in their
+  // opened barrows on the Three Wives, a knoll above the barrow road.
+  // Life Drain (drainsMax): the Hit Point maximum drops by the damage taken, until a Long Rest
+  // (combat/battle.js, "Life Drain"). 'incorporeal-movement': it moves through creatures and
+  // walls as if they were Difficult Terrain (combat/grid.js).
+  {
+    id: 'specter',
+    name: 'Specter',
+    size: 'medium',
+    type: 'Undead',
+    ac: 12,
+    hp: { average: 22, dice: '5d8' },
+    speed: 30,
+    fly: 50, // it hovers
+    abilities: { strength: 1, dexterity: 14, constitution: 11, intelligence: 10, wisdom: 10, charisma: 11 },
+    saves: { strength: -5, dexterity: 2, constitution: 0, intelligence: 0, wisdom: 0, charisma: 0 },
+    initiative: 2,
+    resistances: ['acid', 'bludgeoning', 'cold', 'fire', 'lightning', 'piercing', 'slashing', 'thunder'],
+    immunities: ['necrotic', 'poison'],
+    conditionImmunities: ['charmed', 'exhaustion', 'grappled', 'paralyzed', 'petrified', 'poisoned', 'prone', 'restrained', 'unconscious'],
+    darkvision: 60,
+    passivePerception: 10,
+    cr: '1',
+    xp: 200,
+    traits: ['incorporeal-movement'],
+    attacks: [{ id: 'life-drain', name: 'Life Drain', kind: 'melee', bonus: 4, reach: 5, damage: { dice: '2d6', bonus: 0, type: 'necrotic' }, drainsMax: true }],
+    behaviour: 'brute',
+    sprite: 'specter',
+    variant: 'It never chooses to end its move inside a wall or an obstacle, so the 1d10 Force damage for ending a turn inside one doesn’t come up. Sunlight Sensitivity doesn’t come up either: the Barrow-Wives are fought in the dark of their barrows.',
+    text: 'Incorporeal Movement. The specter can move through other creatures and objects as if they were Difficult Terrain. It takes 5 (1d10) Force damage if it ends its turn inside an object. Sunlight Sensitivity. While in sunlight, the specter has Disadvantage on ability checks and attack rolls. Life Drain. Melee Attack Roll: +4, reach 5 ft. Hit: 7 (2d6) Necrotic damage. If the target is a creature, its Hit Point maximum decreases by an amount equal to the damage taken.',
     source: 'SRD 5.2.1',
   },
 ];

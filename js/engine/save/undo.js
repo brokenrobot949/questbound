@@ -28,6 +28,7 @@ export const PLAY_FIELDS = [
   'slotsUsed',
   'tempHp',
   'activeSpells',
+  'hpMaxDrop',
   'featureUses',
   'xp',
   'battle',

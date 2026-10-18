@@ -6,6 +6,8 @@
 //     id                       a companion from data/campaign/companions.js
 //     hp, tempHp, slotsUsed, featureUses, activeSpells
 //                              what they've spent, as for the hero (character/resources.js)
+//     hpMaxDrop                how far their Hit Point maximum is lowered until a Long Rest
+//                              (Life Drain), as the hero's; missing means 0
 //     inventory                their pack ([{ id, quantity }]): their starting kit
 //     tactic                   how they fight: 'aggressive', 'defensive', 'support' or 'hold'
 //     approval                 how much they like the hero's choices: 0 to start, up or down
@@ -18,7 +20,7 @@
 
 import { approvalBands, companions, tactics } from '../../../data/campaign/companions.js';
 import { startingInventory } from './inventory.js';
-import { maxHp } from './resources.js';
+import { hpMaxDropOf, maxHp } from './resources.js';
 import { findClass } from './sheet.js';
 
 // Up to two companions travel with the hero.
@@ -77,10 +79,10 @@ export function memberGame(game, member) {
   });
 }
 
-// A companion's Hit Point maximum now (with Aid, while it lasts).
+// A companion's Hit Point maximum now (with Aid, while it lasts, less any Life Drain).
 export function memberMaxHp(game, member) {
   const bonus = (member.activeSpells || []).reduce((sum, s) => sum + (s.hpBonus || 0), 0);
-  return maxHp(companionCharacter(member.id, game.character.level)) + bonus;
+  return Math.max(0, maxHp(companionCharacter(member.id, game.character.level)) + bonus - hpMaxDropOf(member));
 }
 
 // A companion joins: full Hit Points, nothing spent, their starting kit, approval 0.
@@ -142,6 +144,7 @@ export function partyLongRest(game) {
     member.featureUses = {};
     member.tempHp = 0;
     member.activeSpells = [];
+    member.hpMaxDrop = 0;
     member.hp = memberMaxHp(game, member);
   }
 }
@@ -157,6 +160,7 @@ export function raiseMember(game, id) {
   member.featureUses = {};
   member.tempHp = 0;
   member.activeSpells = [];
+  member.hpMaxDrop = 0;
   member.hp = memberMaxHp(game, member);
   return true;
 }
@@ -187,7 +191,8 @@ export function partyProblems(party) {
       Array.isArray(m.inventory) &&
       findTactic(m.tactic) &&
       Number.isInteger(m.approval) &&
-      typeof m.fallen === 'boolean',
+      typeof m.fallen === 'boolean' &&
+      (m.hpMaxDrop === undefined || (Number.isInteger(m.hpMaxDrop) && m.hpMaxDrop >= 0)),
   );
   const ids = party.map((m) => m && m.id);
   return ok && new Set(ids).size === ids.length && party.length <= PARTY_LIMIT ? [] : ['the party'];

@@ -47,6 +47,7 @@ export const sprites = {
   gnoll: { sheet: 'humanoid', col: 0, row: 21 }, // a hunched brown beast-man with a muzzle
   'giant-hyena': { sheet: 'dog', col: 1, row: 2 }, // a big spotted brown dog
   scout: { sheet: 'player', col: 2, row: 7 }, // a woodsman in green
+  specter: { sheet: 'undead', col: 0, row: 6, alpha: 0.8 }, // a grey hooded shape, thin as smoke, trailing wisps
 };
 
 // Floor tiles and things that stand on them. alpha (0 to 1) draws a picture faded, and

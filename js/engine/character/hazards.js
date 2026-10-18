@@ -4,7 +4,8 @@
 
 import { d20Test } from '../rules/d20-test.js';
 import { rollDice } from '../rules/dice.js';
-import { findAbility, resistances, savingThrow } from './sheet.js';
+import { findAbility, resistances, savingThrow, wornSaveBonus } from './sheet.js';
+import { wornItems } from './inventory.js';
 import { heroMaxHp } from './resources.js';
 import { soakDamage } from './spell-effects.js';
 import { traps } from '../../../data/srd/traps.js';
@@ -27,7 +28,7 @@ export function trapDamageDice(trap, level) {
 // onHits(hits) runs before the damage, and onDamage and onDying as for takeDamage.
 export function springTrap(game, trap, { onHits = () => {}, onDamage, onDying } = {}) {
   const ability = findAbility(trap.save.ability);
-  const modifiers = savingThrow(game.character, ability.id).parts.map((p) => ({ ...p, source: `${ability.name} saving throw` }));
+  const modifiers = savingThrow(game.character, ability.id, wornItems(game)).parts.map((p) => ({ ...p, source: `${ability.name} saving throw` }));
   const save = d20Test({ rng: game.rng, kind: 'save', label: `${trap.name} (${ability.name} save)`, modifiers, target: { type: 'DC', value: trap.save.dc } });
   game.pending.push({ type: 'roll', result: save });
   if (save.success) return { save, hits: 0, outcome: 'safe' };
@@ -73,7 +74,7 @@ function dyingAlone(game) {
   let successes = 0;
   let failures = 0;
   while (successes < 3 && failures < 3) {
-    const roll = d20Test({ rng: game.rng, kind: 'save', label: 'Death saving throw', target: { type: 'DC', value: 10 } });
+    const roll = d20Test({ rng: game.rng, kind: 'save', label: 'Death saving throw', modifiers: wornSaveBonus(wornItems(game)), target: { type: 'DC', value: 10 } });
     game.pending.push({ type: 'roll', result: roll });
     if (roll.natural === 20) {
       game.hp = 1;

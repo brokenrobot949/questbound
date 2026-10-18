@@ -21,6 +21,7 @@ import {
   resistances,
   savingThrow,
   skillBonus,
+  wornSaveBonus,
   speed,
   spellcasting,
 } from '../js/engine/character/sheet.js';
@@ -34,7 +35,7 @@ import { pointBuy, standardArray } from '../data/srd/character-creation.js';
 import { quickStartHeroes } from '../data/campaign/quick-start.js';
 import { nameTables } from '../data/campaign/names.js';
 import * as creation from '../js/engine/character/creation.js';
-import { buyItem, costInCopper, moneyText, startingInventory } from '../js/engine/character/inventory.js';
+import { addItem, buyItem, costInCopper, findItem, inventoryProblems, moneyText, startingInventory, wornItems } from '../js/engine/character/inventory.js';
 import { canCastSpell, findSpell, magicInitiateLists, spellGroups, spellNumbers, spellsOnList } from '../js/engine/character/spells.js';
 import { spells } from '../data/srd/spells.js';
 import { defaultLook, heroSprite, lookProblems, rollLook } from '../js/engine/character/look.js';
@@ -997,6 +998,35 @@ test('Heroic Inspiration: a reroll changes only that d20 test’s kept die, and 
   assertEqual([first.dice, third.dice], [plain[0].dice, plain[2].dice], 'the other dice fall just as they did');
   assertEqual([second.rerolled.from, second.rerolled.to, second.dice.includes(17), second.natural], [plain[1].natural, 17, true, Math.max(...second.dice)]);
   assertTrue(rollLine(second).includes(`${plain[1].natural} → 17`) && rollLine(second).includes('Heroic Inspiration'), rollLine(second));
+});
+
+// ---- Wondrous Items: the Cloak of Protection (SRD 5.2.1) ----
+
+test('Cloak of Protection: an uncommon Wondrous Item, not for sale; carried, it’s worn (attuned at once)', () => {
+  const cloak = findItem('cloak-of-protection');
+  assertEqual([cloak.name, cloak.category, cloak.rarity, cloak.attunement, cloak.cost, cloak.worn], ['Cloak of Protection', 'wondrous', 'uncommon', true, null, { ac: 1, saves: 1 }]);
+  assertEqual(cloak.source, 'SRD 5.2.1');
+  const game = { inventory: [], money: 0 };
+  assertEqual(wornItems(game), []);
+  addItem(game.inventory, 'cloak-of-protection');
+  assertEqual(wornItems(game).map((i) => i.id), ['cloak-of-protection']);
+  assertEqual(inventoryProblems(0, game.inventory), [], 'a save can hold it');
+  assertEqual(wornItems({ inventory: [{ id: 'cloak-of-protection', quantity: 0 }] }), [], 'not if it’s gone');
+});
+
+test('Cloak of Protection: +1 to Armor Class and to every saving throw, each shown in the maths', () => {
+  const hero = makeHero();
+  const cloak = [findItem('cloak-of-protection')];
+  const ac = armorClass(hero, [], cloak);
+  assertEqual(ac.value, armorClass(hero).value + 1);
+  assertTrue(ac.parts.some((p) => p.label === 'Cloak of Protection' && p.value === 1), JSON.stringify(ac.parts));
+  for (const ability of ['strength', 'wisdom']) {
+    const save = savingThrow(hero, ability, cloak);
+    assertEqual(save.value, savingThrow(hero, ability).value + 1, ability);
+    assertTrue(save.parts.some((p) => p.label === 'Cloak of Protection' && p.value === 1));
+  }
+  assertEqual(wornSaveBonus(cloak), [{ label: 'Cloak of Protection', value: 1, source: 'Cloak of Protection (worn)' }], 'for death saves too');
+  assertEqual(wornSaveBonus([]), []);
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

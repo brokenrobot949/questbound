@@ -493,7 +493,7 @@ test('The last morning: Act I’s missed side quests wait in Bramblegate before 
   assertEqual(cards(game), ['Go out into Bramblegate, one last time']);
   assertTrue(!has(game, 'act_1_complete'), 'not over yet');
   pick(game, 'Go out into Bramblegate');
-  const all = ['Ask Morwen whether her cats ever came home', "Read Warden Pike's notice about the wolves on the north road", 'Ask Hob why he keeps looking up the barrow road', "Call in at Hob's forge", 'Ride south with the shard'];
+  const all = ['Ask Morwen whether her cats ever came home', "Read Warden Pike's notice about the wolves on the north road", 'Ask Hob why he keeps looking up the barrow road', "Read Warden Pike's new notice: KEEP OFF THE THREE WIVES AFTER DARK", "Call in at Hob's forge", 'Ride south with the shard'];
   assertEqual(cards(game), all);
   pick(game, 'Ask Morwen');
   assertTrue(pageText(game.page).includes('A fortnight'), 'the cats have been gone a while now');
@@ -501,6 +501,7 @@ test('The last morning: Act I’s missed side quests wait in Bramblegate before 
   settleFight(game, 'Fight them');
   pick(game, 'Coax them down');
   assertEqual(cards(game), all.filter((t) => !t.startsWith('Ask Morwen')), 'back to the last morning, the cats done');
+  assertTrue(pageText(game.page).includes('The square is still busy') && !pageText(game.page).includes('Marchbank has letters'), 'back in the square, without the morning’s opening again');
   pick(game, "Call in at Hob's forge");
   assertEqual(cards(game), ["Take Hob's bet: arm-wrestle his apprentice", "Look over Hob's blades", 'Back to the square']);
   pick(game, 'Back to the square');
@@ -546,6 +547,7 @@ async function atTheLastMorning(seed, { flags = [], companions = ['odda', 'fen']
 }
 
 const CHAPTER_1_DONE = ['cats_done', 'wolf_den_done', 'hobs_bet_done'];
+const CHAPTER_3_DONE = ['barrow_wives_done'];
 
 test('The Hanging Tree: Fen’s Choir letter-drop, the Precentor’s seal, the cipher read against the hymnal, the old court tongue; copied and put back', async () => {
   const game = await atTheRally('hanging-tree');
@@ -657,7 +659,7 @@ test('Hob’s ore: losing is Fate’s Mercy, and Dabbin gets the cart, the star-
 });
 
 test('The last morning: Fen’s hanging tree waits, and Dabbin is overdue in the Gorse Cut; home again, Hob works his star-iron into your weapon (+1)', async () => {
-  const game = await atTheLastMorning('last-morning-ch2', { flags: CHAPTER_1_DONE });
+  const game = await atTheLastMorning('last-morning-ch2', { flags: [...CHAPTER_1_DONE, ...CHAPTER_3_DONE] });
   assertEqual(cards(game), ['Walk out to the old hanging tree at the crossroads with Fen', 'Ask Hob why he keeps looking up the barrow road', "Call in at Hob's forge", 'Ride south with the shard']);
   pick(game, 'Ask Hob why');
   assertTrue(pageText(game.page).includes('three days back') && questStatus(game, 'hobs-ore') === 'active');
@@ -676,7 +678,7 @@ test('The last morning: Fen’s hanging tree waits, and Dabbin is overdue in the
 });
 
 test('The last morning: with the star-iron home from Chapter 2, Hob owes you; ride south and you call at his forge on the way', async () => {
-  const game = await atTheLastMorning('last-morning-owed', { flags: [...CHAPTER_1_DONE, 'hobs_ore_done'], companions: [] });
+  const game = await atTheLastMorning('last-morning-owed', { flags: [...CHAPTER_1_DONE, ...CHAPTER_3_DONE, 'hobs_ore_done'], companions: [] });
   assertTrue(pageText(game.page).includes("he's not having you leave without it") && !pageText(game.page).includes('loose ends'));
   assertEqual(cards(game), ["Call in at Hob's forge", "Call at Hob's forge for what he owes you, then ride south with the shard"], 'no hanging tree without Fen');
   pick(game, "Call in at Hob's forge");
@@ -687,6 +689,127 @@ test('The last morning: with the star-iron home from Chapter 2, Hob owes you; ri
   assertTrue(game.inventory.some((e) => e.id === 'flail-plus-1'));
   const heading = game.page.beats.find((b) => b.heading);
   assertEqual(heading && heading.text, 'End of Act I · The Barrow Dead');
+});
+
+// ---- Act I's side quests: Chapter 3 ----
+
+// The last morning of Act I, everything else done, having seen the Barrow-Wives on the walk
+// home (unless seen is false): Pike asks, and you go up to the Three Wives. With Odda and Fen
+// and the Shard of Names unless told otherwise. Stops at the ring of barrows.
+async function atTheThreeWives(seed, { flags = [], companions = ['odda', 'fen'], shard = true, seen = true } = {}) {
+  const others = [...CHAPTER_1_DONE, 'hanging_tree_done', 'hobs_ore_done', 'hob_reforged'];
+  const game = await atTheLastMorning(seed, { flags: [...others, ...(seen ? ['saw_the_barrow_wives'] : []), ...flags], companions });
+  if (shard) addItem(game.inventory, 'shard-of-names');
+  pick(game, seen ? 'Ask Warden Pike about the grey women' : "Read Warden Pike's new notice");
+  return game;
+}
+
+const RING = ['Go into the east barrow, where a bird is cut in the stone over the door', 'Go into the west barrow, the biggest of the three', 'Go into the north barrow, its mouth half-choked with heather'];
+const hasCloak = (game) => game.inventory.some((e) => e.id === 'cloak-of-protection');
+
+test('The Barrow-Wives: Pike asks; the shard finds Sunniva’s name, the oath you swore, Fen finds the locket, and the last to lie down gives you her cloak', async () => {
+  const game = await atTheThreeWives('wives-shard', { flags: ['swore_the_oath'] });
+  const opening = pageText(game.page);
+  assertTrue(['You saw them', 'white over one ear', "aren't in his budget", 'three barrows on its crown in a ring', 'Seals, I said once', 'I vote none of them'].every((s) => opening.includes(s)), opening);
+  assertEqual(questStatus(game, 'barrow-wives'), 'active');
+  assertEqual(cards(game), RING);
+  pick(game, 'Go into the east barrow');
+  assertTrue(pageText(game.page).includes('smooth as a thumbprint') && pageText(game.page).includes('Out of the world'));
+  assertEqual(cards(game), ['Hold up the shard, and ask it her name', 'Look at the bier for some sign of who she was', 'Ask Odda to say the old lists of the sworn, and watch the grey woman for the name that stills her', 'Draw steel before she reaches you']);
+  assertTrue(game.story.currentChoices[0].tags.includes('shard:names'), 'the card shows the shard');
+  const xp = game.xp;
+  pick(game, 'Hold up the shard');
+  assertTrue(has(game, 'named_sunniva') && has(game, 'east_wife_rested') && pageText(game.page).includes('SUNNIVA, WHO KEPT THE HERON FORD'));
+  assertEqual(game.xp - xp, 200, 'her XP, as for a fight avoided');
+  assertTrue(!hasCloak(game), 'not the last of them');
+  assertEqual(cards(game), RING.slice(1));
+  pick(game, 'Go into the west barrow');
+  assertEqual(cards(game), ["Raise your hand with hers, and say the oath you swore under the Kings' Barrow", 'Say the words of the oath with her, as the faith keeps them, with Odda a half-breath ahead of you', 'Draw steel before she can come at you']);
+  pick(game, 'Raise your hand with hers');
+  assertTrue(has(game, 'west_wife_rested') && pageText(game.page).includes('Hold the door'), 'no roll: you swore it under the Kings’ Barrow');
+  pick(game, 'Go into the north barrow');
+  const fen = memberOf(game, 'fen');
+  const odda = memberOf(game, 'odda');
+  const [fenWas, oddaWas, before] = [fen.approval, odda.approval, game.xp];
+  pick(game, 'Ask Fen to look');
+  const end = pageText(game.page);
+  assertTrue(['COME HOME', 'a grey hand comes back out of the dark', 'Name, oath and memory', 'strangest morning of my life'].every((s) => end.includes(s)), end);
+  assertTrue(has(game, 'north_wife_rested') && has(game, 'given_the_grey_cloak') && hasCloak(game) && has(game, 'barrow_wives_done'));
+  assertEqual([fen.approval - fenWas, odda.approval - oddaWas, game.xp - before], [1, 1, 250], 'Fen finds things; Odda’s glad; 200 for her and 50 for the quest');
+  assertEqual(questStatus(game, 'barrow-wives'), 'done');
+  assertTrue(game.journal.deeds.some((d) => d.text.includes('their name, their oath and their memory')));
+  assertTrue(!cards(game).some((t) => t.includes('Three Wives')), 'back to the last morning, and done');
+});
+
+test('The Barrow-Wives: Pike’s notice, for a save that never saw them; a wrong name is a fight; swear the oath now; drawing steel first; the cloak left folded in the ring', async () => {
+  const game = await atTheThreeWives('wives-steel', { seen: false, shard: false });
+  assertTrue(pageText(game.page).includes('nailing up a fresh notice'));
+  pick(game, 'Go into the east barrow');
+  assertEqual(cards(game), ['Look at the bier for some sign of who she was', 'Ask Odda to say the old lists of the sworn, and watch the grey woman for the name that stills her', 'Draw steel before she reaches you'], 'no shard, no shard card');
+  forceNextD20(1);
+  pick(game, 'Look at the bier');
+  assertTrue(pageText(game.page).includes('tearing silk'));
+  assertEqual(cards(game), ['Fight']);
+  settleFight(game, 'Fight');
+  assertTrue(has(game, 'east_wife_destroyed') && !has(game, 'east_wife_rested') && pageText(game.page).includes("I'd have liked to know that"));
+  pick(game, 'Go into the west barrow');
+  assertTrue(cards(game).includes('Raise your hand with hers, and swear the oath of the sworn, and mean it'), 'you only said the words under the barrow');
+  pick(game, 'Raise your hand with hers, and swear');
+  assertTrue(has(game, 'swore_the_oath') && has(game, 'west_wife_rested') && !hasCloak(game));
+  pick(game, 'Go into the north barrow');
+  const odda = memberOf(game, 'odda');
+  const was = odda.approval;
+  settleFight(game, 'Draw steel');
+  const end = pageText(game.page);
+  assertTrue(['She was only asking', 'a grey cloak folded square', 'Some of them, at least'].every((s) => end.includes(s)), end);
+  assertEqual(odda.approval - was, -1, 'Odda minds');
+  assertTrue(has(game, 'north_wife_destroyed') && hasCloak(game) && has(game, 'barrow_wives_done'));
+});
+
+test('The Barrow-Wives: Odda’s lists and Insight; the oath in the old forms, with Odda; the locket not found, and losing is Fate’s Mercy', async () => {
+  const game = await atTheThreeWives('wives-mercy');
+  pick(game, 'Go into the east barrow');
+  forceNextD20(20);
+  pick(game, 'Ask Odda to say the old lists');
+  assertTrue(has(game, 'east_wife_rested') && !has(game, 'named_sunniva') && pageText(game.page).includes('Sunniva of the Heron Ford'));
+  pick(game, 'Go into the west barrow');
+  assertTrue(game.story.currentChoices.find((c) => c.text.startsWith('Say the words')).tags.includes('check:religion:10'), 'easier with Odda');
+  forceNextD20(20);
+  pick(game, 'Say the words');
+  assertTrue(has(game, 'west_wife_rested') && !has(game, 'swore_the_oath'), 'said, not sworn');
+  pick(game, 'Go into the north barrow');
+  forceNextD20(1);
+  pick(game, 'Go back out, and search the heather');
+  assertTrue(pageText(game.page).includes('a sheep\'s jaw'));
+  game.money = 500;
+  settleFight(game, 'Fight', { won: false });
+  const after = pageText(game.page);
+  assertTrue(["doesn't come one step further", 'nobody is going back in for it', 'can wait another day'].every((s) => after.includes(s)), after);
+  assertTrue(has(game, 'barrow_wives_fates_mercy') && has(game, 'barrow_wives_done') && !has(game, 'north_wife_destroyed') && !hasCloak(game));
+  assertEqual([game.money, questStatus(game, 'barrow-wives')], [0, 'done']);
+  assertTrue(!cards(game).some((t) => t.includes('Three Wives')), 'back to the last morning');
+});
+
+test('The Barrow-Wives: alone, with no shard, there are fewer ways in; Survival on the drag marks finds the locket', async () => {
+  const game = await atTheThreeWives('wives-alone', { companions: [], shard: false });
+  assertTrue(!pageText(game.page).includes('Seals, I said'));
+  pick(game, 'Go into the north barrow');
+  assertEqual(cards(game), ['Go back out, and search the heather by the barrow\'s mouth', 'Follow the drag marks the dead left, out through the heather', 'Draw steel, while she isn\'t looking']);
+  forceNextD20(20);
+  pick(game, 'Follow the drag marks');
+  assertTrue(has(game, 'north_wife_rested'));
+  pick(game, 'Go into the east barrow');
+  assertEqual(cards(game), ['Look at the bier for some sign of who she was', 'Draw steel before she reaches you']);
+  forceNextD20(20);
+  pick(game, 'Look at the bier');
+  assertTrue(has(game, 'east_wife_rested') && pageText(game.page).includes('Sunniva at the Heron Ford'));
+  pick(game, 'Go into the west barrow');
+  assertEqual(cards(game), ['Raise your hand with hers, and swear the oath of the sworn, and mean it', 'Say the words of the oath with her, as the faith keeps them', 'Draw steel before she can come at you']);
+  assertTrue(game.story.currentChoices[1].tags.includes('check:religion:13'), 'harder without Odda');
+  forceNextD20(20);
+  pick(game, 'Say the words');
+  assertTrue(has(game, 'west_wife_rested') && hasCloak(game) && pageText(game.page).includes('a grey hand comes back out of the dark'), 'the last to lie down');
+  assertTrue(has(game, 'barrow_wives_done') && !pageText(game.page).includes('Odda'));
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

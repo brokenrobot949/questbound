@@ -18,6 +18,8 @@ import { beginSession, endSession, recap, whatNow } from '../js/engine/story/ses
 import { quickStartHeroes } from '../data/campaign/quick-start.js';
 import { joinParty } from '../js/engine/character/party.js';
 import { startBattle } from '../js/engine/combat/battle.js';
+import { heroMaxHp, maxHp } from '../js/engine/character/resources.js';
+import { PLAY_FIELDS } from '../js/engine/save/undo.js';
 
 // Wren Ashdown, the Quick Start Fighter.
 const testHero = quickStartHeroes.find((h) => h.id === 'wren').character;
@@ -98,7 +100,7 @@ test('A save holds game state, Ink state, dice state, session count and last-pla
   const game = newGame(runtime, { slot: 2, seed: 'contents', character: testHero, now: new Date('2026-10-01T09:00:00Z') });
   const record = gameToSave(game, new Date('2026-10-06T12:00:00Z'));
   assertEqual(Object.keys(record).sort(), ['createdAt', 'game', 'ink', 'lastBackupSession', 'rng', 'savedAt', 'seed', 'sessionCount', 'slot', 'version']);
-  assertEqual(Object.keys(record.game).sort(), ['activeSpells', 'battle', 'canPrepare', 'character', 'day', 'dungeon', 'featureUses', 'flags', 'hp', 'inspiration', 'inventory', 'journal', 'lastBattle', 'levelUp', 'location', 'money', 'objective', 'page', 'party', 'rollLog', 'session', 'slotsUsed', 'tempHp', 'time', 'undo', 'xp']);
+  assertEqual(Object.keys(record.game).sort(), ['activeSpells', 'battle', 'canPrepare', 'character', 'day', 'dungeon', 'featureUses', 'flags', 'hp', 'hpMaxDrop', 'inspiration', 'inventory', 'journal', 'lastBattle', 'levelUp', 'location', 'money', 'objective', 'page', 'party', 'rollLog', 'session', 'slotsUsed', 'tempHp', 'time', 'undo', 'xp']);
   assertEqual([record.version, record.slot, record.sessionCount, record.lastBackupSession], [SAVE_VERSION, 2, 1, 0]);
   assertEqual([record.createdAt, record.savedAt], ['2026-10-01T09:00:00.000Z', '2026-10-06T12:00:00.000Z']);
   assertTrue(record.rng.length === 4 && record.rng.every(Number.isInteger), 'dice state should be four whole numbers');
@@ -661,6 +663,32 @@ test('Migration: a version 17 hero has taken no feats at levels yet, a level-up 
   assertEqual(migrateSave({ version: 17, slot: 1, game: { character: hero, levelUp: null, undo: null } }, migrations, 18).game.levelUp, null, 'no level-up, nothing to add');
 });
 
+test('Migration: a version 18 hero’s Hit Point maximum has never been lowered, and it becomes version 19', () => {
+  const party = [{ id: 'odda', hp: 9 }];
+  const v18 = { version: 18, slot: 1, game: { hp: 7, party, undo: { kind: 'choice', state: { hp: 8 } } } };
+  const save = migrateSave(v18, migrations, 19);
+  assertEqual([save.version, save.game.hpMaxDrop, save.game.undo.state.hpMaxDrop, save.game.party], [19, 0, 0, party], 'a companion’s missing one means none');
+  assertEqual(migrateSave({ version: 18, slot: 1, game: { undo: null } }, migrations, 19).game.undo, null);
+});
+
+test('Saves: a Hit Point maximum lowered by Life Drain is saved, kept by an undo point, and checked', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'drained', character: testHero });
+  assertEqual(game.hpMaxDrop, 0, 'a new hero');
+  game.hpMaxDrop = 4;
+  game.hp = Math.min(game.hp, heroMaxHp(game));
+  const record = throughJson(gameToSave(game));
+  assertEqual(record.game.hpMaxDrop, 4);
+  const loaded = loadGame(await freshRuntime(), throughJson(record));
+  assertEqual([loaded.hpMaxDrop, heroMaxHp(loaded)], [4, maxHp(testHero) - 4]);
+  assertTrue(PLAY_FIELDS.includes('hpMaxDrop'), 'an undo point keeps it');
+  const bad = throughJson(record);
+  bad.game.hpMaxDrop = -1;
+  assertThrows(() => validateSave(bad), 'lowered Hit Point maximum');
+  const badParty = throughJson(record);
+  badParty.game.party = [{ id: 'odda', hp: 5, tempHp: 0, slotsUsed: [], featureUses: {}, activeSpells: [], inventory: [], tactic: 'support', approval: 0, fallen: false, hpMaxDrop: 'lots' }];
+  assertThrows(() => validateSave(badParty), 'the party');
+});
+
 test('Old ends: a save made where the story used to stop “for now” carries on where the story goes today', async () => {
   const game = newGame(await freshRuntime(), { slot: 1, seed: 'old-end', character: testHero });
   game.page = jumpTo(game, 'act1_end'); // where the story stops today
@@ -774,7 +802,7 @@ test('Old ends: a save that stopped at the End of Act I card, the morning after 
   const record = throughJson(gameToSave(game));
   record.game.page.scene = 'ch3_night'; // as if it had stopped the morning after the feast
   const loaded = loadGame(await freshRuntime(), throughJson(record));
-  assertEqual(loaded.story.currentChoices.map((c) => c.text), ['Ask Morwen whether her cats ever came home', "Read Warden Pike's notice about the wolves on the north road", 'Ask Hob why he keeps looking up the barrow road', "Call in at Hob's forge", 'Ride south with the shard']);
+  assertEqual(loaded.story.currentChoices.map((c) => c.text), ['Ask Morwen whether her cats ever came home', "Read Warden Pike's notice about the wolves on the north road", 'Ask Hob why he keeps looking up the barrow road', "Read Warden Pike's new notice: KEEP OFF THE THREE WIVES AFTER DARK", "Call in at Hob's forge", 'Ride south with the shard']);
   assertEqual(loaded.page.beats.slice(0, record.game.page.beats.length), record.game.page.beats, 'the End of Act I page stays on screen above it');
 });
 

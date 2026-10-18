@@ -326,13 +326,22 @@ export function skillBonus(character, skillId) {
 // The bonus to a check with a tool, e.g. Thieves' Tools: its ability, plus Proficiency.
 export const toolBonus = skillBonus;
 
-export function savingThrow(character, abilityId) {
+// worn: the magic items the hero wears (character/inventory.js, wornItems): a Cloak of
+// Protection adds to every saving throw, here and in armorClass().
+export function savingThrow(character, abilityId, worn = []) {
   const ability = findAbility(abilityId);
   const parts = [{ label: ability.abbreviation, value: abilityModifierOf(character, abilityId) }];
   if (classOf(character).savingThrows.includes(abilityId)) {
     parts.push({ label: `Proficiency (${classOf(character).name})`, value: proficiencyBonus(character.level) });
   }
+  parts.push(...wornSaveBonus(worn));
   return derived(parts);
+}
+
+// What worn magic items add to every saving throw, death saves included (a Cloak of
+// Protection's +1), as modifiers: [{ label, value, source }].
+export function wornSaveBonus(worn = []) {
+  return worn.filter((item) => item.worn && item.worn.saves).map((item) => ({ label: item.name, value: item.worn.saves, source: `${item.name} (worn)` }));
 }
 
 // 10 plus the Wisdom (Perception) check modifier.
@@ -382,27 +391,29 @@ export function hitDice(character) {
 }
 
 // spellsOn: ids of spells on the hero right now (see character/spell-effects.js), for
-// Mage Armor here and Longstrider in speed().
-export function armorClass(character, spellsOn = []) {
-  const worn = character.armorId ? findArmor(character.armorId) : null;
-  if (character.armorId && !worn) throw new Error(`Unknown armor: ${character.armorId}`);
+// Mage Armor here and Longstrider in speed(). worn: the magic items they wear (a Cloak of
+// Protection's +1; see savingThrow).
+export function armorClass(character, spellsOn = [], worn = []) {
+  const armour = character.armorId ? findArmor(character.armorId) : null;
+  if (character.armorId && !armour) throw new Error(`Unknown armor: ${character.armorId}`);
   const dex = abilityModifierOf(character, 'dexterity');
   const parts = [];
-  if (worn) {
-    parts.push({ label: worn.name, value: worn.baseAc });
-    const counted = worn.dexCap === null ? dex : Math.min(dex, worn.dexCap);
-    if (worn.dexCap !== 0) parts.push({ label: worn.dexCap === null ? 'Dex' : `Dex (max +${worn.dexCap})`, value: counted });
+  if (armour) {
+    parts.push({ label: armour.name, value: armour.baseAc });
+    const counted = armour.dexCap === null ? dex : Math.min(dex, armour.dexCap);
+    if (armour.dexCap !== 0) parts.push({ label: armour.dexCap === null ? 'Dex' : `Dex (max +${armour.dexCap})`, value: counted });
   } else if (spellsOn.includes('mage-armor')) {
     parts.push({ label: 'Mage Armor', value: spellCombat('mage-armor').baseAc }, { label: 'Dex', value: dex });
   } else {
     parts.push({ label: 'Unarmored', value: unarmoredBaseAc }, { label: 'Dex', value: dex });
   }
   if (character.shield) parts.push({ label: shield.name, value: shield.acBonus });
-  if (worn) {
+  if (armour) {
     for (const { feat } of characterFeats(character)) {
       if (feat.armoredAcBonus) parts.push({ label: feat.name, value: feat.armoredAcBonus });
     }
   }
+  for (const item of worn) if (item.worn && item.worn.ac) parts.push({ label: item.name, value: item.worn.ac });
   return derived(parts);
 }
 
