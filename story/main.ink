@@ -25,6 +25,8 @@ INCLUDE act-1/act1-last-morning.ink
 INCLUDE act-1/ch1-too-many-cats.ink
 INCLUDE act-1/ch1-wolf-den.ink
 INCLUDE act-1/ch1-hobs-bet.ink
+INCLUDE act-1/ch2-hanging-tree.ink
+INCLUDE act-1/ch2-hobs-ore.ink
 INCLUDE common/hobs-forge.ink
 
 // Where play begins: Chapter 1, on the road to Bramblegate.

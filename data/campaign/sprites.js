@@ -10,6 +10,7 @@ export const sheets = {
   humanoid: ['assets/dawnlike/Characters/Humanoid0.png', 'assets/dawnlike/Characters/Humanoid1.png'],
   pest: ['assets/dawnlike/Characters/Pest0.png', 'assets/dawnlike/Characters/Pest1.png'],
   cat: ['assets/dawnlike/Characters/Cat0.png', 'assets/dawnlike/Characters/Cat1.png'],
+  quadraped: ['assets/dawnlike/Characters/Quadraped0.png', 'assets/dawnlike/Characters/Quadraped1.png'],
   floor: ['assets/dawnlike/Objects/Floor.png'],
   wall: ['assets/dawnlike/Objects/Wall.png'],
   decor: ['assets/dawnlike/Objects/Decor0.png'],
@@ -43,6 +44,9 @@ export const sprites = {
   wight: { sheet: 'undead', col: 1, row: 2 }, // a skeletal knight in blue and gold
   cantor: { sheet: 'humanoid', col: 2, row: 7 }, // Cantor Vesk: a heavy hooded figure in grey
   stirge: { sheet: 'pest', col: 5, row: 1 }, // a little red bloodsucker with blue wings and a long nose
+  gnoll: { sheet: 'humanoid', col: 0, row: 21 }, // a hunched brown beast-man with a muzzle
+  'giant-hyena': { sheet: 'dog', col: 1, row: 2 }, // a big spotted brown dog
+  scout: { sheet: 'player', col: 2, row: 7 }, // a woodsman in green
 };
 
 // Floor tiles and things that stand on them. alpha (0 to 1) draws a picture faded, and
@@ -110,6 +114,9 @@ export const tiles = {
   'ginger-cat': { sheet: 'cat', col: 0, row: 1 },
   'black-cat': { sheet: 'cat', col: 2, row: 0 },
   'white-cat': { sheet: 'cat', col: 0, row: 2 },
+  // Dabbin's cart on the barrow road (Hob's ore): its pony, Parsnip, in the shafts. The cart
+  // itself is drawn as its load: crates, sacks and a barrel.
+  pony: { sheet: 'quadraped', col: 0, row: 4 },
 };
 
 // Walls join up with their neighbours. Each wall style is a block of tiles in DawnLike's

@@ -45,6 +45,7 @@ export const dmNotes = {
   itemGained: 'You now have: {item}.',
   itemBought: 'Bought: {item}, for {cost}.',
   itemGone: 'Gone from your pack: {item}.',
+  weaponMadeMagic: 'Your {weapon} is now a {item}: a magic weapon, +{bonus} to its attack rolls and damage rolls.',
   xpGained: 'You gain {xp} XP.',
   xpMilestone: 'A milestone: your XP rises to {xp}, enough for level {level}.',
   coinsLost: 'Your purse is gone.',

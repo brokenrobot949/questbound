@@ -27,7 +27,11 @@
 
 // The Old Ford held: up from Bramblegate in a day.
 = back_north
-A carter taking stores up to the Old Ford lets you ride on his sacks, and by noon you're across the river and walking. #location:The barrow road #time:Midday
+{ has_flag("hobs_ore_taken"):
+    You leave Dabbin at the Old Ford with his crate of star-iron, and cross the river on foot. #location:The barrow road #time:Midday
+- else:
+    A carter taking stores up to the Old Ford lets you ride on his sacks, and by noon you're across the river and walking. #location:The barrow road #time:Midday
+}
 { has_flag("varrow_rallied"):
     Behind you on the road, Captain Varrow's watch comes marching north in a long file, spears on their shoulders. Varrow lifts a hand to you, once, and that's all.
 }
@@ -135,6 +139,9 @@ She turns her cup in her hands. "Don't tell the Prior the Flame felt warm. He'll
 "Nobody sees her face. She sings from behind a screen of grey gauze, and when she stops, the whole Choir holds its breath till she starts again. Vesk would die for her.{has_flag("rhosyn_dead"): Rhosyn did, in a way.| So would Rhosyn.}" #speaker:fen
 "I stood close enough once to see her hands. Younger than you'd think. Rings on every finger, and one of them a signet with a crown cut in it." He shrugs. "Odd thing for a hymn-singer to wear." #speaker:fen
 ~ set_flag("heard_of_precentor_signet")
+{ has_flag("saw_precentor_seal"):
+    You think of the grey wax on the letter in the hanging tree, and the crown cut deep into it.
+}
 -> fen_feels
 
 // How Fen feels about the hero shows at the end of his first talk.
@@ -158,6 +165,9 @@ He's quiet a moment. "I didn't care for it. I mean not to do it again for a good
 ~ set_flag("fen_told_of_ledger")
 { companion_alive("odda"):
     Fen waits until Odda is snoring, a sound like a small, contented bear.
+}
+{ has_flag("fen_dodged_the_book"):
+    "That book in the letter at the hanging tree. I told you I'd never read one. I lied." #speaker:fen
 }
 "I didn't just walk out of the Choir," he says, very low. "I took something with me. The Precentor's ledger: who pays them, who they've bought, and what they bought them with. Every name." #speaker:fen
 "They think I burned it. I didn't. It's sewn into the lining of a coat, somewhere I'm not telling even you." He grins, a little sickly, in the firelight. "That's why it's double for dead. They want me quiet. Some of the names in that book wear chains of office." #speaker:fen

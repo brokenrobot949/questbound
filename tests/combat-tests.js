@@ -7,7 +7,7 @@ import { forceNextD20 } from '../js/engine/rules/dice.js';
 import { isStandable, lineBlock, parseMap, reachableSquares, squaresBetween, key } from '../js/engine/combat/grid.js';
 import { heroAttackOptions, hitChance, rollDamage } from '../js/engine/combat/attacks.js';
 import * as fight from '../js/engine/combat/battle.js';
-import { startingInventory } from '../js/engine/character/inventory.js';
+import { findItem, inventoryProblems, makeMagicWeapon, plainWeapons, startingInventory } from '../js/engine/character/inventory.js';
 import { freshResources } from '../js/engine/character/resources.js';
 import { monsters } from '../data/srd/monsters.js';
 import { quickStartHeroes } from '../data/campaign/quick-start.js';
@@ -109,6 +109,28 @@ test('Attacks: a Shield rules out two-handed weapons; arrows are needed for a bo
   const noArrows = gameFor(wren);
   noArrows.inventory = noArrows.inventory.filter((e) => e.id !== 'arrow');
   assertTrue(!heroAttackOptions(noArrows).some((o) => o.id === 'shortbow-ranged'));
+});
+
+test('Magic weapons: a Greatsword +1 adds 1 to its attack rolls and damage rolls, and keeps its Weapon Mastery', () => {
+  const item = findItem('greatsword-plus-1');
+  assertEqual([item.name, item.category, item.baseId, item.magicBonus, item.rarity, item.damage.dice, item.cost], ['Greatsword +1', 'weapon', 'greatsword', 1, 'uncommon', '2d6', null]);
+  assertEqual([findItem('greatsword-plus-4'), findItem('banana-plus-1'), findItem('rope-plus-1')], [null, null, null], 'only +1 to +3, and only weapons');
+  const game = gameFor(wren);
+  const plain = heroAttackOptions(game).find((o) => o.id === 'greatsword-melee');
+  assertEqual(makeMagicWeapon(game, 'greatsword').name, 'Greatsword +1');
+  assertTrue(!game.inventory.some((e) => e.id === 'greatsword') && game.inventory.some((e) => e.id === 'greatsword-plus-1'));
+  const magic = heroAttackOptions(game).find((o) => o.id === 'greatsword-plus-1-melee');
+  const total = (o) => o.modifiers.reduce((s, m) => s + m.value, 0);
+  assertEqual([total(magic) - total(plain), magic.damage.bonus - plain.damage.bonus, magic.damage.dice], [1, 1, '2d6']);
+  assertEqual(magic.modifiers.find((m) => m.label === 'Magic').source, 'Greatsword +1 (a magic weapon)');
+  assertEqual(magic.modifiers.find((m) => m.label === 'Proficiency').source, 'Proficient with Greatswords');
+  assertEqual([magic.mastery && magic.mastery.id, magic.abilityMod], [plain.mastery && plain.mastery.id, plain.abilityMod], 'Wren’s mastery still works with it, and Graze still deals only her Strength');
+  assertEqual(inventoryProblems(game.money, game.inventory), [], 'a save keeps it');
+  assertTrue(plainWeapons(game).includes('flail') && !plainWeapons(game).some((id) => id.startsWith('greatsword')), plainWeapons(game).join(', '));
+  // One of a stack: seven plain javelins and a Javelin +1.
+  makeMagicWeapon(game, 'javelin');
+  assertEqual([game.inventory.find((e) => e.id === 'javelin').quantity, game.inventory.find((e) => e.id === 'javelin-plus-1').quantity], [7, 1]);
+  assertThrows(() => makeMagicWeapon(game, 'greatsword-plus-1'), 'already magic');
 });
 
 test('Attacks: a Wizard has attack cantrips and Magic Missile while slots last', () => {
@@ -1280,6 +1302,107 @@ test('Resolve: a level 5 Fighter makes both attacks each turn', () => {
     if (entry.roll && entry.roll.kind === 'attack' && entry.roll.yours) firstTurn.push(entry);
   }
   assertTrue(firstTurn.length >= 2, `${firstTurn.length} attacks on the first turn`);
+});
+
+// ---- The gnolls in the Gorse Cut (Chapter 2, Hob's ore) ----
+
+// The Gorse Cut: a level 3 Wren, any companions, Dabbin on his cart's tail-board, and a Giant
+// Hyena and four Gnoll Warriors. Wren goes first; everyone else rolls a 1 for Initiative. keep:
+// the foes to leave standing (all of them, if not given). Tests move people and set the turn
+// order by hand after.
+function gnollFight({ party = [], seed = 'gnolls', keep = null } = {}) {
+  const game = { ...gameFor(champion3, seed), party: [] };
+  for (const id of party) joinParty(game, id);
+  game.rng = scriptedThen([20, ...Array(12).fill(1)], seed);
+  fight.startBattle(game, 'gorse-cut-gnolls', 0);
+  if (keep) for (const foe of fight.enemies(game.battle)) if (!keep.includes(foe.id)) foe.hp = 0;
+  return game;
+}
+
+test('Gnolls: a Giant Hyena and four Gnoll Warriors, 600 XP; Dabbin fights beside you as a Scout, drawn as himself', () => {
+  const gnoll = fight.findMonster('gnoll-warrior');
+  const hyena = fight.findMonster('giant-hyena');
+  assertEqual([gnoll.xp, gnoll.ac, gnoll.hp.average, hyena.xp, hyena.speed], [100, 15, 27, 200, 50]);
+  const game = gnollFight({ party: ['odda', 'fen'] });
+  const battle = game.battle;
+  assertEqual(fight.enemies(battle).map((c) => c.name), ['Giant Hyena', 'Gnoll Warrior 1', 'Gnoll Warrior 2', 'Gnoll Warrior 3', 'Gnoll Warrior 4']);
+  const [dabbin] = fight.allyCombatants(battle);
+  assertEqual([dabbin.id, dabbin.name, dabbin.monsterId, dabbin.hp, dabbin.person, dabbin.fallsHurt, dabbin.pos], ['dabbin', 'Dabbin', 'scout', 16, 'dabbin', true, { x: 4, y: 5 }]);
+  assertEqual(fight.objectiveText(battle), 'Keep Dabbin alive: still standing.');
+  assertEqual(fightRating(game, 'gorse-cut-gnolls').rating, 'Moderate', 'for a level 3 party of three, as Chapter 2 expects');
+});
+
+test('Gnolls: Rampage. Hurting someone already Bloodied, a gnoll Rends again with its Bonus Action, once a fight', () => {
+  const game = gnollFight({ keep: ['gnoll-warrior-1'] });
+  const battle = game.battle;
+  const gnoll = fight.combatantById(battle, 'gnoll-warrior-1');
+  gnoll.pos = { x: 3, y: 3 }; // beside Wren
+  battle.order = ['hero', gnoll.id];
+  battle.turn = 0;
+  const bloodied = Math.floor(fight.maxHpOf(game, fight.heroCombatant(battle)) / 2);
+  game.hp = bloodied;
+  // Rend (15: a hit on AC 17, 1d6 1 + 2 = 3), then Rampage's Rend (15, 1 + 2 = 3).
+  game.rng = scriptedThen([15, 1, 15, 1], 'rampage');
+  fight.endHeroTurn(game);
+  assertTrue(said(game, 'Gnoll Warrior 1 smells blood, and Rampages!'));
+  const rends = () => battle.log.filter((e) => e.roll && e.roll.kind === 'attack' && e.text.startsWith('Gnoll Warrior 1 hits you with Rend')).length;
+  assertEqual([rends(), game.hp, gnoll.rampaged], [2, bloodied - 6, true]);
+  // Once a fight: the next hit on a Bloodied hero is only a hit.
+  game.rng = scriptedThen([15, 1], 'rampage-again');
+  fight.endHeroTurn(game);
+  assertEqual([rends(), battle.log.filter((e) => e.text.includes('Rampages')).length], [3, 1]);
+});
+
+test('Gnolls: no Rampage when the one it hurts wasn’t Bloodied yet', () => {
+  const game = gnollFight({ keep: ['gnoll-warrior-1'] });
+  const battle = game.battle;
+  const gnoll = fight.combatantById(battle, 'gnoll-warrior-1');
+  gnoll.pos = { x: 3, y: 3 };
+  battle.order = ['hero', gnoll.id];
+  battle.turn = 0;
+  game.rng = scriptedThen([15, 6], 'no-rampage'); // a hit for 8, from full Hit Points
+  fight.endHeroTurn(game);
+  assertTrue(!said(game, 'Rampages') && !gnoll.rampaged);
+});
+
+test('Gnolls: a Giant Hyena that drops Dabbin Rampages on, bounding up to 25 feet to bite you; Dabbin goes down badly hurt', () => {
+  const game = gnollFight({ keep: ['giant-hyena-1'] });
+  const battle = game.battle;
+  const hyena = fight.combatantById(battle, 'giant-hyena-1');
+  const dabbin = fight.combatantById(battle, 'dabbin');
+  const hero = fight.heroCombatant(battle);
+  hyena.pos = { x: 5, y: 6 }; // beside Dabbin on the tail-board
+  hero.pos = { x: 2, y: 8 }; // three squares off
+  dabbin.hp = 5; // Bloodied
+  battle.order = ['hero', hyena.id];
+  battle.turn = 0;
+  const hp = game.hp;
+  // A Bite on Dabbin (15: a hit on AC 13, 2d6 1 1 + 3 = 5), then Rampage's Bite on you (15: a
+  // hit on AC 17, 2d6 2 2 + 3 = 7).
+  game.rng = scriptedThen([15, 1, 1, 15, 2, 2], 'hyena-rampage');
+  fight.endHeroTurn(game);
+  assertTrue(said(game, 'Dabbin goes down, badly hurt.') && said(game, 'Giant Hyena smells blood, and Rampages!'));
+  assertEqual([dabbin.hp, squaresBetween(hyena.pos, hero.pos), game.hp], [0, 1, hp - 7]);
+  assertEqual(fight.objectiveText(battle), 'Keep Dabbin alive: down, badly hurt.');
+  for (const foe of fight.enemies(battle)) foe.hp = 0;
+  battle.outcome = 'victory';
+  fight.finishBattle(game);
+  assertEqual(game.lastBattle.alliesAlive, [], 'the story hears he fell');
+});
+
+test('Allies: Dabbin, a Scout, holds the tail-board and shoots his longbow twice at the nearest gnoll', () => {
+  const game = gnollFight({ keep: ['gnoll-warrior-1', 'gnoll-warrior-4'] });
+  const battle = game.battle;
+  const dabbin = fight.combatantById(battle, 'dabbin');
+  const near = fight.combatantById(battle, 'gnoll-warrior-4');
+  near.pos = { x: 6, y: 9 }; // 20 feet behind the cart; Gnoll Warrior 1 is 25 feet ahead
+  battle.order = ['hero', 'dabbin'];
+  battle.turn = 0;
+  // Two Longbow shots (15: hits on AC 15, 1d8 4 + 2 = 6 each).
+  game.rng = scriptedThen([15, 4, 15, 4], 'dabbin-shoots');
+  fight.endHeroTurn(game);
+  assertEqual(battle.log.filter((e) => e.text.startsWith('Dabbin hits Gnoll Warrior 4 with Longbow')).length, 2);
+  assertEqual([near.hp, dabbin.pos], [15, { x: 4, y: 5 }]);
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

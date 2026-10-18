@@ -35,6 +35,12 @@
 //     (nettle_rallied). Promise her Brackenhollow back (promised_nettle_warren), or say honestly
 //     that it isn't yours to promise (Odda +1).
 //   Nan Burdock's stall, for potions. Then Lark sees you off at the north gate.
+//   Chapter 2's side quests (Rob, Oct 18, 2026): Fen asks you out to the hanging tree
+//     (side_hanging_tree, ch2-hanging-tree.ink), and at his forge Hob asks you to ride north
+//     with his cousin Dabbin's cart and bring his star-iron home from the Old Ford (Hob's ore,
+//     ch2-hobs-ore.ink). Saying yes (hobs_ore_taken) makes the ride north Dabbin's cart ride,
+//     with the gnolls in the Gorse Cut on the way. Missed ones wait for the last morning of
+//     Act I (act1-last-morning.ink).
 
 // ---- The Old Ford held: back to Bramblegate from Cairnfield ----
 
@@ -302,14 +308,49 @@ Crane writes to his order that same night, every word of it, and lets you read t
     -> varrow
 * {has_flag("goblins_at_mill")} [Go out to Dunn's Mill, and ask Mother Nettle for help]
     -> nettle
++ [Call in at Hob's forge]
+    -> forge_call
 + [Visit Nan Burdock's stall]
     -> nans_stall
-+ {has_flag("ford_fell")} [Take the barrow road north again]
+* {companion_alive("fen")} [Go with Fen to the old hanging tree at the crossroads]
+    -> side_hanging_tree ->
+    -> about
++ {has_flag("ford_fell") && not has_flag("hobs_ore_taken")} [Take the barrow road north again]
     -> farewell ->
     -> ch2_cairnfield.road_north
-+ {not has_flag("ford_fell")} [Take the barrow road north, to the Kings' Barrow]
++ {has_flag("ford_fell") && has_flag("hobs_ore_taken")} [Ride north on Dabbin's cart]
+    -> farewell ->
+    -> side_hobs_ore ->
+    -> ch2_cairnfield.road_north
++ {not has_flag("ford_fell") && not has_flag("hobs_ore_taken")} [Take the barrow road north, to the Kings' Barrow]
     -> farewell ->
     -> north_for_now
++ {not has_flag("ford_fell") && has_flag("hobs_ore_taken")} [Ride north on Dabbin's cart, to the Kings' Barrow]
+    -> farewell ->
+    -> by_cart
+
+// Hob's forge: his blades, and his star-iron (Hob's ore, ch2-hobs-ore.ink).
+= forge_call
+{ forge_call == 1:
+    Hob's forge is quiet for once. Hob is sitting on his anvil with his chin in his hands, and he brightens when he sees you. "The heroes! Off up the barrow road again, they say." #location:Bramblegate, Hob's forge #speaker:hob
+    "Here's a thing, then, since you're going that way. There's a crate of mine sitting in the strongroom at the Old Ford post: star-iron, all the way up from the south, paid for a month back. {has_flag("ford_fell"):The post's fallen, and no carter|No carter} will take the barrow road since the dead got up, and now there's gnolls on it too, come down from the hills after the dead." #speaker:hob
+    "My cousin Dabbin says he'll take his cart up and fetch it, if somebody rides with him. Bring my star-iron home, and I'll work it into whatever you carry. You've never held anything like it." #speaker:hob
+- else:
+    Hob waves his hammer at you. #location:Bramblegate, Hob's forge
+}
+-> forge_talk
+
+= forge_talk
++ {not has_flag("hobs_ore_taken")} [Say you'll ride north with Dabbin and his cart]
+    ~ set_flag("hobs_ore_taken")
+    ~ start_quest("hobs-ore")
+    "Good!" Hob says, and claps you on the arm, which is as high as he can reach. "He'll be at the north gate with Parsnip when you're ready. Don't let Parsnip bite you. He bites." #speaker:hob
+    -> forge_talk
++ [Look over Hob's blades]
+    -> hobs_wares ->
+    -> forge_talk
++ [Back to the square]
+    -> about
 
 // Captain Varrow, if the Old Ford held. (If it fell, he already said he can't spare a spear.)
 = varrow
@@ -433,4 +474,10 @@ Lark Dunn is waiting at the north gate, sitting on the mounting block with her f
 = north_for_now
 ~ set_objective("Take the barrow road north, make camp near Cairnfield, and go down into the Kings' Barrow at the dark of the moon.")
 You go out through the north gate, with Bramblegate behind you and the barrow road ahead.
+-> ch2_eve
+
+// The same, on Dabbin's cart as far as the Old Ford, with the gnolls on the way (Hob's ore).
+= by_cart
+~ set_objective("Take the barrow road north, make camp near Cairnfield, and go down into the Kings' Barrow at the dark of the moon.")
+-> side_hobs_ore ->
 -> ch2_eve

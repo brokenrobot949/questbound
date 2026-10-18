@@ -39,4 +39,20 @@ export const quests = [
     chapter: 2,
     source: 'original',
   },
+  // Chapter 2's side quests, offered on the morning before the barrow (and again on the last
+  // morning in Bramblegate, if missed).
+  {
+    id: 'hanging-tree',
+    title: 'The Hanging Tree',
+    summary: 'Fen wants to look inside an old Ashen Choir letter-drop in the hanging tree at the crossroads outside Bramblegate.',
+    chapter: 2,
+    source: 'original',
+  },
+  {
+    id: 'hobs-ore',
+    title: 'Hob’s Ore',
+    summary: 'Hob’s crate of star-iron has sat at the Old Ford post for a month. His cousin Dabbin will fetch it with his cart, if someone rides with him: there are gnolls on the barrow road.',
+    chapter: 2,
+    source: 'original',
+  },
 ];

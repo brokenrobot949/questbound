@@ -106,6 +106,21 @@ EXTERNAL contest(skill, who, bonus)
 EXTERNAL give_item(item)
 EXTERNAL has_item(item)
 
+// item_name(item): an item's name, to print in a scene ("Longsword"), or "" for "".
+EXTERNAL item_name(item)
+
+// Making a weapon magic (Hob's star-iron): plain_weapon(n) is the id of the nth kind of plain
+// (not magic) weapon in the pack, 1 for the first, or "" if there are fewer.
+// make_weapon_magic(item): one of that weapon becomes a +1 magic weapon (SRD 5.2.1, "Weapon,
+// +1"), and the player is told. Story commands can't be called inside a choice's text, so put
+// what the choice shows in a temporary variable first:
+//   ~ temp first = plain_weapon(1)
+//   ~ temp first_name = item_name(first)
+//   + {first != ""} [Your {first_name}]
+//       ~ make_weapon_magic(first)
+EXTERNAL plain_weapon(n)
+EXTERNAL make_weapon_magic(item)
+
 // has_shard(id): true while the hero carries that shard of the crown (an id from
 // data/campaign/shards.js, such as "names"). Show a choice that uses its power only with it,
 // and tag it so the card shows the shard. Using a power raises the Whisper: until the Whisper is

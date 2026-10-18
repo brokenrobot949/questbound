@@ -2,23 +2,54 @@
 //
 //   game.money       coins, counted in copper pieces (1 GP = 10 SP = 100 CP)
 //   game.inventory   [{ id, quantity }]: item ids from data/srd/equipment.js and armor.js,
-//                    and the story's own items in data/campaign/items.js
+//                    magic weapons ("longsword-plus-1", see magicWeapon), and the story's own
+//                    items in data/campaign/items.js
 //
 // Prices in the data are in coins ({ gp: 50 }); money is shown as gold, silver and copper.
 
 import { equipment } from '../../../data/srd/equipment.js';
 import { armor, shield } from '../../../data/srd/armor.js';
+import { magicItems } from '../../../data/srd/magic-items.js';
 import { items as storyItems } from '../../../data/campaign/items.js';
 import { shards } from '../../../data/campaign/shards.js';
 import { shops } from '../../../data/campaign/shops.js';
 import { findBackground, findClass } from './sheet.js';
 
-// Any item: armour, a Shield, other equipment, or one of the story's own items.
+// Any item: armour, a Shield, other equipment, a magic weapon, or one of the story's own items.
 export function findItem(id) {
   if (id === shield.id) return { ...shield, category: 'shield' };
   const worn = armor.find((a) => a.id === id);
   if (worn) return { ...worn, category: 'armor', armorCategory: worn.category };
-  return equipment.find((e) => e.id === id) || storyItems.find((e) => e.id === id) || null;
+  return equipment.find((e) => e.id === id) || storyItems.find((e) => e.id === id) || magicWeapon(id);
+}
+
+// ---- Magic weapons (SRD 5.2.1, "Weapon, +1, +2, or +3") ----
+// "longsword-plus-1" is a Longsword +1: the plain weapon (baseId, baseName), with magicBonus
+// added to its attack rolls and damage rolls (combat/attacks.js), and the magic item's rarity
+// and text (data/srd/magic-items.js). It isn't for sale.
+const MAGIC_WEAPON = /^(.+)-plus-([1-3])$/;
+function magicWeapon(id) {
+  const match = typeof id === 'string' && id.match(MAGIC_WEAPON);
+  const base = match && equipment.find((e) => e.id === match[1] && e.category === 'weapon');
+  if (!base) return null;
+  const bonus = Number(match[2]);
+  const magic = magicItems.find((m) => m.id === 'weapon-plus');
+  return { ...base, id, baseId: base.id, baseName: base.name, name: `${base.name} +${bonus}`, magicBonus: bonus, rarity: magic.rarity[bonus], text: magic.text, cost: null };
+}
+
+// The plain weapons in the pack that could be made magic, one id for each kind, in pack order.
+export function plainWeapons(game) {
+  return game.inventory.filter((entry) => entry.quantity > 0 && findItem(entry.id).category === 'weapon' && !findItem(entry.id).magicBonus).map((entry) => entry.id);
+}
+
+// One of a plain weapon in the pack becomes a magic one (+1, say). Returns the new item.
+export function makeMagicWeapon(game, id, bonus = 1) {
+  const item = findItem(id);
+  if (!item || item.category !== 'weapon' || item.magicBonus) throw new Error(`${id} isn't a plain weapon`);
+  const magicId = `${id}-plus-${bonus}`;
+  removeItem(game.inventory, id, 1);
+  addItem(game.inventory, magicId, 1);
+  return findItem(magicId);
 }
 
 export const COPPER_PER = { cp: 1, sp: 10, ep: 50, gp: 100, pp: 1000 };

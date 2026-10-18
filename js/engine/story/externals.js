@@ -12,7 +12,7 @@ import { d20Test } from '../rules/d20-test.js';
 import { canCastSpell, findSpell, preparePicks } from '../character/spells.js';
 import { castCostText, castInScene, guidanceModifiers, sceneCastCost, spellSaveDc } from '../character/casting.js';
 import { findAbility, findSkill, findTool } from '../character/sheet.js';
-import { addItem, buyItem, canAfford, COPPER_PER, findItem, hasItem, hasShard, moneyText, removeItem } from '../character/inventory.js';
+import { addItem, buyItem, canAfford, COPPER_PER, findItem, hasItem, hasShard, makeMagicWeapon, moneyText, plainWeapons, removeItem } from '../character/inventory.js';
 import { findBond, findDrive } from '../character/creation.js';
 import { addDeed, findQuest, finishQuest, questNote, startQuest } from './journal.js';
 import { longRestRecovery } from '../character/resources.js';
@@ -362,6 +362,34 @@ export function bindExternals(story, runtime) {
     false,
   );
   story.BindExternalFunction('has_item', (id) => hasItem(runtime.game, id), false);
+
+  // item_name(item): an item's name, to print in a scene ("Longsword"); "" for "".
+  story.BindExternalFunction(
+    'item_name',
+    (id) => {
+      if (id === '') return '';
+      const item = findItem(id);
+      if (!item) throw new Error(`Unknown item: ${id}`);
+      return item.name;
+    },
+    false,
+  );
+
+  // Making a weapon magic (Hob's star-iron): plain_weapon(n) is the id of the nth kind of plain
+  // weapon in the pack (1 for the first), in pack order, or "" if there are fewer.
+  // make_weapon_magic(item): one of that weapon becomes a +1 magic weapon, and the DM says so.
+  // (Ink can't call these inside a choice's text: put them in temporary variables first, as
+  // hobs_reforge does in story/act-1/ch2-hobs-ore.ink.)
+  story.BindExternalFunction('plain_weapon', (n) => plainWeapons(runtime.game)[n - 1] || '', false);
+  story.BindExternalFunction(
+    'make_weapon_magic',
+    (id) => {
+      const plain = findItem(id);
+      const magic = makeMagicWeapon(runtime.game, id, 1);
+      note(runtime.game, dmNotes.weaponMadeMagic, { weapon: plain.name, item: magic.name, bonus: magic.magicBonus });
+    },
+    false,
+  );
 
   // has_shard(id): true while the hero carries that shard of the crown (an id from
   // data/campaign/shards.js, such as "names"). A choice that uses its power is shown only with

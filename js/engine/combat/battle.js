@@ -439,13 +439,18 @@ export function startBattle(game, encounterId, choiceIndex, { surprise = false, 
     combatants.push({ id: `${id}-${numbered[id]}`, side: 'enemy', name, monsterId: id, pos: { ...pos }, hp: monster.hp.average, maxHp: monster.hp.average });
   }
   // Allies who fight on the hero's side, played by the game (the Old Ford's soldiers; the Rival,
-  // by the name the player gave them, if the story freed them).
-  (encounter.allies || []).forEach(({ id: allyId, monster: id, pos, name, bondName, ifFlag }, i) => {
+  // by the name the player gave them, if the story freed them; Dabbin and his cart). person:
+  // drawn as someone from the story (data/campaign/people.js); fallsHurt: at 0 Hit Points
+  // they're badly hurt, not killed.
+  (encounter.allies || []).forEach(({ id: allyId, monster: id, pos, name, bondName, ifFlag, person, fallsHurt }, i) => {
     if (ifFlag && !flags.includes(ifFlag)) return;
     const monster = findMonster(id);
     if (!monster) throw new Error(`Unknown monster: ${id}`);
     const bond = bondName && game.character.bond && game.character.bond.name;
-    combatants.push({ id: allyId || `ally-${i + 1}`, side: 'hero', ally: true, name: bond || name || monster.name, monsterId: id, pos: { ...pos }, hp: monster.hp.average, maxHp: monster.hp.average });
+    const ally = { id: allyId || `ally-${i + 1}`, side: 'hero', ally: true, name: bond || name || monster.name, monsterId: id, pos: { ...pos }, hp: monster.hp.average, maxHp: monster.hp.average };
+    if (person) ally.person = person;
+    if (fallsHurt) ally.fallsHurt = true;
+    combatants.push(ally);
   });
   // Companions start on the free squares nearest the hero.
   for (const member of fightingMembers(game)) {
@@ -701,6 +706,8 @@ export function objectiveText(battle) {
   const allies = allyCombatants(battle);
   if (encounter.allyObjective && allies.length) {
     const standing = allies.filter((c) => c.hp > 0).length;
+    // One ally (Dabbin): "still standing", or how they fell.
+    if (allies.length === 1) return `${encounter.allyObjective}: ${standing ? 'still standing' : allies[0].fallsHurt ? 'down, badly hurt' : 'fallen'}.`;
     return `${encounter.allyObjective}: ${standing} of ${allies.length} still standing.`;
   }
   if (battle.reinforcements && battle.reinforcements.coming) return reinforcementsText(encounter.reinforcements, reinforcementsComing(battle));
@@ -1341,6 +1348,8 @@ function performAttack(game, attacker, target, option) {
     const total = amount + (plus ? plus.amount : 0);
     log(game, isHero(target) ? `Uncanny Dodge! (your reaction) You roll with the blow: the damage is halved, to ${total}.` : `Uncanny Dodge! ${target.name} rolls with the blow: the damage is halved, to ${total}.`);
   }
+  // A gnoll that hurts someone already Bloodied can Rampage (see "Rampage").
+  const healthBefore = canRampage(game, attacker, target) ? healthOf(game, target) : null;
   // (A Spiritual Weapon strikes from its own square: the damage is still from its caster.)
   applyDamage(game, target, amount, { type: damage.type, critical, plus, from: combatantById(battle, attacker.id) || attacker });
   if (option.rider && target.hp > 0) addRider(game, attacker, target, option);
@@ -1348,6 +1357,7 @@ function performAttack(game, attacker, target, option) {
   if (option.attach && !battle.outcome) attach(game, attacker, target, option);
   if (ours && option.mastery) masteryOnHit(game, attacker, target, option, damageDealt(target, damage.total, damage.type) > 0);
   if (strike && !battle.outcome) cunningStrikeEffect(game, attacker, target, strike);
+  if (healthBefore !== null && healthOf(game, target) < healthBefore && !battle.outcome) rampage(game, attacker, target);
   return { critical };
 }
 
@@ -1667,7 +1677,7 @@ function takeHit(game, target, amount, { type, critical = false, plus = null, ke
       log(game, `Undead Fortitude fails ${target.name}.`, { roll: save });
     }
     target.hp = Math.max(0, target.hp - taken);
-    if (target.hp === 0) log(game, target.ally ? `${target.name} falls, and doesn't get up.` : `${target.name} falls.`);
+    if (target.hp === 0) log(game, !target.ally ? `${target.name} falls.` : target.fallsHurt ? `${target.name} goes down, badly hurt.` : `${target.name} falls, and doesn't get up.`);
     if (target.hp === 0) dropClings(battle, target.id);
     // A foe's Concentration: it ends if the foe falls; otherwise damage means a save to keep it.
     if (target.hp === 0 && target.concentration) endConcentration(game, target, `${target.concentration.name} ends with ${target.name}.`);
@@ -3437,6 +3447,57 @@ export function heroPullOff(game, foeId) {
   letGo(game, clingOf(battle, foeId), isHero(pick.host) ? `You tear ${pick.foe.name} off yourself.` : `You tear ${pick.foe.name} off ${pick.host.name}.`);
 }
 
+// ---- Rampage (a Gnoll Warrior's or a Giant Hyena's Bonus Action; SRD 5.2.1) ----
+// Once a day (so once in a fight), on its own turn, straight after it deals damage to someone
+// who was already Bloodied (at half their Hit Points or fewer), it moves up to half its Speed
+// and makes one more melee attack (a gnoll's Rend, a hyena's Bite). It goes for the same one
+// again if they're still on their feet and it can get beside them, otherwise for the most hurt
+// of the hero's side it can reach. The move is extra: it doesn't use the foe's own movement,
+// and it can provoke Opportunity Attacks. With nobody in reach, it doesn't rampage.
+
+// Hit Points plus any Temporary Hit Points: what damage has to get through.
+function healthOf(game, c) {
+  if (isHero(c)) return game.hp + (game.tempHp || 0);
+  if (c.companion) return memberFor(game, c).hp + (memberFor(game, c).tempHp || 0);
+  return c.hp;
+}
+
+const isBloodied = (game, c) => hpOf(game, c) > 0 && hpOf(game, c) <= maxHpOf(game, c) / 2;
+
+// True if this attack, should it hurt the target, sets off the attacker's Rampage.
+function canRampage(game, c, target) {
+  const battle = game.battle;
+  if (c.side !== 'enemy' || c.rampaged || currentCombatant(battle) !== c || battle.turnState.bonus) return false;
+  if (!(findMonster(c.monsterId).bonusActions || []).includes('rampage')) return false;
+  return isBloodied(game, target);
+}
+
+function rampage(game, c, first) {
+  const battle = game.battle;
+  const strike = monsterAttackOptions(findMonster(c.monsterId)).find((o) => o.how === 'melee' && !o.alone);
+  if (!strike || c.hp <= 0 || isIncapacitated(battle, c.id)) return;
+  const half = Math.floor(speedOf(game, c) / 2 / 5) * 5;
+  const squares = [...reachFor(game, c, half).values()];
+  const reachable = battle.combatants
+    .filter((p) => p.side === 'hero' && upright(game, p) && !hiddenOf(battle, p.id))
+    .map((p) => ({ p, spot: squares.filter((s) => isAdjacent(s.pos, p.pos)).sort((a, b) => a.cost - b.cost)[0] }))
+    .filter((r) => r.spot);
+  if (!reachable.length) return;
+  reachable.sort((a, b) => Number(b.p === first) - Number(a.p === first) || hpOf(game, a.p) - hpOf(game, b.p) || a.spot.cost - b.spot.cost);
+  const { p: target, spot } = reachable[0];
+  c.rampaged = true;
+  battle.turnState.bonus = true;
+  log(game, `${c.name} smells blood, and Rampages! (its Bonus Action)`);
+  if (spot.path.length) {
+    const left = battle.turnState.movementLeft;
+    battle.turnState.movementLeft = half;
+    moveAlong(game, c, spot.path);
+    battle.turnState.movementLeft = left;
+  }
+  if (battle.outcome || c.hp <= 0 || !upright(game, target)) return;
+  performAttack(game, c, target, strike);
+}
+
 // ---- Enemy turns ----
 
 // Each monster fights to its behaviour profile (data/srd/monsters.js):
@@ -3772,10 +3833,13 @@ function closeIn(game, c) {
 }
 
 // ---- An ally's turn ----
-// An ally (the Old Ford's soldiers) holds its ground, as a companion on Hold does: it never
-// leaves its square. It stands up if it's Prone, then attacks the most wounded foe beside it
-// (its Multiattack, if it has one). With no foe beside it but foes near (within 30 feet), it
-// takes the Dodge action, braced for them to come.
+// An ally (the Old Ford's soldiers, Dabbin) holds its ground, as a companion on Hold does: it
+// never leaves its square. It stands up if it's Prone, then attacks the most wounded foe beside
+// it (its Multiattack, if it has one). With no foe beside it, a skirmisher (a Scout: Dabbin)
+// shoots its bow: at the nearest foe it has a clear shot at within the bow's normal range, the
+// most wounded of equals. Otherwise, with foes near (within 30 feet), it takes the Dodge
+// action, braced for them to come. (The Old Ford's Guards and the Rival are brutes: they hold
+// the line with steel.)
 function allyTurn(game, c) {
   const battle = game.battle;
   if (isProne(battle, c.id) && speedOf(game, c) > 0) standUp(game, c);
@@ -3785,13 +3849,28 @@ function allyTurn(game, c) {
   }
   if (c.turned) return turnedAllyTurn(game, c);
   const monster = findMonster(c.monsterId);
-  const melee = monsterAttackOptions(monster).find((o) => o.how === 'melee' && !o.alone);
+  const options = monsterAttackOptions(monster);
+  const melee = options.find((o) => o.how === 'melee' && !o.alone);
+  const bow = monster.behaviour === 'skirmisher' && monster.attacks.find((a) => a.kind === 'ranged');
+  const ranged = bow && options.find((o) => o.id === `${bow.id}-ranged`);
   const besideFoes = () => enemies(battle).filter((e) => e.hp > 0 && isAdjacent(e.pos, c.pos)).sort((a, b) => a.hp - b.hp);
   if (melee && besideFoes().length) {
     for (let i = 0; i < (monster.multiattack || 1); i++) {
       const [target] = besideFoes();
       if (battle.outcome || !target || c.hp <= 0) break;
       performAttack(game, c, target, melee);
+    }
+    return checkEnd(game);
+  }
+  const inSight = () =>
+    enemies(battle)
+      .filter((e) => e.hp > 0 && !e.escaped && feetBetween(c.pos, e.pos) <= ranged.range[0] && clearShot(game, c.pos, e.pos))
+      .sort((a, b) => squaresBetween(c.pos, a.pos) - squaresBetween(c.pos, b.pos) || a.hp - b.hp);
+  if (ranged && inSight().length) {
+    for (let i = 0; i < (monster.multiattack || 1); i++) {
+      const [target] = inSight();
+      if (battle.outcome || !target || c.hp <= 0) break;
+      performAttack(game, c, target, ranged);
     }
     return checkEnd(game);
   }

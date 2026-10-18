@@ -1896,7 +1896,7 @@ test('Chapter 2: in the morning Varrow’s watch will hold the outer cairns (all
   toTheMorning(game);
   assertEqual([currentLocation(game), currentTime(game)], ['Bramblegate, the square', 'Morning']);
   assertTrue(pageText(game).includes('The dark of the moon is tomorrow night'));
-  assertEqual(cards(game), ['Ask Captain Varrow for the watch', 'Go out to Dunn\'s Mill, and ask Mother Nettle for help', "Visit Nan Burdock's stall", "Take the barrow road north, to the Kings' Barrow"]);
+  assertEqual(cards(game), ['Ask Captain Varrow for the watch', 'Go out to Dunn\'s Mill, and ask Mother Nettle for help', "Call in at Hob's forge", "Visit Nan Burdock's stall", 'Go with Fen to the old hanging tree at the crossroads', "Take the barrow road north, to the Kings' Barrow"]);
   pick(game, 'Ask Captain Varrow');
   assertTrue(pageText(game).includes("I'll not hang a child") && pageText(game).includes('outer cairns') && game.flags.includes('varrow_rallied'));
   assertTrue(missingMiller(game).includes('Captain Varrow will hold the outer cairns'));
@@ -1910,7 +1910,7 @@ test('Chapter 2: in the morning Varrow’s watch will hold the outer cairns (all
   pick(game, 'Buy a Potion of Healing');
   assertTrue(game.inventory.some((i) => i.id === 'potion-of-healing') && !cards(game).includes('Buy a Potion of Healing'), 'ten gold left');
   pick(game, 'Back to the square');
-  assertEqual(cards(game), ["Visit Nan Burdock's stall", "Take the barrow road north, to the Kings' Barrow"]);
+  assertEqual(cards(game), ["Call in at Hob's forge", "Visit Nan Burdock's stall", 'Go with Fen to the old hanging tree at the crossroads', "Take the barrow road north, to the Kings' Barrow"]);
   pick(game, 'Take the barrow road north');
   assertTrue(speakersOf(game).includes('lark') && pageText(game).includes('a pack on her back'));
   assertTrue(game.objective.startsWith('Take the barrow road north, make camp near Cairnfield'));
@@ -1922,7 +1922,7 @@ test('Chapter 2: if only some of the watch lived, Varrow takes talking round (Pe
   pick(wary, 'Go back down the barrow road');
   pick(wary, "Let Odda ask to see the temple's books");
   toTheMorning(wary, 'Take the ledger to Reeve Corbin');
-  assertEqual(cards(wary), ['Ask Captain Varrow for the watch', "Visit Nan Burdock's stall", "Take the barrow road north, to the Kings' Barrow"], 'no goblins at the mill');
+  assertEqual(cards(wary), ['Ask Captain Varrow for the watch', "Call in at Hob's forge", "Visit Nan Burdock's stall", 'Go with Fen to the old hanging tree at the crossroads', "Take the barrow road north, to the Kings' Barrow"], 'no goblins at the mill');
   pick(wary, 'Ask Captain Varrow');
   assertTrue(pageText(wary).includes("the Prior's in the cell next door") && pageText(wary).includes('I lost people at that ford'));
   assertEqual(tagsOf(wary)[0], 'check:persuasion:15');
@@ -1952,7 +1952,7 @@ test('Chapter 2: if the Old Ford fell, the temple comes before Cairnfield: Odda,
   assertTrue(!memberOf(game, 'odda').fallen && game.flags.includes('odda_raised'));
   pick(game, "Let Odda ask to see the temple's books");
   toTheMorning(game);
-  assertEqual(cards(game), ['Go out to Dunn\'s Mill, and ask Mother Nettle for help', "Visit Nan Burdock's stall", 'Take the barrow road north again'], 'Varrow has no spears to spare');
+  assertEqual(cards(game), ['Go out to Dunn\'s Mill, and ask Mother Nettle for help', "Call in at Hob's forge", "Visit Nan Burdock's stall", 'Go with Fen to the old hanging tree at the crossroads', 'Take the barrow road north again'], 'Varrow has no spears to spare');
   pick(game, 'Go out to Dunn');
   assertTrue(pageText(game).includes("you're going there next"));
   pick(game, 'Promise her');

@@ -7,7 +7,8 @@ import { loadStory } from '../js/engine/story/ink-loader.js';
 import { bindExternals } from '../js/engine/story/externals.js';
 import { continueAfterBattle, jumpTo, listScenes, makeChoice, revealRoll, startFight } from '../js/engine/story/story-runner.js';
 import * as fight from '../js/engine/combat/battle.js';
-import { priceAt } from '../js/engine/character/inventory.js';
+import { addItem, priceAt } from '../js/engine/character/inventory.js';
+import { joinParty, memberOf } from '../js/engine/character/party.js';
 import { checkModifiers } from '../js/engine/character/sheet.js';
 import { rollLine } from '../js/engine/ui/roll-format.js';
 import { forceNextD20 } from '../js/engine/rules/dice.js';
@@ -492,7 +493,7 @@ test('The last morning: Act I’s missed side quests wait in Bramblegate before 
   assertEqual(cards(game), ['Go out into Bramblegate, one last time']);
   assertTrue(!has(game, 'act_1_complete'), 'not over yet');
   pick(game, 'Go out into Bramblegate');
-  const all = ['Ask Morwen whether her cats ever came home', "Read Warden Pike's notice about the wolves on the north road", "Call in at Hob's forge", 'Ride south with the shard'];
+  const all = ['Ask Morwen whether her cats ever came home', "Read Warden Pike's notice about the wolves on the north road", 'Ask Hob why he keeps looking up the barrow road', "Call in at Hob's forge", 'Ride south with the shard'];
   assertEqual(cards(game), all);
   pick(game, 'Ask Morwen');
   assertTrue(pageText(game.page).includes('A fortnight'), 'the cats have been gone a while now');
@@ -508,6 +509,184 @@ test('The last morning: Act I’s missed side quests wait in Bramblegate before 
   assertEqual(heading && heading.text, 'End of Act I · The Barrow Dead');
   assertTrue(has(game, 'act_1_complete') && game.story.currentChoices.length === 0);
   assertEqual(game.objective, 'Follow the shard south. (Act II is still being written.)');
+});
+
+// ---- Act I's side quests: Chapter 2 ----
+
+// The morning before the barrow in Bramblegate's square (ch2_rally), with Odda and Fen (unless
+// fen is false), the Choir's hymnal in the pack, and any story flags.
+async function atTheRally(seed, { character = testHero, flags = [], fen = true } = {}) {
+  const game = newGame(await freshRuntime(), { slot: 1, seed, character });
+  game.flags.push(...flags);
+  joinParty(game, 'odda');
+  if (fen) joinParty(game, 'fen');
+  addItem(game.inventory, 'choir-hymnal');
+  game.page = jumpTo(game, 'ch2_rally');
+  return game;
+}
+
+// From the rally's square: take Hob's job at his forge, and set off north on Dabbin's cart.
+function onDabbinsCart(game) {
+  pick(game, "Call in at Hob's forge");
+  pick(game, "Say you'll ride north");
+  pick(game, 'Back to the square');
+  pick(game, "Ride north on Dabbin's cart");
+}
+
+// The last morning of Act I in Bramblegate (from the morning after the feast), with Odda and
+// Fen unless told otherwise, and any flags (Chapter 1's side quests done, say).
+async function atTheLastMorning(seed, { flags = [], companions = ['odda', 'fen'] } = {}) {
+  const game = newGame(await freshRuntime(), { slot: 1, seed, character: testHero });
+  for (const id of companions) joinParty(game, id);
+  addItem(game.inventory, 'choir-hymnal');
+  game.flags.push(...flags);
+  game.page = jumpTo(game, 'ch3_night.morning');
+  pick(game, 'Go out into Bramblegate');
+  return game;
+}
+
+const CHAPTER_1_DONE = ['cats_done', 'wolf_den_done', 'hobs_bet_done'];
+
+test('The Hanging Tree: Fen’s Choir letter-drop, the Precentor’s seal, the cipher read against the hymnal, the old court tongue; copied and put back', async () => {
+  const game = await atTheRally('hanging-tree');
+  assertEqual(cards(game), ['Ask Captain Varrow for the watch', "Call in at Hob's forge", "Visit Nan Burdock's stall", 'Go with Fen to the old hanging tree at the crossroads', "Take the barrow road north, to the Kings' Barrow"]);
+  pick(game, 'Go with Fen');
+  assertEqual(questStatus(game, 'hanging-tree'), 'active');
+  assertEqual(cards(game), ['Ask Fen what this place is', 'Ask Fen why he wants to look', 'Tear the last of the old rope from the ring', 'Let Fen find the drop']);
+  const fen = memberOf(game, 'fen');
+  const approval = fen.approval;
+  pick(game, 'Tear the last');
+  assertTrue(has(game, 'cut_the_hanging_rope') && fen.approval === approval + 1, 'Fen hates hangings');
+  const [money, xp] = [game.money, game.xp];
+  pick(game, 'Let Fen find');
+  assertTrue(has(game, 'saw_precentor_seal') && pageText(game.page).includes('The Precentor') && game.money - money === 800, 'her seal, and the runner’s eight gold');
+  assertTrue(game.story.currentChoices.find((c) => c.text.startsWith('Work through')).tags.includes('check:investigation:12'));
+  forceNextD20(20);
+  pick(game, 'Work through');
+  assertTrue(has(game, 'read_choir_orders') && pageText(game.page).includes('Treble for the book whole'));
+  assertEqual(cards(game), ['Ask him what book', 'Let it lie']);
+  pick(game, 'Ask him what book');
+  assertTrue(has(game, 'fen_dodged_the_book'));
+  assertEqual(cards(game), ['Puzzle out the old letters', 'Leave it'], 'no Comprehend Languages for Wren');
+  forceNextD20(20);
+  pick(game, 'Puzzle out');
+  assertTrue(has(game, 'read_precentor_postscript') && pageText(game.page).includes('He is only sleeping') && pageText(game.page).includes('somebody expensive'));
+  pick(game, 'Copy it out');
+  assertTrue(has(game, 'copied_choir_drop') && has(game, 'hanging_tree_done') && fen.approval === approval + 2 && questStatus(game, 'hanging-tree') === 'done');
+  assertTrue(!game.inventory.some((e) => e.id === 'choir-letter'), 'it went back in the tree');
+  assertEqual(game.xp - xp, 100, '25 for the cipher, 25 for the court tongue, 50 for the quest');
+  assertTrue(!cards(game).some((t) => t.includes('hanging tree')) && cards(game).includes("Call in at Hob's forge"), 'back in the square');
+});
+
+test('The Hanging Tree: a miss reads only the first lines; Comprehend Languages reads the court tongue; the letter pocketed', async () => {
+  const game = await atTheRally('hanging-tree-wizard', { character: juniperHero });
+  pick(game, 'Go with Fen');
+  pick(game, 'Let Fen find');
+  forceNextD20(1);
+  pick(game, 'Work through');
+  assertTrue(has(game, 'read_choir_orders_part') && !has(game, 'read_choir_orders') && pageText(game.page).includes('lamb, lantern'));
+  const spell = game.story.currentChoices.find((c) => c.text.startsWith('Read the line'));
+  assertTrue(Boolean(spell) && spell.tags.includes('spell:comprehend-languages'), cards(game).join(' / '));
+  pick(game, 'Read the line');
+  assertTrue(has(game, 'read_precentor_postscript'));
+  pick(game, 'Pocket the letter');
+  assertTrue(game.inventory.some((e) => e.id === 'choir-letter') && has(game, 'took_choir_letter') && has(game, 'hanging_tree_done'));
+});
+
+test('Hob’s ore: Hob asks at his forge; yes makes the ride north Dabbin’s cart; read the gorse, feed them the mutton for the fight’s XP; Dabbin pays at the ford', async () => {
+  const game = await atTheRally('hobs-ore');
+  pick(game, "Call in at Hob's forge");
+  assertTrue(pageText(game.page).includes('star-iron') && pageText(game.page).includes('gnolls'));
+  assertEqual(cards(game), ["Say you'll ride north with Dabbin and his cart", "Look over Hob's blades", 'Back to the square']);
+  pick(game, "Say you'll ride north");
+  assertTrue(has(game, 'hobs_ore_taken') && questStatus(game, 'hobs-ore') === 'active');
+  assertEqual(cards(game), ["Look over Hob's blades", 'Back to the square']);
+  pick(game, 'Back to the square');
+  assertTrue(cards(game).includes("Ride north on Dabbin's cart, to the Kings' Barrow") && !cards(game).includes("Take the barrow road north, to the Kings' Barrow"));
+  pick(game, "Ride north on Dabbin's cart");
+  assertTrue(['Bring him home', 'Parsnip', 'stops dead'].every((s) => pageText(game.page).includes(s)), 'Lark sees you off, then the cart and the Cut');
+  assertEqual(cards(game), ['Read the gorse on the banks', 'Get Parsnip moving, and drive on through']);
+  forceNextD20(20);
+  pick(game, 'Read the gorse');
+  assertTrue(has(game, 'spotted_gnolls'));
+  const strike = game.story.currentChoices.find((c) => c.text.startsWith('Strike before'));
+  assertTrue(strike.tags.includes('combat:gorse-cut-gnolls') && strike.tags.includes('surprise'));
+  const [money, xp] = [game.money, game.xp];
+  forceNextD20(20);
+  pick(game, 'Pitch a sack');
+  assertTrue(has(game, 'gnolls_fed') && has(game, 'hobs_ore_done') && questStatus(game, 'hobs-ore') === 'done');
+  assertEqual([game.money - money, game.xp - xp], [1000, 650], 'Dabbin’s ten gold; the fight’s 600 XP and the quest’s 50');
+  assertTrue(pageText(game.page).includes('HOB painted on it') && !has(game, 'hob_reforged'), 'Hob pays in star-iron later, at his forge');
+  assertEqual(cards(game), ['Follow the barrow road north, onto the moor'], 'on to the eve of the barrow');
+  pick(game, 'Follow the barrow road north');
+  assertTrue(pageText(game.page).includes('You leave Dabbin at the Old Ford'));
+});
+
+test('Hob’s ore: the gnolls rise round the cart; Dabbin falls badly hurt and his pay goes on the surgeon; with the Old Ford fallen, on to Cairnfield', async () => {
+  const game = await atTheRally('hobs-ore-ford-fell', { flags: ['ford_fell'] });
+  pick(game, "Call in at Hob's forge");
+  assertTrue(pageText(game.page).includes("The post's fallen"));
+  pick(game, "Say you'll ride north");
+  pick(game, 'Back to the square');
+  pick(game, "Ride north on Dabbin's cart");
+  assertTrue(pageText(game.page).includes("Varrow's given me the key"));
+  pick(game, 'Get Parsnip moving');
+  assertEqual(cards(game), ['Fight']);
+  const money = game.money;
+  settleFight(game, 'Fight', {
+    setUp: (g) => {
+      assertTrue(!g.battle.surprise);
+      const dabbin = fight.combatantById(g.battle, 'dabbin');
+      assertEqual([dabbin.name, dabbin.person, fight.objectiveText(g.battle)], ['Dabbin', 'dabbin', 'Keep Dabbin alive: still standing.']);
+      dabbin.hp = 0;
+    },
+  });
+  assertTrue(has(game, 'gnolls_killed') && has(game, 'dabbin_hurt') && has(game, 'hobs_ore_done'));
+  assertEqual(game.money, money, 'no ten gold: it goes on the surgeon');
+  assertTrue(['Odda is beside him', 'fresh graves', 'You leave Dabbin at the Old Ford, lashing down'].every((s) => pageText(game.page).includes(s)), pageText(game.page));
+});
+
+test('Hob’s ore: losing is Fate’s Mercy, and Dabbin gets the cart, the star-iron and you to the Old Ford anyway', async () => {
+  const game = await atTheRally('hobs-ore-mercy');
+  onDabbinsCart(game);
+  pick(game, 'Get Parsnip moving');
+  settleFight(game, 'Fight', { won: false });
+  assertEqual(game.money, 0, 'your purse went over the side');
+  assertTrue(has(game, 'hobs_ore_fates_mercy') && has(game, 'hobs_ore_done') && questStatus(game, 'hobs-ore') === 'done' && pageText(game.page).includes('Hold on!'));
+  assertEqual(cards(game), ['Follow the barrow road north, onto the moor']);
+});
+
+test('The last morning: Fen’s hanging tree waits, and Dabbin is overdue in the Gorse Cut; home again, Hob works his star-iron into your weapon (+1)', async () => {
+  const game = await atTheLastMorning('last-morning-ch2', { flags: CHAPTER_1_DONE });
+  assertEqual(cards(game), ['Walk out to the old hanging tree at the crossroads with Fen', 'Ask Hob why he keeps looking up the barrow road', "Call in at Hob's forge", 'Ride south with the shard']);
+  pick(game, 'Ask Hob why');
+  assertTrue(pageText(game.page).includes('three days back') && questStatus(game, 'hobs-ore') === 'active');
+  pick(game, 'Run for the Gorse Cut');
+  assertTrue(pageText(game.page).includes('nearly weeps'));
+  pick(game, 'Get Parsnip moving');
+  settleFight(game, 'Fight');
+  assertTrue(has(game, 'hobs_ore_done') && pageText(game.page).includes('Star-iron'));
+  assertEqual(cards(game), ['Your Greatsword', 'Your Flail', 'Your Javelin', 'Your Spear'], 'Wren’s first four weapons');
+  pick(game, 'Your Greatsword');
+  assertTrue(game.inventory.some((e) => e.id === 'greatsword-plus-1') && !game.inventory.some((e) => e.id === 'greatsword') && has(game, 'hob_reforged'));
+  assertTrue(notesOn(game.page).includes('Your Greatsword is now a Greatsword +1: a magic weapon, +1 to its attack rolls and damage rolls.'), notesOn(game.page).join(' / '));
+  assertEqual(cards(game), ['Walk out to the old hanging tree at the crossroads with Fen', "Call in at Hob's forge", 'Ride south with the shard']);
+  pick(game, 'Walk out to the old hanging tree');
+  assertTrue(pageText(game.page).includes('before we go south'));
+});
+
+test('The last morning: with the star-iron home from Chapter 2, Hob owes you; ride south and you call at his forge on the way', async () => {
+  const game = await atTheLastMorning('last-morning-owed', { flags: [...CHAPTER_1_DONE, 'hobs_ore_done'], companions: [] });
+  assertTrue(pageText(game.page).includes("he's not having you leave without it") && !pageText(game.page).includes('loose ends'));
+  assertEqual(cards(game), ["Call in at Hob's forge", "Call at Hob's forge for what he owes you, then ride south with the shard"], 'no hanging tree without Fen');
+  pick(game, "Call in at Hob's forge");
+  assertEqual(cards(game)[0], 'Give Hob a weapon to work his star-iron into');
+  pick(game, 'Back to the square');
+  pick(game, "Call at Hob's forge for what he owes you");
+  pick(game, 'Your Flail');
+  assertTrue(game.inventory.some((e) => e.id === 'flail-plus-1'));
+  const heading = game.page.beats.find((b) => b.heading);
+  assertEqual(heading && heading.text, 'End of Act I · The Barrow Dead');
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

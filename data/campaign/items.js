@@ -33,6 +33,17 @@ export const items = [
     text: 'Slipped into your hand by a courier at the feast in Bramblegate, sealed in black wax with a little gold ship: “The Free League would be glad to make you an offer for what you carried out of the Kings’ Barrow, or for your company, or both. The Regent will want it for nothing. We pay. When you come south, and you will, ask for Silas Dray at any League house.” It’s signed with a flourish: O. Kettering, Magister.',
     source: 'original',
   },
+  // From the Ashen Choir's letter-drop in the hanging tree (Chapter 2, The Hanging Tree), if the
+  // hero pockets it rather than putting it back.
+  {
+    id: 'choir-letter',
+    name: 'The letter from the hanging tree',
+    category: 'quest',
+    weight: 0,
+    cost: null,
+    text: 'A Choir letter from the drop in the hanging tree: columns of numbers in threes, a cipher keyed to the Choir’s hymnal, and under them one line in a tall, looped, old-fashioned hand. The grey wax seal has a crown cut into it: the Precentor’s own.',
+    source: 'original',
+  },
   {
     id: 'goblin-tooth-charm',
     name: 'Goblin-tooth charm',

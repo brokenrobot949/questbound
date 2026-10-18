@@ -125,6 +125,15 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     }
     return companionArt.get(c.id);
   };
+  // An ally who is someone from the story (Dabbin, with his cart), drawn as they look in scenes.
+  const allyArt = new Map();
+  const personFrames = (c) => {
+    if (!allyArt.has(c.id)) {
+      const sprite = personSprite(findPerson(c.person));
+      allyArt.set(c.id, sprite.frames.map((rows) => spriteImage(sprite, rows)));
+    }
+    return allyArt.get(c.id);
+  };
   // People watching from the side who aren't in the fight (Lark on her ledge), drawn as they
   // look in scenes, unless they aren't there this time (battle.absentOnlookers).
   const absent = game.battle.absentOnlookers || [];
@@ -1053,10 +1062,13 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       const c = fight.combatantById(battle, unit.id);
       const standing = unit.hp > 0;
       const pos = at(unit);
-      drawTile(ctx, art, sprites[fight.findMonster(c.monsterId).sprite], pos.x, pos.y, size, standing ? frame : 0, {
-        alpha: standing ? 1 : 0.35,
-        lying: !standing || unit.prone,
-      });
+      if (c.person) blit(ctx, personFrames(c)[standing ? frame : 0], 0, 0, pos.x, pos.y, size, { alpha: standing ? 1 : 0.5, lying: !standing || unit.prone });
+      else {
+        drawTile(ctx, art, sprites[fight.findMonster(c.monsterId).sprite], pos.x, pos.y, size, standing ? frame : 0, {
+          alpha: standing ? 1 : 0.35,
+          lying: !standing || unit.prone,
+        });
+      }
       if (standing) drawHealthBar(ctx, pos, unit.hp / c.maxHp, size, scale);
       if (standing && c.ally) frameSquare(ctx, pos, size, scale, ALLY_FRAME);
       // Who the chosen attack can reach.

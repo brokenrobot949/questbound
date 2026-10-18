@@ -102,14 +102,16 @@ export function heroAttackOptions(game) {
     const proficient = proficientWithWeapon(character, item);
     const twoHands = props.includes('two-handed') || (props.includes('versatile') && !character.shield);
     const dice = props.includes('versatile') && !character.shield ? item.versatile : item.damage.dice;
-    const mastery = masteryFor(character, item.id);
+    const mastery = masteryFor(character, item.baseId || item.id); // a Longsword +1 is a longsword
+    const magic = item.magicBonus || 0; // a magic weapon's bonus to attack and damage rolls
 
     // extra: the Light property's extra attack, which adds no ability modifier to its damage
     // (unless it's negative, or with Two-Weapon Fighting).
     const make = (how, abilityId, { extra = false } = {}) => {
       const mod = abilityId === 'strength' ? str : dex;
       const modifiers = [{ label: short(abilityId), value: mod, source: `${findAbility(abilityId).name} ${abilityScore(character, abilityId).value}` }];
-      if (proficient) modifiers.push({ label: 'Proficiency', value: pb, source: `Proficient with ${item.name}s` });
+      if (proficient) modifiers.push({ label: 'Proficiency', value: pb, source: `Proficient with ${item.baseName || item.name}s` });
+      if (magic) modifiers.push({ label: 'Magic', value: magic, source: `${item.name} (a magic weapon)` });
       if (how === 'ranged' && styles.includes('archery')) modifiers.push({ label: 'Archery', value: 2, source: 'Archery fighting style' });
       // Heavy weapons need Strength 13 (melee) or Dexterity 13 (ranged).
       const needed = how === 'ranged' && props.includes('ammunition') ? 'dexterity' : 'strength';
@@ -126,7 +128,8 @@ export function heroAttackOptions(game) {
         reach: how === 'melee' ? 5 : null,
         range: how === 'ranged' ? item.range : null,
         modifiers,
-        damage: { dice: how === 'melee' ? dice : item.damage.dice, bonus: extra && !styles.includes('two-weapon-fighting') ? Math.min(0, mod) : mod, type: item.damage.type },
+        damage: { dice: how === 'melee' ? dice : item.damage.dice, bonus: (extra && !styles.includes('two-weapon-fighting') ? Math.min(0, mod) : mod) + magic, type: item.damage.type },
+        magicBonus: magic,
         abilityMod: mod,
         greatWeapon: styles.includes('great-weapon-fighting') && how === 'melee' && twoHands,
         savage,
@@ -224,7 +227,8 @@ function lightExtra(game) {
   if (!battle || battle.outcome || battle.order[battle.turn] !== (game.actorId || 'hero')) return null;
   const turn = battle.turnState;
   if (!turn || !turn.light || turn.extraUsed || game.character.shield) return null;
-  const mastery = masteryFor(game.character, turn.light);
+  const used = findItem(turn.light);
+  const mastery = masteryFor(game.character, (used && used.baseId) || turn.light);
   return { itemId: turn.light, nick: Boolean(mastery && mastery.id === 'nick') };
 }
 

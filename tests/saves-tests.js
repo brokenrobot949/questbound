@@ -774,7 +774,7 @@ test('Old ends: a save that stopped at the End of Act I card, the morning after 
   const record = throughJson(gameToSave(game));
   record.game.page.scene = 'ch3_night'; // as if it had stopped the morning after the feast
   const loaded = loadGame(await freshRuntime(), throughJson(record));
-  assertEqual(loaded.story.currentChoices.map((c) => c.text), ['Ask Morwen whether her cats ever came home', "Read Warden Pike's notice about the wolves on the north road", "Call in at Hob's forge", 'Ride south with the shard']);
+  assertEqual(loaded.story.currentChoices.map((c) => c.text), ['Ask Morwen whether her cats ever came home', "Read Warden Pike's notice about the wolves on the north road", 'Ask Hob why he keeps looking up the barrow road', "Call in at Hob's forge", 'Ride south with the shard']);
   assertEqual(loaded.page.beats.slice(0, record.game.page.beats.length), record.game.page.beats, 'the End of Act I page stays on screen above it');
 });
 

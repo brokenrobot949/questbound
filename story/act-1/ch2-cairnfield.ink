@@ -53,10 +53,13 @@ That night you sleep at the Tallow and Thistle. Morwen asks no questions at all,
 // ---- Up onto the high moor ----
 
 = road_north
-{ has_flag("ford_fell"):
-    You pass the Old Ford at noon. Varrow's riders have been and gone: there are fresh graves on the north bank, and the tower door is shut and barred. #location:The barrow road #time:Midday
-- else:
-    North of the Old Ford the barrow road climbs out of the valley and onto the high moor. #location:The barrow road #time:Morning
+{
+    - has_flag("ford_fell") && has_flag("hobs_ore_taken"):
+        You leave Dabbin at the Old Ford, lashing down his crate of star-iron, and walk on north. #location:The barrow road #time:Midday
+    - has_flag("ford_fell"):
+        You pass the Old Ford at noon. Varrow's riders have been and gone: there are fresh graves on the north bank, and the tower door is shut and barred. #location:The barrow road #time:Midday
+    - else:
+        North of the Old Ford the barrow road climbs out of the valley and onto the high moor. #location:The barrow road #time:Morning
 }
 The moor is wide and bare and brown, all heather and bog-cotton and sky, and the barrows on it grow bigger and older the farther north you go. Every one stands open. The tracks of the dead run north between them, sunk deep, and once you find a capstone lying in the heather where its carrier simply stopped, and left it.
 { companion_alive("fen"):

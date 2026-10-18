@@ -79,6 +79,15 @@ export const people = [
     source: 'original',
   },
   {
+    id: 'dabbin',
+    name: 'Dabbin', // Hob's cousin, a carter on the barrow road (Hob's ore); his pony is Parsnip
+    species: 'gnome',
+    size: 'small',
+    armor: 'leather-armor', // a carter's jerkin
+    look: { skin: 'tan', hairStyle: 'tousled', hairColor: 'brown', beard: true, outfit: 'green', accent: 'brown', headgear: 'none' },
+    source: 'original',
+  },
+  {
     id: 'crane',
     name: 'Prior Crane',
     species: 'human',
@@ -133,7 +142,6 @@ export const people = [
   { id: 'goblin-child', name: 'The goblin child', sprite: 'goblin-minion', source: 'original' },
   { id: 'goblin-warrior', name: 'A goblin warrior', sprite: 'goblin-warrior', source: 'original' },
   { id: 'acolyte', name: 'The Choir acolyte', sprite: 'cultist', source: 'original' },
-
   // ---- The bounty hunters (Chapter 2): drawn as they are on the battle grid ----
   { id: 'gaunt', name: 'Mercy Gaunt', sprite: 'bandit-captain', source: 'original' },
   { id: 'hunter', name: 'A bounty hunter', sprite: 'bandit', source: 'original' },

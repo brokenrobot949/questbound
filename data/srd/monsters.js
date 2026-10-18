@@ -45,7 +45,9 @@
 //   'undead-fortitude' (trait): when damage drops it to 0 Hit Points, a Constitution save
 //                   (DC 5 + the damage) leaves it at 1 instead, unless the damage is Radiant or
 //                   from a Critical Hit
-//   bonusActions    e.g. 'nimble-escape' (Disengage or Hide as a Bonus Action)
+//   bonusActions    e.g. 'nimble-escape' (Disengage or Hide as a Bonus Action), 'rampage' (a
+//                   gnoll's: once a day, after hurting someone already Bloodied, it moves half
+//                   its Speed and makes one more melee attack)
 //   spellcasting    the spells it casts (a Cultist Fanatic's): { ability, saveDc, attackBonus,
 //                   atWill: spell ids it can always cast (none of them used in a fight yet),
 //                   spells: [{ id, perDay, bonusAction, words, look }] }. id is a spell in
@@ -494,6 +496,87 @@ export const monsters = [
     behaviour: 'brute',
     sprite: 'stirge',
     text: 'Proboscis. Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Piercing damage, and the stirge attaches to the target. While attached, the stirge can’t make Proboscis attacks, and the target takes 5 (2d4) Necrotic damage at the start of each of the stirge’s turns. The stirge can detach itself by spending 5 feet of its movement. The target or a creature within 5 feet of it can detach the stirge as an action.',
+    source: 'SRD 5.2.1',
+  },
+  // The gnoll pack on the barrow road (Chapter 2, Hob's ore): hungry fiends who follow the
+  // walking dead the way crows follow a plough, with a giant hyena running among them.
+  // 'rampage' (Bonus Action, once a day): straight after it deals damage to someone who was
+  // already Bloodied, it moves up to half its Speed and makes one more melee attack (its Rend
+  // or Bite). See combat/battle.js, "Rampage".
+  {
+    id: 'gnoll-warrior',
+    name: 'Gnoll Warrior',
+    size: 'medium',
+    type: 'Fiend',
+    ac: 15,
+    hp: { average: 27, dice: '6d8' },
+    speed: 30,
+    abilities: { strength: 14, dexterity: 12, constitution: 11, intelligence: 6, wisdom: 10, charisma: 7 },
+    saves: { strength: 2, dexterity: 1, constitution: 0, intelligence: -2, wisdom: 0, charisma: -2 },
+    initiative: 1,
+    darkvision: 60,
+    passivePerception: 10,
+    cr: '1/2',
+    xp: 100,
+    attacks: [
+      { id: 'rend', name: 'Rend', kind: 'melee', bonus: 4, reach: 5, damage: { dice: '1d6', bonus: 2, type: 'piercing' } },
+      { id: 'bone-bow', name: 'Bone Bow', kind: 'ranged', bonus: 3, range: [150, 600], damage: { dice: '1d10', bonus: 1, type: 'piercing' } },
+    ],
+    bonusActions: ['rampage'],
+    behaviour: 'brute',
+    sprite: 'gnoll',
+    text: 'Rend. Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage. Bone Bow. Ranged Attack Roll: +3, range 150/600 ft. Hit: 6 (1d10 + 1) Piercing damage. Rampage (1/Day; Bonus Action). Immediately after dealing damage to a creature that is already Bloodied, the gnoll moves up to half its Speed, and it makes one Rend attack.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'giant-hyena',
+    name: 'Giant Hyena',
+    size: 'large',
+    type: 'Beast',
+    ac: 12,
+    hp: { average: 45, dice: '6d10 + 12' },
+    speed: 50,
+    abilities: { strength: 16, dexterity: 14, constitution: 14, intelligence: 2, wisdom: 12, charisma: 7 },
+    saves: { strength: 3, dexterity: 2, constitution: 2, intelligence: -4, wisdom: 1, charisma: -2 },
+    initiative: 2,
+    skills: { perception: 3 },
+    darkvision: 60,
+    passivePerception: 13,
+    cr: '1',
+    xp: 200,
+    attacks: [{ id: 'bite', name: 'Bite', kind: 'melee', bonus: 5, reach: 5, damage: { dice: '2d6', bonus: 3, type: 'piercing' } }],
+    bonusActions: ['rampage'],
+    behaviour: 'brute',
+    sprite: 'giant-hyena',
+    variant: 'It’s Large, but on the grid it takes one square, as the Ogre Zombie does: Large creatures come when Act II’s big monsters need them.',
+    text: 'Bite. Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Piercing damage. Rampage (1/Day; Bonus Action). Immediately after dealing damage to a creature that was already Bloodied, the hyena can move up to half its Speed, and it makes one Bite attack.',
+    source: 'SRD 5.2.1',
+  },
+  // Dabbin, Hob's cousin, fights from his cart on the barrow road as a Scout (an ally in
+  // encounters.js).
+  {
+    id: 'scout',
+    name: 'Scout',
+    size: 'medium', // Medium or Small (Dabbin is a gnome)
+    type: 'Humanoid',
+    ac: 13, // Leather Armor
+    hp: { average: 16, dice: '3d8 + 3' },
+    speed: 30,
+    abilities: { strength: 11, dexterity: 14, constitution: 12, intelligence: 11, wisdom: 13, charisma: 11 },
+    saves: { strength: 0, dexterity: 2, constitution: 1, intelligence: 0, wisdom: 1, charisma: 0 },
+    initiative: 2,
+    skills: { nature: 4, perception: 5, stealth: 6, survival: 5 },
+    passivePerception: 15,
+    cr: '1/2',
+    xp: 100,
+    multiattack: 2,
+    attacks: [
+      { id: 'shortsword', name: 'Shortsword', kind: 'melee', bonus: 4, reach: 5, damage: { dice: '1d6', bonus: 2, type: 'piercing' } },
+      { id: 'longbow', name: 'Longbow', kind: 'ranged', bonus: 4, range: [150, 600], damage: { dice: '1d8', bonus: 2, type: 'piercing' } },
+    ],
+    behaviour: 'skirmisher',
+    sprite: 'scout',
+    text: 'Multiattack. The scout makes two attacks, using Shortsword and Longbow in any combination. Shortsword. Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage. Longbow. Ranged Attack Roll: +4, range 150/600 ft. Hit: 6 (1d8 + 2) Piercing damage.',
     source: 'SRD 5.2.1',
   },
 ];

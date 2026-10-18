@@ -20,10 +20,12 @@
 //                name, pos } (the Old Ford's soldiers, as Guards). With bondName: true, they're
 //                called by the name the player gave their Bond (the Rival). With ifFlag, they're
 //                only there when that story flag is set. They hold their ground, as a
-//                companion on Hold does, and the foes go for them too. They don't count
-//                towards the difficulty, and at 0 Hit Points they die. The story hears how
-//                many lived, and which (allies_standing() and ally_standing(id) in
-//                story/externals.ink)
+//                companion on Hold does, and the foes go for them too; a skirmisher (a Scout)
+//                shoots its bow when no foe is beside it. They don't count towards the difficulty, and at 0
+//                Hit Points they die, or with fallsHurt: true, go down badly hurt (the Rival,
+//                Dabbin). With person, they're drawn as someone from data/campaign/people.js.
+//                The story hears how many stayed on their feet, and which (allies_standing()
+//                and ally_standing(id) in story/externals.ink)
 //   allyObjective  what the battle screen says about them: "Keep the watch alive" shows as
 //                "Keep the watch alive: 3 of 3 still standing."
 //   onlookers    figures who watch but don't fight: { decor, pos }, or someone from
@@ -141,6 +143,21 @@ const loftLegend = {
 const denLegend = {
   ...roadLegend,
   C: { terrain: 'floor', tile: 'cave-floor' }, // the den's mouth
+};
+
+// The Gorse Cut on the barrow road (Chapter 2, Hob's ore): the road runs through a cutting
+// between banks of gorse, with rock at the corners. Dabbin's cart stands in the road: Parsnip
+// the pony in the shafts, the load of crates, and the tail-board Dabbin shoots from.
+const gorseLegend = {
+  R: { terrain: 'wall', wall: 'rock' },
+  ',': { terrain: 'floor', tile: 'grass' },
+  '.': { terrain: 'floor', tile: 'dirt' },
+  '"': { terrain: 'difficult', tile: 'grass', decor: 'bracken' }, // gorse
+  T: { terrain: 'obstacle', tile: 'grass', decor: 'tree' },
+  o: { terrain: 'obstacle', tile: 'grass', decor: 'boulder' },
+  p: { terrain: 'obstacle', tile: 'dirt', decor: 'pony' },
+  x: { terrain: 'obstacle', tile: 'wood-floor', decor: 'crates' }, // the cart's load
+  c: { terrain: 'floor', tile: 'wood-floor' }, // the cart's tail-board
 };
 
 // Dame Aveline's name, from the oath-wall in the Hall of Champions (Chapter 3). Called by it,
@@ -524,7 +541,7 @@ export const encounters = [
       { monster: 'zombie', pos: { x: 1, y: 6 } },
       { monster: 'zombie', pos: { x: 6, y: 6 } },
     ],
-    allies: [{ id: 'rival', monster: 'bandit-captain', bondName: true, ifFlag: 'rival_freed', pos: { x: 4, y: 1 } }],
+    allies: [{ id: 'rival', monster: 'bandit-captain', bondName: true, ifFlag: 'rival_freed', fallsHurt: true, pos: { x: 4, y: 1 } }],
     hymn: { singer: 'cultist-fanatic', rises: { monster: 'zombie', pos: { x: 2, y: 7 } }, round: 3, from: 'the ash' },
     reinforcements: {
       round: 3,
@@ -554,7 +571,7 @@ export const encounters = [
       { monster: 'zombie', pos: { x: 6, y: 6 } },
       { monster: 'zombie', pos: { x: 3, y: 5 } },
     ],
-    allies: [{ id: 'rival', monster: 'bandit-captain', bondName: true, ifFlag: 'rival_freed', pos: { x: 1, y: 4 } }],
+    allies: [{ id: 'rival', monster: 'bandit-captain', bondName: true, ifFlag: 'rival_freed', fallsHurt: true, pos: { x: 1, y: 4 } }],
     hymn: { singer: 'cultist-fanatic', rises: { monster: 'zombie', pos: { x: 2, y: 7 } }, round: 3, from: 'the ash' },
     callByName: avelinesName,
     whileHeroDown: '{name} leaves you lying in the ash. The hymn matters more than you do.',
@@ -629,6 +646,49 @@ export const encounters = [
       arrival: 'Over the ridge, answering her howl, comes {names}, and joins the fight!',
     },
     whileHeroDown: '{name} stands over you, panting, then slinks back to the den.',
+    source: 'original',
+  },
+  // Chapter 2's side content: Hob's ore. The gnolls rise out of the gorse ahead of Dabbin's
+  // cart: the Giant Hyena and two Gnoll Warriors on the road ahead, and two in the gorse on the
+  // west bank. The party stands at the cart's front, Dabbin on its tail-board, shooting.
+  // Sized, as Chapter 2's other fights are, for a level 3 party of three. Most heroes are
+  // level 4 by the morning before the barrow, where the budget calls it Low; played out 30
+  // times by a plain autopilot hero (as in DESIGN.md), it was won 27 times, and Dabbin lived in
+  // 24 of them, about as hard as Chapter 3's Moderate vault fight at level 4. (Six Gnoll Warriors
+  // and a Giant Hyena, 800 XP, were won 16 times in 30, with Dabbin alive in 7: harder than the
+  // chantry.)
+  {
+    id: 'gorse-cut-gnolls',
+    name: 'Gnolls in the Gorse Cut',
+    difficulty: 'Moderate (a Giant Hyena and four Gnoll Warriors are 600 XP; for a level 3 party of three, Low is 450 and Moderate 675. Dabbin fights beside you, and doesn’t count)',
+    sizedFor: { level: 3, party: 3 },
+    byHand: true,
+    map: {
+      rows: [
+        'R",..,"R',
+        'R",..,,R',
+        '"",..,""',
+        '",,.p,,"',
+        'o,,.x,,"',
+        '",,.c,,o',
+        '",,..,""',
+        '",,..,,"',
+        'T",..,"T',
+        'R",..,,R',
+      ],
+      legend: gorseLegend,
+    },
+    hero: { x: 3, y: 4 },
+    allies: [{ id: 'dabbin', monster: 'scout', name: 'Dabbin', person: 'dabbin', fallsHurt: true, pos: { x: 4, y: 5 } }],
+    allyObjective: 'Keep Dabbin alive',
+    monsters: [
+      { monster: 'giant-hyena', pos: { x: 3, y: 0 } },
+      { monster: 'gnoll-warrior', pos: { x: 2, y: 0 } },
+      { monster: 'gnoll-warrior', pos: { x: 5, y: 0 } },
+      { monster: 'gnoll-warrior', pos: { x: 1, y: 1 } },
+      { monster: 'gnoll-warrior', pos: { x: 0, y: 3 } },
+    ],
+    whileHeroDown: '{name} rips open a sack of the cart’s oats and flings them about, laughing its horrible laugh.',
     source: 'original',
   },
 ];
