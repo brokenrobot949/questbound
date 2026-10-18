@@ -10,6 +10,7 @@ import { equipment } from '../../../data/srd/equipment.js';
 import { armor, shield } from '../../../data/srd/armor.js';
 import { items as storyItems } from '../../../data/campaign/items.js';
 import { shards } from '../../../data/campaign/shards.js';
+import { shops } from '../../../data/campaign/shops.js';
 import { findBackground, findClass } from './sheet.js';
 
 // Any item: armour, a Shield, other equipment, or one of the story's own items.
@@ -99,13 +100,35 @@ export function priceOf(id) {
   return costInCopper(item.cost);
 }
 
-export function canAfford(game, id) {
-  return game.money >= priceOf(id);
+// A shop (data/campaign/shops.js), by id. An unknown id is a story bug.
+export function findShop(id) {
+  const shop = shops.find((s) => s.id === id);
+  if (!shop) throw new Error(`Unknown shop: ${id}`);
+  return shop;
 }
 
-// Pays for one of an item and puts it in the pack. Returns the price paid, in copper.
-export function buyItem(game, id) {
+// The discounts a shop gives this hero now, by their story flags: [{ flag, percent, reason }].
+export function shopDiscounts(game, shopId) {
+  return findShop(shopId).discounts.filter((d) => (game.flags || []).includes(d.flag));
+}
+
+// What one of an item costs, in copper: its price, or in a shop (shopId), its price less any
+// discount the hero has won there, rounded down to the copper.
+export function priceAt(game, id, shopId = null) {
   const price = priceOf(id);
+  if (!shopId) return price;
+  const percent = Math.min(100, shopDiscounts(game, shopId).reduce((sum, d) => sum + d.percent, 0));
+  return Math.floor((price * (100 - percent)) / 100);
+}
+
+export function canAfford(game, id, shopId = null) {
+  return game.money >= priceAt(game, id, shopId);
+}
+
+// Pays for one of an item (in a shop, if shopId is given) and puts it in the pack. Returns the
+// price paid, in copper.
+export function buyItem(game, id, shopId = null) {
+  const price = priceAt(game, id, shopId);
   if (game.money < price) throw new Error(`Not enough money for ${findItem(id).name}`);
   game.money -= price;
   addItem(game.inventory, id, 1);

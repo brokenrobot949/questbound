@@ -17,6 +17,21 @@ export const quests = [
     chapter: 1,
     source: 'original',
   },
+  // Chapter 1's side quests (offered again on the last morning in Bramblegate, if missed).
+  {
+    id: 'too-many-cats',
+    title: 'Too Many Cats',
+    summary: 'The Tallow and Thistle’s cats keep vanishing, Biscuit the grey among them, and Morwen wants them back.',
+    chapter: 1,
+    source: 'original',
+  },
+  {
+    id: 'wolf-den',
+    title: 'Wolves on the North Road',
+    summary: 'Warden Pike pays ten gold to whoever clears the wolf den in the Grey Teeth, an hour up the north road. The wolves have taken eleven sheep and a shepherd’s dog.',
+    chapter: 1,
+    source: 'original',
+  },
   {
     id: 'millers-daughter',
     title: 'The Miller’s Daughter',

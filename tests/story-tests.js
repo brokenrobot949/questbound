@@ -5,7 +5,11 @@ import { test, assertEqual, assertTrue, run } from './harness.js';
 import { Compiler, CompilerOptions, JsonFileHandler } from '../vendor/ink-full.js';
 import { loadStory } from '../js/engine/story/ink-loader.js';
 import { bindExternals } from '../js/engine/story/externals.js';
-import { jumpTo, listScenes, makeChoice, revealRoll } from '../js/engine/story/story-runner.js';
+import { continueAfterBattle, jumpTo, listScenes, makeChoice, revealRoll, startFight } from '../js/engine/story/story-runner.js';
+import * as fight from '../js/engine/combat/battle.js';
+import { priceAt } from '../js/engine/character/inventory.js';
+import { checkModifiers } from '../js/engine/character/sheet.js';
+import { rollLine } from '../js/engine/ui/roll-format.js';
 import { forceNextD20 } from '../js/engine/rules/dice.js';
 import { createRng } from '../js/engine/rules/rng.js';
 import { gameToSave, loadGame, newGame } from '../js/engine/save/save-format.js';
@@ -198,7 +202,7 @@ test('Chapter 1: townsfolk don’t repeat their greeting after each answer, and 
   go("Show her your old regiment's token");
   go("Call in at Hob's forge");
   assertEqual(go('Ask Hob').length, 2, 'Hob’s answer, and no greeting after it');
-  assertEqual(cards(game), ['Back to the square'], 'asked once, that’s it');
+  assertEqual(cards(game), ["Take Hob's bet: arm-wrestle his apprentice", "Look over Hob's blades", 'Back to the square'], 'asked once, that’s it');
   go('Back to the square');
   assertEqual(go("Call in at Hob's forge").length, 1, 'coming back gets one short greeting');
   go('Back to the square');
@@ -296,6 +300,214 @@ test('Heroic Inspiration: no reroll without it, for a kept roll, or for someone 
   assertTrue(!canRerollRoll(game, theirs), 'the warden’s die isn’t yours');
   keepRoll(beat);
   assertTrue(!canRerollRoll(game, beat) && game.inspiration, 'kept, and the Inspiration with it');
+});
+
+// ---- Act I's side quests: Chapter 1 ----
+
+const soraelHero = quickStartHeroes.find((h) => h.id === 'sorael').character;
+
+// Scripted d20 faces first, then the seeded dice: for rolls in an exact order.
+function scriptedThen(faces, seed) {
+  const queue = [...faces];
+  const rest = createRng(seed);
+  return { nextInt: (n) => (queue.length ? queue.shift() - 1 : rest.nextInt(n)), getState: () => rest.getState() };
+}
+
+// A new game in Bramblegate's square on the first morning (Morwen's breakfast eaten).
+async function inTheSquare(seed, character = testHero) {
+  const game = newGame(await freshRuntime(), { slot: 1, seed, character });
+  game.page = jumpTo(game, 'ch1_morning');
+  return game;
+}
+
+// Starts the fight on the card starting with these words, and settles it: won (every foe down)
+// or lost (the hero down). setUp(game) looks at the fight first. (A fight settled this way
+// banks no XP of its own.)
+function settleFight(game, start, { won = true, setUp = () => {} } = {}) {
+  const choice = game.story.currentChoices.find((c) => c.text.startsWith(start) && (c.tags || []).some((t) => t.startsWith('combat:')));
+  if (!choice) throw new Error(`No fight "${start}": ${cards(game).join(' / ')}`);
+  startFight(game, choice);
+  setUp(game);
+  if (won) for (const foe of fight.enemies(game.battle)) foe.hp = 0;
+  else game.hp = 0;
+  game.battle.outcome = won ? 'victory' : 'defeat';
+  game.page = continueAfterBattle(game);
+}
+
+const pageText = (page) => page.beats.filter((b) => b.type === 'text').map((b) => b.text).join(' ');
+const questStatus = (game, id) => (game.journal.quests.find((q) => q.id === id) || {}).status || null;
+const has = (game, flag) => game.flags.includes(flag);
+const athletics = (character) => checkModifiers(character, 'athletics').modifiers.reduce((sum, m) => sum + m.value, 0);
+
+test('Too Many Cats: the notice sends you to Morwen; smoke keeps the nest asleep; the cats, the nest’s loot and free breakfasts', async () => {
+  const game = await inTheSquare('cats');
+  pick(game, 'Read the notice board');
+  assertTrue(pageText(game.page).includes('WOLVES on the north road'), 'Pike’s notice is up too');
+  pick(game, 'Take the notice about Biscuit');
+  assertEqual(questStatus(game, 'too-many-cats'), 'active');
+  assertEqual(cards(game), ['Have a look round the stable first', "Take Morwen's smudge pot up the ladder", 'Climb straight up the ladder']);
+  forceNextD20(20);
+  pick(game, 'Have a look round');
+  assertTrue(has(game, 'saw_stirge_bites') && cards(game).includes("Work out what's been biting the cob"), 'the bites open the Nature check');
+  forceNextD20(20);
+  pick(game, 'Work out');
+  assertTrue(has(game, 'knows_stirges') && pageText(game.page).includes('Stirges'));
+  pick(game, "Take Morwen's smudge pot");
+  assertTrue(has(game, 'smoked_the_nest'));
+  assertEqual(cards(game), ['Fight them', 'Creep across the boards, and strike first']);
+  settleFight(game, 'Fight them', {
+    setUp: (g) => {
+      assertEqual(fight.enemies(g.battle).map((c) => c.name), ['Stirge 1', 'Stirge 2']);
+      assertEqual(g.battle.reinforcements, null, 'the nest sleeps in the smoke');
+    },
+  });
+  assertTrue(pageText(game.page).includes('They were besieged.'));
+  assertEqual(cards(game), ['Coax them down', "Leave the hatch open, and let them come down when they're ready"]);
+  const [money, potions, xp] = [game.money, game.inventory.find((e) => e.id === 'potion-of-healing').quantity, game.xp];
+  pick(game, 'Leave the hatch open');
+  assertEqual([game.money - money, game.inventory.find((e) => e.id === 'potion-of-healing').quantity - potions, game.xp - xp], [800, 1, 50], '8 gold and a potion from the nest, and the quest’s 50 XP');
+  assertTrue(has(game, 'cats_done') && has(game, 'morwen_free_breakfasts') && questStatus(game, 'too-many-cats') === 'done');
+  assertTrue(cards(game).includes('Read the notice board'), 'back in the square');
+  pick(game, 'Read the notice board');
+  assertTrue(!cards(game).some((t) => t.includes('Biscuit')) && pageText(game.page).includes("Warden Pike's wolf bounty") && !pageText(game.page).includes('Biscuit'), 'the cat is off the board');
+});
+
+test('Too Many Cats: without the smoke a third Stirge wakes on round 3; creeping up strikes first; losing is Fate’s Mercy', async () => {
+  const game = await inTheSquare('cats-unsmoked');
+  pick(game, 'Read the notice board');
+  pick(game, 'Take the notice about Biscuit');
+  pick(game, 'Climb straight up');
+  forceNextD20(20);
+  pick(game, 'Creep across');
+  assertEqual(cards(game), ['Strike']);
+  assertTrue(game.story.currentChoices[0].tags.includes('surprise'));
+  settleFight(game, 'Strike', {
+    won: false,
+    setUp: (g) => {
+      assertTrue(g.battle.surprise, 'a surprise attack');
+      assertEqual(g.battle.reinforcements.coming, true, 'the nest wakes on round 3');
+      assertEqual(fight.objectiveText(g.battle), 'One Stirge is coming from the nest: it arrives at the start of round 3.');
+    },
+  });
+  assertEqual(game.money, 0, 'Nan Burdock takes her fee');
+  assertTrue(has(game, 'cats_fates_mercy') && has(game, 'cats_done') && questStatus(game, 'too-many-cats') === 'done', 'Morwen finishes the job, and the cats come down');
+});
+
+test('Wolves: Pike pays ten gold; the empty hills say why they’re starving; driving her off is worth the fight’s XP', async () => {
+  const game = await inTheSquare('wolves');
+  pick(game, 'Read the notice board');
+  pick(game, 'Take Warden Pike up on the wolf bounty');
+  assertEqual(questStatus(game, 'wolf-den'), 'active');
+  assertEqual(cards(game), ['Read the ground as you go', 'Keep to the road, and go straight up to the den']);
+  let xp = game.xp;
+  forceNextD20(20);
+  pick(game, 'Read the ground');
+  assertTrue(has(game, 'wolves_starving') && game.xp - xp === 25, 'the deer are gone: 25 XP');
+  assertEqual(questStatus(game, 'missing-miller'), null, 'no note in a quest not yet taken');
+  pick(game, 'Walk straight up to it');
+  assertTrue(pageText(game.page).includes('an answer comes'), 'she howls for her mate');
+  assertTrue(cards(game).includes('Fight her') && !cards(game).some((t) => t.startsWith('Strike before')));
+  const money = game.money;
+  xp = game.xp;
+  forceNextD20(20);
+  pick(game, 'Make yourself big and loud');
+  assertTrue(has(game, 'wolves_moved_on') && has(game, 'wolf_den_done') && questStatus(game, 'wolf-den') === 'done');
+  assertEqual([game.money - money, game.xp - xp], [1000, 150], 'ten gold; both wolves’ 100 XP and the contract’s 50');
+  assertTrue(pageText(game.page).includes('Gone’s as good as dead') || pageText(game.page).includes("Gone's as good as dead"));
+  assertTrue(cards(game).includes('Read the notice board'), 'back in the square');
+});
+
+test('Wolves: coming at the den unseen keeps her mate away and strikes first; a won fight is paid too', async () => {
+  const game = await inTheSquare('wolves-unseen');
+  game.flags.push('took_bounty'); // so the hills' story goes in The Missing Miller
+  pick(game, 'Read the notice board');
+  pick(game, 'Take Warden Pike up on the wolf bounty');
+  forceNextD20(20);
+  pick(game, 'Read the ground');
+  assertTrue(game.journal.quests.find((q) => q.id === 'missing-miller').notes.some((n) => n.text.startsWith('The deer have gone')), 'a note in The Missing Miller');
+  forceNextD20(20); // Stealth, in Chain Mail: both dice
+  pick(game, 'Circle round');
+  assertTrue(has(game, 'den_unseen') && cards(game).includes("Strike before she knows you're there") && !cards(game).includes('Fight her'));
+  const money = game.money;
+  settleFight(game, 'Strike before', {
+    setUp: (g) => {
+      assertTrue(g.battle.surprise);
+      assertEqual(g.battle.reinforcements, null, 'her mate never heard her');
+    },
+  });
+  assertTrue(has(game, 'wolves_killed') && has(game, 'wolf_den_done'));
+  assertEqual(game.money - money, 1000);
+});
+
+test('Hob’s bet: Greta rolls, then you; a tie goes again; a win takes 10% off Hob’s blades', async () => {
+  const game = await inTheSquare('hob', soraelHero);
+  pick(game, "Call in at Hob's forge");
+  pick(game, "Take Hob's bet");
+  const grip = game.story.currentChoices.find((c) => c.text.startsWith('Grip her hand'));
+  assertTrue(grip.tags.includes('contest:athletics:Greta') && grip.tags.includes('drive:glory'));
+  assertTrue(cards(game).some((t) => t.startsWith('Grease your palm')), 'a Rogue can cheat');
+  const bonus = athletics(soraelHero);
+  game.rng = scriptedThen([10, 15 - bonus], 'hob-tie'); // Greta 10 + 5; Sorael the same
+  pick(game, 'Grip her hand');
+  const rolls = game.page.beats.filter((b) => b.type === 'roll').map((b) => b.result);
+  assertEqual(rolls.map((r) => [r.label, r.total, r.outcome, Boolean(r.opponent)]), [["Greta's Athletics check", 15, null, true], ['Athletics contest', 15, 'tie', false]]);
+  assertEqual(rollLine(rolls[1]).endsWith('= 15 vs Greta’s 15 — tie'), true, rollLine(rolls[1]));
+  assertEqual(cards(game), ['Go again']);
+  const money = game.money;
+  game.rng = scriptedThen([2, 20], 'hob-win');
+  pick(game, 'Go again');
+  assertTrue(has(game, 'hob_discount') && has(game, 'won_hobs_bet') && has(game, 'hobs_bet_done'));
+  assertEqual(game.money - money, 100, 'Hob’s gold piece');
+  assertEqual(cards(game), ['Ask Hob everything he knows about the barrows', "Look over Hob's blades", 'Back to the square'], 'the bet is won');
+  pick(game, "Look over Hob's blades");
+  const dagger = game.story.currentChoices.find((c) => c.text === 'Buy a dagger');
+  assertTrue(dagger.tags.includes('buy:dagger') && dagger.tags.includes('shop:hobs-forge'));
+  assertEqual([priceAt(game, 'dagger'), priceAt(game, 'dagger', 'hobs-forge'), priceAt(game, 'javelin', 'hobs-forge')], [200, 180, 45], '10% off, rounded down to the copper');
+  const before = game.money;
+  pick(game, 'Buy a dagger');
+  assertEqual(game.money, before - 180);
+  assertTrue(notesOn(game.page).includes('Bought: Dagger, for 1 GP, 8 SP.'));
+});
+
+test('Hob’s bet: losing buys the smithy a round; turning it down leaves the offer standing', async () => {
+  const game = await inTheSquare('hob-lose', soraelHero);
+  pick(game, "Call in at Hob's forge");
+  pick(game, "Take Hob's bet");
+  pick(game, 'Laugh it off');
+  assertTrue(!has(game, 'hobs_bet_done') && cards(game).includes("Take Hob's bet: arm-wrestle his apprentice"), 'the bet stands');
+  pick(game, "Take Hob's bet");
+  const money = game.money;
+  game.rng = scriptedThen([20, 1], 'hob-lose');
+  pick(game, 'Grip her hand');
+  assertTrue(has(game, 'lost_hobs_bet') && has(game, 'hobs_bet_done') && !has(game, 'hob_discount'));
+  assertEqual(game.money - money, -100, 'a round for the smithy');
+  pick(game, "Look over Hob's blades");
+  assertEqual(game.story.currentChoices.find((c) => c.text === 'Buy a dagger').tags.includes('shop:hobs-forge'), true);
+  assertEqual(priceAt(game, 'dagger', 'hobs-forge'), 200, 'no discount');
+});
+
+test('The last morning: Act I’s missed side quests wait in Bramblegate before the road south, then the End of Act I', async () => {
+  const game = newGame(await freshRuntime(), { slot: 1, seed: 'last-morning', character: testHero });
+  game.page = jumpTo(game, 'ch3_night.morning');
+  assertEqual(cards(game), ['Go out into Bramblegate, one last time']);
+  assertTrue(!has(game, 'act_1_complete'), 'not over yet');
+  pick(game, 'Go out into Bramblegate');
+  const all = ['Ask Morwen whether her cats ever came home', "Read Warden Pike's notice about the wolves on the north road", "Call in at Hob's forge", 'Ride south with the shard'];
+  assertEqual(cards(game), all);
+  pick(game, 'Ask Morwen');
+  assertTrue(pageText(game.page).includes('A fortnight'), 'the cats have been gone a while now');
+  pick(game, "Take Morwen's smudge pot");
+  settleFight(game, 'Fight them');
+  pick(game, 'Coax them down');
+  assertEqual(cards(game), all.filter((t) => !t.startsWith('Ask Morwen')), 'back to the last morning, the cats done');
+  pick(game, "Call in at Hob's forge");
+  assertEqual(cards(game), ["Take Hob's bet: arm-wrestle his apprentice", "Look over Hob's blades", 'Back to the square']);
+  pick(game, 'Back to the square');
+  pick(game, 'Ride south');
+  const heading = game.page.beats.find((b) => b.heading);
+  assertEqual(heading && heading.text, 'End of Act I · The Barrow Dead');
+  assertTrue(has(game, 'act_1_complete') && game.story.currentChoices.length === 0);
+  assertEqual(game.objective, 'Follow the shard south. (Act II is still being written.)');
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

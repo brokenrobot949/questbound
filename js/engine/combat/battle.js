@@ -56,7 +56,9 @@
 //                start of the hero's next turn), while Slow uses 'slowed'; 'charmed'
 //                (Hypnotic Pattern, concentration); and 'spirit-guardians' (target: its caster,
 //                concentration; radius, dc, damage, and hits: { foe id: the 'round:turn' it
-//                last hurt them }, see "Spirit Guardians")
+//                last hurt them }, see "Spirit Guardians"); and 'attached' (a Stirge clinging
+//                on: target, the one it clings to; by, the Stirge; dice and damageType, what it
+//                drinks each turn; see "Clinging on")
 //   concentration  the spell the hero is concentrating on: { spellId, name }, or null (a
 //                companion's is on their combatant)
 //   reactionsUsed  ids that have used their reaction since their last turn
@@ -378,6 +380,8 @@ export function battleScene(game) {
       escaped: Boolean(c.escaped),
       // What a companion or a foe is concentrating on (the hero's is concentration above).
       concentrating: !isHero(c) && c.concentration ? c.concentration.name : null,
+      // Who a Stirge is clinging to (their id), or null.
+      clinging: clingOf(battle, c.id) ? clingOf(battle, c.id).target : null,
     })),
   };
 }
@@ -513,7 +517,8 @@ function speedOf(game, c) {
   const turn = game.battle.turnState;
   if (isHero(c) && turn && turn.steadyAim && currentCombatant(game.battle) === c) return 0;
   const actor = isPartyMember(c) ? actorGame(game, c) : null;
-  const base = actor ? heroSpeed(actor.character, activeSpellIds(actor)).value : findMonster(c.monsterId).speed;
+  const monster = actor ? null : findMonster(c.monsterId);
+  const base = actor ? heroSpeed(actor.character, activeSpellIds(actor)).value : Math.max(monster.speed, monster.fly || 0);
   return Math.max(0, base - (hasEffect(game.battle, c.id, 'slowed') ? 10 : 0));
 }
 
@@ -524,6 +529,8 @@ function beginTurn(game) {
   battle.reactionsUsed = battle.reactionsUsed.filter((id) => id !== c.id);
   battle.turnState = { movementLeft: speedOf(game, c), action: false, bonus: false, disengaged: false, savageUsed: false, surged: false, athleteMove: 0, freeMoveFrom: null, attacksLeft: 0, slotSpent: false, light: null, extraUsed: false, moved: false, steadyAim: false, aimed: false, commanded: null };
   log(game, isHero(c) ? 'Your turn.' : `${c.name}'s turn.`, { turnOf: c.id });
+  // A Stirge clinging to someone drinks (see "Clinging on").
+  if (c.side === 'enemy') drinkAtStartOfTurn(game, c);
   // A Command spoken to it ends now: this turn obeys it, unless it can't act anyway.
   const command = battle.effects.find((e) => e.target === c.id && COMMANDS.includes(e.kind));
   if (command) {
@@ -664,7 +671,10 @@ function reinforcementsArrive(game) {
     battle.order.push(foe.id);
     arrived.push(foe.name);
   }
-  if (arrived.length) log(game, `Out of the dark from ${coming.from} come ${namesText(arrived)}, and join the fight!`);
+  if (!arrived.length) return;
+  const one = arrived.length === 1;
+  const names = namesText(arrived);
+  log(game, coming.arrival ? coming.arrival.replace('{names}', names) : `Out of the dark from ${coming.from} ${one ? 'comes' : 'come'} ${names}, and ${one ? 'joins' : 'join'} the fight!`);
 }
 
 const NUMBER_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six'];
@@ -838,6 +848,7 @@ function moveAlong(game, mover, path, { free = false, freeFrom = 'Remarkable Ath
         for (const foe of battle.combatants) {
           if (foe.side === mover.side || !canReact(game, foe)) continue;
           if (mover.side === 'hero' && hiddenOf(battle, mover.id)) continue; // nobody sees a hidden one go
+          if (clingOf(battle, foe.id)) continue; // a clinging Stirge can't strike at anyone
           if (isAdjacent(foe.pos, mover.pos) && !isAdjacent(foe.pos, next)) {
             opportunityAttack(game, foe, mover);
             if (battle.outcome || !upright(game, mover)) return;
@@ -849,6 +860,7 @@ function moveAlong(game, mover, path, { free = false, freeFrom = 'Remarkable Ath
       const from = { ...mover.pos };
       mover.pos = { ...next };
       walking.get(battle).path.push({ ...next });
+      dragClingers(battle, mover, from);
       guardiansAfterStep(game, mover, from);
       if (battle.outcome || !upright(game, mover)) return;
     }
@@ -857,6 +869,7 @@ function moveAlong(game, mover, path, { free = false, freeFrom = 'Remarkable Ath
     else log(game, isHero(mover) ? 'You move.' : `${mover.name} moves.`);
   } finally {
     walking.delete(battle);
+    settleClings(game);
   }
 }
 
@@ -1332,6 +1345,7 @@ function performAttack(game, attacker, target, option) {
   applyDamage(game, target, amount, { type: damage.type, critical, plus, from: combatantById(battle, attacker.id) || attacker });
   if (option.rider && target.hp > 0) addRider(game, attacker, target, option);
   if (option.onHit && !battle.outcome) onHitCondition(game, attacker, target, option.onHit);
+  if (option.attach && !battle.outcome) attach(game, attacker, target, option);
   if (ours && option.mastery) masteryOnHit(game, attacker, target, option, damageDealt(target, damage.total, damage.type) > 0);
   if (strike && !battle.outcome) cunningStrikeEffect(game, attacker, target, strike);
   return { critical };
@@ -1654,6 +1668,7 @@ function takeHit(game, target, amount, { type, critical = false, plus = null, ke
     }
     target.hp = Math.max(0, target.hp - taken);
     if (target.hp === 0) log(game, target.ally ? `${target.name} falls, and doesn't get up.` : `${target.name} falls.`);
+    if (target.hp === 0) dropClings(battle, target.id);
     // A foe's Concentration: it ends if the foe falls; otherwise damage means a save to keep it.
     if (target.hp === 0 && target.concentration) endConcentration(game, target, `${target.concentration.name} ends with ${target.name}.`);
     else if (taken > 0 && target.concentration) concentrationCheck(game, target, taken);
@@ -2624,6 +2639,7 @@ function pushAway(game, c, from, feet) {
   }
   c.pos = { ...at };
   log(game, `${c.name} is thrown back ${path.length * SQUARE_FEET} feet.`, {}, { moves: [{ id: c.id, from: start, path }] });
+  settleClings(game, (foe, whom) => `${foe.name} is knocked loose from ${whom}.`);
 }
 
 // ---- Spells and potions for the party ----
@@ -3233,6 +3249,7 @@ export function heroTeleport(game, optionId, pos) {
   const from = { ...hero.pos };
   hero.pos = { ...pos };
   log(game, `You cast ${option.name}: silver mist swallows you, and you step out ${feetBetween(from, pos)} feet away.`, {}, { moves: [{ id: 'hero', from, path: [{ ...pos }], teleport: true }] });
+  settleClings(game, (foe) => `${foe.name} is left clutching at the mist.`);
 }
 
 // Fighter level 2, Action Surge: one more action this turn, though not to cast a spell.
@@ -3303,6 +3320,123 @@ export function heroDrinkPotion(game, targetId = 'hero') {
   rescene(game);
 }
 
+// ---- Clinging on (a Stirge's Proboscis; SRD 5.2.1) ----
+// A monster attack with attach (data/srd/monsters.js) clings on when it hits: an 'attached'
+// effect, target: the one it clings to, by: the monster, with the damage it drains (dice,
+// damageType). While it clings it makes no more of those attacks (a Stirge has no other, so it
+// does nothing else), and at the start of each of its turns the one it clings to takes that
+// damage. It goes along when they walk, a step behind them, and keeps a square beside them.
+// It lets go at the start of its turn if they're down (foes so far never hurt the fallen), or
+// if it can't act (asleep, held, charmed or turned); and straight away if it's pushed off, if
+// they vanish by Misty Step, or if it falls. They, or anyone of their side beside them, can
+// pull it off with an action (the hero: heroPullOff). Companions go for it with their weapons
+// instead: a foe clinging to one of the party is worth three times as much to hurt (weighUp in
+// companion-ai.js).
+
+const clingOf = (battle, foeId) => battle.effects.find((e) => e.kind === 'attached' && e.by === foeId) || null;
+const clingsOn = (battle, id) => battle.effects.filter((e) => e.kind === 'attached' && e.target === id);
+
+// Who a foe is clinging to, or null.
+export function clingingTo(battle, foe) {
+  const cling = clingOf(battle, foe.id);
+  return cling ? combatantById(battle, cling.target) || null : null;
+}
+
+// Whoever's clinging to this creature: [foe].
+export const clingersOn = (battle, id) => clingsOn(battle, id).map((e) => combatantById(battle, e.by)).filter(Boolean);
+
+function attach(game, attacker, target, option) {
+  const battle = game.battle;
+  if (attacker.hp <= 0 || !upright(game, target) || clingOf(battle, attacker.id)) return;
+  battle.effects.push({ kind: 'attached', target: target.id, by: attacker.id, dice: option.attach.dice, damageType: option.attach.type });
+  log(game, `${attacker.name} clings on to ${isHero(target) ? 'you' : target.name}, and starts to drink!`);
+}
+
+function letGo(game, cling, line = null) {
+  const battle = game.battle;
+  battle.effects = battle.effects.filter((e) => e !== cling);
+  if (line) log(game, line);
+}
+
+// A foe that falls lets go of whoever it was clinging to.
+function dropClings(battle, foeId) {
+  battle.effects = battle.effects.filter((e) => !(e.kind === 'attached' && e.by === foeId));
+}
+
+// At the start of a clinging foe's turn: it drinks, or lets go.
+function drinkAtStartOfTurn(game, c) {
+  const battle = game.battle;
+  const cling = clingOf(battle, c.id);
+  if (!cling) return;
+  const host = combatantById(battle, cling.target);
+  const whom = host && isHero(host) ? 'you' : host ? host.name : 'its prey';
+  if (!host || !upright(game, host)) return letGo(game, cling, `${c.name} lets go of ${whom}, and flutters off.`);
+  if (isIncapacitated(battle, c.id)) return letGo(game, cling, `${c.name} goes limp, and drops off ${whom}.`);
+  const damage = rollDamage(game.rng, { dice: cling.dice, bonus: 0, type: cling.damageType });
+  log(game, `${c.name} drinks from ${whom}: ${damageText(damage, cling.dice)} damage.`);
+  applyDamage(game, host, damage.total, { type: damage.type, from: c });
+}
+
+// As the one they cling to takes a step (from: the square they left), each clinging foe goes
+// along a step behind them.
+function dragClingers(battle, mover, from) {
+  let trail = from;
+  for (const foe of clingersOn(battle, mover.id)) {
+    const was = foe.pos;
+    foe.pos = { ...trail };
+    trail = was;
+  }
+}
+
+// After a move, a push or a teleport: each clinging foe that isn't beside the one it clings to
+// takes the nearest free square beside them, or lets go if there's none (or if it was pushed
+// away, or they vanished: letGoWhy).
+function settleClings(game, letGoWhy = null) {
+  const battle = game.battle;
+  const map = battleMap(battle);
+  for (const cling of battle.effects.filter((e) => e.kind === 'attached')) {
+    const foe = combatantById(battle, cling.by);
+    const host = combatantById(battle, cling.target);
+    if (!foe || !host || foe.hp <= 0) {
+      letGo(game, cling);
+      continue;
+    }
+    if (isAdjacent(foe.pos, host.pos)) continue;
+    const whom = isHero(host) ? 'you' : host.name;
+    if (letGoWhy) {
+      letGo(game, cling, letGoWhy(foe, whom));
+      continue;
+    }
+    const blocked = blockedFor(game, foe);
+    const spot = STEPS_AROUND.map(([dx, dy]) => ({ x: host.pos.x + dx, y: host.pos.y + dy })).find((p) => isStandable(map, p) && !blocked(p));
+    if (spot) foe.pos = spot;
+    else letGo(game, cling, `${foe.name} is torn off ${whom}.`);
+  }
+}
+
+// Who the hero can pull a clinging foe off now: themselves, or anyone of their side beside
+// them. [{ foe, host }]
+export function pullOffTargets(game) {
+  const battle = game.battle;
+  if (!battle) return [];
+  const hero = heroCombatant(battle);
+  return battle.effects
+    .filter((e) => e.kind === 'attached')
+    .map((e) => ({ foe: combatantById(battle, e.by), host: combatantById(battle, e.target) }))
+    .filter(({ foe, host }) => foe && host && foe.hp > 0 && (host === hero || (host.side === 'hero' && isAdjacent(host.pos, hero.pos))));
+}
+
+// Pulling it off takes the hero's action. It stays where it is, free to strike again on its
+// turn.
+export function heroPullOff(game, foeId) {
+  requireHeroTurn(game);
+  const battle = game.battle;
+  const pick = pullOffTargets(game).find((p) => p.foe.id === foeId);
+  if (!pick) throw new Error('There is nothing clinging to you, or to a friend beside you, to pull off.');
+  heroUseAction(game, `pull ${pick.foe.name} off`);
+  letGo(game, clingOf(battle, foeId), isHero(pick.host) ? `You tear ${pick.foe.name} off yourself.` : `You tear ${pick.foe.name} off ${pick.host.name}.`);
+}
+
 // ---- Enemy turns ----
 
 // Each monster fights to its behaviour profile (data/srd/monsters.js):
@@ -3314,7 +3448,7 @@ export function heroDrinkPotion(game, targetId = 'hero') {
 // up first. A monster singing a hymn does nothing but sing. A monster that casts spells (a
 // Cultist Fanatic) casts what it can first (see "A foe's spells" below). A Ghoul rakes with
 // its Claw while its target can still be Paralyzed, and bites twice (its Multiattack) once
-// they are. The foes so far don't attack anyone who's down: with nobody left standing, each
+// they are. A Stirge clinging on only drinks (see "Clinging on"). The foes so far don't attack anyone who's down: with nobody left standing, each
 // encounter says what they do instead (its whileHeroDown line).
 function enemyTurn(game, c) {
   const battle = game.battle;
@@ -3332,6 +3466,8 @@ function enemyTurn(game, c) {
     else log(game, `${c.name} sways on its feet, too drowsy to act.`);
     return;
   }
+  // Clinging on and drinking (it drank as its turn began): it does nothing else.
+  if (clingOf(battle, c.id)) return;
   // Who it goes after: the nearest of the party still on their feet (and not hidden).
   const target = chooseTarget(game, c);
   const someoneHidden = partyCombatants(battle).some((p) => upright(game, p) && hiddenOf(battle, p.id));

@@ -10,7 +10,8 @@
 // Medicine check (DC 10) to stabilise them. Next, a friend Paralyzed (by a Ghoul's Claw, or a
 // Fanatic's Hold Person), Blinded or Poisoned is freed with Lesser Restoration, if they have
 // it. Support also heals anyone Bloodied (at half their Hit Points or fewer). When they attack,
-// a foe holding one of the party with Hold Person is worth three times as much to hurt (weighUp).
+// a foe holding one of the party with Hold Person, or a Stirge clinging to one of them, is worth
+// three times as much to hurt (weighUp).
 // A spellcaster (Odda) opens a real fight with a Concentration spell, chosen by tactic (the
 // tactic's concentrate list): a fight whose foes still standing are worth at least a Low
 // fight for the party (realFight), and only if they'd still have a spell slot left for
@@ -38,6 +39,7 @@ import {
   addLogLine,
   attackPreview,
   clearShot,
+  clingingTo,
   companionAttack,
   companionCantUse,
   companionCastAura,
@@ -373,7 +375,8 @@ function weighUp(game, c, options) {
       const preview = attackPreview(game, option.id, foe.id, c.id);
       if (!preview || preview.invalid) continue;
       const sneak = preview.sneak ? averageOf({ dice: preview.sneak, bonus: 0 }) : 0;
-      const worth = holdingSomeone(game.battle, foe) ? 3 : 1;
+      const clinging = clingingTo(game.battle, foe);
+      const worth = holdingSomeone(game.battle, foe) || (clinging && clinging.side === 'hero') ? 3 : 1;
       list.push({ option, foe, value: worth * preview.chance * (averageOf(option.damage) + sneak), preview });
     }
   }

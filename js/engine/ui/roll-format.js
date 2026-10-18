@@ -46,8 +46,11 @@ export function modifierText(modifier) {
   return `${sign} ${modifier.label} ${Math.abs(modifier.value)}`;
 }
 
+// "DC 15", "AC 13", or in a contest, the other side's total: "Greta’s 17".
 export function targetText(result) {
-  return result.target ? `${result.target.type} ${result.target.value}` : '';
+  if (!result.target) return '';
+  if (result.target.type === 'contest') return `${result.target.who}’s ${result.target.value}`;
+  return `${result.target.type} ${result.target.value}`;
 }
 
 // "success", "failure", "hit", "miss", "critical hit" or "miss (natural 1)".

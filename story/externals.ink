@@ -87,6 +87,21 @@ EXTERNAL set_objective(text)
 EXTERNAL can_afford(item)
 EXTERNAL buy(item)
 
+// can_afford_at(shop, item) and buy_at(shop, item): the same, in a shop from
+// data/campaign/shops.js, at its price there (less any discount the hero has won). Tag the
+// choice with #shop too, so the card shows that price:
+//   + {can_afford_at("hobs-forge", "dagger")} [Buy a dagger #buy:dagger #shop:hobs-forge]
+//       ~ buy_at("hobs-forge", "dagger")
+EXTERNAL can_afford_at(shop, item)
+EXTERNAL buy_at(shop, item)
+
+// contest(skill, who, bonus): the hero and someone else both make a check, and the higher
+// total wins, e.g. arm-wrestling: ~ temp won = contest("athletics", "Greta", 5)
+// They roll first (adding bonus), then the hero; the player sees both rolls. Returns 1 if the
+// hero wins, -1 if they lose, and 0 for a tie (go again, say). Tag the choice with
+// #contest:skill:who, so the card says what it is.
+EXTERNAL contest(skill, who, bonus)
+
 // give_item(item): the hero is given one of an item, free. has_item(item): they carry one.
 EXTERNAL give_item(item)
 EXTERNAL has_item(item)

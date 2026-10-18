@@ -660,6 +660,118 @@ test('Wolf: while the hero is down, it goes back to the dead goblin, and the fal
   assertTrue(fight.isProne(hurt.game.battle, 'hero'), 'Unconscious includes Prone');
 });
 
+// ---- Stirges (Too Many Cats) ----
+
+// The hayloft fight, with the nest smoked (two Stirges) and the hero going first: Stirge 1 moved
+// beside the hero (on the hatch at (3, 7)), Stirge 2 out of the fight unless kept (keepSecond).
+// Initiative is rolled hero first, then the Stirges in order: 20, 1, 1.
+function stirgeFight({ character = wren, seed = 'stirge', keepSecond = false, flags = ['smoked_the_nest'] } = {}) {
+  const game = { ...gameFor(character, seed), flags: [...flags] };
+  game.rng = scriptedThen([20, 1, 1], seed);
+  fight.startBattle(game, 'loft-stirges', 0);
+  const [first, second] = fight.enemies(game.battle);
+  first.pos = { x: 3, y: 6 };
+  if (!keepSecond) second.hp = 0;
+  return { game, first, second };
+}
+
+const isAdjacentTo = (a, b) => squaresBetween(a.pos, b.pos) === 1;
+
+// Ends the hero's turn with Stirge 1's Proboscis hitting (a 15: 20 against Wren's AC).
+function stirgeClings(game) {
+  game.rng = scriptedThen([15], 'cling');
+  fight.endHeroTurn(game);
+}
+
+test('Stirge: a Tiny flyer worth 25 XP, it flies 40 feet to reach you', () => {
+  const stirge = fight.findMonster('stirge');
+  assertEqual([stirge.size, stirge.speed, stirge.fly, stirge.xp, stirge.hp.average], ['tiny', 10, 40, 25, 5]);
+  const { game, second } = stirgeFight({ keepSecond: true });
+  second.pos = { x: 6, y: 2 }; // 25 feet away: too far to walk at 10 feet, not to fly
+  const first = fight.enemies(game.battle)[0];
+  first.pos = { x: 1, y: 2 };
+  fight.endHeroTurn(game);
+  const hero = fight.heroCombatant(game.battle);
+  assertTrue(isAdjacentTo(second, hero) && isAdjacentTo(first, hero), JSON.stringify([first.pos, second.pos]));
+});
+
+test('Stirge: a hit clings on; it drinks 2d4 necrotic as each of its turns begins, and strikes no more', () => {
+  const { game, first } = stirgeFight();
+  stirgeClings(game);
+  assertTrue(game.battle.log.some((e) => e.text === 'Stirge 1 clings on to you, and starts to drink!'), 'it clings on');
+  assertEqual(fight.clingingTo(game.battle, first), fight.heroCombatant(game.battle));
+  assertEqual(fight.battleScene(game).units.find((u) => u.id === first.id).clinging, 'hero');
+  const hp = game.hp;
+  const lines = game.battle.log.length;
+  fight.endHeroTurn(game);
+  const turn = game.battle.log.slice(lines);
+  const drink = turn.find((e) => e.text.startsWith('Stirge 1 drinks from you: 2d4 ('));
+  assertTrue(Boolean(drink), turn.map((e) => e.text).join(' | '));
+  const drunk = Number(drink.text.match(/= (\d+) necrotic/)[1]);
+  assertTrue(drunk >= 2 && drunk <= 8 && game.hp === hp - drunk, `${hp} → ${game.hp}`);
+  assertTrue(!turn.some((e) => e.roll && e.roll.kind === 'attack'), 'no Proboscis attack while it clings');
+});
+
+test('Stirge: it goes along when you walk, and makes no Opportunity Attack as you go', () => {
+  const { game, first } = stirgeFight();
+  stirgeClings(game);
+  const lines = game.battle.log.length;
+  fight.heroMove(game, { x: 5, y: 7 });
+  assertTrue(!game.battle.log.slice(lines).some((e) => e.text.includes('Opportunity Attack')), 'nothing to dodge');
+  assertTrue(isAdjacentTo(first, fight.heroCombatant(game.battle)), `it came along, to ${JSON.stringify(first.pos)}`);
+  assertEqual(fight.clingingTo(game.battle, first), fight.heroCombatant(game.battle));
+});
+
+test('Stirge: pull it off with your action; kill it, and it lets go', () => {
+  const { game, first } = stirgeFight();
+  stirgeClings(game);
+  assertEqual(fight.pullOffTargets(game).map(({ foe, host }) => [foe.id, host.id]), [[first.id, 'hero']]);
+  fight.heroPullOff(game, first.id);
+  assertTrue(game.battle.turnState.action && fight.clingingTo(game.battle, first) === null);
+  assertTrue(game.battle.log.some((e) => e.text === 'You tear Stirge 1 off yourself.'));
+  assertThrows(() => fight.heroPullOff(game, first.id), 'nothing clinging any more');
+
+  const killed = stirgeFight({ seed: 'stirge-kill' });
+  stirgeClings(killed.game);
+  forceNextD20(19); // a hit; the greatsword's 2d6 + 3 is always 5 or more
+  fight.heroAttack(killed.game, 'greatsword-melee', killed.first.id);
+  assertEqual(killed.first.hp, 0);
+  assertTrue(!killed.game.battle.effects.some((e) => e.kind === 'attached'), 'a fallen Stirge lets go');
+});
+
+test('Stirge: it lets go of someone who falls, rather than drink from the dying', () => {
+  const { game, first } = stirgeFight({ seed: 'stirge-falls' });
+  stirgeClings(game);
+  game.hp = 1;
+  // Its next drink (2d4: 1 and 1) drops the hero; then three death saves of 10 (Stable).
+  game.rng = scriptedThen([1, 1, 10, 10, 10], 'stirge-falls');
+  fight.endHeroTurn(game);
+  const text = game.battle.log.map((e) => e.text);
+  assertTrue(text.filter((t) => t.startsWith('Stirge 1 drinks from you')).length === 1, 'one drink, then no more');
+  assertTrue(text.includes('Stirge 1 lets go of you, and flutters off.'), text.slice(-12).join(' | '));
+  assertEqual(fight.clingingTo(game.battle, first), null);
+});
+
+test('Stirge: companions go for a Stirge clinging to one of the party before one that isn’t', () => {
+  const game = { ...gameFor(wren, 'stirge-party'), party: [], flags: ['smoked_the_nest'] };
+  joinParty(game, 'fen');
+  // Initiative, rolled Wren, the two Stirges, then Fen: Wren goes first, then Fen (1 + his
+  // Dexterity beats the Stirges' 1 + 3).
+  game.rng = scriptedThen([20, 1, 1, 1], 'stirge-party');
+  fight.startBattle(game, 'loft-stirges', 0);
+  assertEqual(game.battle.order.slice(0, 2), ['hero', 'fen']);
+  const [first, second] = fight.enemies(game.battle);
+  // Both Stirges beside Wren and Fen, so they're as easy to hurt; Stirge 2 clings to Wren.
+  fight.combatantById(game.battle, 'fen').pos = { x: 4, y: 6 };
+  first.pos = { x: 3, y: 6 };
+  second.pos = { x: 4, y: 7 };
+  game.battle.effects.push({ kind: 'attached', target: 'hero', by: second.id, dice: '2d4', damageType: 'necrotic' });
+  const lines = game.battle.log.length;
+  fight.endHeroTurn(game);
+  const fens = game.battle.log.slice(lines).filter((e) => e.text.startsWith('Fen ') && e.roll && e.roll.kind === 'attack');
+  assertTrue(fens.length > 0 && fens[0].text.includes('Stirge 2'), game.battle.log.slice(lines).map((e) => e.text).join(' | '));
+});
+
 // ---- The story ----
 
 async function storyGame(character, seed) {

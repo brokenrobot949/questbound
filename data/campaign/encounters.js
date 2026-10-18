@@ -43,7 +43,9 @@
 //                they never come. The battle screen says they're coming, and when. They don't
 //                count towards the difficulty, and a fight with them is played by hand. Each
 //                one can have a name ("Sister Rhosyn"), and an ifFlag: then they only come if
-//                that story flag is set
+//                that story flag is set. arrival (optional) is the fight log's line when they
+//                come, with {names} for who ("Over the ridge comes {names}…"); otherwise
+//                "Out of the dark from the moor come Zombie 1 and Zombie 2, and join the fight!"
 //   callByName   a foe the hero can call by its true name, if the story taught it to them:
 //                { monster, name, ifFlag, range (feet), goesFor (a foe's name), action, what,
 //                call, heard }. Calling uses the hero's action, and works while that foe is on
@@ -116,6 +118,29 @@ const roadLegend = {
   o: { terrain: 'obstacle', tile: 'grass', decor: 'boulder' },
   g: { terrain: 'floor', tile: 'dirt', decor: 'goblin-body' },
   b: { terrain: 'floor', tile: 'grass', decor: 'bones' },
+};
+
+// The Tallow and Thistle's hayloft (Chapter 1, Too Many Cats): a plank floor under the thatch,
+// bales of hay, a barrel and crates of the inn's stores, the ladder hatch the hero comes up
+// through, the Stirges' nest, and the inn's cats, out of reach up on the cross-beams.
+const loftLegend = {
+  '#': { terrain: 'wall', wall: 'wood' },
+  '.': { terrain: 'floor', tile: 'wood-floor' },
+  h: { terrain: 'obstacle', tile: 'wood-floor', decor: 'hay-bale' },
+  b: { terrain: 'obstacle', tile: 'wood-floor', decor: 'barrel' },
+  x: { terrain: 'obstacle', tile: 'wood-floor', decor: 'crates' },
+  H: { terrain: 'floor', tile: 'hatch' },
+  n: { terrain: 'obstacle', tile: 'wood-floor', decor: 'furs' }, // the nest
+  g: { terrain: 'obstacle', tile: 'wood-floor', decor: 'grey-cat' }, // Biscuit
+  o: { terrain: 'obstacle', tile: 'wood-floor', decor: 'ginger-cat' },
+  k: { terrain: 'obstacle', tile: 'wood-floor', decor: 'black-cat' },
+};
+
+// The wolves' den (Chapter 1's contract): a track up through grass and bracken to the den's
+// mouth in the rocks, with old sheep bones by the path.
+const denLegend = {
+  ...roadLegend,
+  C: { terrain: 'floor', tile: 'cave-floor' }, // the den's mouth
 };
 
 // Dame Aveline's name, from the oath-wall in the Hall of Champions (Chapter 3). Called by it,
@@ -533,6 +558,77 @@ export const encounters = [
     hymn: { singer: 'cultist-fanatic', rises: { monster: 'zombie', pos: { x: 2, y: 7 } }, round: 3, from: 'the ash' },
     callByName: avelinesName,
     whileHeroDown: '{name} leaves you lying in the ash. The hymn matters more than you do.',
+    source: 'original',
+  },
+  // ---- Act I side quests ----
+  // Too Many Cats (Chapter 1): two Stirges in the Tallow and Thistle's hayloft. A third sleeps
+  // in the nest and wakes on round 3, unless the hero smoked the nest first.
+  {
+    id: 'loft-stirges',
+    name: 'The Stirges in the Loft',
+    difficulty: 'Low (50 XP budget for one level 1 hero; two Stirges are 50 XP. Unless the nest was smoked, a third wakes on round 3)',
+    sizedFor: { level: 1, party: 1 },
+    map: {
+      rows: [
+        '########',
+        '#g.hh.o#',
+        '#......#',
+        '#h..n..#',
+        '#......#',
+        '#.x...h#',
+        '#k.....#',
+        '#h.H..b#',
+        '########',
+      ],
+      legend: loftLegend,
+    },
+    hero: { x: 3, y: 7 },
+    monsters: [
+      { monster: 'stirge', pos: { x: 3, y: 3 } },
+      { monster: 'stirge', pos: { x: 5, y: 2 } },
+    ],
+    reinforcements: {
+      round: 3,
+      monsters: [{ monster: 'stirge', pos: { x: 5, y: 3 } }],
+      from: 'the nest',
+      unlessFlag: 'smoked_the_nest',
+      arrival: 'Something stirs in the nest, and {names} whines up out of it, and joins the fight!',
+    },
+    whileHeroDown: '{name} whines up into the rafters, full and sleepy.',
+    source: 'original',
+  },
+  // The wolf den (Chapter 1's contract on the notice board): a starving she-wolf at the den's
+  // mouth. Her mate is out on the hills, and comes back on round 3, unless the hero reached the
+  // den unseen (so she never howled for him).
+  {
+    id: 'wolf-den',
+    name: 'The Wolf Den on the North Road',
+    difficulty: 'Low (50 XP budget for one level 1 hero; one Wolf is 50 XP. Unless the hero came unseen, her mate joins on round 3)',
+    sizedFor: { level: 1, party: 1 },
+    map: {
+      rows: [
+        'RRRCCRRR',
+        'R,,..,"R',
+        'o,"..b,,',
+        ',,,..,,T',
+        'T",..,,,',
+        ',,,..o,,',
+        'D",..,,T',
+        ',,,..,,,',
+        'T,,..,,T',
+      ],
+      legend: denLegend,
+    },
+    hero: { x: 3, y: 8 },
+    monsters: [{ monster: 'wolf', pos: { x: 4, y: 1 } }],
+    reinforcements: {
+      round: 3,
+      monsters: [{ monster: 'wolf', pos: { x: 7, y: 4 } }],
+      from: 'the hills',
+      unlessFlag: 'den_unseen',
+      arrival: 'Over the ridge, answering her howl, comes {names}, and joins the fight!',
+    },
+    whileHeroDown: '{name} stands over you, panting, then slinks back to the den.',
     source: 'original',
   },
 ];

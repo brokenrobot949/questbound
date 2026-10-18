@@ -8,6 +8,8 @@ export const sheets = {
   dog: ['assets/dawnlike/Characters/Dog0.png', 'assets/dawnlike/Characters/Dog1.png'],
   undead: ['assets/dawnlike/Characters/Undead0.png', 'assets/dawnlike/Characters/Undead1.png'],
   humanoid: ['assets/dawnlike/Characters/Humanoid0.png', 'assets/dawnlike/Characters/Humanoid1.png'],
+  pest: ['assets/dawnlike/Characters/Pest0.png', 'assets/dawnlike/Characters/Pest1.png'],
+  cat: ['assets/dawnlike/Characters/Cat0.png', 'assets/dawnlike/Characters/Cat1.png'],
   floor: ['assets/dawnlike/Objects/Floor.png'],
   wall: ['assets/dawnlike/Objects/Wall.png'],
   decor: ['assets/dawnlike/Objects/Decor0.png'],
@@ -40,6 +42,7 @@ export const sprites = {
   'ogre-zombie': { sheet: 'undead', col: 6, row: 0 }, // a great hulking zombie
   wight: { sheet: 'undead', col: 1, row: 2 }, // a skeletal knight in blue and gold
   cantor: { sheet: 'humanoid', col: 2, row: 7 }, // Cantor Vesk: a heavy hooded figure in grey
+  stirge: { sheet: 'pest', col: 5, row: 1 }, // a little red bloodsucker with blue wings and a long nose
 };
 
 // Floor tiles and things that stand on them. alpha (0 to 1) draws a picture faded, and
@@ -99,6 +102,14 @@ export const tiles = {
   // The Chantry of Ash: the Choir's altar, and the slab of Dame Aveline's tomb.
   altar: { sheet: 'decor', col: 0, row: 20 },
   'tomb-slab': { sheet: 'decor', col: 2, row: 20 },
+  // Act I's side quests: the Tallow and Thistle's hayloft (bales of hay, the ladder hatch, and
+  // the inn's cats up on the cross-beams), and the wolves' den in the rocks up the north road.
+  'hay-bale': { sheet: 'decor', col: 6, row: 9 },
+  hatch: { sheet: 'tile', col: 1, row: 1 },
+  'grey-cat': { sheet: 'cat', col: 0, row: 3 },
+  'ginger-cat': { sheet: 'cat', col: 0, row: 1 },
+  'black-cat': { sheet: 'cat', col: 2, row: 0 },
+  'white-cat': { sheet: 'cat', col: 0, row: 2 },
 };
 
 // Walls join up with their neighbours. Each wall style is a block of tiles in DawnLike's

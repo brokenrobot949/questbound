@@ -10,6 +10,10 @@
 //   #drive:wealth                the choice fits that Drive; the card says so if it's the hero's.
 //                                 A choice can fit two (#drive:faith #drive:kinship).
 //   #buy:torch                    the choice buys that item; the card shows the price
+//   #shop:hobs-forge              with #buy: bought in that shop (data/campaign/shops.js); the
+//                                 card shows its price there, less any discount won
+//   #contest:athletics:Greta      the choice is a contest of that skill against someone; the
+//                                 card shows "Athletics · contest with Greta"
 //   #pay:10                       the choice pays that many gold pieces (a fine, a bribe);
 //                                 the card shows it
 //   #combat:mill-scavengers       the choice starts that fight; its content runs after it
@@ -28,7 +32,7 @@
 //                                 Dead", shown as a heading instead of a paragraph
 
 export function parseTags(tags) {
-  const parsed = { check: null, spell: null, by: null, shard: null, location: null, time: null, drives: [], buy: null, pay: null, combat: null, surprise: false, go: null, room: null, speaker: null, heading: false };
+  const parsed = { check: null, contest: null, spell: null, by: null, shard: null, location: null, time: null, drives: [], buy: null, shop: null, pay: null, combat: null, surprise: false, go: null, room: null, speaker: null, heading: false };
   for (const tag of tags || []) {
     const colon = tag.indexOf(':');
     const key = (colon < 0 ? tag : tag.slice(0, colon)).trim();
@@ -36,6 +40,11 @@ export function parseTags(tags) {
     if (key === 'check') {
       const [testId, dc] = value.split(':').map((part) => part.trim());
       parsed.check = { testId, dc: Number(dc) };
+    } else if (key === 'contest') {
+      const [testId, who] = value.split(':').map((part) => part.trim());
+      parsed.contest = { testId, who };
+    } else if (key === 'shop') {
+      parsed.shop = value;
     } else if (key === 'spell') {
       parsed.spell = value;
     } else if (key === 'by') {

@@ -3115,7 +3115,7 @@ test('Chapter 3, beat 7: Knight-Captain Marchbank’s request: the shard won’t
   assertTrue(['a little gold ship', 'ask for Silas Dray', 'O. Kettering, Magister', 'Our arrangement stands', 'stamped with a crown', 'We have taken an interest in what you owe Hollis Grange', 'put a price on a thing in writing'].every((s) => letter.includes(s)), letter);
 });
 
-test('Chapter 3, beat 7: going up to bed without hearing Marchbank out, she stops you on the stair; that night the shard says your name, you reach level 5, and Act I ends with the shard pointing south', async () => {
+test('Chapter 3, beat 7: going up to bed without hearing Marchbank out, she stops you on the stair; that night the shard says your name, you reach level 5, the shard points south, and after one last morning Act I ends', async () => {
   const game = await atTheHomecoming('feast-night', { at: 'ch3_feast' }); // Wren, whose Bond is her sibling Kit
   game.xp = 5000;
   toTheFaces(game);
@@ -3132,10 +3132,16 @@ test('Chapter 3, beat 7: going up to bed without hearing Marchbank out, she stop
   const morning = pageText(game);
   assertTrue(['enormous', 'Have you thought?', 'Odda is packing, and Fen is eating', 'pointing south'].every((s) => morning.includes(s)), morning);
   assertTrue(!morning.includes("Don't come after me"), 'no Rival');
+  assertTrue(!game.page.beats.some((b) => b.heading) && !game.flags.includes('act_1_complete'), 'not the end yet');
+  assertEqual(cards(game), ['Go out into Bramblegate, one last time']);
+  pick(game, 'Go out into Bramblegate');
+  assertTrue(pageText(game).includes('letters for Highcrown') && cards(game).includes('Ride south with the shard'), pageText(game));
+  pick(game, 'Ride south');
   const heading = game.page.beats.filter((b) => b.heading);
   assertEqual(heading, [{ type: 'text', text: 'End of Act I · The Barrow Dead', heading: true }]);
   assertTrue(game.flags.includes('act_1_complete') && !game.flags.includes('rival_left_bramblegate'));
-  assertEqual([cards(game), game.objective, currentTime(game)], [[], 'Follow the shard south. (Act II is still being written.)', 'Morning']);
+  assertTrue(pageText(game).includes('Odda and Fen are arguing'), pageText(game));
+  assertEqual([cards(game), game.objective, currentTime(game)], [[], 'Follow the shard south. (Act II is still being written.)', 'Afternoon']);
 });
 
 test('Chapter 3, beat 7: the old woman with the owl says a few words if you go over, and you don’t answer the shard that night', async () => {

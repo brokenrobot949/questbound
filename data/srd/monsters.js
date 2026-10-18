@@ -3,6 +3,8 @@
 //   size, type      as in the stat block
 //   ac, hp          Armor Class; Hit Points as { average, dice } (monsters use the average)
 //   speed           walking speed in feet
+//   fly             flying speed in feet, if it has one (a Stirge's 40). It moves at whichever
+//                   is faster; on the grid it still goes round obstacles, as walkers do
 //   abilities       the six scores
 //   saves           saving throw bonuses (from the stat block's SAVE column)
 //   initiative      Initiative bonus
@@ -17,7 +19,13 @@
 //                   next turn; notTypes (creature types) and notSpecies (heroes' species) can't
 //                   get it, e.g. a Ghoul's Claw: notTypes ['undead'], notSpecies ['elf'],
 //                   alone: true for an attack that isn't part of its Multiattack: an action of its
-//                   own (see behaviour below) }
+//                   own (see behaviour below),
+//                   attach: { dice, type } for an attack that clings on when it hits (a Stirge's
+//                   Proboscis): while attached, the monster makes no more of these attacks, and
+//                   at the start of each of its turns the one it clings to takes that damage. It
+//                   goes along when they move. It lets go if they drop to 0 Hit Points, or it
+//                   can't act; they, or anyone of their side beside them, can pull it off with
+//                   an action (combat/battle.js, "Clinging on") }
 //   traits          rules the game plays, e.g. 'pack-tactics' (Advantage on attacks against a
 //                   creature with one of its allies, not Incapacitated, within 5 feet of it)
 //   multiattack     how many attacks it makes with its action (1 if not given)
@@ -460,6 +468,32 @@ export const monsters = [
     sprite: 'animated-armor',
     variant: 'Its Blindsight (60 feet) isn’t played yet: in a fight it sees like anyone else, so a hidden hero stays hidden from it.',
     text: 'Multiattack. The armor makes two Slam attacks. Slam. Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Bludgeoning damage.',
+    source: 'SRD 5.2.1',
+  },
+  // ---- Act I side quests ----
+  // The nest in the Tallow and Thistle's loft (Chapter 1, Too Many Cats).
+  {
+    id: 'stirge',
+    name: 'Stirge',
+    size: 'tiny',
+    type: 'Monstrosity',
+    ac: 13,
+    hp: { average: 5, dice: '2d4' },
+    speed: 10,
+    fly: 40,
+    abilities: { strength: 4, dexterity: 16, constitution: 11, intelligence: 2, wisdom: 8, charisma: 6 },
+    saves: { strength: -3, dexterity: 3, constitution: 0, intelligence: -4, wisdom: -1, charisma: -2 },
+    initiative: 3,
+    darkvision: 60,
+    passivePerception: 9,
+    cr: '1/8',
+    xp: 25,
+    attacks: [
+      { id: 'proboscis', name: 'Proboscis', kind: 'melee', bonus: 5, reach: 5, damage: { dice: '1d6', bonus: 3, type: 'piercing' }, attach: { dice: '2d4', type: 'necrotic' } },
+    ],
+    behaviour: 'brute',
+    sprite: 'stirge',
+    text: 'Proboscis. Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Piercing damage, and the stirge attaches to the target. While attached, the stirge can’t make Proboscis attacks, and the target takes 5 (2d4) Necrotic damage at the start of each of the stirge’s turns. The stirge can detach itself by spending 5 feet of its movement. The target or a creature within 5 feet of it can detach the stirge as an action.',
     source: 'SRD 5.2.1',
   },
 ];

@@ -11,7 +11,7 @@ import { abilityCheck } from '../rules/ability-check.js';
 import { d20Test } from '../rules/d20-test.js';
 import { canCastSpell, findSpell, preparePicks } from '../character/spells.js';
 import { castCostText, castInScene, guidanceModifiers, sceneCastCost, spellSaveDc } from '../character/casting.js';
-import { findAbility } from '../character/sheet.js';
+import { findAbility, findSkill, findTool } from '../character/sheet.js';
 import { addItem, buyItem, canAfford, COPPER_PER, findItem, hasItem, hasShard, moneyText, removeItem } from '../character/inventory.js';
 import { findBond, findDrive } from '../character/creation.js';
 import { addDeed, findQuest, finishQuest, questNote, startQuest } from './journal.js';
@@ -304,6 +304,53 @@ export function bindExternals(story, runtime) {
     false,
   );
 
+  // can_afford_at(shop, item) and buy_at(shop, item): the same, in a shop from
+  // data/campaign/shops.js, at its price there (less any discount the hero has won). Tag the
+  // choice with #buy:item and #shop:id, so the card shows that price, e.g.
+  //   + {can_afford_at("hobs-forge", "dagger")} [Buy a dagger #buy:dagger #shop:hobs-forge]
+  //       ~ buy_at("hobs-forge", "dagger")
+  story.BindExternalFunction('can_afford_at', (shop, id) => canAfford(runtime.game, id, shop), false);
+  story.BindExternalFunction(
+    'buy_at',
+    (shop, id) => {
+      const price = buyItem(runtime.game, id, shop);
+      note(runtime.game, dmNotes.itemBought, { item: findItem(id).name, cost: moneyText(price) });
+    },
+    false,
+  );
+
+  // contest(skill, who, bonus): the hero and someone else both make a check, and the higher
+  // total wins (arm-wrestling Hob's apprentice: contest("athletics", "Greta", 5)). who rolls
+  // first, adding bonus, in the open; then the hero rolls to beat it (Guidance and a Fighter's
+  // Tactical Mind help, as with check). Returns 1 if the hero wins, -1 if they lose, and 0 for a
+  // tie: neither has the better of it yet (a scene can have them go again).
+  story.BindExternalFunction(
+    'contest',
+    (skill, who, bonus) => {
+      const { game } = runtime;
+      const theirs = d20Test({
+        rng: game.rng,
+        kind: 'check',
+        label: `${who}'s ${testName(skill)} check`,
+        modifiers: [{ label: testName(skill), value: bonus, source: who }],
+      });
+      game.pending.push({ type: 'roll', result: { ...theirs, opponent: who } });
+      // To win, the hero has to beat their total: meeting it is a tie.
+      const rolled = abilityCheck({ rng: game.rng, character: game.character, testId: skill, dc: theirs.total + 1, extraModifiers: guidanceModifiers(game) });
+      const mine = tacticalMind(game, { ...rolled, label: `${testName(skill)} contest` });
+      const outcome = mine.success ? 1 : mine.total === theirs.total ? 0 : -1;
+      const result = {
+        ...mine,
+        target: { type: 'contest', value: theirs.total, who },
+        success: outcome === 0 ? null : outcome > 0,
+        outcome: ['lost', 'tie', 'won'][outcome + 1],
+      };
+      game.pending.push({ type: 'roll', result });
+      return outcome;
+    },
+    false,
+  );
+
   // give_item(item): the hero is given one of an item, free.
   // has_item(item): true if the hero carries at least one.
   story.BindExternalFunction(
@@ -507,6 +554,13 @@ function aliveMember(game, id) {
   if (!findCompanion(id)) throw new Error(`Unknown companion: ${id}`);
   const member = memberOf(game, id);
   return member && !member.fallen ? member : null;
+}
+
+// "Athletics", "Thieves’ Tools" or "Strength": what a check with this id is called.
+function testName(id) {
+  const named = findSkill(id) || findTool(id) || findAbility(id);
+  if (!named) throw new Error(`Unknown skill, tool or ability: ${id}`);
+  return named.name;
 }
 
 // A short DM note for the page ("New quest: …"), shown where it happened in the story.

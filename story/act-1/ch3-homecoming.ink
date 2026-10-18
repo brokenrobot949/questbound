@@ -23,7 +23,8 @@
 //   The Rival asks to hold the shard (rival_held_the_shard, rival_refused_the_shard), and is gone
 //     by morning (rival_left_bramblegate): in Act II they've joined the Choir.
 //   That night the shard says your name again, and you reach level 5 (xp_milestone(5)). In the
-//     morning it pulls south. End of Act I (act_1_complete).
+//     morning it pulls south. Then one last morning in Bramblegate, for any side quests still
+//     undone, and the End of Act I (act1-last-morning.ink: act1_last_morning, act1_end).
 
 // ---- The great gate, at dawn: Garrick asks "Is it done?" ----
 
@@ -480,7 +481,5 @@ Morning comes grey and clean over Bramblegate's roofs, and smells of Morwen's br
     In the kitchen, Odda is packing, and Fen is eating Odda's breakfast.
 }
 In your pocket, the shard has turned by itself, the way a compass needle settles. It's pointing south.
-~ set_flag("act_1_complete")
-End of Act I · The Barrow Dead #heading
-~ set_objective("Follow the shard south. (Act II is still being written.)")
--> END
++ [Go out into Bramblegate, one last time]
+    -> act1_last_morning

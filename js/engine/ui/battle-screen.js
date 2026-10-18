@@ -484,6 +484,9 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     if ((scene.weapons || []).some((w) => w.by === 'hero')) notes.push('Spiritual Weapon: strikes as a Bonus Action');
     const guardians = (scene.auras || []).find((a) => a.by === 'hero');
     if (guardians) notes.push(`Spirit Guardians: foes within ${guardians.radius} feet of you are slowed and burned`);
+    for (const unit of scene.units.filter((u) => u.clinging === 'hero')) {
+      notes.push(`${fight.combatantById(battle, unit.id).name} is clinging to you, drinking each turn: pull it off (an action), or kill it`);
+    }
     if (heroConditions.includes('charmed')) notes.push('Charmed: you can’t move or act until you’re hurt or shaken out of it');
     if (heroConditions.includes('outlined')) notes.push('Outlined: attacks on you have Advantage');
     if (heroConditions.includes('dodging')) notes.push('Dodging');
@@ -511,6 +514,8 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
             if (unit.prone && !conditions.includes('asleep')) tags.push('Prone');
             // What a foe is concentrating on (hurting it may end it).
             if (c.side === 'enemy' && unit.concentrating) tags.push(`concentrating on ${unit.concentrating}`);
+            // A Stirge clinging on, and to whom.
+            if (unit.clinging) tags.push(`clinging to ${unit.clinging === 'hero' ? 'you' : fight.combatantById(battle, unit.clinging).name}`);
           }
           const label = tags.length ? `${name} (${tags.join(', ')})` : name;
           return el('li', `battle-order-entry${unit.id === scene.actor ? ' is-current' : ''}${down ? ' is-down' : ''}`, label);
@@ -650,6 +655,13 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       card.setAttribute('aria-pressed', String(view.help));
       card.disabled = Boolean(why);
       if (why) card.title = why;
+      other.list.append(card);
+    }
+    // A Stirge clinging to you, or to a friend beside you: pull it off.
+    for (const { foe, host } of fight.pullOffTargets(game)) {
+      const off = fight.isHero(host) ? `Pull ${foe.name} off you` : `Pull ${foe.name} off ${host.name}`;
+      const card = actionCard(off, 'It stops drinking, but it’s free to strike again on its turn', () => act(() => fight.heroPullOff(game, foe.id)));
+      card.disabled = turn.action;
       other.list.append(card);
     }
     // Calling a foe by its true name, if the story taught it (Dame Aveline, in the chantry).

@@ -382,8 +382,10 @@ test('Roll line names a Critical Hit', () => {
 });
 
 test('Ink tags: #check:persuasion:15 is a Persuasion check against DC 15; #location sets the place', () => {
-  const none = { check: null, spell: null, by: null, shard: null, location: null, time: null, drives: [], buy: null, pay: null, combat: null, surprise: false, go: null, room: null, speaker: null, heading: false };
+  const none = { check: null, contest: null, spell: null, by: null, shard: null, location: null, time: null, drives: [], buy: null, shop: null, pay: null, combat: null, surprise: false, go: null, room: null, speaker: null, heading: false };
   assertEqual(parseTags(['check:persuasion:15']), { ...none, check: { testId: 'persuasion', dc: 15 } });
+  assertEqual(parseTags(['contest:athletics:Greta', 'drive:glory']), { ...none, contest: { testId: 'athletics', who: 'Greta' }, drives: ['glory'] }, 'an arm-wrestle');
+  assertEqual(parseTags(['buy:dagger', 'shop:hobs-forge']), { ...none, buy: 'dagger', shop: 'hobs-forge' }, 'bought in a shop');
   assertEqual(parseTags(['shard:names']), { ...none, shard: 'names' }, 'a shard’s power');
   assertEqual(parseTags(['spell:light']).spell, 'light');
   assertEqual(parseTags(['spell:lesser-restoration', 'by:odda']), { ...none, spell: 'lesser-restoration', by: 'odda' }, 'a companion’s spell');

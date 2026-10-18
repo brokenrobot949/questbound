@@ -117,7 +117,9 @@ Reeve Ansel Corbin's hall is a long room full of ledgers and worried people. The
 }
 -> talk
 
-// The conversation itself: the greeting above isn't said again after each answer.
+// The conversation itself: the greeting above isn't said again after each answer. Hob's bet
+// (ch1-hobs-bet.ink) and his blades (story/common/hobs-forge.ink) are tunnels that come back
+// here.
 = talk
 * [Ask Hob everything he knows about the barrows #drive:knowledge]
     ~ drive_moment("knowledge")
@@ -125,6 +127,10 @@ Reeve Ansel Corbin's hall is a long room full of ledgers and worried people. The
 
     "The big one's the Kings' Barrow," he adds, quieter. "Folk say it's never been opened. Folk say a lot of things." #speaker:hob
     -> talk
++ {not has_flag("hobs_bet_done")} [Take Hob's bet: arm-wrestle his apprentice]
+    -> side_hobs_bet -> talk
++ [Look over Hob's blades]
+    -> hobs_wares -> talk
 + [Back to the square]
     -> bramblegate
 
@@ -166,13 +172,17 @@ Reeve Ansel Corbin's hall is a long room full of ledgers and worried people. The
 
     LOST: one grey cat, answers to Biscuit, does not answer to anything else. Ask at the Tallow and Thistle.
 
+    WOLVES on the north road. Eleven sheep and a dog taken this week. Ten gold to whoever clears the den in the Grey Teeth. Apply at the north gate. T. Pike, Warden.
+
     {not has_flag("tore_down_notice"): WANTED: runaway bond-servant Davy Thrush, aged fourteen. Reward for his return from Master Fulke, tanner.}
 - else:
-    The same damp notices: the reeve's call for capable folk, Captain Varrow's ear bounty, and Biscuit the cat, still missing.{not has_flag("tore_down_notice"): The one about the runaway, Davy Thrush, is still there too.} #location:Bramblegate, the square
+    The same damp notices: the reeve's call for capable folk, Captain Varrow's ear bounty{not has_flag("cats_done"):, Biscuit the cat, still missing}{not has_flag("wolf_den_done"):, Warden Pike's wolf bounty}.{not has_flag("tore_down_notice"): The one about the runaway, Davy Thrush, is still there too.} #location:Bramblegate, the square
 }
 -> read
 
-// Reading on: the notices aren't read out again after tearing one down.
+// Reading on: the notices aren't read out again after tearing one down. The cat and the wolves
+// are side quests (ch1-too-many-cats.ink, ch1-wolf-den.ink): tunnels that come back to the
+// square.
 = read
 * [Tear down the notice about the runaway #drive:freedom]
     ~ drive_moment("freedom")
@@ -184,6 +194,10 @@ Reeve Ansel Corbin's hall is a long room full of ledgers and worried people. The
     And one fresh mark, its edges still crisp: a bird with its beak tied shut, over a coin. In the cant, that's a bounty on an informer. Somebody is paying for a songbird who sang too much, and they want it quiet.
     ~ set_flag("read_cant_marks")
     -> read
+* {not has_flag("cats_done")} [Take the notice about Biscuit to Morwen]
+    -> side_cats -> bramblegate
+* {not has_flag("wolf_den_done")} [Take Warden Pike up on the wolf bounty]
+    -> side_wolves -> bramblegate
 + [Back to the square]
     -> bramblegate
 

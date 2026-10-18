@@ -17,7 +17,7 @@ import { levelUpReady } from '../character/level-up.js';
 import { showBattle } from './battle-screen.js';
 import { showLevelUp } from './level-up-screen.js';
 import { sessionCard, whatNowBox } from './session-panels.js';
-import { COPPER_PER, findShard, moneyText, priceOf } from '../character/inventory.js';
+import { COPPER_PER, findShard, moneyText, priceAt, shopDiscounts } from '../character/inventory.js';
 import { findDrive } from '../character/creation.js';
 import {
   abilityModifierOf,
@@ -264,7 +264,8 @@ export function startAdventureScreen({ game, root, onSave, backupReminder = fals
       if (tags.check) card.append(el('span', 'choice-tag', checkLabel(tags.check)));
       if (tags.spell) card.append(el('span', 'choice-tag', spellTag(game, tags.spell, tags.by)));
       if (tags.shard) card.append(el('span', 'choice-tag', findShard(tags.shard).name));
-      if (tags.buy) card.append(el('span', 'choice-tag', `Buy · ${moneyText(priceOf(tags.buy))}`));
+      if (tags.buy) card.append(el('span', 'choice-tag', buyLabel(game, tags.buy, tags.shop)));
+      if (tags.contest) card.append(el('span', 'choice-tag', contestLabel(tags.contest)));
       if (tags.pay) card.append(el('span', 'choice-tag', `Pay · ${moneyText(tags.pay * COPPER_PER.gp)}`));
       if (tags.combat) card.append(el('span', 'choice-tag is-fight', `${fightLabel(game, tags.combat)}${tags.surprise ? ' · Surprise attack' : ''}`));
       // Only the hero's own Drive is pointed out: that's the choice that earns Inspiration.
@@ -496,6 +497,21 @@ function checkLabel(check) {
   const name = named ? named.name : check.testId;
   const difficulty = difficultyLabel(check.dc, getSetting('checkDifficulty'));
   return difficulty ? `${name} · ${difficulty}` : name;
+}
+
+// "Athletics · contest with Greta".
+function contestLabel(contest) {
+  const named = findSkill(contest.testId) || findTool(contest.testId) || findAbility(contest.testId);
+  return `${named ? named.name : contest.testId} · contest with ${contest.who}`;
+}
+
+// "Buy · 2 GP", or in a shop where the hero has won a discount, "Buy · 1 GP, 8 SP (10% off:
+// Hob’s bet)".
+function buyLabel(game, itemId, shopId) {
+  const price = `Buy · ${moneyText(priceAt(game, itemId, shopId))}`;
+  const discounts = shopId ? shopDiscounts(game, shopId) : [];
+  if (!discounts.length) return price;
+  return `${price} (${discounts.map((d) => `${d.percent}% off: ${d.reason}`).join(', ')})`;
 }
 
 // "Fight · Low", "Fight · Deadly": how hard the fight is for the hero and their companions at

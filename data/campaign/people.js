@@ -70,6 +70,15 @@ export const people = [
     source: 'original',
   },
   {
+    id: 'greta',
+    name: 'Greta', // Hob's apprentice, the strongest arm in Bramblegate (Hob's bet)
+    species: 'human',
+    size: 'medium',
+    armor: 'leather-armor', // a smith's apron, like Hob's
+    look: { skin: 'tan', hairStyle: 'cropped', hairColor: 'auburn', beard: false, outfit: 'red', accent: 'black', headgear: 'none' },
+    source: 'original',
+  },
+  {
     id: 'crane',
     name: 'Prior Crane',
     species: 'human',
@@ -221,6 +230,17 @@ export const people = [
     size: 'medium',
     armor: 'leather-armor',
     look: { skin: 'peach', hairStyle: 'long', hairColor: 'black', beard: false, outfit: 'blue', accent: 'white', headgear: 'none' },
+    source: 'original',
+  },
+
+  // ---- Act I's side quests ----
+  {
+    id: 'shepherd',
+    name: 'A shepherd', // up the north road, who finds you if the wolves win
+    species: 'human',
+    size: 'medium',
+    armor: null,
+    look: { skin: 'tan', hairStyle: 'tousled', hairColor: 'grey', beard: true, outfit: 'brown', accent: 'green', headgear: 'hood' },
     source: 'original',
   },
 

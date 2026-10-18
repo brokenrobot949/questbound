@@ -21,6 +21,11 @@ INCLUDE act-1/ch3-vault.ink
 INCLUDE act-1/ch3-chantry.ink
 INCLUDE act-1/ch3-shard.ink
 INCLUDE act-1/ch3-homecoming.ink
+INCLUDE act-1/act1-last-morning.ink
+INCLUDE act-1/ch1-too-many-cats.ink
+INCLUDE act-1/ch1-wolf-den.ink
+INCLUDE act-1/ch1-hobs-bet.ink
+INCLUDE common/hobs-forge.ink
 
 // Where play begins: Chapter 1, on the road to Bramblegate.
 -> ch1_arrival

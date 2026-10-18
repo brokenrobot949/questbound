@@ -55,6 +55,7 @@ Options your character doesn't qualify for stay hidden, so scenes read naturally
 - Difficulty uses the standard ladder (Easy 10, Medium 15, Hard 20, Very Hard 25). **Check difficulty** in Settings shows the word ("Persuasion · Medium", the default), the exact DC ("Persuasion · DC 15"), or nothing, on choice cards and over the die before it's rolled. The roll itself always shows the DC once it's made.
 - **Heroic Inspiration** is the DM's reward for playing to your character's Drive (see Character creation). Spend it to reroll any die. A choice that fits your Drive says so on its card ("★ Your Drive · Faith"); a few choices fit two Drives (letting Odda decide Prior Crane's fate is Faith or Kinship).
 - The random number generator is seeded and saved. Reloading reproduces the same roll, so the dice can't be re-rolled by quitting.
+- **Contests** (original: SRD 5.2.1 has no contest rule; Rob, Oct 18, 2026, with Hob's bet): when you and someone else pit the same skill against each other (arm-wrestling Greta, Athletics), they roll first, in the open, and you roll to beat their total. A tie means neither of you has the better of it yet, and the scene can have you go again. The card says "Athletics · contest with Greta", and your roll shows their total as its target: "= 15 vs Greta's 15 — tie". Guidance and Tactical Mind help, as with any check, and a lost contest can be rerolled with Heroic Inspiration.
 
 How Heroic Inspiration works in the game so far (★ in the status line means you have it):
 
@@ -154,6 +155,7 @@ The game uses the 2024 fifth-edition rules as published in SRD 5.2.1 (https://ww
 - The standard XP table applies: 300 XP for level 2, 6,500 for level 5, 64,000 for level 10 and 355,000 for level 20.
 - XP comes from defeated monsters (their stat-block XP), finished quests and major discoveries.
 - Getting past an encounter without fighting (sneaking, talking it down, a clever spell) earns its full XP, so peaceful solutions are never a penalty.
+- **Side quests** (Rob, Oct 18, 2026) give XP like the main path: their fights' XP (or the same for getting past them), discoveries, and the quest's own XP when it's done (50 for each of Chapter 1's, 25 for Hob's bet), plus gold or loot. Heroes reach a level a little sooner; the milestones keep anyone who skipped them from falling behind.
 - **Milestones** (Rob, Oct 12, 2026): where the story says the hero has reached a level by now, a hero with less XP is brought up to it, so the fights after are sized for everyone. The first is the eve of the Kings' Barrow (Chapter 2): level 4, 2,700 XP. The second is the night of Bramblegate's feast, at the end of Act I (Chapter 3): level 5, 6,500 XP. A hero who lost fights along the way (Fate's Mercy) is the one it catches. Many heroes reach level 5 in the barrow already (about 6,550 XP by the chantry, if they called Aveline by name).
 - Hours per tier are in the Story section's campaign roadmap.
 
@@ -336,6 +338,7 @@ The character sheet is a live, tabbed version of the paper sheet: every number o
 - Magic items scale with tier: mostly common and uncommon in Act I, rare in Act II, very rare in Act III, legendary in Act IV. Loot tables are original, built from rules-listed items.
 - Unknown magic items are identified with a short rest of study or the Identify spell, as in the rules.
 - Shops buy at half price and stock by town size; some stock depends on your faction standing.
+- **Shops so far:** Nan Burdock's stall in Bramblegate's market (Potions of Healing, torches, rations, rope, oil), and **Hob's forge** (Rob, Oct 18, 2026), which sells weapons at the SRD's prices: dagger, javelin, spear, mace, shortsword, flail, scimitar and his one greatsword. A weapon you buy is in your pack, ready to fight with. Only what you can afford is offered, and the card shows the price. A shop can give a discount the story wins (`data/campaign/shops.js`): win Hob's bet and everything at his forge is 10% off, rounded down to the copper, and the card says why ("Buy · 1 GP, 8 SP (10% off: Hob's bet)"). Nothing is sold back yet, and armour waits for a way to change what you wear.
 
 **Inventory rules**
 
@@ -433,6 +436,14 @@ Initiative, attack rolls against AC, critical hits, damage types and resistances
 - **The Chantry of Ash** is the deep barrow's second room, the boss fight: a long hall of pillars and ash, with the stair from the drained vault coming down at the top and the old drain opening in the left wall. Cantor Vesk (a Cultist Fanatic's stat block) sings at the altar near the foot, Dame Aveline (a Wight) stands beside him in front of her open tomb, and two Zombies stand in the ash (three if you came the long way round). High for a level 4 party of three (1,250 or 1,300 XP). Vesk's hymn raises another Zombie on round 3 unless it's broken; once it's done (or broken) he casts his spells (see "Foes who cast spells"). Coming the fast way, two Choir acolytes come down the stair behind you on round 3, led by Sister Rhosyn if she lives, who casts as soon as she arrives; the long way round starts you at the drain with a surprise attack and nobody behind you.
 - **Calling a foe by name** (Rob, Oct 16, 2026): a fight can have one foe the hero can call by its true name, if the story taught it to them. In the chantry, a hero who read the oath-wall gets **Call her by name: "Aveline!"** under Other actions. It takes their action, and works while she's on her feet and within 30 feet (otherwise the button is greyed out and says why). She remembers her oath and fights on your side from then on, as an ally with a blue frame. She doesn't hold her ground like other allies: she goes after Vesk, then the nearest foe. The story hears that she turned (`foe_turned`).
 
+**Act I's side-quest monsters** (SRD 5.2.1, in `data/srd/monsters.js`; Rob's choices, Oct 18, 2026)
+
+- **Stirge** (CR 1/8, 25 XP): a Tiny Monstrosity, AC 13, 5 Hit Points, Speed 10 ft and Fly 40 ft. Its Proboscis (+5, 1d6 + 3 piercing) **clings on** when it hits. While it clings it makes no more attacks, and at the start of each of its turns the one it clings to takes 2d4 necrotic damage. It goes along when they walk, a step behind them, and makes no Opportunity Attack as they go. It lets go if they drop to 0 Hit Points (foes still never hurt the fallen), if it can't act (asleep, held, charmed or turned), if it's knocked loose (Thunderwave), if they vanish by Misty Step, or if it falls. **Pull it off** (an action, under Other actions) works on you or on a friend beside you; it's free to strike again on its turn. Companions go for a Stirge clinging to one of the party first. The turn order says "Stirge 1 (clinging to you)", and your status line says what it's doing to you. Drawn as DawnLike's little red bloodsucker with blue wings.
+- **Flying:** a creature with a fly speed moves at whichever of its speeds is faster. On the grid it still goes round obstacles, as walkers do; flying over them comes if Act II's fliers need it.
+- **The Stirges in the Loft** (Too Many Cats) is the Tallow and Thistle's hayloft: a plank floor, bales of hay, crates and a barrel, the ladder hatch where you come up, the nest under the eaves, and the inn's three cats up on the cross-beams, out of reach. Two Stirges: Low for a level 1 hero alone (50 XP). Unless you smoked the nest first, a third wakes on round 3.
+- **The Wolf Den on the North Road** is a track up through grass and bracken to the den's mouth in the Grey Teeth. One Wolf, the she-wolf: Low for a level 1 hero alone (50 XP). Unless you came at the den unseen, she howls, and her mate comes back over the ridge on round 3.
+- **A reinforcement's own line:** an encounter's reinforcements can say how they come ("Over the ridge, answering her howl, comes Wolf 2, and joins the fight!"); otherwise "Out of the dark from the moor come…". One arriving alone "comes", and "joins".
+
 **Foes who cast spells** (Rob's choices, Oct 17, 2026)
 
 - **The Cultist Fanatic** (CR 2, 450 XP; Sister Rhosyn, Cantor Vesk) has SRD 5.2.1's Spellcasting: Wisdom, spell save DC 12, +4 to hit with spell attacks. **Hold Person** once a day, **Command** twice a day, and as a Bonus Action **Spiritual Weapon** twice a day. Light and Thaumaturgy (at will) have no use in a fight yet. Each Fanatic is fresh in each fight it's in.
@@ -499,6 +510,7 @@ The world is a hand-made region map of towns, wilds and dungeons. You travel bet
 - Each town is a scene backdrop with tappable places: inn, temple, smithy, market, quest board and notable NPCs.
 - The inn is a safe long rest. The temple heals, lifts curses and, at a price, raises the dead.
 - Each town has 2–4 named NPCs with portraits, opinions about you, and side quests.
+- **When side quests come** (Rob, Oct 18, 2026): each is offered at its own chapter's town visit, so it fits the hero's level then (Chapter 1's from Bramblegate's notice board and Hob's forge, on the first morning). Any the hero missed wait for the act's last morning in town: Act I's is the morning after Bramblegate's feast, before the road south, when they're easy for a level 5 party. A side quest is a scene of its own that any town visit can call and that comes back to it (an Ink tunnel).
 
 **Dungeons**
 
@@ -525,6 +537,8 @@ The world is a hand-made region map of towns, wilds and dungeons. You travel bet
 | Side quests | Written by hand | About a quarter | The miller's missing daughter |
 | Contracts | Templates from the quest board | About 15% | Clear the wolf den on the north road |
 | Road events | Random tables per region | About 10% | A broken cart, an ambush, a lost pilgrim |
+
+**Act I's contracts are written by hand** (Rob, Oct 18, 2026): the wolf den on the north road (Chapter 1) and Hob's ore (Chapter 2) are built now as ordinary side quests, offered from the notice board, so Act I has all its content for the playtest. Phase 3's contract board can take them over. Road events still wait for Phase 3's travel.
 
 Contracts combine a template (bounty, escort, retrieve, investigate, rescue) with a location, a monster table for your tier and a reward. Generated dungeons are assembled from hand-written room templates, so they keep authored flavour. This keeps the world alive between story beats and gives players who want it some optional extra adventuring.
 

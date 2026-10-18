@@ -39,4 +39,7 @@ export const storyContinues = [
   { scene: 'ch3_chantry', continueAt: 'ch3_shard', source: 'original' },
   // Then at the great gate at dawn, with Garrick asking "Is it done?"; beat 7 takes him home.
   { scene: 'ch3_shard', continueAt: 'ch3_homecoming', source: 'original' },
+  // Then the morning after the feast, at the End of Act I card; one last morning in Bramblegate
+  // comes first now, for the side quests, and the End of Act I card again on the road south.
+  { scene: 'ch3_night', continueAt: 'act1_last_morning', source: 'original' },
 ];

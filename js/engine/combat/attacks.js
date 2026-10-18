@@ -12,7 +12,9 @@
 //     saveDc, saveAbility, darts, rays,
 //     slotLevel (the spell slot it uses), rider, greatWeapon, savage, heavyDisadvantage,
 //     criticalOn (19 with Improved Critical), potent (a cantrip with Potent Cantrip),
-//     onHit (a monster attack's condition on a hit, e.g. the Wolf's Bite knocking you Prone) }
+//     onHit (a monster attack's condition on a hit, e.g. the Wolf's Bite knocking you Prone),
+//     attach (a monster attack that clings on when it hits, with the damage it drains each
+//     turn: a Stirge's Proboscis, { dice: '2d4', type: 'necrotic' }) }
 // A weapon also carries itemId, weapon (its name), properties, abilityMod (the ability
 // modifier it attacks with), sneakAttack (a Rogue's Sneak Attack dice, with a Finesse or
 // Ranged weapon, or null) and mastery ({ id, name, dc }: the Weapon Mastery property the
@@ -365,6 +367,7 @@ export function monsterAttackOptions(monster) {
       modifiers: [{ label: 'Attack', value: attack.bonus, source: `${monster.name}'s ${attack.name}` }],
       damage: { ...attack.damage, extraOnAdvantage: attack.advantageExtra || null },
       onHit: attack.onHit || null,
+      attach: attack.attach || null, // clings on when it hits (a Stirge's Proboscis)
       alone: Boolean(attack.alone), // not part of its Multiattack: an action of its own
     };
     if (attack.kind === 'melee' || attack.kind === 'melee-or-ranged') {
