@@ -58,6 +58,14 @@ test('Grid: crawling costs 5 feet more a square, 15 in difficult terrain', () =>
   assertTrue(!crawl.has(key({ x: 3, y: 0 })), 'three squares of crawling is more than 25 feet');
 });
 
+test('Grid: where a creature’s Speed is halved (Spirit Guardians), each step costs double', () => {
+  const map = parseMap(['.....'], legend);
+  const slowAt = (pos) => pos.x >= 2;
+  const reach = reachableSquares(map, { x: 0, y: 0 }, 30, () => null, { slowAt });
+  assertEqual([reach.get(key({ x: 1, y: 0 })).cost, reach.get(key({ x: 2, y: 0 })).cost, reach.get(key({ x: 3, y: 0 })).cost], [5, 15, 25]);
+  assertTrue(!reach.has(key({ x: 4, y: 0 })), '35 feet is too far');
+});
+
 test('Grid: pass through an ally but not an enemy, and stop in nobody’s square', () => {
   const map = parseMap(['...'], legend);
   const ally = reachableSquares(map, { x: 0, y: 0 }, 10, (p) => (p.x === 1 ? 'ally' : null));
@@ -1082,6 +1090,84 @@ test('Allies: your potions and healing reach a soldier, though wards are for the
   wat.hp = 0;
   assertEqual(fight.friendProblem(game, { id: 'potion', name: 'Potion of Healing', how: 'potion', range: [5, 5] }, wat), 'Wat is dead.');
   assertEqual(fight.healCombatant(game, wat, 5), 0);
+});
+
+// ---- Level 5: Extra Attack and Tactical Shift ----
+
+// Wren at level 5: a Champion with Strength 18 (+4) and Proficiency +3, so +7 with her Greatsword.
+const fighter5 = {
+  ...champion,
+  level: 5,
+  hitPointRolls: [null, null, null, null],
+  classChoices: { ...wren.classChoices, weaponMasteries: [...wren.classChoices.weaponMasteries, 'longbow'] },
+  levelFeats: [{ level: 4, id: 'ability-score-improvement', increases: { strength: 1, constitution: 1 } }],
+};
+
+test('Extra Attack: the Attack action is two attacks, and no more; Action Surge brings two more', () => {
+  assertEqual(validateCharacter(fighter5), []);
+  const game = millFight(fighter5);
+  const battle = game.battle;
+  const [first, second] = fight.enemies(battle);
+  first.pos = { x: 2, y: 2 };
+  second.pos = { x: 4, y: 2 };
+  first.hp = 60;
+  second.hp = 60;
+  const greatsword = heroAttackOptions(game).find((o) => o.id === 'greatsword-melee');
+  assertEqual(greatsword.modifiers.reduce((s, m) => s + m.value, 0), 7, 'Str +4, Proficiency +3');
+  const swing = (target) => {
+    forceNextD20(15);
+    fight.heroAttack(game, 'greatsword-melee', target.id);
+  };
+  swing(first);
+  assertEqual([battle.turnState.action, battle.turnState.attacksLeft, fight.heroCantUse(game, 'greatsword-melee')], [true, 1, null], 'the second attack is still to come');
+  assertThrows(() => fight.heroDodge(game), 'the action is the Attack action');
+  swing(second);
+  assertEqual([battle.turnState.attacksLeft, Boolean(fight.heroCantUse(game, 'greatsword-melee'))], [0, true], 'no third attack');
+  fight.heroActionSurge(game);
+  swing(first);
+  assertEqual(battle.turnState.attacksLeft, 1, 'Action Surge’s action is two attacks too');
+  swing(second);
+  assertThrows(() => swing(first));
+  assertEqual(battle.log.filter((e) => e.roll && e.roll.kind === 'attack' && e.roll.yours).length, 4);
+  // Next turn the count starts again; a level 4 Fighter attacks once.
+  fight.endHeroTurn(game);
+  assertEqual(game.battle.turnState.attacksLeft, 0);
+  const four = millFight(wren4Fighter);
+  const near = fight.enemies(four.battle)[0];
+  Object.assign(near, { pos: { x: 3, y: 2 }, hp: 60 });
+  forceNextD20(15);
+  fight.heroAttack(four, 'greatsword-melee', near.id);
+  assertEqual([four.battle.turnState.attacksLeft, Boolean(fight.heroCantUse(four, 'greatsword-melee'))], [0, true]);
+});
+
+const wren4Fighter = { ...fighter5, level: 4, hitPointRolls: [null, null, null] };
+
+test('Tactical Shift: Second Wind, then a free move of half your Speed without Opportunity Attacks', () => {
+  const game = millFight(fighter5);
+  const battle = game.battle;
+  const [goblin, other] = fight.enemies(battle);
+  goblin.pos = { x: 3, y: 2 };
+  other.pos = { x: 6, y: 5 };
+  game.hp = 10;
+  fight.heroSecondWind(game);
+  assertEqual([battle.turnState.athleteMove, battle.turnState.freeMoveFrom], [15, 'Tactical Shift']);
+  assertTrue(battle.log.some((e) => e.text === 'Tactical Shift: you can move up to 15 feet straight away without provoking Opportunity Attacks.'));
+  fight.heroMove(game, { x: 5, y: 1 });
+  assertTrue(!battle.log.some((e) => e.text.includes('an Opportunity Attack!')) && battle.log.some((e) => e.text === 'You move, light on your feet (Tactical Shift).'));
+  assertEqual([battle.turnState.movementLeft, battle.turnState.athleteMove], [30, 0], 'and the turn’s own movement is untouched');
+});
+
+test('Resolve: a level 5 Fighter makes both attacks each turn', () => {
+  const game = millFight(fighter5, 'resolve-five');
+  for (const goblin of fight.enemies(game.battle)) goblin.hp = 60;
+  game.battle.log = [];
+  resolveFight(game);
+  const firstTurn = [];
+  for (const entry of game.battle ? game.battle.log : []) {
+    if (entry.turnOf && entry.turnOf !== 'hero' && firstTurn.length) break;
+    if (entry.roll && entry.roll.kind === 'attack' && entry.roll.yours) firstTurn.push(entry);
+  }
+  assertTrue(firstTurn.length >= 2, `${firstTurn.length} attacks on the first turn`);
 });
 
 run(document.getElementById('summary'), document.getElementById('results'));

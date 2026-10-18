@@ -38,6 +38,11 @@ const OPTIONS = [
     hint: 'If you have Hellish Rebuke, the game casts it with its free use (once per Long Rest) the first time a foe within 60 feet hurts you in a fight. It never spends your spell slots.',
   },
   {
+    name: 'autoCounterspell',
+    label: 'Cast Counterspell by itself',
+    hint: 'If you have Counterspell ready, the game casts it with your lowest level 3 or higher spell slot when a foe you can see within 60 feet casts Hold Person on you or a friend. Turn this off to save your slots.',
+  },
+  {
     name: 'autoInspiration',
     label: 'Spend Inspiration against Hold Person',
     hint: 'If a foe casts Hold Person on you and you fail the save while you have Heroic Inspiration, the game spends it to roll the save again. Turn this off to keep it for later.',
@@ -57,7 +62,7 @@ const OPTIONS = [
 // Puts the settings into effect. Call at startup and after any change.
 export function applySettings() {
   document.documentElement.dataset.narration = getSetting('plainNarration') ? 'plain' : 'pixel';
-  setReactionPolicy({ shield: getSetting('autoShield'), rebuke: getSetting('autoRebuke'), inspiration: getSetting('autoInspiration') });
+  setReactionPolicy({ shield: getSetting('autoShield'), rebuke: getSetting('autoRebuke'), inspiration: getSetting('autoInspiration'), counterspell: getSetting('autoCounterspell') });
 }
 
 // onClose(): the player pressed Done.

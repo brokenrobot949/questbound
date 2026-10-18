@@ -1,5 +1,5 @@
 // Classes (SRD 5.2.1). Only what the current phase needs: the Fighter, the Wizard, the Cleric
-// and the Rogue at levels 1–4. More classes and levels are added as each phase needs them.
+// and the Rogue at levels 1–5. More classes and levels are added as each phase needs them.
 //
 // Numbers per level are in `levels` (index 0 is level 1). Feature text is in `features`.
 // Item ids in starting equipment match the equipment data (armour is in data/srd/armor.js;
@@ -71,6 +71,7 @@ export const classes = [
       { level: 2, features: ['action-surge', 'tactical-mind'], secondWindUses: 2, weaponMasteries: 3, actionSurgeUses: 1 },
       { level: 3, features: ['fighter-subclass'], secondWindUses: 2, weaponMasteries: 3, actionSurgeUses: 1 },
       { level: 4, features: ['ability-score-improvement'], secondWindUses: 3, weaponMasteries: 4, actionSurgeUses: 1 },
+      { level: 5, features: ['extra-attack', 'tactical-shift'], secondWindUses: 3, weaponMasteries: 4, actionSurgeUses: 1 },
     ],
     features: {
       'fighting-style': {
@@ -100,6 +101,14 @@ export const classes = [
       'ability-score-improvement': {
         name: 'Ability Score Improvement',
         text: 'You gain the Ability Score Improvement feat or another feat of your choice for which you qualify. You gain this feature again at Fighter levels 6, 8, 12, 14, and 16.',
+      },
+      'extra-attack': {
+        name: 'Extra Attack',
+        text: 'You can attack twice instead of once whenever you take the Attack action on your turn.',
+      },
+      'tactical-shift': {
+        name: 'Tactical Shift',
+        text: 'Whenever you activate your Second Wind with a Bonus Action, you can move up to half your Speed without provoking Opportunity Attacks.',
       },
     },
     subclasses: [
@@ -165,11 +174,12 @@ export const classes = [
       { level: 2, features: ['scholar'], cantrips: 3, preparedSpells: 5, slots: [3] },
       { level: 3, features: ['wizard-subclass'], cantrips: 3, preparedSpells: 6, slots: [4, 2] },
       { level: 4, features: ['ability-score-improvement'], cantrips: 4, preparedSpells: 7, slots: [4, 3] },
+      { level: 5, features: ['memorize-spell'], cantrips: 4, preparedSpells: 9, slots: [4, 3, 2] },
     ],
     features: {
       spellcasting: {
         name: 'Spellcasting',
-        text: 'Intelligence is your spellcasting ability. You know three Wizard cantrips (four from level 4), and your spellbook starts with six level 1 Wizard spells; you add two Wizard spells to it each time you gain a Wizard level. You prepare spells from your spellbook (four at level 1, one more at each of levels 2, 3 and 4) and can change the list whenever you finish a Long Rest. You regain all expended spell slots when you finish a Long Rest. You can use an Arcane Focus or your spellbook as a Spellcasting Focus.',
+        text: 'Intelligence is your spellcasting ability. You know three Wizard cantrips (four from level 4), and your spellbook starts with six level 1 Wizard spells; you add two Wizard spells to it each time you gain a Wizard level. You prepare spells from your spellbook (four at level 1, one more at each of levels 2, 3 and 4, and two more at level 5) and can change the list whenever you finish a Long Rest. You regain all expended spell slots when you finish a Long Rest. You can use an Arcane Focus or your spellbook as a Spellcasting Focus.',
       },
       'ritual-adept': {
         name: 'Ritual Adept',
@@ -190,6 +200,11 @@ export const classes = [
       'ability-score-improvement': {
         name: 'Ability Score Improvement',
         text: 'You gain the Ability Score Improvement feat or another feat of your choice for which you qualify. You gain this feature again at Wizard levels 8, 12, and 16.',
+      },
+      // Short Rests aren't in the game yet, so this waits for them.
+      'memorize-spell': {
+        name: 'Memorize Spell',
+        text: 'Whenever you finish a Short Rest, you can study your spellbook and replace one of the level 1+ Wizard spells you have prepared for your Spellcasting feature with another level 1+ spell from the book.',
       },
     },
     // Skills the Scholar feature can give Expertise in.
@@ -252,11 +267,12 @@ export const classes = [
       { level: 2, features: ['channel-divinity'], cantrips: 3, preparedSpells: 5, slots: [3], channelDivinity: 2 },
       { level: 3, features: ['cleric-subclass'], cantrips: 3, preparedSpells: 6, slots: [4, 2], channelDivinity: 2 },
       { level: 4, features: ['ability-score-improvement'], cantrips: 4, preparedSpells: 7, slots: [4, 3], channelDivinity: 2 },
+      { level: 5, features: ['sear-undead'], cantrips: 4, preparedSpells: 9, slots: [4, 3, 2], channelDivinity: 2 },
     ],
     features: {
       spellcasting: {
         name: 'Spellcasting',
-        text: 'Wisdom is your spellcasting ability. You know three Cleric cantrips (four from level 4); Guidance, Sacred Flame and Thaumaturgy are recommended. You prepare level 1+ spells straight from the Cleric spell list (four at level 1, one more at each of levels 2, 3 and 4), choosing only spells of levels you have slots for, and can change the list whenever you finish a Long Rest. You regain all expended spell slots when you finish a Long Rest. You can use a Holy Symbol as a Spellcasting Focus.',
+        text: 'Wisdom is your spellcasting ability. You know three Cleric cantrips (four from level 4); Guidance, Sacred Flame and Thaumaturgy are recommended. You prepare level 1+ spells straight from the Cleric spell list (four at level 1, one more at each of levels 2, 3 and 4, and two more at level 5), choosing only spells of levels you have slots for, and can change the list whenever you finish a Long Rest. You regain all expended spell slots when you finish a Long Rest. You can use a Holy Symbol as a Spellcasting Focus.',
       },
       'divine-order': {
         name: 'Divine Order',
@@ -273,6 +289,10 @@ export const classes = [
       'ability-score-improvement': {
         name: 'Ability Score Improvement',
         text: 'You gain the Ability Score Improvement feat or another feat of your choice for which you qualify. You gain this feature again at Cleric levels 8, 12, and 16.',
+      },
+      'sear-undead': {
+        name: 'Sear Undead',
+        text: 'Whenever you use Turn Undead, you can roll a number of d8s equal to your Wisdom modifier (minimum of 1d8) and add the rolls together. Each Undead that fails its saving throw against that use of Turn Undead takes Radiant damage equal to the roll’s total. This damage doesn’t end the turn effect.',
       },
     },
     // The roles the Divine Order feature offers at level 1 (classChoices.divineOrder).
@@ -303,7 +323,10 @@ export const classes = [
         levels: [{ level: 3, features: ['disciple-of-life', 'life-domain-spells', 'preserve-life'] }],
         // Spells always prepared from this Cleric level on (they don't count against the
         // number of spells you prepare).
-        domainSpells: [{ level: 3, spells: ['aid', 'bless', 'cure-wounds', 'lesser-restoration'] }],
+        domainSpells: [
+          { level: 3, spells: ['aid', 'bless', 'cure-wounds', 'lesser-restoration'] },
+          { level: 5, spells: ['mass-healing-word', 'revivify'] },
+        ],
         features: {
           'disciple-of-life': {
             name: 'Disciple of Life',
@@ -311,7 +334,7 @@ export const classes = [
           },
           'life-domain-spells': {
             name: 'Life Domain Spells',
-            text: 'Your connection to this divine domain ensures you always have certain spells ready. From Cleric level 3 you always have Aid, Bless, Cure Wounds and Lesser Restoration prepared.',
+            text: 'Your connection to this divine domain ensures you always have certain spells ready. From Cleric level 3 you always have Aid, Bless, Cure Wounds and Lesser Restoration prepared, and from level 5 Mass Healing Word and Revivify too.',
           },
           'preserve-life': {
             name: 'Preserve Life',
@@ -365,6 +388,7 @@ export const classes = [
       { level: 2, features: ['cunning-action'], sneakAttack: '1d6', weaponMasteries: 2, expertise: 2 },
       { level: 3, features: ['rogue-subclass', 'steady-aim'], sneakAttack: '2d6', weaponMasteries: 2, expertise: 2 },
       { level: 4, features: ['ability-score-improvement'], sneakAttack: '2d6', weaponMasteries: 2, expertise: 2 },
+      { level: 5, features: ['cunning-strike', 'uncanny-dodge'], sneakAttack: '3d6', weaponMasteries: 2, expertise: 2 },
     ],
     features: {
       expertise: {
@@ -373,7 +397,7 @@ export const classes = [
       },
       'sneak-attack': {
         name: 'Sneak Attack',
-        text: 'You know how to strike subtly and exploit a foe’s distraction. Once per turn, you can deal an extra 1d6 damage to one creature you hit with an attack roll if you have Advantage on the roll and the attack uses a Finesse or a Ranged weapon. The extra damage’s type is the same as the weapon’s type. You don’t need Advantage on the attack roll if at least one of your allies is within 5 feet of the target, the ally doesn’t have the Incapacitated condition, and you don’t have Disadvantage on the attack roll. The extra damage increases as you gain Rogue levels: 2d6 at level 3.',
+        text: 'You know how to strike subtly and exploit a foe’s distraction. Once per turn, you can deal an extra 1d6 damage to one creature you hit with an attack roll if you have Advantage on the roll and the attack uses a Finesse or a Ranged weapon. The extra damage’s type is the same as the weapon’s type. You don’t need Advantage on the attack roll if at least one of your allies is within 5 feet of the target, the ally doesn’t have the Incapacitated condition, and you don’t have Disadvantage on the attack roll. The extra damage increases as you gain Rogue levels: 2d6 at level 3, and 3d6 at level 5.',
       },
       'thieves-cant': {
         name: 'Thieves’ Cant',
@@ -398,6 +422,16 @@ export const classes = [
       'ability-score-improvement': {
         name: 'Ability Score Improvement',
         text: 'You gain the Ability Score Improvement feat or another feat of your choice for which you qualify. You gain this feature again at Rogue levels 8, 10, 12, and 16.',
+      },
+      // Poison needs a Poisoner's Kit, which isn't in the game yet, so a fight offers Trip and
+      // Withdraw.
+      'cunning-strike': {
+        name: 'Cunning Strike',
+        text: 'You’ve developed cunning ways to use your Sneak Attack. When you deal Sneak Attack damage, you can add one of the following Cunning Strike effects. Each effect has a die cost, which is the number of Sneak Attack damage dice you must forgo to add the effect. You remove the die before rolling, and the effect occurs immediately after the attack’s damage is dealt. For example, if you add the Poison effect, remove 1d6 from the Sneak Attack’s damage before rolling.\n\nIf a Cunning Strike effect requires a saving throw, the DC equals 8 plus your Dexterity modifier and Proficiency Bonus.\n\nPoison (Cost: 1d6). You add a toxin to your strike, forcing the target to make a Constitution saving throw. On a failed save, the target has the Poisoned condition for 1 minute. At the end of each of its turns, the Poisoned target repeats the save, ending the effect on itself on a success. To use this effect, you must have a Poisoner’s Kit on your person.\n\nTrip (Cost: 1d6). If the target is Large or smaller, it must succeed on a Dexterity saving throw or have the Prone condition.\n\nWithdraw (Cost: 1d6). Immediately after the attack, you move up to half your Speed without provoking Opportunity Attacks.',
+      },
+      'uncanny-dodge': {
+        name: 'Uncanny Dodge',
+        text: 'When an attacker that you can see hits you with an attack roll, you can take a Reaction to halve the attack’s damage against you (round down).',
       },
     },
     subclasses: [

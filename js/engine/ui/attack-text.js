@@ -45,6 +45,12 @@ export function attackSummary(option, { slotsLeft = null } = {}) {
   else if (option.how === 'teleport') parts.push(`teleport up to ${option.range[1]} ft to a square you can see`);
   else if (option.how === 'stabilise') parts.push('a friend at 0 Hit Points stops dying and is Stable');
   else if (option.how === 'restore') parts.push(`ends Paralyzed, Blinded or Poisoned${option.company ? '' : ' on you'}`);
+  else if (option.how === 'revive') parts.push(`a companion who died within the last minute comes back with 1 Hit Point; uses up ${option.component.name}`);
+  else if (option.how === 'dispel') parts.push('ends a foe’s spell: its Hold Person on a friend, or its Spiritual Weapon');
+  else if (option.how === 'aura') {
+    const average = averageText(averageDamage(option.damage));
+    parts.push(`spirits round you, ${option.radius} ft out: foes there move at half speed`, `${damageDice(option.damage)} (${average} on average) when they come in or end a turn there`, `${save}, half on a save`);
+  }
   else if (option.how === 'darts') {
     parts.push(`${option.darts} darts that never miss`, `${damageDice(option.damage)} each`, `${averageText(averageDamage(option.damage) * option.darts)} on average`);
   } else if (option.how === 'rays') {
@@ -115,6 +121,7 @@ const WARDS = {
 function friendsText(option) {
   const range = option.range ? option.range[1] : 5;
   if (option.how === 'preserve') return `the Bloodied within ${range} ft, you included`;
+  if (option.how === 'revive') return 'touch: a companion beside you';
   if (option.targeting === 'party') return `you and friends within ${range} ft`;
   if (option.notYou || option.how === 'stabilise') return `a friend within ${range} ft`;
   return range <= 5 ? 'touch: you or a friend beside you' : `you or a friend within ${range} ft`;
@@ -142,6 +149,7 @@ const CONDITIONS = {
   grovel: 'Grovel: on its next turn it falls Prone and does nothing else',
   blinded: 'Blinded: its attacks have Disadvantage, attacks on it Advantage; it saves again each turn',
   baned: '−1d4 on their attack rolls and saves',
+  charmed: 'Charmed: it can’t move or act until it’s hurt or shaken out of it (those who can see it, you and friends too)',
 };
 
 // "melee", "range 80/320 ft", "thrown 20/60 ft", "range 120 ft", "15-ft cone from you",

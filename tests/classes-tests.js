@@ -503,16 +503,16 @@ test('Rogue scenes: Thieves’ Tools open the postern; a Rogue reads the thieves
 
 test('Companions: Odda and Fen are legal characters at every level, levelling with the hero', () => {
   for (const id of ['odda', 'fen']) {
-    for (const level of [1, 2, 3, 4]) assertEqual(validateCharacter(companionCharacter(id, level)), [], `${id} at level ${level}`);
+    for (const level of [1, 2, 3, 4, 5]) assertEqual(validateCharacter(companionCharacter(id, level)), [], `${id} at level ${level}`);
   }
-  for (const level of [1, 2, 3, 4]) {
+  for (const level of [1, 2, 3, 4, 5]) {
     const odda = companionCharacter('odda', level);
     const counts = classSpellCounts(odda);
     assertEqual([odda.spells.cantrips.length, odda.spells.prepared.length], [counts.cantrips, counts.prepared], `Odda has all her spells at level ${level}`);
   }
   const odda = companionCharacter('odda', 3);
   assertEqual([odda.subclassId, domainSpells(odda).includes('cure-wounds'), maxHitPoints(odda).value], ['life', true, 24], 'Life Domain at 3; 8 + 5 + 5, Con +1 and Dwarven Toughness +1 a level');
-  assertEqual([companionCharacter('fen', 3).subclassId, companionCharacter('fen', 9).level], ['thief', 4], 'no higher than the rules data goes');
+  assertEqual([companionCharacter('fen', 3).subclassId, companionCharacter('fen', 9).level], ['thief', 5], 'no higher than the rules data goes');
 });
 
 test('Companions at level 4: Odda +1 Wisdom and Constitution, with Mending and Detect Magic; Fen +1 Dexterity and Constitution', () => {
@@ -530,6 +530,142 @@ test('Companions at level 4: Odda +1 Wisdom and Constitution, with Mending and D
   game.character = { ...posy3, level: 4, hitPointRolls: [null, null, null], levelFeats: [{ level: 4, id: 'ability-score-improvement', increases: { wisdom: 1, constitution: 1 } }] };
   partyLevelUp(game, 3);
   assertEqual(game.party.map((m) => [m.hp, memberMaxHp(game, m)]), [[35, 35], [31, 31]], 'Odda 24 + 11, Fen 21 + 10');
+});
+
+test('Companions at level 5: Odda prepares Spirit Guardians and Dispel Magic, with Mass Healing Word and Revivify always; Fen’s Sneak Attack is 3d6', () => {
+  const odda = companionCharacter('odda', 5);
+  assertEqual(odda.spells.prepared.slice(-2), ['spirit-guardians', 'dispel-magic']);
+  assertEqual(domainSpells(odda).slice(-2), ['mass-healing-word', 'revivify']);
+  assertEqual([maxHitPoints(odda).value, spellcasting(odda).saveDc.value, slotsAt(odda, 3)], [43, 15, 2], '35, then 5 + Con 2 + Dwarven Toughness 1; DC 8 + 4 + 3');
+  const fen = companionCharacter('fen', 5);
+  assertEqual([sneakAttackDice(fen), maxHitPoints(fen).value], ['3d6', 38], '31, then 5 + Con 2');
+  // The hero reaches level 5, and the party follows.
+  const game = gameFor(posy5);
+  game.party = [];
+  joinParty(game, 'odda');
+  joinParty(game, 'fen');
+  game.character = { ...posy5, level: 4, hitPointRolls: [null, null, null] };
+  for (const member of game.party) member.hp = memberMaxHp(game, member);
+  game.character = posy5;
+  partyLevelUp(game, 4);
+  assertEqual(game.party.map((m) => [m.hp, memberMaxHp(game, m)]), [[43, 43], [38, 38]]);
+});
+
+// ---- Level 5: Sear Undead, Cunning Strike, Uncanny Dodge ----
+
+// Posy at level 5 (Wis 18: spell save DC 15) with the level 3 spells these checks need, and
+// Sorael at level 5 (Dex 19: Cunning Strike's DC 15).
+const posy5 = {
+  ...posy,
+  level: 5,
+  subclassId: 'life',
+  hitPointRolls: [null, null, null, null],
+  levelFeats: [{ level: 4, id: 'ability-score-improvement', increases: { wisdom: 1, constitution: 1 } }],
+  spells: { ...posy.spells, cantrips: [...posy.spells.cantrips, 'resistance'], prepared: ['guiding-bolt', 'sanctuary', 'detect-magic', 'hold-person', 'shield-of-faith', 'spiritual-weapon', 'command', 'spirit-guardians', 'dispel-magic'] },
+};
+const sorael5 = { ...sorael, level: 5, subclassId: 'thief', hitPointRolls: [null, null, null, null], levelFeats: [{ level: 4, id: 'ability-score-improvement', increases: { dexterity: 2 } }] };
+
+test('Level 5 heroes for these checks are legal', () => {
+  assertEqual([validateCharacter(posy5), validateCharacter(sorael5)], [[], []]);
+});
+
+test('Sear Undead: Turn Undead also burns each Undead that fails its save, and the burn doesn’t free it', () => {
+  const game = fightWith(posy5, 'lower-dead', 'sear');
+  const zombies = fight.enemies(game.battle);
+  const before = zombies.map((z) => z.hp);
+  game.rng = scriptedRng([2, 2, 2, 2, 1, 1, 20]); // 4d8 (Wis +4) = 8; two zombies fail, the third saves
+  fight.heroCastSelf(game, 'channel-turn-undead');
+  assertTrue(said(game, 'Sear Undead: holy fire for each that fails, 4d8 (2, 2, 2, 2) = 8 radiant damage.'), game.battle.log.map((e) => e.text).join(' / '));
+  assertEqual(zombies.map((z, i) => before[i] - z.hp), [8, 8, 0]);
+  assertEqual(zombies.map((z) => fight.conditionsOf(game.battle, z.id).includes('turned')), [true, true, false], 'still Turned');
+});
+
+test('Cunning Strike: Trip gives up a Sneak Attack die for a Dexterity save or Prone', () => {
+  const { game, goblin } = rogueDuel(sorael5);
+  game.battle.effects.push({ kind: 'outlined', target: goblin.id, endsOn: null }); // Advantage
+  assertThrows(() => fight.setCunningStrike(rogueDuel(sorael3).game, 'trip'), 'not before level 5');
+  fight.setCunningStrike(game, 'trip');
+  const preview = fight.attackPreview(game, 'shortsword-melee', goblin.id);
+  assertEqual([preview.sneak, preview.cunning], ['2d6', 'Trip']);
+  game.rng = scriptedThen([18, 18, 3, 2, 2, 1], 'trip'); // the hit (with Advantage), 1d6, 2d6, then its save: 1
+  fight.heroAttack(game, 'shortsword-melee', goblin.id);
+  assertTrue(lastHit(game).text.includes('+ Sneak Attack 2d6 (2, 2)') && lastHit(game).text.includes('(Cunning Strike: one Sneak Attack die for Trip)'), lastHit(game).text);
+  assertTrue(said(game, 'Trip: Goblin Minion 1 goes sprawling, Prone.') && fight.isProne(game.battle, goblin.id));
+  assertEqual(game.battle.cunningStrike, 'trip', 'the switch stays set');
+});
+
+test('Cunning Strike: Withdraw, then a free move of half your Speed without Opportunity Attacks', () => {
+  const { game, goblin } = rogueDuel(sorael5);
+  game.battle.effects.push({ kind: 'outlined', target: goblin.id, endsOn: null });
+  fight.setCunningStrike(game, 'withdraw');
+  game.rng = scriptedThen([18, 18], 'withdraw');
+  fight.heroAttack(game, 'shortsword-melee', goblin.id);
+  assertEqual([game.battle.turnState.athleteMove, game.battle.turnState.freeMoveFrom], [15, 'Withdraw'], 'half of 35 feet, to the square');
+  const away = [...fight.heroReachable(game).values()].find((s) => s.free && s.cost > 0 && squaresBetween(s.pos, goblin.pos) > 1);
+  fight.heroMove(game, away.pos);
+  assertTrue(!said(game, 'an Opportunity Attack!') && said(game, 'You move, light on your feet (Withdraw).'));
+  assertEqual(game.battle.turnState.movementLeft, 35, 'no movement spent');
+});
+
+test('Uncanny Dodge: a Rogue hit by a foe they can see halves the damage with their reaction', () => {
+  const { game } = rogueDuel(sorael5);
+  const before = game.hp;
+  forceNextD20(19); // the goblin's attack hits
+  fight.endHeroTurn(game);
+  const line = game.battle.log.find((e) => e.text.startsWith('Uncanny Dodge!'));
+  assertTrue(Boolean(line), game.battle.log.map((e) => e.text).join(' / '));
+  assertEqual(before - game.hp, Number(/to (\d+)\.$/.exec(line.text)[1]));
+  const plain = rogueDuel(sorael3).game;
+  forceNextD20(19);
+  fight.endHeroTurn(plain);
+  assertTrue(!plain.battle.log.some((e) => e.text.startsWith('Uncanny Dodge')), 'level 5 only');
+});
+
+test('Fen at level 5: he Trips a foe the hero is fighting; Bloodied beside a foe, he Withdraws and slips away', () => {
+  const game = fightWith(posy5, 'mill-scavengers', 'fen-trip', { party: ['fen'] });
+  const [goblin, other] = fight.enemies(game.battle);
+  other.hp = 0;
+  goblin.hp = goblin.maxHp = 40;
+  goblin.pos = { x: 3, y: 2 }; // beside Posy (3, 1) and Fen (4, 1)
+  fight.combatantById(game.battle, 'fen').pos = { x: 4, y: 1 };
+  game.rng = scriptedThen([15, 3, 2, 2, 1], 'fen-trip'); // he hits (Posy beside it: Sneak Attack), 1d6, 2d6, its save: 1
+  playTurn(game, 'fen');
+  assertTrue(said(game, 'Trip: Goblin Minion 1 goes sprawling, Prone.'), game.battle.log.map((e) => e.text).join(' / '));
+
+  const hurt = fightWith(posy5, 'mill-scavengers', 'fen-withdraw', { party: ['fen'], setUp: (g) => (memberOf(g, 'fen').hp = 5) });
+  const [near, gone] = fight.enemies(hurt.battle);
+  gone.hp = 0;
+  near.hp = near.maxHp = 40;
+  near.pos = { x: 4, y: 2 }; // beside Fen (4, 1) and Posy (3, 1)
+  fight.combatantById(hurt.battle, 'fen').pos = { x: 4, y: 1 };
+  hurt.rng = scriptedThen([15, 3, 2, 2], 'fen-withdraw');
+  playTurn(hurt, 'fen');
+  const text = hurt.battle.log.map((e) => e.text).join(' / ');
+  assertTrue(said(hurt, 'Withdraw: Fen can slip') && said(hurt, 'Fen slips away (Withdraw).') && !isNextTo(hurt, 'fen', near), text);
+  assertTrue(!said(hurt, 'an Opportunity Attack!'), text);
+});
+
+test('Odda at level 5: Mass Healing Word when two of the party are Bloodied or down, not for one', () => {
+  const two = fightWith(posy5, 'mill-scavengers', 'mass-heal-ai', { party: ['odda', 'fen'], setUp: (g) => { g.hp = 10; memberOf(g, 'fen').hp = 5; } });
+  playTurn(two, 'odda');
+  assertTrue(said(two, 'Odda casts Mass Healing Word: 2d4'), two.battle.log.map((e) => e.text).join(' / '));
+  assertEqual(memberOf(two, 'odda').slotsUsed[2], 1);
+  const one = fightWith(posy5, 'mill-scavengers', 'one-hurt-ai', { party: ['odda', 'fen'], setUp: (g) => (g.hp = 10) });
+  playTurn(one, 'odda');
+  assertTrue(!said(one, 'Mass Healing Word'), one.battle.log.map((e) => e.text).join(' / '));
+});
+
+test('Odda at level 5 on Aggressive: Spirit Guardians once a foe is within 30 feet, then she wades in to catch more', () => {
+  const game = fightWith(posy5, 'chantry', 'guardians-ai', { party: ['odda'], setUp: (g) => setTactic(g, 'odda', 'aggressive') });
+  assertTrue(realFight(game), '1,250 XP of foes against a Low budget of 1,000 for two level 5 characters');
+  const odda = fight.combatantById(game.battle, 'odda');
+  const start = { ...odda.pos };
+  playTurn(game, 'odda');
+  const text = game.battle.log.map((e) => e.text).join(' / ');
+  assertTrue(said(game, 'Odda casts Spirit Guardians: bright spirits wheel round them, 15 feet out.'), text);
+  assertEqual([fight.concentrationOf(game.battle, odda).name, memberOf(game, 'odda').slotsUsed[2]], ['Spirit Guardians', 1]);
+  assertTrue((odda.pos.x !== start.x || odda.pos.y !== start.y) && fight.foesInGuardians(game, odda) > 0, text);
+  assertTrue(said(game, "Odda's Spirit Guardians swirl round"), text);
 });
 
 test('Party: up to two companions join with full Hit Points and their kit; rests and levels carry them along', () => {

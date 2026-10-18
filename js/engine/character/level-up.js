@@ -11,8 +11,9 @@
 //     subclassId    level 3: the subclass chosen
 //     scholarSkill  Wizard level 2: the skill Scholar gives Expertise in
 //     spellbook     Wizard: the new spells copied into the spellbook (two each level)
-//     savant        Evoker level 3: two free Evocation spells for the spellbook (Evocation
-//                   Savant; its one extra spell at each new level of spell slots starts at 5)
+//     savant        Evoker: free Evocation spells for the spellbook (Evocation Savant): two of
+//                   level 1 or 2 at level 3, then one at each new level of spell slots (level 5:
+//                   up to level 3, such as Fireball)
 //     prepared      Wizard and Cleric: spells added to the prepared list, up to the new
 //                   number (a Wizard's from the spellbook, a Cleric's from the Cleric list)
 //     cantrips      Wizard and Cleric: new class cantrips (one at level 4)
@@ -35,6 +36,7 @@ import {
   characterFeats,
   findClass,
   findFeat,
+  hasFeature,
   masteredWeapons,
   masteryChoices,
   qualifiesForFeat,
@@ -142,6 +144,7 @@ export function heroAfter(game) {
 //   cantrips, spellbook, savant, prepared   { count, from: [spell ids] }, or null
 //   slots       { before: [...], after: [...] } per spell level, or null
 //   speciesSpells  [{ spell, note }]: spells the hero's lineage or legacy gives at this level
+//   domainSpells   [{ spell, source }]: a Cleric's domain spells that arrive at this level
 export function levelUpPlan(game) {
   const draft = requireDraft(game);
   const before = game.character;
@@ -191,6 +194,11 @@ export function levelUpPlan(game) {
     prepared: null,
     slots: null,
     speciesSpells: newSpeciesSpells,
+    // A Cleric's domain spells that arrive at this level (Life Domain 5: Mass Healing Word and
+    // Revivify), always prepared from now on.
+    domainSpells: domainSpells(after)
+      .filter((id) => !domainSpells(before).includes(id))
+      .map((id) => ({ spell: findSpell(id), source: subclassOf(after).name })),
   };
 
   if (row.features.includes('scholar')) {
@@ -231,11 +239,13 @@ export function levelUpPlan(game) {
         return ids.filter((id) => !inBook.includes(id) && !elsewhere.includes(id));
       };
       plan.spellbook = { count: cls.spellcasting.spellbook.perLevel, from: wizardSpells(top).filter((id) => !draft.savant.includes(id)) };
+      const evocations = (maxLevel) => wizardSpells(maxLevel).filter((id) => findSpell(id).school === 'Evocation' && !draft.spellbook.includes(id));
       if (features.some((f) => f.id === 'evocation-savant')) {
-        plan.savant = {
-          count: 2,
-          from: wizardSpells(2).filter((id) => findSpell(id).school === 'Evocation' && !draft.spellbook.includes(id)),
-        };
+        plan.savant = { count: 2, from: evocations(2) };
+      } else if (hasFeature(after, 'evocation-savant') && top > highestSpellLevel(before)) {
+        // Evocation Savant again: one free Evocation spell at each new level of spell slots.
+        const from = evocations(top);
+        if (from.length) plan.savant = { count: 1, from };
       }
       preparable = [...inBook, ...draft.spellbook, ...draft.savant].filter((id) => !before.spells.prepared.includes(id));
     } else {

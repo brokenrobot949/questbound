@@ -1523,6 +1523,53 @@ test('Fanatic: Odda frees you from Hold Person with Lesser Restoration, and Rhos
   assertTrue(fight.isHeroTurn(game) && !fight.conditionsOf(game.battle, 'hero').includes('paralyzed') && rhosyn.concentration === null);
 });
 
+// Level 5 heroes against the Fanatic: Juniper with Counterspell (Int 19: spell save DC 15), and
+// Wren (so Odda is level 5, with Dispel Magic).
+const counterWizard = {
+  ...juniper,
+  level: 5,
+  subclassId: 'evoker',
+  classChoices: { scholarSkill: 'arcana' },
+  hitPointRolls: [null, null, null, null],
+  levelFeats: [{ level: 4, id: 'ability-score-improvement', increases: { intelligence: 2 } }],
+  spells: { cantrips: [...juniper.spells.cantrips, 'chill-touch'], spellbook: ['shield', 'magic-missile', 'mage-armor', 'sleep', 'counterspell', 'fireball'], prepared: ['shield', 'magic-missile', 'mage-armor', 'sleep', 'counterspell', 'fireball'] },
+};
+const champion5 = {
+  ...champion,
+  level: 5,
+  hitPointRolls: [null, null, null, null],
+  classChoices: { ...wren.classChoices, weaponMasteries: [...wren.classChoices.weaponMasteries, 'longbow'] },
+  levelFeats: [{ level: 4, id: 'ability-score-improvement', increases: { strength: 1, constitution: 1 } }],
+};
+
+test('Counterspell: cast for you with a level 3 slot as Rhosyn casts Hold Person; it fizzles and her use is gone (Settings can say not to)', () => {
+  const { game, rhosyn } = fanaticFight({ character: counterWizard, seed: 'counter' });
+  game.rng = scriptedThen([3], 'counter'); // her Constitution save: 3
+  fight.endHeroTurn(game);
+  assertTrue(said(game, "Counterspell! (your reaction, a level 3 slot) You tear Sister Rhosyn's Hold Person apart as it's spoken: the spell fizzles."), logText(game));
+  const save = game.battle.log.find((e) => e.text.startsWith('Counterspell!')).roll;
+  assertEqual([save.label, save.target.value, save.success], ['Constitution save', 15, false]);
+  assertEqual([game.slotsUsed[2], rhosyn.spellsCast['hold-person'], said(game, 'You fail the Wisdom save'), said(game, 'casts Command')], [1, 1, false, false], 'her action is wasted');
+  fight.setReactionPolicy({ counterspell: false });
+  try {
+    const { game: kept } = fanaticFight({ character: counterWizard, seed: 'no-counter' });
+    kept.rng = scriptedThen([2], 'no-counter'); // your Wisdom save: 2
+    fight.endHeroTurn(kept);
+    assertTrue(!said(kept, 'Counterspell!') && said(kept, 'You fail the Wisdom save') && !kept.slotsUsed[2], logText(kept));
+  } finally {
+    fight.setReactionPolicy({ counterspell: true });
+  }
+});
+
+test('Fanatic: Odda at level 5 ends Rhosyn’s Hold Person on you with Dispel Magic when Lesser Restoration can’t reach you', () => {
+  const { game, rhosyn } = fanaticFight({ character: champion5, odda: { x: 3, y: 0 }, seed: 'dispel' }); // 40 feet away: too far to touch you this turn
+  game.rng = scriptedThen([2], 'dispel'); // your save fails
+  fight.endHeroTurn(game);
+  assertTrue(said(game, "Odda casts Dispel Magic: Sister Rhosyn's Hold Person on you unravels and ends. You can move again."), logText(game));
+  assertTrue(fight.isHeroTurn(game) && !fight.conditionsOf(game.battle, 'hero').includes('paralyzed') && rhosyn.concentration === null);
+  assertEqual(memberOf(game, 'odda').slotsUsed[2], 1);
+});
+
 test('Companions: Fen shoots the Fanatic holding you, though a Zombie would be easier to hit', () => {
   const firstShot = (holding) => {
     const { game, rhosyn } = fanaticFight({ at: { x: 4, y: 3 }, fen: { x: 4, y: 9 }, seed: 'fen-aims' });

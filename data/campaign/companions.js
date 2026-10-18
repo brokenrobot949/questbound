@@ -74,6 +74,10 @@ export const companions = [
         cantrips: ['sacred-flame', 'spare-the-dying', 'guidance', 'mending'],
         prepared: ['guiding-bolt', 'shield-of-faith', 'sanctuary', 'spiritual-weapon', 'prayer-of-healing', 'command', 'detect-magic'],
       },
+      // Spirit Guardians and Dispel Magic; the Life Domain adds Mass Healing Word and Revivify.
+      5: {
+        prepared: ['guiding-bolt', 'shield-of-faith', 'sanctuary', 'spiritual-weapon', 'prayer-of-healing', 'command', 'detect-magic', 'spirit-guardians', 'dispel-magic'],
+      },
     },
     source: 'original',
   },
@@ -119,6 +123,8 @@ export const companions = [
       3: { subclassId: 'thief' },
       // Dexterity 17 to 18 (+4) and Constitution 13 to 14 (+2: 4 more Hit Points).
       4: { levelFeats: [{ level: 4, id: 'ability-score-improvement', increases: { dexterity: 1, constitution: 1 } }] },
+      // Level 5 has no choices for a Rogue: Cunning Strike and Uncanny Dodge come by themselves
+      // (combat/companion-ai.js says when Fen uses them).
     },
     source: 'original',
   },
@@ -134,16 +140,17 @@ export const approvalBands = { likes: 3, dislikes: -2, source: 'original' };
 // How companions fight (the Party section of the Sheet lets the player choose).
 //   concentrate  the Concentration spells a spellcaster opens a real fight with (one that's
 //                worth at least a Low fight for the party), the first they can cast: Bless
-//                goes on the party, Shield of Faith on the hero, Spiritual Weapon beside a foe
-//                (combat/companion-ai.js)
+//                goes on the party, Shield of Faith on the hero, Spiritual Weapon beside a foe,
+//                Spirit Guardians round themselves once a foe is within 30 feet (then they
+//                wade in) (combat/companion-ai.js)
 //   spellNote    what that means, shown on the Sheet under a companion who casts spells
 export const tactics = [
   {
     id: 'aggressive',
     name: 'Aggressive',
     summary: 'Goes after the foe they can hurt most.',
-    spellNote: 'Opens a real fight with Spiritual Weapon (Bless until they know it).',
-    concentrate: ['spiritual-weapon', 'bless'],
+    spellNote: 'Opens a real fight with Spirit Guardians once a foe is near, else Spiritual Weapon (Bless until they know those).',
+    concentrate: ['spirit-guardians', 'spiritual-weapon', 'bless'],
   },
   {
     id: 'defensive',

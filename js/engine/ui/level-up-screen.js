@@ -63,7 +63,7 @@ export function showLevelUp({ container, game, onSave, onDone }) {
     // The subclass and Ability Score Improvement features are the choices below, so they
     // aren't listed again.
     const features = plan.features.filter((f) => !f.id.endsWith('-subclass') && f.id !== 'ability-score-improvement');
-    if (features.length || plan.more.length || plan.speciesSpells.length) nodes.push(featuresSection(features, plan.more, plan.speciesSpells));
+    if (features.length || plan.more.length || plan.speciesSpells.length || plan.domainSpells.length) nodes.push(featuresSection(features, plan.more, plan.speciesSpells, plan.domainSpells));
     if (plan.feat) nodes.push(...featSections(plan, draft));
     if (plan.scholar) nodes.push(scholarSection(plan, draft));
     if (plan.masteries) nodes.push(masterySection(plan, draft));
@@ -131,12 +131,15 @@ export function showLevelUp({ container, game, onSave, onDone }) {
     return box;
   }
 
-  function featuresSection(features, more, speciesSpells) {
-    const box = section('New features', features.length || speciesSpells.length ? 'Tap one to read it.' : '');
+  function featuresSection(features, more, speciesSpells, domainSpells) {
+    const box = section('New features', features.length || speciesSpells.length || domainSpells.length ? 'Tap one to read it.' : '');
     for (const feature of features) box.append(expandable(`${feature.name} (${feature.source})`, feature.text));
     for (const { name, text } of more) box.append(el('p', 'section-text', `${name}: ${text}`));
     for (const { spell, note, source } of speciesSpells) {
       box.append(expandable(`${spell.name} (${source})`, `You always have ${spell.name} prepared, and can cast it ${note}.`));
+    }
+    for (const { spell, source } of domainSpells) {
+      box.append(expandable(`${spell.name} (${source})`, `You always have ${spell.name} prepared, on top of the spells you choose. ${spell.text}`));
     }
     return box;
   }
@@ -358,7 +361,11 @@ export function showLevelUp({ container, game, onSave, onDone }) {
       pickBox('New cantrip', `Learn ${n} more ${plan.className} cantrip${n === 1 ? '' : 's'}.`, 'cantrips', plan.cantrips);
     }
     if (plan.savant) {
-      pickBox('Evocation Savant', 'Two Wizard spells from the Evocation school, of level 1 or 2, copied into your spellbook for free.', 'savant', plan.savant);
+      const hint =
+        plan.savant.count === 2
+          ? 'Two Wizard spells from the Evocation school, of level 1 or 2, copied into your spellbook for free.'
+          : `A new level of spell slots: one more Wizard spell from the Evocation school, of level 1 to ${plan.slots.after.length}, copied into your spellbook for free.`;
+      pickBox('Evocation Savant', hint, 'savant', plan.savant);
     }
     const top = plan.slots.after.length;
     const levels = top === 1 ? '1' : `1 to ${top}`;

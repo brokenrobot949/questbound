@@ -137,10 +137,13 @@ function playTurn(game) {
     best = bestAttack(game);
   }
   if (best) heroAttack(game, best.option.id, best.foe.id);
-  // After a Light weapon, the extra attack with the other one (the action is spent, so it's
-  // all that's left to attack with).
-  const extra = isHeroTurn(game) && best ? bestAttack(game) : null;
-  if (extra && extra.option.extra) heroAttack(game, extra.option.id, extra.foe.id);
+  // Then what the action leaves: Extra Attack's second attack, and after a Light weapon the
+  // extra attack with the other one (spells and other actions are spent by now).
+  for (let more = 0; best && more < 3 && isHeroTurn(game); more++) {
+    const next = bestAttack(game);
+    if (!next || next.option.source !== 'weapon') break;
+    heroAttack(game, next.option.id, next.foe.id);
+  }
   if (isHeroTurn(game)) endHeroTurn(game);
 }
 

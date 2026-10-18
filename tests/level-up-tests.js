@@ -1,13 +1,13 @@
 // Level-up checks. Open tests/levels.html through the local server to run them.
-// Add checks here whenever levelling up or a level 2–4 feature changes.
+// Add checks here whenever levelling up or a level 2–5 feature changes.
 
 import { test, assertEqual, assertTrue, assertThrows, scriptedRng, run } from './harness.js';
 import { createRng } from '../js/engine/rules/rng.js';
 import { abilityCheck } from '../js/engine/rules/ability-check.js';
 import * as levelUp from '../js/engine/character/level-up.js';
 import { tacticalMind } from '../js/engine/character/features.js';
-import { abilityScore, characterFeats, hasFeature, maxHitPoints, skillProficiency, sneakAttackDice } from '../js/engine/character/sheet.js';
-import { canCastSpell, freeCastsLeft } from '../js/engine/character/spells.js';
+import { abilityScore, characterFeats, hasFeature, maxHitPoints, proficiencyBonus, skillProficiency, sneakAttackDice, spellcasting } from '../js/engine/character/sheet.js';
+import { canCastSpell, domainSpells, freeCastsLeft } from '../js/engine/character/spells.js';
 import { validateCharacter } from '../js/engine/character/validate.js';
 import { featureUsesMax, freshResources, slotsAt } from '../js/engine/character/resources.js';
 import { startingInventory } from '../js/engine/character/inventory.js';
@@ -69,9 +69,9 @@ test('Ready: level 2 needs 300 XP, and never opens during a fight', () => {
   assertThrows(() => levelUp.beginLevelUp(gameFor(wren, 0)), 'no level-up without the XP');
 });
 
-test('Ready: level 4 (2,700 XP) is as far as the rules data goes for now', () => {
+test('Ready: level 5 (6,500 XP) is as far as the rules data goes for now', () => {
   const next = (level) => levelUp.nextLevelXp({ ...wren, level });
-  assertEqual([next(1), next(2), next(3), next(4)], [300, 900, 2700, null]);
+  assertEqual([next(1), next(2), next(3), next(4), next(5)], [300, 900, 2700, 6500, null]);
 });
 
 // ---- Fighter ----
@@ -184,7 +184,7 @@ test('Wizard 3: the Evoker, Evocation Savant, level 2 spells and level 2 slots',
   levelUp.chooseSubclass(game, 'evoker');
   const plan = levelUp.levelUpPlan(game);
   assertEqual(plan.savant.count, 2);
-  assertEqual(plan.savant.from, ['scorching-ray', 'shatter'], 'Evocation spells of level 1 or 2 she doesn’t have yet');
+  assertEqual(plan.savant.from, ['scorching-ray', 'shatter', 'darkness'], 'Evocation spells of level 1 or 2 she doesn’t have yet');
   assertTrue(!plan.spellbook.from.includes('thunderwave'), 'she has Thunderwave from Magic Initiate already');
   assertTrue(plan.savant.from.every((id) => !['knock', 'misty-step'].includes(id)), 'Evocation only');
   levelUp.toggleLevelUpSpell(game, 'savant', 'scorching-ray');
@@ -250,7 +250,7 @@ test('Fighter 4: an Ability Score Improvement, a fourth Weapon Mastery and a thi
   assertEqual([hero.classChoices.weaponMasteries, featureUsesMax(hero, 'second-wind')], [['greatsword', 'flail', 'javelin', 'longbow'], 3]);
   assertEqual(hero.levelFeats, [{ level: 4, id: 'ability-score-improvement', increases: { strength: 1, constitution: 1 } }]);
   assertEqual(validateCharacter(hero), []);
-  assertTrue(!levelUp.levelUpReady({ ...game, xp: 100000 }), 'level 4 is the top for now');
+  assertTrue(!levelUp.levelUpReady({ ...game, xp: 6499 }) && levelUp.levelUpReady({ ...game, xp: 6500 }), 'level 5 at 6,500 XP');
 });
 
 test('Ability Score Improvement: no score above 20', () => {
@@ -385,7 +385,117 @@ test('Level 4: choosing another feat clears the first one’s choices', () => {
   assertEqual(levelUp.levelUpOk(game.levelUp), true);
 });
 
+// ---- Level 5 ----
+
+// The Quick Start heroes at level 4, ready for level 5 (6,500 XP). Juniper: Int 19 (+4), Chill
+// Touch as her fourth cantrip, Hold Person and Invisibility in her book. Posy: Wis 18 (+4), Con
+// 14, Resistance, and seven prepared. Sorael: Dex 19.
+const juniper4 = {
+  ...juniper3,
+  level: 4,
+  hitPointRolls: [null, null, null],
+  levelFeats: [{ level: 4, id: 'ability-score-improvement', increases: { intelligence: 2 } }],
+  spells: { cantrips: [...juniper.spells.cantrips, 'chill-touch'], spellbook: [...juniper3.spells.spellbook, 'hold-person', 'invisibility'], prepared: [...juniper3.spells.prepared, 'hold-person'] },
+};
+const posy4 = {
+  ...posy3,
+  level: 4,
+  hitPointRolls: [null, null, null],
+  levelFeats: [{ level: 4, id: 'ability-score-improvement', increases: { wisdom: 1, constitution: 1 } }],
+  spells: { ...posy3.spells, cantrips: [...posy.spells.cantrips, 'resistance'], prepared: [...posy3.spells.prepared, 'shield-of-faith', 'spiritual-weapon', 'command'] },
+};
+const sorael4 = { ...sorael3, level: 4, hitPointRolls: [null, null, null], levelFeats: [{ level: 4, id: 'ability-score-improvement', increases: { dexterity: 2 } }] };
+const wren4Asi = wren4([{ level: 4, id: 'ability-score-improvement', increases: { strength: 1, constitution: 1 } }]);
+
+test('Level 5: the level 4 heroes these checks start from are legal', () => {
+  for (const hero of [wren4Asi, juniper4, posy4, sorael4]) assertEqual(validateCharacter(hero), [], hero.name);
+});
+
+test('Fighter 5: Proficiency +3, Extra Attack and Tactical Shift; only Hit Points to choose', () => {
+  const game = gameFor(wren4Asi, 6500);
+  levelUp.beginLevelUp(game);
+  const plan = levelUp.levelUpPlan(game);
+  assertEqual(plan.features.map((f) => f.id), ['extra-attack', 'tactical-shift']);
+  assertEqual([plan.more, plan.masteries, plan.feat, plan.slots, plan.subclasses], [[], null, null, null, null], 'Second Wind stays at 3 uses, Weapon Mastery at 4 kinds');
+  assertEqual(levelUp.levelUpProblems(game), ['Roll your Hit Die or take the fixed Hit Points.']);
+  levelUp.chooseHitPoints(game, 'fixed');
+  assertEqual(levelUp.finishLevelUp(game), { level: 5, hpGained: 9 });
+  const hero = game.character;
+  assertEqual([proficiencyBonus(hero.level), maxHitPoints(hero).value, hasFeature(hero, 'extra-attack'), hasFeature(hero, 'tactical-shift'), featureUsesMax(hero, 'second-wind')], [3, 49, true, true, 3]);
+  assertEqual(validateCharacter(hero), []);
+  assertTrue(!levelUp.levelUpReady({ ...game, xp: 100000 }), 'level 5 is the top for now');
+});
+
+test('Wizard 5: level 3 slots and spells, two more prepared, and Evocation Savant’s free level 3 spell', () => {
+  const game = gameFor(juniper4, 6500);
+  levelUp.beginLevelUp(game);
+  levelUp.chooseHitPoints(game, 'fixed');
+  const plan = levelUp.levelUpPlan(game);
+  assertEqual([plan.features.map((f) => f.id), plan.slots.after, plan.cantrips, plan.spellbook.count, plan.prepared.count], [['memorize-spell'], [4, 3, 2], null, 2, 2]);
+  for (const id of ['fireball', 'lightning-bolt', 'counterspell', 'hypnotic-pattern', 'dispel-magic', 'speak-with-dead', 'tiny-hut']) assertTrue(plan.spellbook.from.includes(id), id);
+  assertEqual(plan.savant.count, 1, 'one free Evocation spell for a new level of spell slots');
+  assertTrue(['fireball', 'lightning-bolt', 'tiny-hut'].every((id) => plan.savant.from.includes(id)) && !plan.savant.from.includes('counterspell'), plan.savant.from.join());
+  assertEqual(levelUp.levelUpProblems(game), ['Choose 1 more Evocation spell.', 'Choose 2 more spellbook spells.', 'Choose 2 more prepared spells.']);
+  levelUp.toggleLevelUpSpell(game, 'savant', 'fireball');
+  assertTrue(!levelUp.levelUpPlan(game).spellbook.from.includes('fireball'), 'not offered twice');
+  levelUp.toggleLevelUpSpell(game, 'spellbook', 'counterspell');
+  levelUp.toggleLevelUpSpell(game, 'spellbook', 'hypnotic-pattern');
+  levelUp.toggleLevelUpSpell(game, 'prepared', 'fireball');
+  levelUp.toggleLevelUpSpell(game, 'prepared', 'counterspell');
+  assertEqual(levelUp.levelUpProblems(game), []);
+  levelUp.finishLevelUp(game);
+  const hero = game.character;
+  assertEqual([hero.spells.prepared.length, slotsAt(hero, 3), spellcasting(hero).saveDc.value], [9, 2, 15], 'Int 19 (+4) and Proficiency +3');
+  assertTrue(canCastSpell(hero, 'fireball') && canCastSpell(hero, 'counterspell') && !canCastSpell(hero, 'hypnotic-pattern'), 'Hypnotic Pattern is in the book, not prepared');
+  assertEqual(validateCharacter(hero), []);
+});
+
+test('Cleric 5: Mass Healing Word and Revivify always prepared, two more prepared, level 3 slots and Sear Undead', () => {
+  const game = gameFor(posy4, 6500);
+  levelUp.beginLevelUp(game);
+  levelUp.chooseHitPoints(game, 'fixed');
+  const plan = levelUp.levelUpPlan(game);
+  assertEqual([plan.features.map((f) => f.id), plan.slots.after, plan.prepared.count, plan.cantrips], [['sear-undead'], [4, 3, 2], 2, null]);
+  assertTrue(['spirit-guardians', 'dispel-magic', 'speak-with-dead'].every((id) => plan.prepared.from.includes(id)), 'level 3 Cleric spells');
+  assertTrue(!plan.prepared.from.includes('mass-healing-word') && !plan.prepared.from.includes('revivify'), 'the Life Domain gives those');
+  assertEqual(plan.domainSpells.map((d) => [d.spell.id, d.source]), [['mass-healing-word', 'Life Domain'], ['revivify', 'Life Domain']], 'and the screen says so');
+  levelUp.toggleLevelUpSpell(game, 'prepared', 'spirit-guardians');
+  levelUp.toggleLevelUpSpell(game, 'prepared', 'dispel-magic');
+  levelUp.finishLevelUp(game);
+  const hero = game.character;
+  assertEqual(domainSpells(hero), ['aid', 'bless', 'cure-wounds', 'lesser-restoration', 'mass-healing-word', 'revivify']);
+  assertEqual([hero.spells.prepared.length, slotsAt(hero, 3), featureUsesMax(hero, 'channel-divinity'), hasFeature(hero, 'sear-undead')], [9, 2, 2, true]);
+  assertTrue(canCastSpell(hero, 'revivify') && canCastSpell(hero, 'spirit-guardians'));
+  assertEqual(validateCharacter(hero), []);
+});
+
+test('Rogue 5: Sneak Attack 3d6, Cunning Strike and Uncanny Dodge; a Wood Elf gains Pass without Trace', () => {
+  const game = gameFor(sorael4, 6500);
+  levelUp.beginLevelUp(game);
+  const plan = levelUp.levelUpPlan(game);
+  assertEqual(plan.features.map((f) => f.id), ['cunning-strike', 'uncanny-dodge']);
+  assertEqual(plan.more, [{ name: 'Sneak Attack', text: '3d6 extra damage (was 2d6).' }]);
+  assertEqual(plan.speciesSpells.map((s) => [s.spell.id, s.source]), [['pass-without-trace', 'Wood Elf']]);
+  levelUp.chooseHitPoints(game, 'fixed');
+  levelUp.finishLevelUp(game);
+  assertEqual([sneakAttackDice(game.character), freeCastsLeft(game, 'pass-without-trace')], ['3d6', 1]);
+  assertEqual(validateCharacter(game.character), []);
+});
+
 // ---- Debug ----
+
+test('Debug: lowering from level 5 takes back the level 3 spells', () => {
+  const cleric = gameFor(posy4, 6500);
+  levelWith(cleric, { prepared: ['spirit-guardians', 'dispel-magic'] });
+  levelUp.lowerLevel(cleric, 4);
+  assertEqual([cleric.character.spells.prepared.includes('spirit-guardians'), domainSpells(cleric.character).includes('revivify'), cleric.xp], [false, false, 2700]);
+  assertEqual(validateCharacter(cleric.character), []);
+  const wizard = gameFor(juniper4, 6500);
+  levelWith(wizard, { savant: ['fireball'], spellbook: ['counterspell', 'dispel-magic'], prepared: ['fireball', 'counterspell'] });
+  levelUp.lowerLevel(wizard, 4);
+  assertTrue(!wizard.character.spells.spellbook.some((id) => ['fireball', 'counterspell', 'dispel-magic'].includes(id)) && !wizard.character.spells.prepared.includes('fireball'));
+  assertEqual(validateCharacter(wizard.character), []);
+});
 
 test('Debug: lowering a level undoes what it gave', () => {
   const game = gameFor(juniper, 300);

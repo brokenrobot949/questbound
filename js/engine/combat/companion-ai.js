@@ -19,10 +19,18 @@
 // lasts, it strikes each turn as a Bonus Action. If the spell ends, they cast it again on a
 // later turn, the same way. Otherwise their spell slots go on healing, and they attack with
 // weapons and cantrips.
+// From level 5 (Rob, Oct 17, 2026): a Life Cleric (Odda) casts Mass Healing Word first when two
+// or more of the party within 60 feet are down or Bloodied; frees a friend Held by a foe's Hold
+// Person with Dispel Magic when Lesser Restoration can't reach them; and on Aggressive opens a
+// real fight with Spirit Guardians once a foe is within 30 feet, then wades in to catch more
+// foes in it (only while no foe is beside her, so she provokes nothing).
 // A Rogue (Fen, from level 2) uses Cunning Action: Dash to reach a foe they couldn't
 // otherwise attack this turn (Aggressive), then, after attacking, Hide if they can get out of
 // every foe's sight without leaving a foe's reach, or else, Bloodied with a foe beside them,
-// Disengage and step back.
+// Disengage and step back. From level 5 his Sneak Attack carries a Cunning Strike: Withdraw when
+// he's Bloodied with a foe beside him (then he slips away, provoking nothing), else Trip when
+// another of the party is beside his target (so they can hit it while it's down).
+// Uncanny Dodge is used for him, as for the hero, on the first hit each round (battle.js).
 // Every move goes through the fight's own rules (combat/battle.js), so it's logged and saved
 // like any other turn.
 
@@ -32,11 +40,19 @@ import {
   clearShot,
   companionAttack,
   companionCantUse,
+  companionCastAura,
   companionCastOn,
   companionDash,
   companionDisengage,
+  companionDispel,
   companionDodge,
+  companionFreeFeet,
+  companionFreeMove,
+  companionFreeReach,
   companionHeal,
+  companionMassHeal,
+  dispelTargets,
+  foesInGuardians,
   companionHide,
   companionHideProblem,
   companionMedicine,
@@ -84,11 +100,87 @@ export function companionTurn(game, c) {
   }
   const tactic = memberOf(game, c.id).tactic;
   const able = () => !battle.outcome && upright(game, c);
-  rescue(game, c) || restoreSomeone(game, c) || (tactic === 'support' && patchUp(game, c));
+  massHeal(game, c);
+  if (able()) rescue(game, c) || restoreSomeone(game, c) || dispelSomeone(game, c) || (tactic === 'support' && patchUp(game, c));
   if (able()) concentrate(game, c, tactic);
   if (able()) weaponStrike(game, c);
   if (able()) fight(game, c, tactic);
+  if (able()) wadeIn(game, c, tactic);
+  if (able()) withdraw(game, c, tactic);
   if (able()) slipAway(game, c, tactic);
+}
+
+// Mass Healing Word (a Bonus Action): when two or more of the party within its 60 feet are at
+// 0 Hit Points or Bloodied, if it leaves a spell slot for healing. True if cast.
+function massHeal(game, c) {
+  const battle = game.battle;
+  const view = actorGame(game, c);
+  const option = companionOptions(game, c)
+    .filter((o) => o.how === 'heal' && o.targeting === 'party' && !companionCantUse(game, c, o) && keepsASlot(view, o))
+    .sort((a, b) => (a.slotLevel || 0) - (b.slotLevel || 0))[0];
+  if (!option) return false;
+  const needy = partyCombatants(battle).filter((p) => {
+    const state = stateOf(battle, p);
+    if (state === 'dead' || feetBetween(c.pos, p.pos) > option.range[1]) return false;
+    return state !== 'up' || hpOf(game, p) * 2 <= maxHpOf(game, p);
+  });
+  if (needy.length < 2) return false;
+  companionMassHeal(game, c, option.id);
+  return true;
+}
+
+// A friend Held by a foe's Hold Person, whom Lesser Restoration couldn't reach this turn:
+// Dispel Magic (an action, 120 feet), if it leaves a spell slot for healing. True if cast.
+function dispelSomeone(game, c) {
+  if (!actionFree(game)) return false;
+  const view = actorGame(game, c);
+  const option = companionOptions(game, c)
+    .filter((o) => o.how === 'dispel' && !companionCantUse(game, c, o) && keepsASlot(view, o))
+    .sort((a, b) => (a.slotLevel || 0) - (b.slotLevel || 0))[0];
+  if (!option) return false;
+  const target = dispelTargets(game, option, c).find((t) => t.key.startsWith('held:') && !t.problem);
+  if (!target) return false;
+  companionDispel(game, c, option.id, target.key);
+  return true;
+}
+
+// Spirit Guardians up (Aggressive): with no foe beside them, step to where the spirits would
+// catch the most foes, if that's more than now. The foes they move onto are struck.
+function wadeIn(game, c, tactic) {
+  const held = concentrationOf(game.battle, c);
+  if (tactic !== 'aggressive' || !held || held.spellId !== 'spirit-guardians') return;
+  if (enemies(game.battle).some((e) => e.hp > 0 && !e.escaped && isAdjacent(e.pos, c.pos))) return;
+  const now = foesInGuardians(game, c);
+  let best = null;
+  for (const step of companionReach(game, c).values()) {
+    if (step.cost === 0) continue;
+    const caught = foesInGuardians(game, c, step.pos);
+    if (caught > now && (!best || caught > best.caught || (caught === best.caught && step.cost < best.step.cost))) best = { step, caught };
+  }
+  if (best) companionMove(game, c, best.step.path);
+}
+
+// A Rogue's Cunning Strike for an attack on this foe (Fen): Withdraw when Bloodied with a foe
+// beside them, else Trip when another of the party is beside the foe, else none.
+function cunningFor(game, c, foe) {
+  if (!hasFeature(actorGame(game, c).character, 'cunning-strike')) return null;
+  const battle = game.battle;
+  const bloodied = hpOf(game, c) * 2 <= maxHpOf(game, c);
+  if (bloodied && enemies(battle).some((e) => e.hp > 0 && !e.escaped && isAdjacent(e.pos, c.pos))) return 'withdraw';
+  const friendBeside = partyCombatants(battle).some((p) => p !== c && upright(game, p) && isAdjacent(p.pos, foe.pos));
+  return friendBeside ? 'trip' : null;
+}
+
+// After a Cunning Strike's Withdraw: slip as far from the foes as the free move allows (within
+// what the tactic allows), provoking nothing.
+function withdraw(game, c, tactic) {
+  if (companionFreeFeet(game) <= 0) return;
+  const foes = enemies(game.battle).filter((e) => e.hp > 0 && !e.escaped);
+  if (!foes.length) return;
+  const allowed = allowedFor(game, tactic);
+  const gap = (pos) => Math.min(...foes.map((f) => squaresBetween(pos, f.pos)));
+  const away = [...companionFreeReach(game, c).values()].filter((s) => s.cost > 0 && allowed(s.pos) && gap(s.pos) > gap(c.pos)).sort((a, b) => gap(b.pos) - gap(a.pos) || a.cost - b.cost)[0];
+  if (away) companionFreeMove(game, c, away.path);
 }
 
 // ---- Helping the fallen and the hurt ----
@@ -218,6 +310,12 @@ function concentrate(game, c, tactic) {
       .filter((o) => o.spellId === spellId && !companionCantUse(game, c, o) && keepsASlot(view, o))
       .sort((a, b) => (a.slotLevel || 0) - (b.slotLevel || 0))[0];
     if (!option) continue;
+    if (option.how === 'aura') {
+      // Spirit Guardians: once a foe is within 30 feet (then they wade in: wadeIn).
+      if (!enemies(battle).some((e) => e.hp > 0 && !e.escaped && feetBetween(c.pos, e.pos) <= 30)) continue;
+      companionCastAura(game, c, option.id);
+      return true;
+    }
     if (option.how === 'spirit') {
       // Spiritual Weapon: beside the foe it would hurt most.
       const best = bestFromHere(game, c, [option]);
@@ -333,10 +431,12 @@ function fight(game, c, tactic) {
     best = bestFromHere(game, c, attacks(game, c));
   }
   if (best) {
-    companionAttack(game, c, best.option.id, best.foe.id);
+    companionAttack(game, c, best.option.id, best.foe.id, { cunning: cunningFor(game, c, best.foe) });
+    // Withdraw: the free move comes straight after the attack (withdraw), not another swing.
+    if (companionFreeFeet(game) > 0) return;
     // A second Light weapon: the extra attack (free with Nick, otherwise the Bonus Action).
     const extra = !battle.outcome && upright(game, c) ? bestFromHere(game, c, attacks(game, c, { extra: true })) : null;
-    if (extra) companionAttack(game, c, extra.option.id, extra.foe.id);
+    if (extra) companionAttack(game, c, extra.option.id, extra.foe.id, { cunning: cunningFor(game, c, extra.foe) });
     return;
   }
   // Nothing to attack: guard yourself if foes are near.

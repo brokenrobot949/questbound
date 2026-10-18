@@ -14,6 +14,9 @@
 //           one more to its left and above, and two more to its right and below).
 //   Sphere  every square within its radius of the centre square, counted the way movement
 //           is (each diagonal is 5 feet): a 5-foot radius is a 3 × 3 block, 10 feet is 5 × 5.
+//   Line    from your square, one square wide, straight out in one of eight directions for
+//           its length (Lightning Bolt's 100 feet is 20 squares, so it runs to the edge of
+//           the map unless a wall stops it).
 // A Cone's or Cube's point of origin isn't part of it, so your own square never is; a
 // Sphere's centre, or a placed Cube's chosen square, is. Walls block an area: a square only
 // counts if a straight line from the point of origin reaches it without passing through a
@@ -57,7 +60,8 @@ export function areaSquares(map, { shape, size }, origin, direction = null) {
   else {
     const dir = findDirection(direction);
     if (!dir) throw new Error(`A ${shape} needs a direction`);
-    offsets = shape === 'cone' ? coneOffsets(length, dir) : cubeOffsets(length, dir);
+    if (shape === 'line') offsets = Array.from({ length }, (_, i) => [(i + 1) * dir.dx, (i + 1) * dir.dy]);
+    else offsets = shape === 'cone' ? coneOffsets(length, dir) : cubeOffsets(length, dir);
   }
   return offsets
     .map(([dx, dy]) => ({ x: origin.x + dx, y: origin.y + dy }))

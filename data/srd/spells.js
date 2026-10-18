@@ -4,7 +4,10 @@
 // gives by character level 3. Phase 2 adds the Cleric's own spells: the Life Domain's (Aid,
 // Lesser Restoration), then a first set of the Cleric list (Bane, Command, Inflict Wounds,
 // Purify Food and Drink, Shield of Faith, Blindness/Deafness, Prayer of Healing, Spiritual
-// Weapon). Level 4 adds Resistance, the last SRD Cleric cantrip.
+// Weapon). Level 4 adds Resistance, the last SRD Cleric cantrip. Level 5 adds the first level 3
+// spells (Counterspell, Dispel Magic, Fireball, Hypnotic Pattern, Lightning Bolt, Mass Healing
+// Word, Revivify, Speak with Dead, Spirit Guardians, Tiny Hut) and the level 2 spells species
+// give at level 5 (Darkness, Pass without Trace, Ray of Enfeeblement).
 //
 //   level         0 for a cantrip
 //   lists         the class spell lists the spell is on
@@ -42,7 +45,19 @@
 //            'teleport'  Misty Step: to a square you can see within range
 //            'reaction'  the game casts it for you (see Settings): Shield when it would turn a
 //                        hit into a miss, Hellish Rebuke (trigger 'damaged') when a creature
-//                        within range hurts you
+//                        within range hurts you, Counterspell (trigger 'foe-spell') when a foe
+//                        within range you can see casts one of the spells in `counters` (Hold
+//                        Person) at anyone in the party; the foe makes the `save`
+//            'aura'      Spirit Guardians: an Emanation of `radius` feet round the caster, while
+//                        they concentrate. A foe makes the `save` when it's cast on them, when
+//                        the caster moves it onto them, when they enter it, and when they end
+//                        their turn in it (once a turn), taking the damage (halfOnSave); and
+//                        halvesSpeed: a foe's Speed is halved inside it
+//            'dispel'    Dispel Magic: ends a spell of level 3 or lower on a creature or a
+//                        magical effect within range (a foe's Hold Person on a friend, a foe's
+//                        Spiritual Weapon)
+//            'revive'    Revivify: a friend who died within the last `withinRounds` rounds (a
+//                        minute) comes back with 1 Hit Point; the `component` item is used up
 //   targets  for 'self', 'heal' and 'ward' spells: who they go on. None: only you (False
 //            Life). 1: you or one companion within range (Cure Wounds, Sanctuary). More: you
 //            and your companions within range, up to that many (Bless, Aid; the party is
@@ -61,9 +76,12 @@
 //            'no-healing' (until the start of your next turn), 'poisoned' (until the end
 //            of your next turn), 'guided' (the next attack roll against it before the end of
 //            your next turn has Advantage)
-//   area     { shape: 'cone' | 'cube' | 'sphere', size: feet }: a Cone's length, a Cube's
-//            side, a Sphere's radius (combat/areas.js shows how these lie on the grid). With
-//            a range, the area goes on a square within it; with range 0 it starts from you.
+//   area     { shape: 'cone' | 'cube' | 'sphere' | 'line', size: feet }: a Cone's length, a
+//            Cube's side, a Sphere's radius, a Line's length (5 feet wide) (combat/areas.js
+//            shows how these lie on the grid). With a range, the area goes on a square within
+//            it; with range 0 it starts from you.
+//   sight    only creatures who can see the area are caught (Hypnotic Pattern): the Blinded
+//            aren't
 //   halfOnSave  a creature that makes its save still takes half the damage
 //   push     feet a failed save pushes a creature away from you (Thunderwave)
 //   foesOnly the spell affects only the creatures you choose, which is always your foes
@@ -73,8 +91,10 @@
 //            attack rolls against it have Advantage), 'grovel' (Command: on its next turn it
 //            falls Prone and ends its turn), 'blinded' (Blindness/Deafness: its attacks have
 //            Disadvantage and attacks on it Advantage, for a minute, with a new save at the end
-//            of each of its turns) or 'baned' (Bane: it subtracts 1d4 from its attack rolls and
-//            saving throws while you concentrate)
+//            of each of its turns), 'baned' (Bane: it subtracts 1d4 from its attack rolls and
+//            saving throws while you concentrate) or 'charmed' (Hypnotic Pattern: Incapacitated
+//            with a Speed of 0 while you concentrate, until it takes damage or someone shakes
+//            it out of its stupor)
 //   creatureType  only creatures of this type can be chosen ('Humanoid')
 //   bonusAction   cast as a Bonus Action instead of an action
 //   self     for 'self' spells: 'mage-armor' (AC 13 + Dex while unarmoured), 'false-life'
@@ -989,6 +1009,219 @@ export const spells = [
     concentration: false,
     text: 'A loud noise erupts from a point of your choice within range. Each creature in a 10-foot-radius Sphere centered there makes a Constitution saving throw, taking 3d8 Thunder damage on a failed save or half as much damage on a successful one. A Construct has Disadvantage on the save.\n\nA nonmagical object that isn’t being worn or carried also takes the damage if it’s in the spell’s area.',
     upgrade: 'The damage increases by 1d8 for each spell slot level above 2.',
+    source: 'SRD 5.2.1',
+  },
+  // The level 2 spells a lineage or legacy gives at character level 5 (a Drow's or an Infernal
+  // Tiefling's Darkness, a Wood Elf's Pass without Trace, a Chthonic Tiefling's Ray of
+  // Enfeeblement). Not in fights yet: they unlock choices in scenes.
+  {
+    id: 'darkness',
+    name: 'Darkness',
+    level: 2,
+    school: 'Evocation',
+    lists: ['sorcerer', 'warlock', 'wizard'],
+    castingTime: 'Action',
+    ritual: false,
+    range: '60 feet',
+    components: 'V, M (bat fur and a piece of coal)',
+    duration: 'Concentration, up to 10 minutes',
+    concentration: true,
+    text: 'For the duration, magical Darkness spreads from a point within range and fills a 15-foot-radius Sphere. Darkvision can’t see through it, and nonmagical light can’t illuminate it.\n\nAlternatively, you cast the spell on an object that isn’t being worn or carried, causing the Darkness to fill a 15-foot Emanation originating from that object. Covering that object with something opaque, such as a bowl or helm, blocks the Darkness.\n\nIf any of this spell’s area overlaps with an area of Bright Light or Dim Light created by a spell of level 2 or lower, that other spell is dispelled.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'pass-without-trace',
+    name: 'Pass without Trace',
+    level: 2,
+    school: 'Abjuration',
+    lists: ['druid', 'ranger'],
+    castingTime: 'Action',
+    ritual: false,
+    range: 'Self',
+    components: 'V, S, M (ashes from burned mistletoe)',
+    duration: 'Concentration, up to 1 hour',
+    concentration: true,
+    text: 'You radiate a concealing aura in a 30-foot Emanation for the duration. While in the aura, you and each creature you choose have a +10 bonus to Dexterity (Stealth) checks and leave no tracks.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'ray-of-enfeeblement',
+    name: 'Ray of Enfeeblement',
+    level: 2,
+    school: 'Necromancy',
+    lists: ['warlock', 'wizard'],
+    castingTime: 'Action',
+    ritual: false,
+    range: '60 feet',
+    components: 'V, S',
+    duration: 'Concentration, up to 1 minute',
+    concentration: true,
+    text: 'A beam of enervating energy shoots from you toward a creature within range. The target must make a Constitution saving throw. On a successful save, the target has Disadvantage on the next attack roll it makes until the start of your next turn.\n\nOn a failed save, the target has Disadvantage on Strength-based D20 Tests for the duration. During that time, it also subtracts 1d8 from all its damage rolls. The target repeats the save at the end of each of its turns, ending the spell on a success.',
+    source: 'SRD 5.2.1',
+  },
+
+  // ---- Level 3 ----
+  {
+    id: 'counterspell',
+    combat: { kind: 'reaction', trigger: 'foe-spell', range: 60, save: 'constitution', counters: ['hold-person'] },
+    name: 'Counterspell',
+    level: 3,
+    school: 'Abjuration',
+    lists: ['sorcerer', 'warlock', 'wizard'],
+    castingTime: 'Reaction, which you take when you see a creature within 60 feet of yourself casting a spell with Verbal, Somatic, or Material components',
+    ritual: false,
+    range: '60 feet',
+    components: 'S',
+    duration: 'Instantaneous',
+    concentration: false,
+    text: 'You attempt to interrupt a creature in the process of casting a spell. The creature makes a Constitution saving throw. On a failed save, the spell dissipates with no effect, and the action, Bonus Action, or Reaction used to cast it is wasted. If that spell was cast with a spell slot, the slot isn’t expended.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'dispel-magic',
+    combat: { kind: 'dispel', range: 120 },
+    name: 'Dispel Magic',
+    level: 3,
+    school: 'Abjuration',
+    lists: ['bard', 'cleric', 'druid', 'paladin', 'ranger', 'sorcerer', 'warlock', 'wizard'],
+    castingTime: 'Action',
+    ritual: false,
+    range: '120 feet',
+    components: 'V, S',
+    duration: 'Instantaneous',
+    concentration: false,
+    text: 'Choose one creature, object, or magical effect within range. Any ongoing spell of level 3 or lower on the target ends. For each ongoing spell of level 4 or higher on the target, make an ability check using your spellcasting ability (DC 10 plus that spell’s level). On a successful check, the spell ends.',
+    upgrade: 'You automatically end a spell on the target if the spell’s level is equal to or less than the level of the spell slot you use.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'fireball',
+    combat: { kind: 'area', area: { shape: 'sphere', size: 20 }, range: 150, save: 'dexterity', damage: { dice: '8d6', type: 'fire' }, upcast: '1d6', halfOnSave: true },
+    name: 'Fireball',
+    level: 3,
+    school: 'Evocation',
+    lists: ['sorcerer', 'wizard'],
+    castingTime: 'Action',
+    ritual: false,
+    range: '150 feet',
+    components: 'V, S, M (a ball of bat guano and sulfur)',
+    duration: 'Instantaneous',
+    concentration: false,
+    text: 'A bright streak flashes from you to a point you choose within range and then blossoms with a low roar into a fiery explosion. Each creature in a 20-foot-radius Sphere centered on that point makes a Dexterity saving throw, taking 8d6 Fire damage on a failed save or half as much damage on a successful one.\n\nFlammable objects in the area that aren’t being worn or carried start burning.',
+    upgrade: 'The damage increases by 1d6 for each spell slot level above 3.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'hypnotic-pattern',
+    combat: { kind: 'area', area: { shape: 'cube', size: 30 }, range: 120, save: 'wisdom', condition: 'charmed', sight: true },
+    name: 'Hypnotic Pattern',
+    level: 3,
+    school: 'Illusion',
+    lists: ['bard', 'sorcerer', 'warlock', 'wizard'],
+    castingTime: 'Action',
+    ritual: false,
+    range: '120 feet',
+    components: 'S, M (a pinch of confetti)',
+    duration: 'Concentration, up to 1 minute',
+    concentration: true,
+    text: 'You create a twisting pattern of colors in a 30-foot Cube within range. The pattern appears for a moment and vanishes. Each creature in the area who can see the pattern must succeed on a Wisdom saving throw or have the Charmed condition for the duration. While Charmed, the creature has the Incapacitated condition and a Speed of 0.\n\nThe spell ends for an affected creature if it takes any damage or if someone else uses an action to shake the creature out of its stupor.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'lightning-bolt',
+    combat: { kind: 'area', area: { shape: 'line', size: 100 }, range: 0, save: 'dexterity', damage: { dice: '8d6', type: 'lightning' }, upcast: '1d6', halfOnSave: true },
+    name: 'Lightning Bolt',
+    level: 3,
+    school: 'Evocation',
+    lists: ['sorcerer', 'wizard'],
+    castingTime: 'Action',
+    ritual: false,
+    range: 'Self',
+    components: 'V, S, M (a bit of fur and a crystal rod)',
+    duration: 'Instantaneous',
+    concentration: false,
+    text: 'A stroke of lightning forming a 100-foot-long, 5-foot-wide Line blasts out from you in a direction you choose. Each creature in the Line makes a Dexterity saving throw, taking 8d6 Lightning damage on a failed save or half as much damage on a successful one.',
+    upgrade: 'The damage increases by 1d6 for each spell slot level above 3.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'mass-healing-word',
+    combat: { kind: 'heal', range: 60, targets: 6, bonusAction: true, heal: { dice: '2d4' }, upcast: '1d4' },
+    name: 'Mass Healing Word',
+    level: 3,
+    school: 'Abjuration',
+    lists: ['bard', 'cleric'],
+    castingTime: 'Bonus Action',
+    ritual: false,
+    range: '60 feet',
+    components: 'V',
+    duration: 'Instantaneous',
+    concentration: false,
+    text: 'Up to six creatures of your choice that you can see within range regain Hit Points equal to 2d4 plus your spellcasting ability modifier.',
+    upgrade: 'The healing increases by 1d4 for each spell slot level above 3.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'revivify',
+    combat: { kind: 'revive', range: 5, touch: true, targets: 1, withinRounds: 10, component: { item: 'diamond', name: 'a diamond worth 300+ GP' } },
+    name: 'Revivify',
+    level: 3,
+    school: 'Necromancy',
+    lists: ['cleric', 'druid', 'paladin', 'ranger'],
+    castingTime: 'Action',
+    ritual: false,
+    range: 'Touch',
+    components: 'V, S, M (a diamond worth 300+ GP, which the spell consumes)',
+    duration: 'Instantaneous',
+    concentration: false,
+    text: 'You touch a creature that has died within the last minute. That creature revives with 1 Hit Point. This spell can’t revive a creature that has died of old age, nor does it restore any missing body parts.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'speak-with-dead',
+    name: 'Speak with Dead',
+    level: 3,
+    school: 'Necromancy',
+    lists: ['bard', 'cleric', 'wizard'],
+    castingTime: 'Action',
+    ritual: false,
+    range: '10 feet',
+    components: 'V, S, M (burning incense)',
+    duration: '10 minutes',
+    concentration: false,
+    text: 'You grant the semblance of life to a corpse of your choice within range, allowing it to answer questions you pose. The corpse must have a mouth, and this spell fails if the deceased creature was Undead when it died. The spell also fails if the corpse was the target of this spell within the past 10 days.\n\nUntil the spell ends, you can ask the corpse up to five questions. The corpse knows only what it knew in life, including the languages it knew. Answers are usually brief, cryptic, or repetitive, and the corpse is under no compulsion to offer a truthful answer if you are antagonistic toward it or it recognizes you as an enemy. This spell doesn’t return the creature’s soul to its body, only its animating spirit. Thus, the corpse can’t learn new information, doesn’t comprehend anything that has happened since it died, and can’t speculate about future events.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'spirit-guardians',
+    combat: { kind: 'aura', radius: 15, save: 'wisdom', damage: { dice: '3d8', type: 'radiant' }, upcast: '1d8', halfOnSave: true, halvesSpeed: true },
+    name: 'Spirit Guardians',
+    level: 3,
+    school: 'Conjuration',
+    lists: ['cleric'],
+    castingTime: 'Action',
+    ritual: false,
+    range: 'Self',
+    components: 'V, S, M (a prayer scroll)',
+    duration: 'Concentration, up to 10 minutes',
+    concentration: true,
+    text: 'Protective spirits flit around you in a 15-foot Emanation for the duration. If you are good or neutral, their spectral form appears angelic or fey (your choice). If you are evil, they appear fiendish.\n\nWhen you cast this spell, you can designate creatures to be unaffected by it. Any other creature’s Speed is halved in the Emanation, and whenever the Emanation enters a creature’s space and whenever a creature enters the Emanation or ends its turn there, the creature must make a Wisdom saving throw. On a failed save, the creature takes 3d8 Radiant damage (if you are good or neutral) or 3d8 Necrotic damage (if you are evil). On a successful save, the creature takes half as much damage. A creature makes this save only once per turn.',
+    upgrade: 'The damage increases by 1d8 for each spell slot level above 3.',
+    source: 'SRD 5.2.1',
+  },
+  {
+    id: 'tiny-hut',
+    name: 'Tiny Hut',
+    level: 3,
+    school: 'Evocation',
+    lists: ['bard', 'wizard'],
+    castingTime: '1 minute or Ritual',
+    ritual: true,
+    range: 'Self',
+    components: 'V, S, M (a crystal bead)',
+    duration: '8 hours',
+    concentration: false,
+    text: 'A 10-foot Emanation springs into existence around you and remains stationary for the duration. The spell fails when you cast it if the Emanation isn’t big enough to fully encapsulate all creatures in its area.\n\nCreatures and objects within the Emanation when you cast the spell can move through it freely. All other creatures and objects are barred from passing through it. Spells of level 3 or lower can’t be cast through it, and the effects of such spells can’t extend into it.\n\nThe atmosphere inside the Emanation is comfortable and dry, regardless of the weather outside. Until the spell ends, you can command the interior to have Dim Light or Darkness (no action required). The Emanation is opaque from the outside and of any color you choose, but it’s transparent from the inside.\n\nThe spell ends early if you leave the Emanation or if you cast it again.',
     source: 'SRD 5.2.1',
   },
 ];

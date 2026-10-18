@@ -11,6 +11,7 @@ import { formatDuration, summarizeLog } from '../save/playtest-log.js';
 import { offlineReport } from '../save/offline.js';
 import { nextLevelXp } from '../character/level-up.js';
 import { equipment } from '../../../data/srd/equipment.js';
+import { items as storyItems } from '../../../data/campaign/items.js';
 import { companions } from '../../../data/campaign/companions.js';
 import { encounters } from '../../../data/campaign/encounters.js';
 import { fightRating } from '../combat/difficulty.js';
@@ -161,7 +162,8 @@ export function setupDebugPanel({ root, getGame, tracker, offline, actions }) {
     section.append(el('p', 'debug-label', 'Gold pieces'), row(gold, actionButton('Give gold', () => run(() => actions.giveGold(Number(gold.value))))));
     const item = el('select', 'debug-input');
     item.setAttribute('aria-label', 'Item');
-    for (const entry of equipment) {
+    // The rules' gear, then the story's own items (a diamond for Revivify, say).
+    for (const entry of [...equipment, ...storyItems]) {
       const o = el('option', null, entry.name);
       o.value = entry.id;
       item.append(o);

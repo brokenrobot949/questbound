@@ -81,8 +81,10 @@ const STEPS = [
 // Every square a creature can reach this turn, with what it costs and the way there.
 // blockedBy(pos): 'enemy' (can't pass), 'ally' (can pass, can't stop) or null.
 // crawling: a Prone creature crawls, and every square costs 5 feet more.
+// slowAt(pos): true where the creature's Speed is halved (a foe inside Spirit Guardians), so
+// moving into that square costs twice as much.
 // Returns a Map from key(pos) to { pos, cost (feet), path: [pos, …] (not including the start) }.
-export function reachableSquares(map, start, feet, blockedBy = () => null, { crawling = false } = {}) {
+export function reachableSquares(map, start, feet, blockedBy = () => null, { crawling = false, slowAt = null } = {}) {
   const best = new Map([[key(start), { pos: start, cost: 0, path: [] }]]);
   const queue = [{ pos: start, cost: 0, path: [] }];
   while (queue.length) {
@@ -95,7 +97,7 @@ export function reachableSquares(map, start, feet, blockedBy = () => null, { cra
         continue; // no cutting corners
       }
       if (blockedBy(next) === 'enemy') continue;
-      const cost = here.cost + stepCost(map, next, crawling);
+      const cost = here.cost + stepCost(map, next, crawling, slowAt);
       if (cost > feet) continue;
       const known = best.get(key(next));
       if (known && known.cost <= cost) continue;
@@ -110,7 +112,9 @@ export function reachableSquares(map, start, feet, blockedBy = () => null, { cra
 }
 
 // What it costs to move into a square: 5 feet, 10 in difficult terrain, and 5 more when
-// crawling (SRD 5.2.1, "Crawling": each foot costs 1 extra foot, 2 extra in difficult terrain).
-export function stepCost(map, pos, crawling = false) {
-  return ((cellAt(map, pos).terrain === 'difficult' ? 2 : 1) + (crawling ? 1 : 0)) * SQUARE_FEET;
+// crawling (SRD 5.2.1, "Crawling": each foot costs 1 extra foot, 2 extra in difficult terrain);
+// all twice over where the creature's Speed is halved (slowAt, see reachableSquares).
+export function stepCost(map, pos, crawling = false, slowAt = null) {
+  const cost = ((cellAt(map, pos).terrain === 'difficult' ? 2 : 1) + (crawling ? 1 : 0)) * SQUARE_FEET;
+  return slowAt && slowAt(pos) ? cost * 2 : cost;
 }

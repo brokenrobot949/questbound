@@ -64,9 +64,13 @@ const ALLY_FRAME = 'rgba(150, 190, 255, 0.55)';
 const AREA_WASH = ['rgba(240, 140, 60, 0.35)', 'rgba(240, 140, 60, 0.9)'];
 const TELEPORT_WASH = ['rgba(180, 140, 230, 0.35)', 'rgba(180, 140, 230, 0.9)'];
 const HIDING_WASH = ['rgba(60, 110, 235, 0.5)', 'rgba(120, 170, 255, 1)'];
+// Spirit Guardians' reach round their caster.
+const GUARDIAN_GLOW = 'rgba(255, 225, 120, 0.2)';
+const GUARDIAN_EDGE = 'rgba(255, 236, 160, 0.95)';
 // Tints under a creature with a condition, and words for the turn order.
 const CONDITION_TINTS = {
   paralyzed: 'rgba(180, 140, 230, 0.45)',
+  charmed: 'rgba(240, 150, 210, 0.45)', // Hypnotic Pattern
   turned: 'rgba(250, 235, 180, 0.45)', // Turn Undead
   blinded: 'rgba(30, 30, 50, 0.5)', // Blindness/Deafness
   poisoned: 'rgba(110, 200, 90, 0.4)',
@@ -79,6 +83,7 @@ const CONDITION_WORDS = [
   ['asleep', 'Asleep'],
   ['drowsy', 'Drowsy'],
   ['paralyzed', 'Paralyzed'],
+  ['charmed', 'Charmed'],
   ['turned', 'Turned'],
   ['blinded', 'Blinded'],
   ['grovel', 'Commanded: Grovel'],
@@ -224,7 +229,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       }
       return act(() => (view.potion ? fight.heroDrinkPotion(game, friend.c.id) : fight.heroCastOn(game, chosen.id, friend.c.id)));
     }
-    if (aiming === 'self' || aiming === 'nearest' || aiming === 'party') return;
+    if (aiming === 'self' || aiming === 'nearest' || aiming === 'party' || aiming === 'dispel') return;
     const foe = fight.enemies(game.battle).find((c) => c.hp > 0 && c.pos.x === pos.x && c.pos.y === pos.y);
     if (foe && chosen) return act(() => fight.heroAttack(game, chosen.id, foe.id));
     if (!foe && fight.heroReachable(game).has(key(pos))) act(() => fight.heroMove(game, pos));
@@ -477,6 +482,9 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       notes.push(ward ? `Resistance: 1d4 less ${ward.damageType} damage once a turn` : 'Resistance');
     }
     if ((scene.weapons || []).some((w) => w.by === 'hero')) notes.push('Spiritual Weapon: strikes as a Bonus Action');
+    const guardians = (scene.auras || []).find((a) => a.by === 'hero');
+    if (guardians) notes.push(`Spirit Guardians: foes within ${guardians.radius} feet of you are slowed and burned`);
+    if (heroConditions.includes('charmed')) notes.push('Charmed: you can’t move or act until you’re hurt or shaken out of it');
     if (heroConditions.includes('outlined')) notes.push('Outlined: attacks on you have Advantage');
     if (heroConditions.includes('dodging')) notes.push('Dodging');
     if (hero.temp) notes.push(`${hero.temp} Temporary Hit Points`);
@@ -543,7 +551,7 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
         : view.potion
         ? 'Potion of Healing: drink it, or give it to a friend beside you. Tap them on the grid, or below.'
         : turn.athleteMove
-        ? `Remarkable Athlete: tap a gold square to move up to ${turn.athleteMove} feet without provoking Opportunity Attacks, or carry on.`
+        ? `${turn.freeMoveFrom || 'Remarkable Athlete'}: tap a gold square to move up to ${turn.athleteMove} feet without provoking Opportunity Attacks, or carry on.`
         : prone
           ? `You're Prone: your attacks have Disadvantage, and foes beside you have Advantage. Stand up for ${fight.heroStandCost(game)} feet of movement, or crawl (${turn.movementLeft} feet left, each square costs double).`
           : `Your turn. Tap a lit square to move (${turn.movementLeft} feet left), or choose an action.${hidingSquares() ? ' Blue squares are out of every foe’s sight.' : ''}`;
@@ -578,10 +586,15 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     // action (otherwise it's under Bonus Action).
     const weapons = options.filter((o) => o.source === 'weapon' && !o.bonusAction);
     if (weapons.length) {
-      const attacks = actionGroup(turn.action ? 'Attack (action used)' : 'Attack');
+      // Extra Attack: the Attack action's second attack is still to come.
+      const more = turn.attacksLeft || 0;
+      const label = more > 0 ? `Attack (${more} more: Extra Attack)` : turn.action ? 'Attack (action used)' : 'Attack';
+      const attacks = actionGroup(label);
       for (const option of weapons) attacks.list.append(choiceCard(option));
       controls.append(attacks.group);
       if (chosen && chosen.source === 'weapon' && !chosen.bonusAction) controls.append(aimPanel(chosen, options));
+      // A Rogue's Cunning Strike switch (level 5): it changes their next hit with Sneak Attack.
+      if (fight.hasCunningStrike(game)) controls.append(cunningRow());
     }
 
     const spells = firstOfEach(options.filter((o) => o.source === 'spell' && !o.bonusAction));
@@ -718,6 +731,30 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     controls.append(actionCard('End turn', 'Your foes take their turns', () => act(() => fight.endHeroTurn(game)), 'is-primary'));
   }
 
+  // The Cunning Strike switch: None, Trip or Withdraw. It stays as set (for this fight) until
+  // changed, and works on the next hit that gets Sneak Attack.
+  function cunningRow() {
+    const group = actionGroup('Cunning Strike (your next Sneak Attack)');
+    const now = game.battle.cunningStrike || null;
+    const dc = fight.cunningStrikeDc(game.character);
+    const choices = [
+      [null, 'None', 'Keep every Sneak Attack die'],
+      ['trip', 'Trip', `It makes a DC ${dc} Dex save or falls Prone (Large or smaller)`],
+      ['withdraw', 'Withdraw', 'Then move half your Speed without Opportunity Attacks'],
+    ];
+    for (const [kind, name, what] of choices) {
+      const card = actionCard(name, what, () => {
+        fight.setCunningStrike(game, kind);
+        onSave(game);
+        render();
+      });
+      card.dataset.key = `cunning-${kind || 'none'}`;
+      card.setAttribute('aria-pressed', String(now === kind));
+      group.list.append(card);
+    }
+    return group.group;
+  }
+
   // True if the hero can move somewhere out of every foe's sight this turn.
   function hidingSquares() {
     return [...fight.heroReachable(game).values()].some((step) => step.cost > 0 && !step.free && !fight.foesWatching(game, step.pos).length);
@@ -742,6 +779,8 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
     if (option.targeting === 'direction') return `${name}: tap the grid on the side you want it to go. The orange squares are what it covers.`;
     if (option.targeting === 'point') return `${name}: tap the square to centre it on, up to ${option.range[1]} feet away. The orange squares are what it covers.`;
     if (option.how === 'turn') return `${name}: every Undead within 30 feet of you.`;
+    if (option.how === 'aura') return `${name}: spirits wheel round you, ${option.radius} feet out, while you concentrate. Foes inside are slowed, and burned when they come in or end a turn there.`;
+    if (option.how === 'dispel') return `${name}: choose the foe’s spell to end, below.`;
     if (option.targeting === 'nearest') return `${name}: the nearest ${option.targets} foes within ${option.range[1]} feet.`;
     if (option.targeting === 'self' || ((option.targeting === 'friend' || option.targeting === 'party') && !company())) return `${name}: on yourself.`;
     if (option.how === 'preserve') return `${name}: the Bloodied of your party within ${option.range[1]} feet, you included.`;
@@ -808,6 +847,15 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       cast.disabled = !caught.length;
       box.append(cast);
       for (const { problem } of missed) if (problem) box.append(el('p', 'battle-help', problem));
+    } else if (targeting === 'dispel') {
+      // Dispel Magic: a foe's Hold Person on a friend, or a foe's Spiritual Weapon.
+      const targets = actionGroup(`What to end with ${spellName(chosen)}`);
+      for (const target of fight.dispelTargets(game, chosen)) {
+        const card = actionCard(target.name, target.problem || `Ends ${target.what}`, () => act(() => fight.heroDispel(game, chosen.id, target.key)));
+        card.disabled = Boolean(target.problem);
+        targets.list.append(card);
+      }
+      box.append(targets.group);
     } else if (targeting === 'nearest') {
       const targets = fight.nearestTargets(game, chosen);
       const what = targets.length ? `On ${targets.map((c) => c.name).join(', ')}` : `No foes within ${chosen.range[1]} feet`;
@@ -928,6 +976,31 @@ export async function showBattle({ container, game, onSave, onShown = () => {}, 
       } catch {
         aimed = null;
       }
+    }
+    // Spirit Guardians: a faint gold glow over every square within their reach of the caster.
+    for (const aura of scene.auras || []) {
+      const unit = scene.units.find((u) => u.id === aura.by);
+      if (!unit) continue;
+      const centre = at(unit);
+      const reach = Math.round(aura.radius / 5);
+      ctx.fillStyle = GUARDIAN_GLOW;
+      for (let y = Math.round(centre.y) - reach; y <= Math.round(centre.y) + reach; y++) {
+        for (let x = Math.round(centre.x) - reach; x <= Math.round(centre.x) + reach; x++) {
+          const inside = x >= 0 && y >= 0 && x < map.width && y < map.height && map.cells[y][x].terrain !== 'wall';
+          if (inside && (x !== Math.round(centre.x) || y !== Math.round(centre.y))) ctx.fillRect(x * size, y * size, size, size);
+        }
+      }
+      // A dashed gold edge round the whole of it, so it reads on any floor.
+      const left = Math.max(0, Math.round(centre.x) - reach);
+      const top = Math.max(0, Math.round(centre.y) - reach);
+      const right = Math.min(map.width - 1, Math.round(centre.x) + reach);
+      const bottom = Math.min(map.height - 1, Math.round(centre.y) + reach);
+      ctx.save();
+      ctx.strokeStyle = GUARDIAN_EDGE;
+      ctx.lineWidth = scale;
+      ctx.setLineDash([3 * scale, 2 * scale]);
+      ctx.strokeRect(left * size + scale, top * size + scale, (right - left + 1) * size - 2 * scale, (bottom - top + 1) * size - 2 * scale);
+      ctx.restore();
     }
     for (const pos of (aimed && aimed.squares) || view.flash || []) washSquare(ctx, pos, size, scale, AREA_WASH);
     if (chosen && chosen.targeting === 'square') for (const pos of fight.teleportSquares(game, chosen.id)) washSquare(ctx, pos, size, scale, TELEPORT_WASH);
@@ -1159,7 +1232,7 @@ function targetText(preview) {
   const percent = `${Math.round(preview.chance * 100)}%`;
   const how = preview.option.how;
   const chance = how === 'save' ? `${percent} it fails the save` : how === 'darts' ? 'Never misses' : `${percent} to hit`;
-  return [chance, ...preview.advantage.map((r) => `Advantage: ${r}`), ...preview.disadvantage.map((r) => `Disadvantage: ${r}`), ...(preview.sneak ? [`Sneak Attack +${preview.sneak} on a hit`] : [])].join(' · ');
+  return [chance, ...preview.advantage.map((r) => `Advantage: ${r}`), ...preview.disadvantage.map((r) => `Disadvantage: ${r}`), ...(preview.sneak ? [`Sneak Attack +${preview.sneak}${preview.cunning ? ` and ${preview.cunning}` : ''} on a hit`] : [])].join(' · ');
 }
 
 function squares(a, b) {

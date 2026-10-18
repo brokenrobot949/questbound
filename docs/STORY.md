@@ -409,7 +409,7 @@ All eight beats are written (`story/act-1/ch2-millers-daughter.ink`, `story/act-
 
 **The barrow on the dungeon map** (Rob, Oct 12, 2026): two maps, one for each level. The upper barrow (`kings-barrow` in `data/campaign/dungeons.js`, built): the forecourt and great gate, the dart corridor (shown on the map as "The crowned passage", so its name doesn't give the trap away), the Hall of Champions and the oath-wall. The deep barrow, a map of its own: the flooded vault, the long way round, the Chantry of Ash and Aveline's tomb.
 
-Beats 1 to 6 are written (`story/act-1/ch3-barrow-gate.ink`: `ch3_dark_moon` and `ch3_gate`; `story/act-1/ch3-hall.ink`: `ch3_hall`; `story/act-1/ch3-vault.ink`: `ch3_vault`; `story/act-1/ch3-chantry.ink`: `ch3_chantry`; `story/act-1/ch3-shard.ink`: `ch3_shard`). The story stops at the great gate at dawn for now, with Garrick asking "Is it done?"; beat 7 comes after level 5.
+Beats 1 to 6 are written (`story/act-1/ch3-barrow-gate.ink`: `ch3_dark_moon` and `ch3_gate`; `story/act-1/ch3-hall.ink`: `ch3_hall`; `story/act-1/ch3-vault.ink`: `ch3_vault`; `story/act-1/ch3-chantry.ink`: `ch3_chantry`; `story/act-1/ch3-shard.ink`: `ch3_shard`). The story stops at the great gate at dawn for now, with Garrick asking "Is it done?". Level 5 is built (Oct 17, 2026), so beat 7 is next.
 
 1. **Under the dark moon.** *(Built: `ch3_dark_moon`, straight after the eve's dawn.)* The allies you earned turn up, or don't.
    - **The day:** the longest day you can remember, waiting in the sheepfold (Odda checks everyone's straps; Fen sleeps like a cat). At full dark, up to the ridge. The Choir's camp is ashes (`cairnfield_won`) or empty: every singer is inside the hill tonight.
@@ -486,7 +486,8 @@ Beats 1 to 6 are written (`story/act-1/ch3-barrow-gate.ink`: `ch3_dark_moon` and
    - A Regency envoy, **Knight-Captain Beatrix Marchbank**, "requests" you bring the shard to Highcrown.
    - A Free League courier slips you a letter.
    - An old woman with an owl watches from the crowd (the Old Circle).
-   - That night the shard says your name again. You reach level 5. **End of Act I.**
+   - That night the shard says your name again. You reach level 5 (`xp_milestone(5)`; level 5 is built: the companions come up with you, Odda with Spirit Guardians, Dispel Magic, Mass Healing Word and Revivify, Fen with Cunning Strike and Uncanny Dodge). **End of Act I.**
+   - Level 3 spells that are keys for scenes start here: Speak with Dead (questioning the dead, as the shard does) and Tiny Hut (a Wizard's safe camp in the wild) wait for Act II's scenes.
 
 **Side content:**
 - **The Barrow-Wives** (side quest): three restless Specters in the lesser barrows, each laid to rest by finding what they lost.

@@ -169,7 +169,7 @@ The DM marks the moment with a line of narration, then walks you through: hit po
 
 **Level 4: the Ability Score Improvement or a feat** (Rob, Oct 11, 2026)
 
-- The rules data covers levels 1–4 for the four classes; a hero stops at level 4 (2,700 XP) for now.
+- The rules data covers levels 1–5 for the four classes (level 5: see below); a hero stops at level 5 (6,500 XP) for now.
 - At level 4 every class takes the **Ability Score Improvement** (+2 to one score, or +1 to two, none above 20), or a feat instead. The level-up screen lists the Ability Score Improvement first (marked Recommended), then the **Origin feats** (Alert, Magic Initiate, Savage Attacker, Skilled), then, for a Fighter, the **Fighting Styles** she doesn't have yet. A feat the hero already has isn't offered again unless it repeats: Skilled repeats, and Magic Initiate repeats with a spell list not used yet.
 - **Grappler**, the SRD's other level 4 feat, waits until grappling is in fights.
 - The Ability Score Improvement is a + and − for each score, with the points left shown. Skilled picks three skills the hero isn't proficient in. Magic Initiate picks its list, spellcasting ability, two cantrips and a level 1 spell, as at creation. A spell the hero already has another way (a class cantrip, a domain spell) is greyed out with the reason.
@@ -178,12 +178,25 @@ The DM marks the moment with a line of narration, then walks you through: hit po
 - **Also at level 4:** a Wizard and a Cleric learn a fourth class cantrip (a Thaumaturge a fifth) and prepare seven spells, with a third level 2 slot; a Fighter gains a fourth kind of weapon for Weapon Mastery and a third Second Wind. The Rogue's Sneak Attack stays 2d6. The level-up screen lists what grows ("Second Wind: you can use it 3 times between Long Rests (was 2)").
 - Debug's lower level takes back the feat, its spells, the new cantrip and the extra Weapon Mastery.
 
+**Level 5** (Rob, Oct 17, 2026: one slice, built before Chapter 3's feast, which brings heroes to level 5)
+
+- The level costs 6,500 XP, and a hero stops there for now. Proficiency rises to +3 for everyone (attacks, saves, skills, spell save DCs), and damaging cantrips roll twice the dice (Fire Bolt 2d10, Sacred Flame 2d8).
+- **Fighter:** **Extra Attack**: the Attack action is two attacks, each with whatever weapon suits (moving between them is fine). The battle screen's Attack group says "Attack (1 more: Extra Attack)" after the first. Action Surge's extra action is two attacks as well; Resolve makes both. **Tactical Shift**: Second Wind is followed by a free move of half your Speed (15 feet for most) that provokes no Opportunity Attacks, shown in gold like Remarkable Athlete's. Second Wind stays at three uses and Weapon Mastery at four kinds.
+- **Rogue:** Sneak Attack 3d6. **Cunning Strike**: a switch under the Attack group (None · Trip · Withdraw, Rob's choice) trades one Sneak Attack die on your next hit that gets Sneak Attack for an effect. Trip: a Large or smaller foe makes a Dexterity save (DC 8 + Dex + Proficiency) or falls Prone. Withdraw: straight after the attack, a free move of half your Speed with no Opportunity Attacks. The switch stays as set for the fight; a Cunning Strike that couldn't work (Trip on a foe already down) isn't used, and the die stays. The target's card says "Sneak Attack +2d6 and Trip on a hit". Poison needs a Poisoner's Kit, which isn't in the game yet. **Uncanny Dodge**: the game uses your reaction to halve the damage of the first hit each round from an attacker you can see (it costs nothing else, so it has no Settings switch).
+- **Cleric:** **Sear Undead**: Turn Undead also rolls as many d8s as your Wisdom modifier (at least one), and every Undead that fails its save takes that much Radiant damage; the damage doesn't end the Turning. Level 3 slots (two), nine prepared spells, and the Life Domain's Mass Healing Word and Revivify always prepared. Channel Divinity stays at two uses.
+- **Wizard:** level 3 slots (two), nine prepared spells, and two new spellbook spells of level 1 to 3. **Evocation Savant** gives an Evoker one more free Evocation spell for the new level of slots (Fireball, Lightning Bolt or Tiny Hut, or a lower one). **Memorize Spell** (swap a prepared spell after a Short Rest) waits for Short Rests.
+- **Species spells at 5:** a Drow's and an Infernal Tiefling's Darkness, a High Elf's Misty Step, a Wood Elf's Pass without Trace, an Abyssal Tiefling's Hold Person and a Chthonic Tiefling's Ray of Enfeeblement, each free once per Long Rest. Darkness, Pass without Trace and Ray of Enfeeblement wait for scenes (Act II) and aren't in fights yet.
+- **The level 3 spells** (Rob's ten): Fireball, Lightning Bolt, Counterspell, Hypnotic Pattern and Tiny Hut (Wizard), Dispel Magic and Speak with Dead (both lists), and Spirit Guardians, Mass Healing Word and Revivify (Cleric). How each works is under Spells.
+- **Fights don't need retuning yet:** heroes reach level 5 at the feast that ends Act I, so no Act I fight is played at level 5. Act II's encounters are sized for level 5 parties by the budget.
+
 **Class features that act on their own**
 
 A few features would need a pop-up at an awkward moment, so the game uses them for you when it's clearly worth it:
 - **Tactical Mind** (Fighter 2) spends a Second Wind use on a failed ability check only when the extra d10 could turn it into a success, and the use is spent only if it does.
 - **Opportunity attacks** are taken automatically.
 - **Sneak Attack** (Rogue) is used on the first hit each turn that qualifies.
+- **Uncanny Dodge** (Rogue 5) halves the first hit each round from an attacker you can see.
+- **Counterspell** (a Wizard's level 3 spell) is cast with your lowest level 3+ slot when a foe you can see within 60 feet casts Hold Person on you or a friend. **Cast Counterspell by itself** in Settings turns it off.
 - **Weapon Mastery** properties are always used: a Quarterstaff always tries to Topple, a Javelin always Slows.
 
 A setting to be asked instead can come later, alongside the Shield spell's reaction.
@@ -198,18 +211,18 @@ A setting to be asked instead can come later, alongside the Shield spell's react
 
 The free rules include one subclass per class, such as Champion, Thief, Life Domain and Evoker. Original subclasses can be added later.
 
-**The Cleric (Phase 2, levels 1–4 so far)**
+**The Cleric (Phase 2, levels 1–5 so far)**
 
 - **The basics:** Wisdom spellcasting, d8 Hit Dice, Wisdom and Charisma saves, two skills from History, Insight, Medicine, Persuasion or Religion, Simple weapons, Light and Medium armour and Shields. Kit A is a chain shirt, Shield, mace, Holy Symbol and Priest's Pack with 7 GP; kit B is 110 GP.
 - **Divine Order** (chosen on the Class step): a **Protector** gains Martial weapons and Heavy armour; a **Thaumaturge** knows a fourth cantrip and adds their Wisdom modifier (at least +1) to Arcana and Religion checks, shown in the roll.
-- **Spells:** three cantrips (four from level 4), and prepared spells straight from the whole Cleric list (no spellbook): four at level 1, five at level 2, six at level 3 (when level 2 spells open up), seven at level 4. The Cleric list in the game is the curated one: the cantrips and spells already in the data, growing with each slice. It now has all seven SRD Cleric cantrips, so every Cleric has one to learn at level 4 (a Thaumaturge Acolyte such as Posy already knows the other six).
+- **Spells:** three cantrips (four from level 4), and prepared spells straight from the whole Cleric list (no spellbook): four at level 1, five at level 2, six at level 3 (when level 2 spells open up), seven at level 4, nine at level 5 (when level 3 spells open up). The Cleric list in the game is the curated one: the cantrips and spells already in the data, growing with each slice. It now has all seven SRD Cleric cantrips, so every Cleric has one to learn at level 4 (a Thaumaturge Acolyte such as Posy already knows the other six).
 - **Resistance** (a cantrip; Concentration; touch): you or a friend beside you takes 1d4 less damage of one type, once a turn. The game picks the type for you: the one most of the foes still standing deal (the zombies' bludgeoning at the Old Ford, the goblins' piercing at the mill), and the log says which. The turn order marks the warded one "(Resistance)", and the status line says what it guards against when it's on you. Its part of the damage is cut before any Resistance from species halves it.
 - **Channel Divinity** (level 2; two uses, back after a Long Rest; a Short Rest would give one back once Short Rests arrive): its own group of buttons in a fight.
   - **Divine Spark:** 1d8 + Wisdom, either Radiant damage to a foe within 30 feet (Constitution save for half) or healing for a companion within 30 feet. The SRD says "another creature", so it never heals the Cleric, and a Cleric alone can only use it to hurt. (The Necrotic option comes when a foe resists Radiant.)
   - **Turn Undead:** every Undead within 30 feet makes a Wisdom save or is Turned for a minute: Frightened and Incapacitated, it spends its turns moving as far from you as it can. Damage ends it, and so does your dropping to 0 Hit Points. The button is greyed out with no Undead in reach.
 - **Life Domain** (level 3, the SRD's subclass):
   - **Disciple of Life:** a healing spell cast with a slot heals 2 + the slot's level more (not Magic Initiate's free cast).
-  - **Life Domain spells:** Aid, Bless, Cure Wounds and Lesser Restoration are always prepared, on top of the six. A domain spell you'd already prepared frees its place at the level-up.
+  - **Life Domain spells:** Aid, Bless, Cure Wounds and Lesser Restoration are always prepared, on top of the six, and from level 5 Mass Healing Word and Revivify too. A domain spell you'd already prepared frees its place at the level-up.
   - **Preserve Life** (Channel Divinity): up to five times your Cleric level in Hit Points, shared among the Bloodied of your party within 30 feet (you included), none above half their Hit Points. The game shares it out for you: the fallen first, then the most hurt, each up to half before the next.
 - **Aid:** the Hit Point maximum and current Hit Points of you and your companions within 30 feet rise by 5 (10 with a level 3 slot) until your next Long Rest. A companion at 0 Hit Points comes to. Cast it from the Sheet or in a fight.
 - **Lesser Restoration** (a level 2 spell, so from level 3; a Life Domain spell): in a fight, a Bonus Action and a touch end Paralyzed (a Ghoul's Claw), Blinded or Poisoned on you or a friend beside you. The list of the party under it says who has which. Alone, it's offered only when one of those is on you. Odda casts it too (see Companions). Its scene is still to come: in Chapter 2, a Ghoul's claws leave Lark Paralyzed in the mill tunnel, and it frees her.
@@ -225,7 +238,7 @@ The free rules include one subclass per class, such as Champion, Thief, Life Dom
   - **Not yet:** Protection from Evil and Good, because it uses up a flask of Holy Water (25 GP) each time, and Holy Water arrives with shops. The rest of the level 2 list comes later.
 - **Posy Hearthstone** is the Quick Start Cleric: a halfling Acolyte and Thaumaturge, with Healing Word from the Acolyte's Magic Initiate.
 
-**The Rogue (Phase 2, levels 1–4 so far)**
+**The Rogue (Phase 2, levels 1–5 so far)**
 
 - **The basics:** Dexterity, d8 Hit Dice, Dexterity and Intelligence saves, four skills from Acrobatics, Athletics, Deception, Insight, Intimidation, Investigation, Perception, Persuasion, Sleight of Hand or Stealth. Simple weapons, and Martial weapons with Finesse or Light (Shortsword, Scimitar); Light armour; Thieves' Tools. Kit A is leather armour, two Daggers, a Shortsword, a Shortbow with 20 arrows and a Quiver, Thieves' Tools and a Burglar's Pack, with 8 GP; kit B is 100 GP.
 - **Expertise** (on the Skills step): two skills the Rogue is proficient in add twice the Proficiency Bonus, marked ★ on the sheet. Sleight of Hand and Stealth are suggested.
@@ -244,7 +257,7 @@ The free rules include one subclass per class, such as Champion, Thief, Life Dom
 
 The free rules hold over 300 spells, and each needs either combat code or a story use. Launch ships a curated set of about 60 Cleric and Wizard spells across spell levels 1–9, growing with each phase. Utility spells such as Detect Magic, Speak with Dead and Knock double as keys that unlock choice cards in scenes. Concentration and ritual casting work as written.
 
-Phase 1 ships 44 spells (16 cantrips, 22 level 1, 6 level 2): enough choice for a Wizard of levels 1–3, for Magic Initiate on the Cleric, Druid or Wizard list, and every spell a species grants by character level 3. Phase 2 adds the Cleric's own (so far Aid, Bane, Blindness/Deafness, Command, Inflict Wounds, Lesser Restoration, Prayer of Healing, Purify Food and Drink, Shield of Faith, Spiritual Weapon and the Resistance cantrip: 55 in all). In a scene, a choice that needs a spell is shown only to heroes who can cast it: a known cantrip, a prepared or always-prepared spell, or a ritual in a Wizard's spellbook.
+Phase 1 ships 44 spells (16 cantrips, 22 level 1, 6 level 2): enough choice for a Wizard of levels 1–3, for Magic Initiate on the Cleric, Druid or Wizard list, and every spell a species grants by character level 3. Phase 2 adds the Cleric's own (so far Aid, Bane, Blindness/Deafness, Command, Inflict Wounds, Lesser Restoration, Prayer of Healing, Purify Food and Drink, Shield of Faith, Spiritual Weapon and the Resistance cantrip), and level 5 brings ten level 3 spells and the three level 2 spells species give at level 5: 68 in all. In a scene, a choice that needs a spell is shown only to heroes who can cast it: a known cantrip, a prepared or always-prepared spell, or a ritual in a Wizard's spellbook.
 
 How spells work in the game so far:
 
@@ -274,6 +287,15 @@ How spells work in the game so far:
   - STORY.md lists where each spell is useful in Chapter 1. Level 2 spells wait for Chapter 2, because a hero first has them at level 3: Lesser Restoration frees Lark, Knock opens the stocks' padlock (with a bang the whole square hears), and Invisibility walks the hero into the Choir's camp at Cairnfield alone, unseen (one creature: a level 2 slot can't take a second).
 - **Guidance:** a hero who knows it adds 1d4 to every ability check in a scene, shown in the roll's breakdown.
 - **Not yet in fights:** Charm Person, Fog Cloud and Invisibility. They work in scenes (Invisibility at Cairnfield).
+- **Level 3 spells** (from character level 5; Rob, Oct 17, 2026):
+  - **Fireball:** a 20-foot-radius Sphere (9 × 9 squares, so it's easy to catch yourself or a friend) within 150 feet, 8d6 fire, half on a Dexterity save. **Lightning Bolt:** a 100-foot Line from you, one square wide, straight out in one of eight directions until a wall stops it, 8d6 lightning, half on a Dexterity save. Both add 1d6 for a higher slot.
+  - **Hypnotic Pattern** (Concentration): a 30-foot Cube within 120 feet. Everyone in it who can see it (you and friends too) makes a Wisdom save or is Charmed: Incapacitated with a Speed of 0. Damage ends it on a creature, and so does a friend shaking them out of it as an action (foes do this for each other, as they wake sleepers). The turn order says "Charmed", and the creature is tinted pink.
+  - **Counterspell:** a reaction the game casts for you (see "Class features that act on their own"): only against a foe's Hold Person (Rob's choice). The foe makes a Constitution save against your spell save DC; on a failure its spell fizzles and its action is wasted. A foe's spells are uses a day, not spell slots, so the use is gone too.
+  - **Dispel Magic:** ends a foe's spell on someone of your side (Hold Person, so they can move again) or a foe's Spiritual Weapon, within 120 feet; its list says what it would end. In scenes it's a key, like any spell.
+  - **Spirit Guardians** (Concentration): spirits wheel round the caster, 15 feet out, drawn as a gold glow on the grid. The party and their allies are spared. A foe makes a Wisdom save, taking 3d8 radiant (half on a save; +1d8 a higher slot), when it's cast with the foe inside, when the caster walks up to the foe, when the foe walks in, and when it ends its turn inside: once a turn at most. Inside it, a foe's Speed is halved: each step there costs double.
+  - **Mass Healing Word:** a Bonus Action; one roll of 2d4 + your spellcasting modifier (Disciple of Life adds 5 with a level 3 slot), and everyone in the party within 60 feet who's hurt regains that much. The fallen come to. From the Sheet it heals the whole party too.
+  - **Revivify:** by touch, a companion who died within the last minute (10 rounds) of this fight comes back with 1 Hit Point. It uses up a diamond worth 300 GP (`diamond` in the campaign items). Nobody sells diamonds yet: they come with shops (debug mode can give one). Casting it after the fight, and on allies, comes later.
+  - **Speak with Dead** and **Tiny Hut** (a Wizard Ritual) are keys for scenes; heroes reach level 5 at the end of Act I, so their scenes come in Act II.
 
 **Rests**
 
@@ -613,8 +635,9 @@ You play one character, but up to two companions can travel with you, chosen fro
 - **The great candle** (Rob, Oct 12, 2026): when the party comes back to Bramblegate in Chapter 2 (beat 6), Prior Crane gives the temple's great candle for anyone lying there: once in its life it can call back someone who fell holding back the dark, and it burns out doing it. They live again with all their Hit Points, free (`raise_companion`). It's a story liberty, not the Raise Dead spell (which would cost about 2,500 gold at a temple, by the SRD's spellcasting services, and leave a −4 penalty that wears off with Long Rests). It's spent once used (`flame_spent`); a companion who dies after that waits for Act II's temples, and debug mode's Raise works meanwhile. Companions who fall in the Kings' Barrow are carried out and home to the temple (Rob, Oct 17, 2026), and at Chapter 3's feast the candle raises them if it hasn't been used (to be built with beat 7).
 - **Levels:** they're always your level. Their big picks are set for now: Odda takes the Life Domain at level 3, Fen the Thief. Each later level takes the fixed Hit Points, and their Hit Points rise when yours do.
   - **Level 4** (Rob, Oct 11, 2026): both take the Ability Score Improvement as +1 to their main score and +1 Constitution. Odda's Wisdom goes 17 to 18 (+4, spell save DC 14) and Fen's Dexterity 17 to 18 (+4), the same modifier +2 would give, and each gains 4 Hit Points from the Constitution (Odda 35, Fen 31 at level 4). Odda also learns Mending (her fourth cantrip) and prepares Detect Magic (her seventh spell), ready for the wards of the barrows.
+  - **Level 5** (Rob, Oct 17, 2026): Odda prepares Spirit Guardians and Dispel Magic (her eighth and ninth spells); the Life Domain adds Mass Healing Word and Revivify. Her spell save DC is 15, and she has 43 Hit Points. Fen has no choices at 5: his Sneak Attack is 3d6, with Cunning Strike and Uncanny Dodge, and 38 Hit Points.
 - **The Party section of the Sheet** shows each companion's portrait, Hit Points, likes and dislikes, full sheet and **tactic**:
-  - **Aggressive:** goes after the foe they'd hurt most. Odda opens a real fight with Spiritual Weapon (from level 3), or Bless before then.
+  - **Aggressive:** goes after the foe they'd hurt most. Odda opens a real fight with Spirit Guardians once a foe is within 30 feet (from level 5), then wades in, with no foe beside her, to the square that catches the most foes in it; otherwise Spiritual Weapon (from level 3), or Bless before then.
   - **Defensive:** stays within 10 feet of you and fights what comes near, or Dodges. Odda opens a real fight with Shield of Faith on you.
   - **Support:** heals first, then fights from beside you. Odda opens a real fight with Bless. This is Odda's to start with; Fen starts Aggressive.
   - **Hold:** doesn't move, and fights only what they can reach from there. Odda opens a real fight with Bless.
@@ -622,6 +645,7 @@ You play one character, but up to two companions can travel with you, chosen fro
   - They start on the free squares nearest you, roll their own Initiative and take their own turns.
   - Whatever the tactic, they first help anyone at 0 Hit Points, you first. They use a healing spell if they have one (Odda's Healing Word, then Cure Wounds), or else Spare the Dying, or the Help action's DC 10 Medicine check to stabilise.
   - Next, Odda (from level 3) frees anyone else Paralyzed (by a Ghoul, or held by a foe's Hold Person) or Blinded or Poisoned, with Lesser Restoration, moving beside them if she can, as long as she'd still have a spell slot left for healing. SRD 5.2.1's Lesser Restoration ends the Paralyzed condition, Hold Person's too.
+  - From level 5, Odda first casts **Mass Healing Word** (a Bonus Action) when two or more of the party within 60 feet are at 0 Hit Points or Bloodied, and frees someone held by a foe's Hold Person with **Dispel Magic** when Lesser Restoration can't reach them this turn. Both only if she'd keep a spell slot for healing. She doesn't cast Revivify (she carries no diamond).
   - When they attack, a foe holding one of the party with Hold Person counts three times over (Rob, Oct 17, 2026): hurting it may break its Concentration and free them, so Odda and Fen go for it when they can reach it, even over an easier mark.
   - A Paralyzed companion loses their turn ("Fen is Paralyzed, and can't move or act") and their Concentration.
   - **Odda's Concentration spells:** in a real fight she opens with her tactic's spell (above) and keeps it going, casting it again on a later turn if it ends.
@@ -635,6 +659,7 @@ You play one character, but up to two companions can travel with you, chosen fro
     - After attacking, he Hides if he can get out of every foe's sight where he stands, or by moving without leaving a foe's reach: his next attack then has Advantage, and Sneak Attack. Foes find him as they find you.
     - Otherwise, Bloodied with a foe beside him, he Disengages and steps back, as far from foes as he can.
   - Fen takes the Nick extra attack with his dagger.
+  - **Fen's Cunning Strike** (from level 5): Withdraw when he's Bloodied with a foe beside him (then, straight after the hit and before his dagger's extra attack, he slips as far from the foes as the free move takes him, provoking nothing), else Trip when you or Odda stand beside his target, so you can hit it while it's down. His Uncanny Dodge works as yours does.
   - Fen's Sneak Attack counts you or Odda standing beside his target, as the rule says, and your Sneak Attack counts them.
 - **Foes** go after the nearest of the party on their feet, the most wounded of equals. Nobody attacks someone who's down, and a hidden hero has to be found first.
 - **When you fall**, the fight goes on while a companion stands. You make death saves, and they try to get you back up. The fight is lost only if you die, or you're stable at 0 Hit Points with no companion left standing; then Fate's Mercy happens as before. After a win, anyone at 0 Hit Points comes to with 1.

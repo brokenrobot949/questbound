@@ -16,6 +16,7 @@ import { activeSpellIds, castFromSheet, sheetSpellProblem, sheetSpells, timePass
 import { freeCastKey } from '../js/engine/character/spells.js';
 import { takeDamage } from '../js/engine/character/hazards.js';
 import { armorClass, speed } from '../js/engine/character/sheet.js';
+import { validateCharacter } from '../js/engine/character/validate.js';
 import { attackSummary } from '../js/engine/ui/attack-text.js';
 import { castInScene, sceneCastCost } from '../js/engine/character/casting.js';
 import { loadStory } from '../js/engine/story/ink-loader.js';
@@ -503,6 +504,12 @@ const acolyteFighter = {
 // other spell without one must unlock a choice somewhere.
 const WAITING = {
   guidance: 'works on every ability check in a scene instead',
+  // Heroes reach level 5 at the end of Act I, so these wait for Act II's scenes.
+  'speak-with-dead': 'Act II: the dead who can be questioned',
+  'tiny-hut': 'Act II: a safe camp in the wild, with travel',
+  darkness: 'a Drow’s or an Infernal Tiefling’s at level 5 (and a Wizard spell): Act II',
+  'pass-without-trace': 'a Wood Elf’s at level 5: Act II’s sneaking',
+  'ray-of-enfeeblement': 'a Chthonic Tiefling’s at level 5 (and a Wizard spell): its fight rules come later',
 };
 
 test('Scenes: every spell without a use in a fight unlocks a choice in a scene (or waits for one)', async () => {
@@ -548,6 +555,176 @@ test('Guidance: a hero who knows it adds 1d4 to ability checks in scenes', async
   const page = makeChoice(game, talk);
   const guidance = page.beats.find((b) => b.type === 'roll').result.modifiers.find((m) => m.label === 'Guidance');
   assertTrue(guidance && guidance.value >= 1 && guidance.value <= 4, JSON.stringify(guidance));
+});
+
+// ---- Level 3 spells (level 5 heroes) ----
+
+// Juniper at level 5 (Int 19: spell save DC 15) with the level 3 Wizard spells prepared, and
+// Posy at level 5 (Wis 18: DC 15), a Life Cleric, with the Cleric's.
+const wizard5 = {
+  ...juniper,
+  level: 5,
+  subclassId: 'evoker',
+  classChoices: { scholarSkill: 'arcana' },
+  hitPointRolls: [null, null, null, null],
+  levelFeats: [{ level: 4, id: 'ability-score-improvement', increases: { intelligence: 2 } }],
+  spells: {
+    cantrips: [...juniper.spells.cantrips, 'chill-touch'],
+    spellbook: ['shield', 'magic-missile', 'mage-armor', 'sleep', 'fireball', 'lightning-bolt', 'hypnotic-pattern', 'counterspell', 'dispel-magic', 'tiny-hut'],
+    prepared: ['shield', 'magic-missile', 'mage-armor', 'sleep', 'fireball', 'lightning-bolt', 'hypnotic-pattern', 'counterspell', 'dispel-magic'],
+  },
+};
+const posy = quickStartHeroes.find((h) => h.id === 'posy').character;
+const cleric5 = {
+  ...posy,
+  level: 5,
+  subclassId: 'life',
+  hitPointRolls: [null, null, null, null],
+  levelFeats: [{ level: 4, id: 'ability-score-improvement', increases: { wisdom: 1, constitution: 1 } }],
+  spells: { ...posy.spells, cantrips: [...posy.spells.cantrips, 'resistance'], prepared: ['guiding-bolt', 'sanctuary', 'detect-magic', 'hold-person', 'shield-of-faith', 'spiritual-weapon', 'command', 'spirit-guardians', 'dispel-magic'] },
+};
+
+// The mill fight with companions beside the hero: everyone after the hero rolls a 1.
+function partyFight(character, party, setUp = () => {}) {
+  const game = { ...gameFor(character, 'party-spells'), party: [] };
+  for (const id of party) joinParty(game, id);
+  setUp(game);
+  game.rng = scriptedRng([20, 1, 1, 1, 1]);
+  fight.startBattle(game, 'mill-scavengers', 0);
+  game.rng = createRng('party-spells');
+  return game;
+}
+
+test('Level 5 casters for these checks are legal', () => {
+  assertEqual([validateCharacter(wizard5), validateCharacter(cleric5)], [[], []]);
+});
+
+test('Areas: a Line is one square wide, straight out from you, until the edge of the map or a wall', () => {
+  assertEqual(areaSquares(open, { shape: 'line', size: 100 }, middle, 'e').map((s) => `${s.x},${s.y}`), ['5,4', '6,4', '7,4', '8,4']);
+  assertEqual(areaSquares(open, { shape: 'line', size: 100 }, middle, 'ne').map((s) => `${s.x},${s.y}`), ['5,3', '6,2', '7,1', '8,0']);
+  const walled = parseMap(['.....', '.....', '#####', '.....', '.....'], legend);
+  assertEqual(areaSquares(walled, { shape: 'line', size: 100 }, { x: 2, y: 4 }, 'n'), [{ x: 2, y: 3 }], 'the wall stops it');
+});
+
+test('Fireball: a 20-foot-radius Sphere within 150 feet, 8d6 fire, half on a Dexterity save', () => {
+  const game = fightWith(wizard5);
+  const [first, second] = fight.enemies(game.battle);
+  first.hp = 60;
+  second.hp = 60;
+  const option = heroAttackOptions(game).find((o) => o.id === 'spell-fireball');
+  assertEqual([option.slotLevel, option.damage.dice, option.saveDc, option.targeting], [3, '8d6', 15, 'point']);
+  assertEqual(attackSummary(option).join(' · '), 'Dex save against DC 15 · 8d6 fire · 28 on average · half on a save · 20-ft-radius sphere within 150 ft · uses a level 3 slot');
+  const { caught } = fight.areaFor(game, option.id, { at: { x: 3, y: 6 } });
+  assertEqual(caught.map((c) => c.id), [first.id, second.id], 'not you, 25 feet from its centre');
+  game.rng = scriptedRng([3, 3, 3, 3, 3, 3, 3, 3, 1, 20]); // 8d6 = 24; the first fails, the second saves
+  fight.heroCastArea(game, option.id, { at: { x: 3, y: 6 } });
+  assertEqual([first.hp, second.hp, game.slotsUsed[2]], [36, 48, 1]);
+});
+
+test('Lightning Bolt: a 100-foot Line from you, 8d6 lightning, half on a Dexterity save', () => {
+  const game = fightWith(wizard5);
+  const [first, second] = fight.enemies(game.battle); // at (3, 7) and (4, 7); you're at (3, 1)
+  first.hp = 60;
+  const option = heroAttackOptions(game).find((o) => o.id === 'spell-lightning-bolt');
+  assertEqual([option.targeting, attackSummary(option).includes('100-ft line from you')], ['direction', true]);
+  assertEqual(fight.areaFor(game, option.id, { direction: 's' }).caught.map((c) => c.id), [first.id], 'straight down the room: only the first');
+  game.rng = scriptedRng([1, 1, 1, 1, 1, 1, 1, 1, 1]); // 8d6 = 8, and a failed save
+  fight.heroCastArea(game, option.id, { direction: 's' });
+  assertEqual([first.hp, second.hp > 0], [52, true]);
+});
+
+test('Hypnotic Pattern: a failed Wisdom save leaves a foe Charmed (Incapacitated, Speed 0); damage or a friend’s shake ends it', () => {
+  const game = fightWith(wizard5);
+  const [first, second] = fight.enemies(game.battle);
+  Object.assign(first, { pos: { x: 3, y: 5 }, hp: 60 });
+  Object.assign(second, { pos: { x: 4, y: 5 }, hp: 60 });
+  const option = heroAttackOptions(game).find((o) => o.id === 'spell-hypnotic-pattern');
+  assertEqual(fight.areaFor(game, option.id, { at: { x: 3, y: 5 } }).squares.length, 26, 'a 6 × 6 block, cut short by the edge of the map and the walls');
+  game.rng = scriptedRng([1, 1]);
+  fight.heroCastArea(game, option.id, { at: { x: 3, y: 5 } });
+  assertTrue(has(game, first, 'charmed') && has(game, second, 'charmed') && fight.isIncapacitated(game.battle, first.id), game.battle.log.map((e) => e.text).join(' / '));
+  assertEqual(game.battle.concentration.name, 'Hypnotic Pattern');
+  game.rng = createRng('pattern');
+  forceNextD20(20);
+  game.battle.turnState.action = false; // (a Fire Bolt next, for the check)
+  fight.heroAttack(game, 'spell-fire-bolt', first.id);
+  assertTrue(said(game, 'The pain snaps Goblin Minion 1 out of the swirling colours.') && !has(game, first, 'charmed'));
+  fight.endHeroTurn(game);
+  assertTrue(said(game, 'Goblin Minion 1 shakes Goblin Minion 2 out of its daze.'), game.battle.log.map((e) => e.text).join(' / '));
+  assertTrue(said(game, 'Hypnotic Pattern holds nobody now, and ends.'));
+});
+
+test('Mass Healing Word: a Bonus Action, one roll for everyone hurt within 60 feet; the fallen come to', () => {
+  const game = partyFight(cleric5, ['odda', 'fen'], (g) => {
+    g.hp = 10;
+    memberOf(g, 'odda').hp = 0;
+    memberOf(g, 'fen').hp = 20;
+  });
+  const option = heroAttackOptions(game).find((o) => o.spellId === 'mass-healing-word');
+  assertEqual([option.targeting, option.bonusAction, option.slotLevel], ['party', true, 3]);
+  game.rng = scriptedRng([2, 3]);
+  fight.heroCastSelf(game, option.id);
+  assertTrue(said(game, 'You cast Mass Healing Word: 2d4 (2, 3) + 4 + 5 (Disciple of Life) = 14 each.'), game.battle.log.map((e) => e.text).join(' / '));
+  assertEqual([game.hp, memberOf(game, 'odda').hp, memberOf(game, 'fen').hp, fight.combatantById(game.battle, 'odda').state], [24, 14, 34, 'up']);
+  assertEqual([game.battle.turnState.bonus, game.battle.turnState.action], [true, false]);
+});
+
+test('Revivify: a companion who died within the last minute comes back with 1 Hit Point, using up a diamond', () => {
+  const game = partyFight(cleric5, ['fen']);
+  const fen = fight.combatantById(game.battle, 'fen');
+  const option = heroAttackOptions(game).find((o) => o.spellId === 'revivify');
+  assertEqual(fight.heroCantUse(game, option.id), 'Nobody here has died.');
+  Object.assign(fen, { state: 'dead', diedRound: game.battle.round });
+  Object.assign(memberOf(game, 'fen'), { hp: 0, fallen: true });
+  assertEqual(fight.heroCantUse(game, option.id), 'Revivify needs a diamond worth 300+ GP, which it uses up.');
+  game.inventory.push({ id: 'diamond', quantity: 1 });
+  fen.diedRound = game.battle.round - 10;
+  assertEqual(fight.heroCantUse(game, option.id), 'Fen died more than a minute ago.');
+  fen.diedRound = game.battle.round - 9;
+  assertEqual(fight.heroCantUse(game, option.id), null);
+  fight.heroCastOn(game, option.id, 'fen');
+  assertEqual([fen.state, memberOf(game, 'fen').hp, memberOf(game, 'fen').fallen, game.inventory.some((e) => e.id === 'diamond' && e.quantity > 0), game.slotsUsed[2]], ['up', 1, false, false, 1]);
+  assertTrue(said(game, 'and Fen gasps back to life with 1 Hit Point.'));
+});
+
+test('Spirit Guardians: foes save or take 3d8 radiant when it’s cast on them, when it reaches them, and at the end of their turn there, once a turn', () => {
+  const game = fightWith(cleric5);
+  const [first, second] = fight.enemies(game.battle);
+  Object.assign(first, { pos: { x: 1, y: 3 }, hp: 60, maxHp: 60 }); // 10 feet from you
+  Object.assign(second, { pos: { x: 3, y: 7 }, hp: 60, maxHp: 60 }); // 30 feet away
+  game.rng = scriptedRng([1, 4, 4, 4]); // the first goblin's Wisdom save: 1; 3d8 = 12
+  fight.heroCastSelf(game, 'spell-spirit-guardians');
+  assertEqual([first.hp, second.hp, game.battle.concentration.name, game.slotsUsed[2]], [48, 60, 'Spirit Guardians', 1]);
+  assertTrue(said(game, 'Your Spirit Guardians swirl round Goblin Minion 1: 3d8 (4, 4, 4) = 12 radiant damage.'));
+  assertEqual(fight.battleScene(game).auras, [{ by: 'hero', radius: 15 }]);
+  // Walking up to the second goblin brings the spirits onto it.
+  game.rng = scriptedRng([20, 2, 2, 2]); // it saves: half of 6
+  fight.heroMove(game, { x: 4, y: 4 });
+  assertTrue(said(game, 'Your Spirit Guardians swirl round Goblin Minion 2: 3d8 (2, 2, 2) = 6 radiant damage, halved to 3 by its Wisdom save.'), game.battle.log.map((e) => e.text).join(' / '));
+  // The first goblin, Charmed where it stands (inside), ends its turn there.
+  game.battle.effects.push({ kind: 'charmed', target: first.id, endsOn: null });
+  game.rng = createRng('guardians');
+  fight.endHeroTurn(game);
+  const log = game.battle.log.map((e) => e.text);
+  const turn = log.indexOf('Goblin Minion 1\'s turn.');
+  assertTrue(turn >= 0 && log.slice(turn).some((t) => t.startsWith('Your Spirit Guardians swirl round Goblin Minion 1')), log.join(' / '));
+  assertEqual(log.filter((t) => t.startsWith('Your Spirit Guardians swirl round Goblin Minion 1')).length, 2, 'once on your turn, once on its own');
+});
+
+test('Dispel Magic: ends a foe’s Hold Person on a friend; a foe’s Spiritual Weapon can be dispelled too', () => {
+  const game = partyFight(wizard5, ['odda']);
+  const goblin = fight.enemies(game.battle)[0];
+  const option = heroAttackOptions(game).find((o) => o.spellId === 'dispel-magic');
+  assertEqual(fight.heroCantUse(game, option.id), 'No foe’s spell here to dispel.');
+  goblin.concentration = { spellId: 'hold-person', name: 'Hold Person' };
+  game.battle.effects.push({ kind: 'paralyzed', target: 'odda', endsOn: null, concentration: true, by: goblin.id, dc: 12 });
+  const [held] = fight.dispelTargets(game, option);
+  assertEqual([held.key, held.what, held.problem], ['held:odda', "Goblin Minion 1's Hold Person on Odda", null]);
+  fight.heroDispel(game, option.id, 'held:odda');
+  assertTrue(said(game, "You cast Dispel Magic: Goblin Minion 1's Hold Person on Odda unravels and ends. Odda can move again."), game.battle.log.map((e) => e.text).join(' / '));
+  assertEqual([has(game, { id: 'odda' }, 'paralyzed'), goblin.concentration, game.slotsUsed[2]], [false, null, 1]);
+  game.battle.effects.push({ kind: 'spiritual-weapon', target: goblin.id, by: goblin.id, endsOn: null, concentration: true, pos: { x: 4, y: 6 }, damage: { dice: '1d8', bonus: 2, type: 'force' }, modifiers: [] });
+  assertEqual(fight.dispelTargets(game, option).map((t) => t.key), [`weapon:${goblin.id}`]);
 });
 
 test('Spare the Dying: a beaten lookout lives, Nettle hears of it, and it lies on the map', async () => {

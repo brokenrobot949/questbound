@@ -20,8 +20,12 @@
 //                and the story flags that change its map, as they were when the fight began
 //   turnState    { movementLeft, action, bonus, disengaged, savageUsed, surged, athleteMove,
 //                slotSpent, light, extraUsed } for the current turn: surged after Action
-//                Surge; athleteMove is the free move Remarkable Athlete gives straight after a
-//                Critical Hit (feet, or 0); slotSpent once a spell slot has been used (one a
+//                Surge; athleteMove is a free move (feet, or 0) that costs no movement and
+//                provokes nothing, and freeMoveFrom what gave it: Remarkable Athlete straight
+//                after a Critical Hit, Tactical Shift with Second Wind, a Cunning Strike's
+//                Withdraw (none in older saves: Remarkable Athlete); attacksLeft, the attacks
+//                still to make with this turn's Attack action (Extra Attack: a Fighter's second;
+//                none in older saves); slotSpent once a spell slot has been used (one a
 //                turn); light, the Light weapon the hero attacked with (which opens the Light
 //                property's extra attack), and extraUsed once that extra attack is made;
 //                moved once the hero has walked a square; steadyAim after Steady Aim (Speed 0
@@ -49,7 +53,10 @@
 //                and from the hero's Weapon Mastery, 'vexed' (Vex, with by: the weapon; the
 //                hero's next attack roll on it has Advantage, until the end of the hero's next
 //                turn) and 'sapped' (Sap: its next attack roll has Disadvantage, until the
-//                start of the hero's next turn), while Slow uses 'slowed'
+//                start of the hero's next turn), while Slow uses 'slowed'; 'charmed'
+//                (Hypnotic Pattern, concentration); and 'spirit-guardians' (target: its caster,
+//                concentration; radius, dc, damage, and hits: { foe id: the 'round:turn' it
+//                last hurt them }, see "Spirit Guardians")
 //   concentration  the spell the hero is concentrating on: { spellId, name }, or null (a
 //                companion's is on their combatant)
 //   reactionsUsed  ids that have used their reaction since their last turn
@@ -66,6 +73,9 @@
 //                Disadvantage)
 //   sneakAttackTurn  { combatant id: 'round:turn' }: the turn each Rogue last dealt Sneak
 //                Attack (once a turn); a plain 'round:turn' in older saves was the hero's
+//   cunningStrike  a Rogue hero's Cunning Strike switch (level 5): null, 'trip' or 'withdraw',
+//                used on their next hit with Sneak Attack (none in older saves: null)
+// A companion who dies in the fight has diedRound: the round they died in (for Revivify).
 //   hymn         for an encounter with a hymn: { singing, risen } (see encounters.js)
 //   reinforcements  for an encounter with reinforcements: { coming: true, absent: the indices
 //                of those whose ifFlag wasn't set } until they arrive, then { coming: false };
@@ -84,7 +94,7 @@ import { encounters } from '../../../data/campaign/encounters.js';
 import { monsters } from '../../../data/srd/monsters.js';
 import { d20Test, rerollKept, retarget, startD20Count, stopD20Count } from '../rules/d20-test.js';
 import { rollDice, rollDie } from '../rules/dice.js';
-import { abilityModifier, armorClass, findAbility, findClass, hasFeature, initiative as heroInitiative, savingThrow, speed as heroSpeed } from '../character/sheet.js';
+import { abilityModifier, abilityModifierOf, armorClass, findAbility, findClass, hasFeature, initiative as heroInitiative, proficiencyBonus, savingThrow, speed as heroSpeed } from '../character/sheet.js';
 import { abilityCheck } from '../rules/ability-check.js';
 import { heal, featureUsesLeft, heroMaxHp, slotsLeft, spendFeature, spendSlot } from '../character/resources.js';
 import { activeSpellIds, castFromSheet, lastsText, namesText, putSpellOn, regainText, soakDamage } from '../character/spell-effects.js';
@@ -225,8 +235,13 @@ export const isProne = (battle, id) => hasEffect(battle, id, 'prone');
 //                Constitution save at the end of each of its turns ends it; so does a minute.
 //   'baned'      Bane: it subtracts 1d4 from its attack rolls and saving throws, while the hero
 //                concentrates
+//   'charmed'    Hypnotic Pattern: Charmed, so Incapacitated with a Speed of 0, while the hero
+//                concentrates. Damage ends it, and so does someone else shaking it out of its
+//                stupor as an action (as Sleep's sleepers are shaken awake).
 // An Incapacitated singer can't sing (it can't speak), so the hymn stops.
-const INCAPACITATING = ['drowsy', 'asleep', 'paralyzed', 'turned'];
+const INCAPACITATING = ['drowsy', 'asleep', 'paralyzed', 'turned', 'charmed'];
+// The spell trances that damage, or a friend's shaking, ends.
+const STUPORS = ['drowsy', 'asleep', 'charmed'];
 export const isIncapacitated = (battle, id) => battle.effects.some((e) => e.target === id && INCAPACITATING.includes(e.kind));
 const isHelpless = (battle, id) => hasEffect(battle, id, 'asleep') || hasEffect(battle, id, 'paralyzed');
 const autoFails = (battle, c, abilityId) => isHelpless(battle, c.id) && ['strength', 'dexterity'].includes(abilityId);
@@ -247,7 +262,7 @@ const WARDS = ['blessed', 'sanctuary', 'shield-of-faith', 'resisting'];
 
 // Conditions on a creature, for the battle screen: e.g. ['asleep', 'poisoned']. Paralyzed by
 // Hold Person (a spell held up by Concentration, not a Ghoul's Claw) adds 'held'.
-const SHOWN = ['drowsy', 'asleep', 'paralyzed', 'turned', 'blinded', 'grovel', 'halt', 'baned', 'poisoned', 'outlined', 'guided', 'vexed', 'sapped', 'slowed', 'hidden', 'shield', 'shield-of-faith', 'dodging', 'blessed', 'sanctuary', 'resisting', 'helped'];
+const SHOWN = ['drowsy', 'asleep', 'paralyzed', 'charmed', 'turned', 'blinded', 'grovel', 'halt', 'baned', 'poisoned', 'outlined', 'guided', 'vexed', 'sapped', 'slowed', 'hidden', 'shield', 'shield-of-faith', 'dodging', 'blessed', 'sanctuary', 'resisting', 'helped'];
 export function conditionsOf(battle, id) {
   const kinds = SHOWN.filter((kind) => hasEffect(battle, id, kind));
   if (battle.effects.some((e) => e.target === id && e.kind === 'paralyzed' && e.concentration)) kinds.push('held');
@@ -277,10 +292,11 @@ function baneOf(game, c) {
 }
 
 // Reactions the game takes for the hero: Shield, cast when it would turn a hit into a miss,
-// Hellish Rebuke, cast with its free use when a foe hurts the hero, and spending Heroic
-// Inspiration to reroll a failed save against a foe's Hold Person (inspiration). The Settings
-// screen turns each on or off (see setReactionPolicy).
-const reactionPolicy = { shield: true, rebuke: true, inspiration: true };
+// Hellish Rebuke, cast with its free use when a foe hurts the hero, Counterspell, cast at a
+// foe casting Hold Person on the party, and spending Heroic Inspiration to reroll a failed save
+// against a foe's Hold Person (inspiration). The Settings screen turns each on or off (see
+// setReactionPolicy). (Uncanny Dodge costs nothing but the reaction, so it's always used.)
+const reactionPolicy = { shield: true, rebuke: true, inspiration: true, counterspell: true };
 export function setReactionPolicy(policy) {
   Object.assign(reactionPolicy, policy);
 }
@@ -349,6 +365,8 @@ export function battleScene(game) {
     concentration: battle.concentration ? battle.concentration.name : null,
     // Spiritual Weapons in the fight, the party's and a foe's: { by, pos, foe }.
     weapons: battle.effects.filter((e) => e.kind === 'spiritual-weapon').map((e) => ({ by: e.target, pos: { ...e.pos }, foe: Boolean(combatantById(battle, e.target) && combatantById(battle, e.target).side === 'enemy') })),
+    // Spirit Guardians round whoever cast them: { by, radius } (feet).
+    auras: battle.effects.filter((e) => e.kind === 'spirit-guardians').map((e) => ({ by: e.target, radius: e.radius })),
     units: battle.combatants.map((c) => ({
       id: c.id,
       pos: { ...c.pos },
@@ -486,9 +504,11 @@ function rollInitiative(game) {
 
 // ---- Turns ----
 
-// Speed, with Longstrider, Ray of Frost's slowing, and 0 for the Unconscious and Paralyzed.
+// Speed, with Longstrider, Ray of Frost's slowing, and 0 for the Unconscious, the Paralyzed and
+// the Charmed (Hypnotic Pattern). (Spirit Guardians halve a foe's Speed inside them by making
+// each step there cost double: see slowAtFor.)
 function speedOf(game, c) {
-  if (isHelpless(game.battle, c.id)) return 0;
+  if (isHelpless(game.battle, c.id) || hasEffect(game.battle, c.id, 'charmed')) return 0;
   // Steady Aim: the hero's Speed is 0 for the rest of their turn.
   const turn = game.battle.turnState;
   if (isHero(c) && turn && turn.steadyAim && currentCombatant(game.battle) === c) return 0;
@@ -502,7 +522,7 @@ function beginTurn(game) {
   const c = currentCombatant(battle);
   battle.effects = battle.effects.filter((e) => e.endsOn !== c.id || e.endsAt === 'end');
   battle.reactionsUsed = battle.reactionsUsed.filter((id) => id !== c.id);
-  battle.turnState = { movementLeft: speedOf(game, c), action: false, bonus: false, disengaged: false, savageUsed: false, surged: false, athleteMove: 0, slotSpent: false, light: null, extraUsed: false, moved: false, steadyAim: false, aimed: false, commanded: null };
+  battle.turnState = { movementLeft: speedOf(game, c), action: false, bonus: false, disengaged: false, savageUsed: false, surged: false, athleteMove: 0, freeMoveFrom: null, attacksLeft: 0, slotSpent: false, light: null, extraUsed: false, moved: false, steadyAim: false, aimed: false, commanded: null };
   log(game, isHero(c) ? 'Your turn.' : `${c.name}'s turn.`, { turnOf: c.id });
   // A Command spoken to it ends now: this turn obeys it, unless it can't act anyway.
   const command = battle.effects.find((e) => e.target === c.id && COMMANDS.includes(e.kind));
@@ -700,10 +720,12 @@ function runEnemyTurns(game) {
     } else if (c.companion) {
       if (c.state === 'up' && !obeyCommand(game, c)) companionTurn(game, c);
     } else if (battle.heroState === 'up') {
-      // A hero obeying a foe's Command, or Paralyzed, can't move or act: their turn passes.
+      // A hero obeying a foe's Command, Paralyzed, or caught in their own Hypnotic Pattern
+      // can't move or act: their turn passes.
       const obeyed = obeyCommand(game, c);
       if (!obeyed && !isIncapacitated(battle, c.id)) return;
-      if (!obeyed) log(game, 'You’re Paralyzed: you can’t move or act this turn.');
+      if (!obeyed && hasEffect(battle, c.id, 'charmed')) log(game, 'You stand entranced by the swirling colours, and can’t move or act this turn.');
+      else if (!obeyed) log(game, 'You’re Paralyzed: you can’t move or act this turn.');
     }
     if (battle.outcome) return;
     advanceTurn(game);
@@ -736,8 +758,16 @@ function blockedFor(game, mover) {
   };
 }
 
-// Where the hero can move now. Squares within a Remarkable Athlete free move are marked
-// free: going there costs no movement and provokes no Opportunity Attacks.
+// Where a creature (a foe, an ally or a companion) can move this turn, with `feet` of movement
+// (what it has left, unless given): crawling if it's Prone, and slowed inside Spirit Guardians
+// if it's a foe. A Map of key(pos) → { pos, cost, path }.
+function reachFor(game, c, feet = game.battle.turnState.movementLeft) {
+  const battle = game.battle;
+  return reachableSquares(battleMap(battle), c.pos, feet, blockedFor(game, c), { crawling: isProne(battle, c.id), slowAt: slowAtFor(game, c) });
+}
+
+// Where the hero can move now. Squares within a free move (Remarkable Athlete, Tactical Shift,
+// Withdraw) are marked free: going there costs no movement and provokes no Opportunity Attacks.
 export function heroReachable(game) {
   if (!isHeroTurn(game)) return new Map();
   const battle = game.battle;
@@ -777,18 +807,30 @@ export function heroMove(game, pos) {
   requireHeroTurn(game);
   const step = heroReachable(game).get(key(pos));
   if (!step || step.cost === 0) throw new Error("You can't reach that square this turn.");
+  const freeFrom = game.battle.turnState.freeMoveFrom || 'Remarkable Athlete';
   game.battle.turnState.athleteMove = 0;
-  moveAlong(game, heroCombatant(game.battle), step.path, { free: Boolean(step.free) });
+  moveAlong(game, heroCombatant(game.battle), step.path, { free: Boolean(step.free), freeFrom });
   checkEnd(game); // a Hellish Rebuke on the way can finish the fight
 }
 
+// Gives whoever's turn it is a free move straight away: up to half their Speed, costing no
+// movement and provoking nothing. from: what gave it ('Tactical Shift', 'Withdraw').
+function grantFreeMove(game, c, from) {
+  const turn = game.battle.turnState;
+  turn.athleteMove = Math.floor(speedOf(game, c) / 2 / 5) * 5;
+  turn.freeMoveFrom = from;
+  return turn.athleteMove;
+}
+
 // Moves one square at a time, provoking an Opportunity Attack from any foe whose reach the
-// mover leaves, unless the mover took the Disengage action. A free move (Remarkable Athlete)
-// costs no movement and provokes nothing.
-function moveAlong(game, mover, path, { free = false } = {}) {
+// mover leaves, unless the mover took the Disengage action. A free move (Remarkable Athlete,
+// Tactical Shift, Withdraw: freeFrom says which) costs no movement and provokes nothing.
+// Spirit Guardians strike a foe who walks into them, and any foe their caster walks up to.
+function moveAlong(game, mover, path, { free = false, freeFrom = 'Remarkable Athlete' } = {}) {
   const battle = game.battle;
   const map = battleMap(battle);
   const crawling = isProne(battle, mover.id);
+  const slowAt = slowAtFor(game, mover);
   walking.set(battle, { id: mover.id, from: { ...mover.pos }, path: [] });
   try {
     for (const next of path) {
@@ -802,12 +844,15 @@ function moveAlong(game, mover, path, { free = false } = {}) {
           }
         }
       }
-      if (!free) battle.turnState.movementLeft -= stepCost(map, next, crawling);
+      if (!free) battle.turnState.movementLeft -= stepCost(map, next, crawling, slowAt);
       if (isHero(mover)) battle.turnState.moved = true; // (no Steady Aim after moving)
+      const from = { ...mover.pos };
       mover.pos = { ...next };
       walking.get(battle).path.push({ ...next });
+      guardiansAfterStep(game, mover, from);
+      if (battle.outcome || !upright(game, mover)) return;
     }
-    if (free) log(game, 'You move, light on your feet (Remarkable Athlete).');
+    if (free) log(game, isHero(mover) ? `You move, light on your feet (${freeFrom}).` : `${mover.name} slips away (${freeFrom}).`);
     else if (crawling) log(game, isHero(mover) ? 'You crawl.' : `${mover.name} crawls.`);
     else log(game, isHero(mover) ? 'You move.' : `${mover.name} moves.`);
   } finally {
@@ -965,7 +1010,7 @@ function searchForHidden(game, c) {
   const whom = isHero(quarry) ? 'you' : quarry.name;
   if (!sees(game, c, quarry)) {
     const map = battleMap(battle);
-    const reach = [...reachableSquares(map, c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling: isProne(battle, c.id) }).values()].filter((s) => s.path.length);
+    const reach = [...reachFor(game, c).values()].filter((s) => s.path.length);
     const viewing = reach.filter((s) => lineBlock(map, s.pos, quarry.pos) === null).sort((a, b) => a.cost - b.cost)[0];
     const toward = viewing || reach.sort((a, b) => squaresBetween(a.pos, quarry.pos) - squaresBetween(b.pos, quarry.pos) || a.cost - b.cost)[0];
     if (toward) moveAlong(game, c, toward.path);
@@ -1077,7 +1122,11 @@ export function attackPreview(game, optionId, targetId, actorId = 'hero') {
     if (criticalOn < 20) preview.describe += ` · Critical Hit on ${criticalOn}–20`;
     // Sneak Attack's dice, if a hit now would get them.
     preview.sneak = option.sneakAttack && sneakAttackReason(game, hero, target, mode) ? option.sneakAttack : null;
-    if (preview.sneak) preview.describe += ` · Sneak Attack +${preview.sneak} on a hit`;
+    // The hero's Cunning Strike switch trades one of those dice for its effect.
+    const switched = actorId === 'hero' && hasFeature(game.character, 'cunning-strike') ? battle.cunningStrike : null;
+    const cunning = preview.sneak && switched ? cunningStrikeFor(game, hero, target, switched, preview.sneak) : null;
+    if (cunning) Object.assign(preview, { sneak: cunning.dice, cunning: CUNNING_STRIKES[cunning.kind] });
+    if (preview.sneak) preview.describe += ` · Sneak Attack +${preview.sneak}${cunning ? ` and ${preview.cunning}` : ''} on a hit`;
     // Parry: its reaction can add 2 to its AC against a melee hit.
     if ((option.how === 'melee' || spirit) && canParry(game, target)) preview.describe += ` · ${target.name} can Parry (+2 AC against one melee hit)`;
   }
@@ -1115,7 +1164,9 @@ export function heroAttack(game, optionId, targetId, { reroll = null } = {}) {
     useAction(game, option);
     if (option.concentration) startConcentration(game, option);
     const spirit = option.how === 'spirit' || option.how === 'spirit-strike';
-    ({ critical } = spirit ? spiritStrike(game, option, target) : performAttack(game, hero, target, option));
+    // A Rogue's Cunning Strike switch goes with the attack (it's used only if it gets Sneak Attack).
+    const cunning = hasFeature(game.character, 'cunning-strike') ? battle.cunningStrike || null : null;
+    ({ critical } = spirit ? spiritStrike(game, option, target) : performAttack(game, hero, target, { ...option, cunning }));
     if (option.concentration) tidyConcentration(game);
     checkEnd(game);
   } finally {
@@ -1123,7 +1174,7 @@ export function heroAttack(game, optionId, targetId, { reroll = null } = {}) {
   }
   // Champion: straight after a Critical Hit, move up to half your Speed without provoking.
   if (critical && !battle.outcome && battle.heroState === 'up' && hasFeature(game.character, 'remarkable-athlete')) {
-    battle.turnState.athleteMove = Math.floor(speedOf(game, hero) / 2 / 5) * 5;
+    grantFreeMove(game, hero, 'Remarkable Athlete');
     log(game, `Remarkable Athlete: you can move up to ${battle.turnState.athleteMove} feet straight away without provoking Opportunity Attacks.`);
   }
   if (game.undo) game.undo.after = battle.log.length;
@@ -1259,19 +1310,95 @@ function performAttack(game, attacker, target, option) {
   if (savage) battle.turnState.savageUsed = true;
   const sneak = ours && option.sneakAttack && sneakAttackReason(game, attacker, target, roll.mode) ? option.sneakAttack : null;
   if (sneak) spendSneakAttack(battle, attacker);
-  const damage = rollDamage(game.rng, option.damage, { critical, advantage: roll.mode === 'advantage', greatWeapon: option.greatWeapon, savage, sneak });
+  // Cunning Strike: a Sneak Attack die given up, before the roll, for its effect after it.
+  const strike = sneak && option.cunning ? cunningStrikeFor(game, attacker, target, option.cunning, sneak) : null;
+  const damage = rollDamage(game.rng, option.damage, { critical, advantage: roll.mode === 'advantage', greatWeapon: option.greatWeapon, savage, sneak: strike ? strike.dice : sneak });
   const how = option.source === 'spell' ? `${option.name} hits ${whom}` : `${who} hit${you ? '' : 's'} ${whom} with ${option.name}`;
   const savaged = damage.savaged ? ' (Savage Attacker: rolled twice, kept the better)' : '';
   const improved = roll.criticalHit && roll.natural < 20 ? 'Critical hit (Improved Critical)! ' : '';
-  const plus = extraDamage(game, option.damage.plus, critical);
+  let plus = extraDamage(game, option.damage.plus, critical);
   const plusText = plus ? ` plus ${plus.text}` : '';
-  log(game, `${improved || (critical ? 'Critical hit! ' : '')}${how}: ${damageText(damage, option.damage.dice)} damage${plusText}${savaged}.`, { roll });
+  const traded = strike ? ` (Cunning Strike: one Sneak Attack die for ${CUNNING_STRIKES[strike.kind]})` : '';
+  log(game, `${improved || (critical ? 'Critical hit! ' : '')}${how}: ${damageText(damage, option.damage.dice)} damage${plusText}${savaged}${traded}.`, { roll });
+  // Uncanny Dodge: a Rogue hit by an attacker they can see halves the damage with a reaction.
+  let amount = damage.total;
+  if (uncannyDodge(game, attacker, target)) {
+    amount = Math.floor(amount / 2);
+    if (plus) plus = { ...plus, amount: Math.floor(plus.amount / 2) };
+    const total = amount + (plus ? plus.amount : 0);
+    log(game, isHero(target) ? `Uncanny Dodge! (your reaction) You roll with the blow: the damage is halved, to ${total}.` : `Uncanny Dodge! ${target.name} rolls with the blow: the damage is halved, to ${total}.`);
+  }
   // (A Spiritual Weapon strikes from its own square: the damage is still from its caster.)
-  applyDamage(game, target, damage.total, { type: damage.type, critical, plus, from: combatantById(battle, attacker.id) || attacker });
+  applyDamage(game, target, amount, { type: damage.type, critical, plus, from: combatantById(battle, attacker.id) || attacker });
   if (option.rider && target.hp > 0) addRider(game, attacker, target, option);
   if (option.onHit && !battle.outcome) onHitCondition(game, attacker, target, option.onHit);
   if (ours && option.mastery) masteryOnHit(game, attacker, target, option, damageDealt(target, damage.total, damage.type) > 0);
+  if (strike && !battle.outcome) cunningStrikeEffect(game, attacker, target, strike);
   return { critical };
+}
+
+// ---- Cunning Strike and Uncanny Dodge (a Rogue's, from level 5; SRD 5.2.1) ----
+// Cunning Strike: when a Rogue deals Sneak Attack, they can give up one of its dice (removed
+// before rolling) for an effect straight after the damage. Trip: a Large or smaller target makes
+// a Dexterity save (DC 8 + the Rogue's Dexterity modifier and Proficiency Bonus) or falls Prone.
+// Withdraw: the Rogue moves up to half their Speed straight away, without provoking Opportunity
+// Attacks (a free move, as Remarkable Athlete's). Poison needs a Poisoner's Kit, which isn't in
+// the game yet. The hero chooses with a switch on the battle screen (setCunningStrike), used
+// on their next hit with Sneak Attack; Fen chooses for himself (combat/companion-ai.js). A
+// Cunning Strike that couldn't work (Trip on a foe already Prone, too big, or that can't be
+// knocked down; Withdraw on someone else's turn) isn't used, and the die stays.
+export const CUNNING_STRIKES = { trip: 'Trip', withdraw: 'Withdraw' };
+
+export const hasCunningStrike = (game) => hasFeature(game.character, 'cunning-strike');
+
+// A Cunning Strike's save DC: 8 + the Rogue's Dexterity modifier and Proficiency Bonus.
+export const cunningStrikeDc = (character) => 8 + abilityModifierOf(character, 'dexterity') + proficiencyBonus(character.level);
+
+// The hero's Cunning Strike switch: null (none), 'trip' or 'withdraw'.
+export function setCunningStrike(game, kind) {
+  if (kind !== null && !CUNNING_STRIKES[kind]) throw new Error(`Unknown Cunning Strike: ${kind}`);
+  if (!hasFeature(game.character, 'cunning-strike')) throw new Error('Cunning Strike comes at Rogue level 5.');
+  game.battle.cunningStrike = kind;
+}
+
+// The Cunning Strike this hit can use: { kind, dice: the Sneak Attack dice left }, or null.
+function cunningStrikeFor(game, attacker, target, kind, sneak) {
+  const battle = game.battle;
+  const { count, sides } = parseDice(sneak);
+  if (count < 2 || !CUNNING_STRIKES[kind] || target.side !== 'enemy') return null;
+  if (kind === 'trip') {
+    const monster = findMonster(target.monsterId);
+    if (isProne(battle, target.id) || SIZES.indexOf(monster.size) > SIZES.indexOf('large') || (monster.conditionImmunities || []).includes('prone')) return null;
+  }
+  if (kind === 'withdraw' && (battle.order[battle.turn] !== attacker.id || speedOf(game, attacker) <= 0)) return null;
+  return { kind, dice: `${count - 1}d${sides}` };
+}
+
+// A Cunning Strike's effect, once the damage is dealt.
+function cunningStrikeEffect(game, attacker, target, strike) {
+  const you = isHero(attacker);
+  if (strike.kind === 'trip') {
+    if (target.hp <= 0) return;
+    const dc = cunningStrikeDc(actorGame(game, attacker).character);
+    const dodging = hasEffect(game.battle, target.id, 'dodging') ? ['Dodging'] : [];
+    const save = foeSave(game, target, 'dexterity', dc, dodging);
+    if (save.success) return log(game, `Trip: ${target.name} stumbles, but keeps its feet.`, { roll: save });
+    knockProne(game, target);
+    return log(game, `Trip: ${target.name} goes sprawling, Prone.`, { roll: save });
+  }
+  if (!upright(game, attacker)) return;
+  const feet = grantFreeMove(game, combatantById(game.battle, attacker.id), 'Withdraw');
+  log(game, you ? `Withdraw: you can move up to ${feet} feet straight away without provoking Opportunity Attacks.` : `Withdraw: ${attacker.name} can slip up to ${feet} feet away without provoking Opportunity Attacks.`);
+}
+
+// Uncanny Dodge: someone in the party with it, hit by an attacker they can see, halves the
+// damage with their reaction. The game always uses it on the first hit it can (it costs only
+// the reaction). True if it was used.
+function uncannyDodge(game, attacker, target) {
+  if (!isPartyMember(target) || attacker.side === target.side) return false;
+  if (!hasFeature(actorGame(game, target).character, 'uncanny-dodge') || !canReact(game, target) || !sees(game, target, attacker)) return false;
+  game.battle.reactionsUsed.push(target.id);
+  return true;
 }
 
 // A hit's extra damage of another type: a flat amount ("plus 1 necrotic"), or dice rolled
@@ -1505,7 +1632,7 @@ function applyDamage(game, target, amount, damage) {
   if (isHero(target) && damage.from && game.hp + (game.tempHp || 0) < before) hellishRebuke(game, damage.from);
 }
 
-function takeHit(game, target, amount, { type, critical = false, plus = null }) {
+function takeHit(game, target, amount, { type, critical = false, plus = null, keepTurned = false }) {
   const battle = game.battle;
   if (target.companion) return companionHit(game, target, amount, { type, critical, plus });
   // A foe, or an ally: a monster's stat block.
@@ -1531,9 +1658,10 @@ function takeHit(game, target, amount, { type, critical = false, plus = null }) 
     if (target.hp === 0 && target.concentration) endConcentration(game, target, `${target.concentration.name} ends with ${target.name}.`);
     else if (taken > 0 && target.concentration) concentrationCheck(game, target, taken);
     if (taken > 0) hymnHurt(game, target, taken);
-    // Damage ends Sleep on a creature, and Turn Undead.
-    if (taken > 0 && target.hp > 0) wake(game, target, `${target.name} wakes with a start.`);
-    if (taken > 0 && target.hp > 0 && hasEffect(battle, target.id, 'turned')) {
+    // Damage ends Sleep and Hypnotic Pattern on a creature, and Turn Undead (but not Sear
+    // Undead's own damage: keepTurned).
+    if (taken > 0 && target.hp > 0) wake(game, target, stirText(battle, target, 'damage'));
+    if (taken > 0 && target.hp > 0 && !keepTurned && hasEffect(battle, target.id, 'turned')) {
       battle.effects = battle.effects.filter((e) => !(e.target === target.id && e.kind === 'turned'));
       log(game, `The pain breaks Turn Undead’s hold on ${target.name}.`);
     }
@@ -1543,6 +1671,7 @@ function takeHit(game, target, amount, { type, critical = false, plus = null }) 
   ({ amount, plus } = resistanceCut(game, target, amount, type, plus));
   const taken = damageAfterResistance(amount, type, resisted) + (plus ? damageAfterResistance(plus.amount, plus.type, resisted) : 0);
   if (taken < amount + (plus ? plus.amount : 0)) log(game, `You resist some of the damage: you take ${taken}.`);
+  if (taken > 0) wake(game, target, stirText(battle, target, 'damage')); // (your own Hypnotic Pattern)
   if (battle.heroState === 'up') {
     // Temporary Hit Points go first.
     const { soaked, rest } = soakDamage(game, taken);
@@ -1667,6 +1796,7 @@ function companionHit(game, target, amount, { type, critical, plus }) {
   ({ amount, plus } = resistanceCut(game, target, amount, type, plus));
   const taken = damageAfterResistance(amount, type, resisted) + (plus ? damageAfterResistance(plus.amount, plus.type, resisted) : 0);
   if (taken < amount + (plus ? plus.amount : 0)) log(game, `${target.name} resists some of the damage, and takes ${taken}.`);
+  if (taken > 0) wake(game, target, stirText(battle, target, 'damage')); // (the hero's Hypnotic Pattern)
   if (target.state === 'up') {
     const { rest } = soakDamage(actor, taken);
     const overflow = rest - member.hp;
@@ -1721,6 +1851,7 @@ function companionDeathSave(game, c) {
 function companionDies(game, c, reason) {
   const battle = game.battle;
   c.state = 'dead';
+  c.diedRound = battle.round; // (Revivify can bring them back within a minute)
   const member = memberFor(game, c);
   member.hp = 0;
   member.fallen = true;
@@ -1935,7 +2066,9 @@ function checkCanAct(game, option) {
     return;
   }
   if (option.bonusAction && turn.bonus) throw new Error('You have already used your Bonus Action this turn.');
-  if (!option.bonusAction && turn.action) throw new Error('You have already used your action this turn.');
+  // Extra Attack: the Attack action's further attacks, with any weapon.
+  const anotherAttack = option.source === 'weapon' && !option.bonusAction && (turn.attacksLeft || 0) > 0;
+  if (!option.bonusAction && turn.action && !anotherAttack) throw new Error('You have already used your action this turn.');
   if (option.source === 'spell' && !option.bonusAction && turn.surged) throw new Error("Action Surge's extra action can't be used to cast a spell.");
   if (option.slotLevel && turn.slotSpent) throw new Error('You can spend only one spell slot on your turn, and you already have.');
 }
@@ -1943,14 +2076,24 @@ function checkCanAct(game, option) {
 // The kinds of option that make an attack roll.
 const ATTACK_ROLLS = ['melee', 'ranged', 'rays', 'spirit', 'spirit-strike'];
 
+// How many attacks one Attack action makes: two with a Fighter's Extra Attack (level 5).
+export const attacksPerAction = (character) => (hasFeature(character, 'extra-attack') ? 2 : 1);
+
 // Spends the action (or Bonus Action), and the spell slot (or free cast) unless it's already
-// been spent.
+// been spent. A weapon attack is the Attack action: with Extra Attack its first attack leaves
+// attacksLeft for the rest, which take no more action (even after Action Surge gives a new one).
 // actor: whose resources pay for it, the hero's game or a companion's (actorGame).
 function useAction(game, option, { slotAlreadySpent = false, actor = game } = {}) {
   const turn = game.battle.turnState;
   if (option.extra) turn.extraUsed = true;
   if (option.bonusAction) turn.bonus = true;
-  else if (!option.extra) turn.action = true;
+  else if (!option.extra) {
+    if (option.source === 'weapon' && (turn.attacksLeft || 0) > 0) turn.attacksLeft -= 1;
+    else {
+      turn.action = true;
+      turn.attacksLeft = option.source === 'weapon' ? attacksPerAction(actor.character) - 1 : 0;
+    }
+  }
   // An attack with a Light weapon opens the Light property's extra attack.
   if (option.source === 'weapon' && !option.extra && (option.properties || []).includes('light')) turn.light = option.itemId;
   turn.athleteMove = 0;
@@ -1975,6 +2118,11 @@ function useAction(game, option, { slotAlreadySpent = false, actor = game } = {}
 function optionProblem(game, option) {
   if (option.how === 'turn' && !undeadInReach(game).length) return 'No Undead within 30 feet.';
   if (option.how === 'multi' && !nearestTargets(game, option).length) return `No foes within ${option.range[1]} feet.`;
+  if (option.how === 'dispel') {
+    const targets = dispelTargets(game, option);
+    if (!targets.length) return 'No foe’s spell here to dispel.';
+    if (targets.every((t) => t.problem)) return targets[0].problem;
+  }
   if (option.targeting === 'friend' || option.targeting === 'party') {
     const party = option.targeting === 'friend' ? friendsFor(game.battle, option) : partyCombatants(game.battle);
     const problems = party.map((c) => friendProblem(game, option, c));
@@ -1984,6 +2132,11 @@ function optionProblem(game, option) {
     if (option.how === 'heal') return 'Nobody within reach is hurt.';
     if (option.how === 'preserve') return 'Nobody within 30 feet is Bloodied.';
     if (option.how === 'stabilise') return 'Nobody within reach is dying.';
+    if (option.how === 'revive') {
+      // Someone who could come back, but not now: say why ("needs a diamond").
+      const fallen = party.findIndex((c) => c.companion && stateOf(game.battle, c) === 'dead');
+      return fallen >= 0 ? problems[fallen] : 'Nobody here has died.';
+    }
     if (option.how === 'restore') {
       // Someone who needs it, out of reach: say why ("Fen isn’t beside you.").
       const needy = party.findIndex((c) => option.ends.some((kind) => hasEffect(game.battle, c.id, kind)));
@@ -2114,7 +2267,7 @@ function concentrationCheck(game, c, damage) {
 
 // Puts a spell's condition on a creature (Faerie Fire can catch the hero too), unless it's
 // immune. Returns true if it took hold.
-const CONDITION_NAMES = { poisoned: 'Poisoned', paralyzed: 'Paralyzed', drowsy: 'put to sleep', asleep: 'put to sleep', outlined: 'outlined' };
+const CONDITION_NAMES = { poisoned: 'Poisoned', paralyzed: 'Paralyzed', drowsy: 'put to sleep', asleep: 'put to sleep', outlined: 'outlined', charmed: 'charmed' };
 function applyCondition(game, target, kind, extra = {}) {
   const battle = game.battle;
   const monster = isPartyMember(target) ? null : findMonster(target.monsterId);
@@ -2148,6 +2301,10 @@ function applyCondition(game, target, kind, extra = {}) {
     log(game, `${target.name} is Blinded: its attacks have Disadvantage, and attacks against it Advantage.`);
   }
   if (kind === 'baned') log(game, `${target.name} is Baned: it subtracts 1d4 from its attack rolls and saves.`);
+  if (kind === 'charmed') {
+    const it = target.side === 'enemy' ? 'it' : 'them';
+    log(game, isHero(target) ? 'You’re Charmed by the swirling colours: you can’t move or act until something hurts you or a friend shakes you out of it.' : `${target.name} is Charmed by the swirling colours: Incapacitated, with a Speed of 0, until damage or a shake breaks the spell on ${it}.`);
+  }
   if (INCAPACITATING.includes(kind)) silenceSinger(game, target);
   return true;
 }
@@ -2161,10 +2318,23 @@ function silenceSinger(game, c) {
   }
 }
 
-// Sleep ends on a creature that takes damage or that an ally shakes awake. It stays Prone.
+// What the log says when Sleep or Hypnotic Pattern ends on someone: how 'damage' (it takes
+// some) or the one who shakes them out of it.
+function stirText(battle, c, how) {
+  const charmed = hasEffect(battle, c.id, 'charmed');
+  const you = isHero(c);
+  if (how === 'damage') {
+    if (!charmed) return `${c.name} wakes with a start.`;
+    return you ? 'The pain snaps you out of the swirling colours.' : `The pain snaps ${c.name} out of the swirling colours.`;
+  }
+  return charmed ? `${how.name} shakes ${c.name} out of ${c.side === 'enemy' ? 'its' : 'their'} daze.` : `${how.name} shakes ${c.name} awake.`;
+}
+
+// Sleep and Hypnotic Pattern end on a creature that takes damage or that an ally shakes out of
+// it. A sleeper stays Prone.
 function wake(game, c, why) {
   const battle = game.battle;
-  const sleeping = (e) => e.target === c.id && (e.kind === 'drowsy' || e.kind === 'asleep');
+  const sleeping = (e) => e.target === c.id && STUPORS.includes(e.kind);
   if (!battle.effects.some(sleeping)) return;
   battle.effects = battle.effects.filter((e) => !sleeping(e));
   log(game, why);
@@ -2197,6 +2367,10 @@ function endOfTurn(game, c) {
     return;
   }
   if (c.side !== 'enemy' || c.hp <= 0) return;
+  // Spirit Guardians: a foe ending its turn inside them.
+  guardiansAtEndOfTurn(game, c);
+  checkEnd(game);
+  if (c.hp <= 0 || battle.outcome) return;
   // Blindness/Deafness: a Constitution save at the end of each of its turns.
   const blind = battle.effects.find((e) => e.target === c.id && e.kind === 'blinded');
   if (blind) {
@@ -2345,6 +2519,11 @@ export function heroCastArea(game, optionId, aim) {
   if (!caught.length) log(game, 'It catches nobody.');
   for (const c of caught) {
     if (battle.outcome) break;
+    // Hypnotic Pattern catches only those who can see it.
+    if (option.sight && (!upright(game, c) || hasEffect(battle, c.id, 'blinded') || isIncapacitated(battle, c.id))) {
+      log(game, isHero(c) ? 'You don’t see the pattern.' : `${c.name} doesn’t see the pattern.`);
+      continue;
+    }
     if (option.condition === 'drowsy') putToSleep(game, c, option);
     else if (option.damage) areaDamage(game, c, option, damage, hero);
     else areaCondition(game, c, option);
@@ -2468,7 +2647,13 @@ export function friendProblem(game, option, c, caster = heroCombatant(game.battl
   const is = you ? 'You’re' : `${c.name} is`;
   const on = you ? 'you' : c.name;
   const from = isHero(caster) ? 'you' : caster.name;
-  if (stateOf(battle, c) === 'dead') return `${c.name} is dead.`;
+  // Revivify: for a companion who died within the last minute, with a diamond in your pack.
+  if (option.how === 'revive') {
+    if (stateOf(battle, c) !== 'dead') return you ? 'You’re alive.' : `${c.name} isn’t dead.`;
+    if (!c.companion || !Number.isInteger(c.diedRound)) return `${name} is for your companions.`;
+    if (battle.round - c.diedRound >= option.withinRounds) return `${c.name} died more than a minute ago.`;
+    if (!hasItem(game, option.component.item)) return `${name} needs ${option.component.name}, which it uses up.`;
+  } else if (stateOf(battle, c) === 'dead') return `${c.name} is dead.`;
   if (option.notYou && c === caster) return `${name} heals another creature, not you.`;
   if (option.how === 'stabilise' && stateOf(battle, c) !== 'down') return you ? 'You’re not dying.' : `${c.name} isn’t dying.`;
   if (c !== caster) {
@@ -2549,6 +2734,7 @@ export function heroCastOn(game, optionId, targetId = 'hero') {
   if (problem) throw new Error(problem);
   if (option.targeting === 'party') return castOnFriends(game, option, partyTargets(game, option));
   if (option.source === 'channel') return channelOnYourself(game, option);
+  if (option.how === 'aura') return castAura(game, option);
   // False Life: only on you (character/spell-effects.js).
   const text = castFromSheet(game, option.spellId, option.freeCast ? 'free' : option.slotLevel);
   useAction(game, option, { slotAlreadySpent: true });
@@ -2562,12 +2748,15 @@ function castOnFriends(game, option, targets) {
   const hero = heroCombatant(battle);
   if (option.how === 'heal') {
     useAction(game, option);
+    // Mass Healing Word: everyone it can help in range.
+    if (option.targeting === 'party') return castMassHealing(game, hero, option, targets);
     return castHealing(game, hero, option, targets[0]);
   }
   if (option.how === 'preserve') return preserveLife(game, option, targets);
   if (option.how === 'ward') return castWard(game, option, targets);
   useAction(game, option);
   if (option.how === 'restore') return restoreCondition(game, hero, option, targets[0]);
+  if (option.how === 'revive') return revive(game, option, targets[0]);
   if (option.how === 'stabilise') {
     // Spare the Dying: someone at 0 Hit Points becomes Stable.
     const [c] = targets;
@@ -2629,6 +2818,38 @@ function castHealing(game, caster, option, target) {
   rescene(game);
 }
 
+// Mass Healing Word, from someone in the party on everyone in it it can help within range (up
+// to six): one roll of its dice plus the caster's spellcasting modifier, and Disciple of Life's
+// extra for each. The fallen come to. The Bonus Action and the slot are already spent.
+function castMassHealing(game, caster, option, targets) {
+  const { dice, bonus = 0, extra = 0 } = option.heal;
+  const { count, sides } = parseDice(dice);
+  const roll = rollDice(game.rng, count, sides);
+  const total = Math.max(0, roll.total + bonus) + extra;
+  const healed = targets.map((target) => {
+    const fallen = !upright(game, target);
+    const gained = healCombatant(game, target, total);
+    const comes = fallen ? (isHero(target) ? ', and come to' : ', and comes to') : '';
+    return `${regainText({ you: isHero(target), name: target.name }, gained)}${comes}`;
+  });
+  const sum = `${dice} (${roll.rolls.join(', ')})${bonus ? ` ${bonus < 0 ? '−' : '+'} ${Math.abs(bonus)}` : ''}${extra ? ` + ${extra} (Disciple of Life)` : ''} = ${total}`;
+  log(game, `${isHero(caster) ? 'You cast' : `${caster.name} casts`} ${optionName(option)}: ${sum} each. ${healed.join('; ')}.`);
+  rescene(game);
+}
+
+// Revivify: a companion who died within the last minute (10 rounds) of this fight comes back
+// with 1 Hit Point, still Prone; the diamond is used up. The action and the slot are spent.
+function revive(game, option, target) {
+  const member = memberFor(game, target);
+  removeItem(game.inventory, option.component.item, 1);
+  Object.assign(target, { state: 'up', deathSaves: { successes: 0, failures: 0 } });
+  delete target.diedRound;
+  member.hp = 1;
+  member.fallen = false;
+  log(game, `You press the diamond to ${target.name}'s chest and cast Revivify. It crumbles to dust, and ${target.name} gasps back to life with 1 Hit Point.`);
+  rescene(game);
+}
+
 // Preserve Life: up to five times the Cleric level in Hit Points, shared among the Bloodied of
 // the party within 30 feet, none above half their Hit Point maximum. It goes to the fallen
 // first, then the most hurt, each up to half before the next.
@@ -2670,6 +2891,15 @@ function channelOnYourself(game, option) {
   useAction(game, option);
   if (option.how === 'turn') {
     log(game, 'You raise your holy symbol and channel Turn Undead.');
+    // Sear Undead (level 5): one roll of as many d8s as your Wisdom modifier (at least one),
+    // Radiant damage to each Undead that fails its save, which doesn't end the Turning.
+    let sear = null;
+    if (hasFeature(game.character, 'sear-undead')) {
+      const dice = Math.max(1, abilityModifierOf(game.character, 'wisdom'));
+      const roll = rollDice(game.rng, dice, 8);
+      sear = { total: roll.total, text: `${dice}d8 (${roll.rolls.join(', ')}) = ${roll.total}` };
+      log(game, `Sear Undead: holy fire for each that fails, ${sear.text} radiant damage.`);
+    }
     for (const c of undeadInReach(game)) {
       const save = foeSave(game, c, 'wisdom', option.saveDc);
       if (save.success) {
@@ -2679,7 +2909,12 @@ function channelOnYourself(game, option) {
       battle.effects = battle.effects.filter((e) => !(e.target === c.id && e.kind === 'turned'));
       battle.effects.push({ kind: 'turned', target: c.id, endsOn: null, untilRound: battle.round + 10 });
       log(game, `${c.name} is Turned: Frightened and Incapacitated, it will flee from you for a minute, or until it takes damage.`, { roll: save });
+      if (sear) {
+        log(game, `Holy fire sears ${c.name}: ${sear.total} radiant damage.`);
+        applyDamage(game, c, sear.total, { type: 'radiant', keepTurned: true });
+      }
     }
+    checkEnd(game);
   } else {
     throw new Error(`Unknown Channel Divinity: ${option.id}`);
   }
@@ -2689,7 +2924,7 @@ function channelOnYourself(game, option) {
 function fleeFromHero(game, c) {
   const battle = game.battle;
   const hero = heroCombatant(battle);
-  const reach = reachableSquares(battleMap(battle), c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling: isProne(battle, c.id) });
+  const reach = reachFor(game, c);
   const far = [...reach.values()].sort((a, b) => squaresBetween(b.pos, hero.pos) - squaresBetween(a.pos, hero.pos) || a.cost - b.cost)[0];
   if (!far || squaresBetween(far.pos, hero.pos) <= squaresBetween(c.pos, hero.pos)) {
     log(game, `${c.name} cowers from your holy symbol, with nowhere farther to go.`);
@@ -2734,6 +2969,196 @@ export function heroCastMulti(game, optionId) {
   }
   if (option.concentration) tidyConcentration(game);
   checkEnd(game);
+}
+
+// ---- Spirit Guardians (an 'aura' spell; SRD 5.2.1) ----
+// Spirits flit round the caster (the hero, or Odda) in a 15-foot Emanation while they
+// concentrate ('spirit-guardians', target: the caster). The party and their allies are spared;
+// each foe makes a Wisdom save, taking 3d8 Radiant damage (half on a save), when the spell is
+// cast with it inside, when the caster moves up to it, when it walks in, and when it ends its
+// turn inside: once a turn at most (hits). A foe's Speed is halved inside, so each step it takes
+// there costs double (slowAtFor). The grid shows the spirits round their caster.
+
+// The Spirit Guardians this creature would suffer: a foe, from casters on the other side.
+function guardiansAgainst(game, c) {
+  if (c.side !== 'enemy') return [];
+  return game.battle.effects.filter((e) => e.kind === 'spirit-guardians' && (combatantById(game.battle, e.target) || {}).side !== c.side);
+}
+
+// True if a square is inside these Spirit Guardians (within their radius of the caster).
+function inGuardians(game, effect, pos) {
+  const caster = combatantById(game.battle, effect.target);
+  return Boolean(caster) && feetBetween(caster.pos, pos) <= effect.radius;
+}
+
+// Where this creature's Speed is halved (inside Spirit Guardians against it), or null.
+function slowAtFor(game, c) {
+  const auras = guardiansAgainst(game, c);
+  return auras.length ? (pos) => auras.some((e) => inGuardians(game, e, pos)) : null;
+}
+
+// The spirits strike a foe: a Wisdom save, and the damage, half on a save. Once a turn.
+function guardianStrike(game, effect, foe) {
+  const battle = game.battle;
+  if (foe.hp <= 0 || foe.escaped || effect.hits[foe.id] === turnKey(battle)) return;
+  effect.hits[foe.id] = turnKey(battle);
+  const caster = combatantById(battle, effect.target);
+  const whose = isHero(caster) ? 'Your' : `${caster.name}'s`;
+  const save = foeSave(game, foe, 'wisdom', effect.dc);
+  const damage = rollDamage(game.rng, effect.damage);
+  const amount = save.success ? Math.floor(damage.total / 2) : damage.total;
+  const half = save.success ? `, halved to ${amount} by its Wisdom save` : '';
+  log(game, `${whose} Spirit Guardians swirl round ${foe.name}: ${damageText(damage, effect.damage.dice)} damage${half}.`, { roll: save });
+  applyDamage(game, foe, amount, { type: damage.type });
+}
+
+// After a step: a foe who walked into Spirit Guardians, or the foes a caster's Spirit Guardians
+// moved onto, are struck. from: where the mover was before the step.
+function guardiansAfterStep(game, mover, from) {
+  const battle = game.battle;
+  for (const effect of guardiansAgainst(game, mover)) {
+    if (!inGuardians(game, effect, from) && inGuardians(game, effect, mover.pos)) guardianStrike(game, effect, mover);
+  }
+  const own = battle.effects.find((e) => e.kind === 'spirit-guardians' && e.target === mover.id);
+  if (!own) return;
+  for (const foe of enemies(battle).filter((e) => e.hp > 0 && !e.escaped)) {
+    if (battle.outcome) return;
+    if (feetBetween(from, foe.pos) > own.radius && feetBetween(mover.pos, foe.pos) <= own.radius) guardianStrike(game, own, foe);
+  }
+}
+
+// A foe ending its turn inside Spirit Guardians is struck (if it wasn't already this turn).
+function guardiansAtEndOfTurn(game, c) {
+  for (const effect of guardiansAgainst(game, c)) {
+    if (c.hp > 0 && inGuardians(game, effect, c.pos)) guardianStrike(game, effect, c);
+  }
+}
+
+// Casts Spirit Guardians round the caster (the hero, or a companion: Odda), as their action,
+// and strikes every foe already inside.
+function castAura(game, option, caster = heroCombatant(game.battle)) {
+  const battle = game.battle;
+  useAction(game, option, { actor: actorGame(game, caster) });
+  startConcentration(game, option, caster);
+  const effect = { kind: 'spirit-guardians', target: caster.id, by: caster.id, endsOn: null, concentration: true, radius: option.radius, dc: option.saveDc, damage: option.damage, hits: {} };
+  battle.effects.push(effect);
+  const who = isHero(caster) ? 'You cast' : `${caster.name} casts`;
+  const round = isHero(caster) ? 'you' : isPartyMember(caster) ? 'them' : 'it';
+  log(game, `${who} ${optionName(option)}: bright spirits wheel round ${round}, ${option.radius} feet out. Foes inside are slowed, and burned (Wisdom save for half).`);
+  for (const foe of enemies(battle).filter((e) => e.hp > 0 && !e.escaped && inGuardians(game, effect, e.pos))) {
+    if (battle.outcome) break;
+    guardianStrike(game, effect, foe);
+  }
+  checkEnd(game);
+}
+
+// A companion's Spirit Guardians (Odda's).
+export function companionCastAura(game, c, optionId) {
+  requireTurnOf(game, c);
+  const option = heroAttackOptions(actorGame(game, c)).find((o) => o.id === optionId);
+  if (!option || option.how !== 'aura') throw new Error(`${c.name} can't cast that.`);
+  checkCanAct(game, option);
+  castAura(game, option, c);
+}
+
+// How many foes standing inside a caster's Spirit Guardians if they stood at pos (for Odda to
+// wade in), or 0 if they have none.
+export function foesInGuardians(game, c, pos = c.pos) {
+  const effect = game.battle.effects.find((e) => e.kind === 'spirit-guardians' && e.target === c.id);
+  if (!effect) return 0;
+  return enemies(game.battle).filter((e) => e.hp > 0 && !e.escaped && feetBetween(pos, e.pos) <= effect.radius).length;
+}
+
+// ---- Dispel Magic (SRD 5.2.1) ----
+// Ends a spell of level 3 or lower on a creature or a magical effect within 120 feet: in a
+// fight, a foe's Hold Person on someone on the hero's side (who can move again), or a foe's
+// Spiritual Weapon (its caster's Concentration on it ends). Your own spells aren't offered.
+
+// What Dispel Magic could end now, from the caster (the hero, or a companion: Odda), and why
+// not if it's out of reach: [{ key, what, name, effect, problem }]. key: 'held:<id>' or
+// 'weapon:<foe id>'.
+export function dispelTargets(game, option, caster = heroCombatant(game.battle)) {
+  const battle = game.battle;
+  const range = option.range[1];
+  const list = [];
+  const reach = (pos) => {
+    const feet = feetBetween(caster.pos, pos);
+    if (feet > range) return `${feet} feet away, out of range.`;
+    return clearShot(game, caster.pos, pos) ? null : 'A wall is in the way.';
+  };
+  for (const effect of battle.effects) {
+    const holder = combatantById(battle, holderOf(effect));
+    if (!holder || holder.side !== 'enemy') continue;
+    if (effect.kind === 'paralyzed' && effect.concentration) {
+      const held = combatantById(battle, effect.target);
+      if (!held || held.side === 'enemy' || !upright(game, held)) continue;
+      const name = isHero(held) ? 'you' : held.name;
+      list.push({ key: `held:${held.id}`, name: isHero(held) ? 'You' : held.name, what: `${holder.name}'s Hold Person on ${name}`, effect, problem: held === caster ? null : reach(held.pos) });
+    } else if (effect.kind === 'spiritual-weapon') {
+      list.push({ key: `weapon:${holder.id}`, name: `${holder.name}'s Spiritual Weapon`, what: `${holder.name}'s Spiritual Weapon`, effect, problem: reach(effect.pos) });
+    }
+  }
+  return list;
+}
+
+// Casts Dispel Magic on one of dispelTargets (its key). caster: the hero or a companion.
+function castDispel(game, option, targetKey, caster = heroCombatant(game.battle)) {
+  const battle = game.battle;
+  const target = dispelTargets(game, option, caster).find((t) => t.key === targetKey);
+  if (!target) throw new Error('There’s no spell there to dispel.');
+  if (target.problem) throw new Error(target.problem);
+  useAction(game, option, { actor: actorGame(game, caster) });
+  battle.effects = battle.effects.filter((e) => e !== target.effect);
+  const who = isHero(caster) ? 'You cast' : `${caster.name} casts`;
+  const freed = target.key.startsWith('held:') ? (target.name === 'You' ? ' You can move again.' : ` ${target.name} can move again.`) : '';
+  log(game, `${who} ${optionName(option)}: ${target.what} unravels and ends.${freed}`);
+  tidyConcentration(game); // the foe's Concentration has nothing left to hold
+  checkEnd(game);
+}
+
+export function heroDispel(game, optionId, targetKey) {
+  requireHeroTurn(game);
+  const option = heroAttackOptions(game).find((o) => o.id === optionId);
+  if (!option || option.how !== 'dispel') throw new Error(`You can't cast ${optionId} right now.`);
+  checkCanAct(game, option);
+  castDispel(game, option, targetKey);
+}
+
+export function companionDispel(game, c, optionId, targetKey) {
+  requireTurnOf(game, c);
+  const option = heroAttackOptions(actorGame(game, c)).find((o) => o.id === optionId);
+  if (!option || option.how !== 'dispel') throw new Error(`${c.name} can't cast that.`);
+  checkCanAct(game, option);
+  castDispel(game, option, targetKey, c);
+}
+
+// ---- Counterspell (a reaction; SRD 5.2.1) ----
+// When a foe within 60 feet that the hero can see casts one of the spells Counterspell is set to
+// stop (Hold Person) at anyone in the party, the game casts it for the hero with their lowest
+// level 3+ slot, if they have it prepared, their reaction is free, and Settings allow it. The foe
+// makes a Constitution save against the hero's spell save DC: on a failure its spell fizzles
+// and its action is wasted. (Only a spell slot would be saved, and a foe's spells are uses a
+// day, so the use is gone too.) It's never cast while the hero is in Sanctuary (casting would
+// end it). Returns true if the foe's spell was stopped.
+function counterspell(game, foe, spellId) {
+  const battle = game.battle;
+  const hero = heroCombatant(battle);
+  const spell = findSpell('counterspell');
+  if (!reactionPolicy.counterspell || !canCastSpell(game.character, spell.id) || !spell.combat.counters.includes(spellId)) return false;
+  if (!canReact(game, hero) || hasEffect(battle, 'hero', 'sanctuary') || feetBetween(hero.pos, foe.pos) > spell.combat.range || !sees(game, hero, foe)) return false;
+  let slot = null;
+  for (let level = spell.level; level <= 9 && slot === null; level++) if (slotsLeft(game, level) > 0) slot = level;
+  if (slot === null) return false;
+  spendSlot(game, slot);
+  battle.reactionsUsed.push('hero');
+  const save = foeSave(game, foe, spell.combat.save, spellSaveDc(game.character, spell.id));
+  const name = findSpell(spellId).name;
+  if (save.success) {
+    log(game, `Counterspell! (your reaction, a level ${slot} slot) You snatch at ${foe.name}'s ${name}, but it holds the spell together.`, { roll: save });
+    return false;
+  }
+  log(game, `Counterspell! (your reaction, a level ${slot} slot) You tear ${foe.name}'s ${name} apart as it's spoken: the spell fizzles.`, { roll: save });
+  return true;
 }
 
 // A ward for the fight on these of the party: Bless (Concentration), Sanctuary (a minute: 10
@@ -2841,7 +3266,8 @@ export function heroBonusActions(game) {
   return list;
 }
 
-// Fighter: regain 1d10 + Fighter level Hit Points.
+// Fighter: regain 1d10 + Fighter level Hit Points. From level 5, Tactical Shift: then move up
+// to half your Speed straight away without provoking Opportunity Attacks (a free move).
 export function heroSecondWind(game) {
   if (!heroBonusActions(game).includes('second-wind')) throw new Error('No Second Wind left.');
   heroUseBonus(game, 'use Second Wind');
@@ -2850,6 +3276,10 @@ export function heroSecondWind(game) {
   const level = Math.min(game.character.level, findClass('fighter').levels.length);
   const gained = heal(game, roll.total + level);
   log(game, `Second Wind: 1d10 (${roll.total}) + ${level} = ${roll.total + level}. You regain ${gained} Hit Points.`);
+  if (hasFeature(game.character, 'tactical-shift')) {
+    const feet = grantFreeMove(game, heroCombatant(game.battle), 'Tactical Shift');
+    if (feet > 0) log(game, `Tactical Shift: you can move up to ${feet} feet straight away without provoking Opportunity Attacks.`);
+  }
 }
 
 // A Potion of Healing, as a Bonus Action: drink it, or give it to someone in the party beside
@@ -2898,6 +3328,7 @@ function enemyTurn(game, c) {
   if (isIncapacitated(battle, c.id)) {
     if (hasEffect(battle, c.id, 'asleep')) log(game, `${c.name} is fast asleep.`);
     else if (hasEffect(battle, c.id, 'paralyzed')) log(game, `${c.name} strains against the spell, frozen in place.`);
+    else if (hasEffect(battle, c.id, 'charmed')) log(game, `${c.name} stares, slack-jawed, at colours only it can see.`);
     else log(game, `${c.name} sways on its feet, too drowsy to act.`);
     return;
   }
@@ -2918,8 +3349,8 @@ function enemyTurn(game, c) {
   // A sleeping ally beside it, and its target out of reach: it shakes the sleeper awake (its
   // action).
   if (!target || !isAdjacent(c.pos, target.pos)) {
-    const sleeper = enemies(battle).find((o) => o !== c && o.hp > 0 && isAdjacent(o.pos, c.pos) && (hasEffect(battle, o.id, 'asleep') || hasEffect(battle, o.id, 'drowsy')));
-    if (sleeper) return wake(game, sleeper, `${c.name} shakes ${sleeper.name} awake.`);
+    const sleeper = enemies(battle).find((o) => o !== c && o.hp > 0 && isAdjacent(o.pos, c.pos) && STUPORS.some((kind) => hasEffect(battle, o.id, kind)));
+    if (sleeper) return wake(game, sleeper, stirText(battle, sleeper, c));
   }
   if (monster.behaviour === 'coward' && encounter.escape && c.hp <= c.maxHp / 2) return flee(game, c, encounter.escape);
   // A hidden hero, with nobody else to fight, has to be found before anyone can attack them.
@@ -2973,9 +3404,7 @@ function weaponTurn(game, c, target) {
   };
 
   if (melee && isAdjacent(c.pos, target.pos)) return attackTimes(strike);
-  const map = battleMap(battle);
-  const crawling = isProne(battle, c.id);
-  const reach = reachableSquares(map, c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling });
+  const reach = reachFor(game, c);
   const closest = [...reach.values()].filter((s) => isAdjacent(s.pos, target.pos)).sort((a, b) => a.cost - b.cost)[0];
   // A wall in the way blocks a shot.
   const shot = ranged && clearShot(game, c.pos, target.pos);
@@ -2988,7 +3417,7 @@ function weaponTurn(game, c, target) {
   if (shot && feetBetween(c.pos, target.pos) <= ranged.range[0]) return attackTimes(ranged);
   // Too far: Dash towards its target.
   battle.turnState.movementLeft += speedOf(game, c);
-  const farther = reachableSquares(map, c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling });
+  const farther = reachFor(game, c);
   const nearest = [...farther.values()].sort((a, b) => squaresBetween(a.pos, target.pos) - squaresBetween(b.pos, target.pos) || a.cost - b.cost)[0];
   if (nearest && nearest.path.length) moveAlong(game, c, nearest.path);
   else log(game, `${c.name} can't find a way through.`);
@@ -3008,7 +3437,7 @@ function chooseTarget(game, c) {
 function flee(game, c, exits) {
   const battle = game.battle;
   battle.turnState.movementLeft += speedOf(game, c);
-  const reach = reachableSquares(battleMap(battle), c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling: isProne(battle, c.id) });
+  const reach = reachFor(game, c);
   const steps = [...reach.values()];
   const out = steps.filter((s) => exits.some((e) => e.x === s.pos.x && e.y === s.pos.y)).sort((a, b) => a.cost - b.cost)[0];
   const nearest = (s) => Math.min(...exits.map((e) => squaresBetween(s.pos, e)));
@@ -3049,7 +3478,8 @@ function flee(game, c, exits) {
 // spellcasting modifier in Force damage. Damage to it means a Constitution save to keep its
 // Concentration (concentrationCheck), so hurting it can free whoever it holds. When the hero
 // fails their first save against Hold Person with Heroic Inspiration in hand, the game spends
-// it to roll again (unless Settings say not to: setReactionPolicy).
+// it to roll again (unless Settings say not to: setReactionPolicy). A hero with Counterspell
+// can stop its Hold Person as it's cast (see "Counterspell").
 
 // How many more times today this foe can cast a spell.
 function spellLeft(c, spellId) {
@@ -3110,6 +3540,7 @@ function foeHoldPerson(game, c, target) {
   battle.turnState.action = true;
   spendSpell(c, 'hold-person');
   log(game, `${c.name} raises a hand towards ${you ? 'you' : target.name} and casts Hold Person.`);
+  if (counterspell(game, c, 'hold-person')) return;
   let save = partySave(game, target, 'wisdom', saveDc, `${c.name}'s Hold Person`);
   // Heroic Inspiration, spent for the hero at once on their first save (Settings can say not to).
   if (you && !save.success && game.inspiration && reactionPolicy.inspiration) {
@@ -3198,7 +3629,7 @@ function closeIn(game, c) {
   const held = battle.effects.find((e) => e.kind === 'paralyzed' && e.concentration && holderOf(e) === c.id);
   const target = (held && combatantById(battle, held.target)) || chooseTarget(game, c);
   if (!target) return;
-  const reach = [...reachableSquares(battleMap(battle), c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling: isProne(battle, c.id) }).values()].filter((s) => s.path.length);
+  const reach = [...reachFor(game, c).values()].filter((s) => s.path.length);
   const beside = reach.filter((s) => isAdjacent(s.pos, target.pos)).sort((a, b) => a.cost - b.cost)[0];
   const toward = beside || reach.sort((a, b) => squaresBetween(a.pos, target.pos) - squaresBetween(b.pos, target.pos) || a.cost - b.cost)[0];
   if (toward && squaresBetween(toward.pos, target.pos) < squaresBetween(c.pos, target.pos)) moveAlong(game, c, toward.path);
@@ -3255,9 +3686,7 @@ function turnedAllyTurn(game, c) {
     return checkEnd(game);
   };
   if (isAdjacent(c.pos, target.pos)) return strike();
-  const map = battleMap(battle);
-  const crawling = isProne(battle, c.id);
-  const reach = reachableSquares(map, c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling });
+  const reach = reachFor(game, c);
   const closest = [...reach.values()].filter((s) => isAdjacent(s.pos, target.pos)).sort((a, b) => a.cost - b.cost)[0];
   if (closest) {
     moveAlong(game, c, closest.path);
@@ -3265,7 +3694,7 @@ function turnedAllyTurn(game, c) {
     return strike();
   }
   battle.turnState.movementLeft += speedOf(game, c);
-  const farther = reachableSquares(map, c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling });
+  const farther = reachFor(game, c);
   const nearest = [...farther.values()].sort((a, b) => squaresBetween(a.pos, target.pos) - squaresBetween(b.pos, target.pos) || a.cost - b.cost)[0];
   if (nearest && nearest.path.length) moveAlong(game, c, nearest.path);
   return checkEnd(game);
@@ -3295,7 +3724,7 @@ export function companionCantUse(game, c, option) {
 // Where the companion can move this turn: Map of key(pos) → { pos, cost, path }.
 export function companionReach(game, c) {
   const battle = game.battle;
-  return reachableSquares(battleMap(battle), c.pos, battle.turnState.movementLeft, blockedFor(game, c), { crawling: isProne(battle, c.id) });
+  return reachFor(game, c);
 }
 
 export function companionStandUp(game, c) {
@@ -3309,8 +3738,9 @@ export function companionMove(game, c, path) {
   checkEnd(game);
 }
 
-// An attack, or a spell aimed at a foe, as the hero's heroAttack.
-export function companionAttack(game, c, optionId, targetId) {
+// An attack, or a spell aimed at a foe, as the hero's heroAttack. cunning: a Rogue's Cunning
+// Strike for this attack, if it gets Sneak Attack ('trip' or 'withdraw'), or null.
+export function companionAttack(game, c, optionId, targetId, { cunning = null } = {}) {
   requireTurnOf(game, c);
   const battle = game.battle;
   const actor = actorGame(game, c);
@@ -3324,9 +3754,43 @@ export function companionAttack(game, c, optionId, targetId) {
   useAction(game, option, { actor });
   if (option.concentration) startConcentration(game, option, c);
   if (spirit) spiritStrike(game, option, target, c);
-  else performAttack(game, c, target, option);
+  else performAttack(game, c, target, { ...option, cunning: hasFeature(actor.character, 'cunning-strike') ? cunning : null });
   if (option.concentration) tidyConcentration(game);
   checkEnd(game);
+}
+
+// The free move a companion has this turn (Withdraw, after a Cunning Strike): feet, or 0.
+export const companionFreeFeet = (game) => game.battle.turnState.athleteMove || 0;
+
+// Where a companion's free move can take them: Map of key(pos) → { pos, cost, path }.
+export function companionFreeReach(game, c) {
+  return reachFor(game, c, companionFreeFeet(game));
+}
+
+// Takes the free move (Withdraw): no movement spent, no Opportunity Attacks.
+export function companionFreeMove(game, c, path) {
+  requireTurnOf(game, c);
+  const turn = game.battle.turnState;
+  const end = path[path.length - 1];
+  const step = end && companionFreeReach(game, c).get(key(end));
+  if (!step) throw new Error(`${c.name} can't slip that far.`);
+  const from = turn.freeMoveFrom || 'Withdraw';
+  turn.athleteMove = 0;
+  moveAlong(game, c, step.path, { free: true, freeFrom: from });
+  checkEnd(game);
+}
+
+// Mass Healing Word from a companion: everyone in the party it can help within range.
+export function companionMassHeal(game, c, optionId) {
+  requireTurnOf(game, c);
+  const actor = actorGame(game, c);
+  const option = heroAttackOptions(actor).find((o) => o.id === optionId);
+  if (!option || option.how !== 'heal' || option.targeting !== 'party') throw new Error(`${c.name} can't cast that.`);
+  checkCanAct(game, option);
+  const targets = partyTargets(game, option, c);
+  if (!targets.length) throw new Error('Nobody within reach is hurt.');
+  useAction(game, option, { actor });
+  castMassHealing(game, c, option, targets);
 }
 
 // A ward cast by a companion (Odda's Bless or Shield of Faith): a 'party' spell on everyone in

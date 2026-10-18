@@ -453,12 +453,14 @@ test('Data: class numbers match the SRD tables', () => {
   const wizard = classes.find((c) => c.id === 'wizard');
   assertEqual([fighter.hitDie, fighter.hitPointsAtLevel1, fighter.hitPointsPerLevel, fighter.savingThrows], [10, 10, 6, ['strength', 'constitution']]);
   assertEqual([wizard.hitDie, wizard.hitPointsAtLevel1, wizard.hitPointsPerLevel, wizard.savingThrows], [6, 6, 4, ['intelligence', 'wisdom']]);
-  assertEqual(wizard.levels.map((r) => [r.cantrips, r.preparedSpells, r.slots]), [[3, 4, [2]], [3, 5, [3]], [3, 6, [4, 2]], [4, 7, [4, 3]]]);
-  assertEqual(fighter.levels.map((r) => [r.secondWindUses, r.weaponMasteries]), [[2, 3], [2, 3], [2, 3], [3, 4]]);
+  assertEqual(wizard.levels.map((r) => [r.cantrips, r.preparedSpells, r.slots]), [[3, 4, [2]], [3, 5, [3]], [3, 6, [4, 2]], [4, 7, [4, 3]], [4, 9, [4, 3, 2]]]);
+  assertEqual(fighter.levels.map((r) => [r.secondWindUses, r.weaponMasteries]), [[2, 3], [2, 3], [2, 3], [3, 4], [3, 4]]);
+  assertEqual(fighter.levels[4].features, ['extra-attack', 'tactical-shift']);
   const cleric = classes.find((c) => c.id === 'cleric');
   const rogue = classes.find((c) => c.id === 'rogue');
-  assertEqual(cleric.levels.map((r) => [r.cantrips, r.preparedSpells, r.slots, r.channelDivinity || 0]), [[3, 4, [2], 0], [3, 5, [3], 2], [3, 6, [4, 2], 2], [4, 7, [4, 3], 2]]);
-  assertEqual(rogue.levels.map((r) => [r.sneakAttack, r.weaponMasteries, r.expertise]), [['1d6', 2, 2], ['1d6', 2, 2], ['2d6', 2, 2], ['2d6', 2, 2]]);
+  assertEqual(cleric.levels.map((r) => [r.cantrips, r.preparedSpells, r.slots, r.channelDivinity || 0]), [[3, 4, [2], 0], [3, 5, [3], 2], [3, 6, [4, 2], 2], [4, 7, [4, 3], 2], [4, 9, [4, 3, 2], 2]]);
+  assertEqual(rogue.levels.map((r) => [r.sneakAttack, r.weaponMasteries, r.expertise]), [['1d6', 2, 2], ['1d6', 2, 2], ['2d6', 2, 2], ['2d6', 2, 2], ['3d6', 2, 2]]);
+  assertEqual(classes.map((c) => c.levels[4].features), [['extra-attack', 'tactical-shift'], ['memorize-spell'], ['sear-undead'], ['cunning-strike', 'uncanny-dodge']], 'level 5 features');
   for (const cls of classes) assertTrue(cls.levels[3].features.includes('ability-score-improvement'), `${cls.name} 4: Ability Score Improvement`);
 });
 
@@ -643,15 +645,15 @@ test('Creation: only Origin feats can be the Human’s Versatile feat', () => {
 
 test('Data: every spell is SRD, and the lists and species have the spells they need', () => {
   for (const s of spells) {
-    assertTrue(s.source === 'SRD 5.2.1' && s.level >= 0 && s.level <= 2 && s.lists.length > 0, s.id);
+    assertTrue(s.source === 'SRD 5.2.1' && s.level >= 0 && s.level <= 3 && s.lists.length > 0, s.id);
     assertTrue(Boolean(s.text.length > 20 && s.castingTime && s.range && s.components && s.duration), `${s.id} is missing a field`);
     assertEqual(s.concentration, s.duration.startsWith('Concentration'), `${s.id} concentration`);
   }
   assertEqual(new Set(spells.map((s) => s.id)).size, spells.length, 'spell ids are unique');
-  // Species spells up to character level 3 (level 5 spells arrive with higher levels).
+  // Species spells up to character level 5.
   for (const sp of species) {
     const options = sp.choice ? sp.choice.options : [];
-    const ids = [sp.cantrip, ...options.flatMap((o) => [o.cantrip, ...(o.cantrips || []), o.level3Spell, o.alwaysPrepared])].filter(Boolean);
+    const ids = [sp.cantrip, ...options.flatMap((o) => [o.cantrip, ...(o.cantrips || []), o.level3Spell, o.level5Spell, o.alwaysPrepared])].filter(Boolean);
     for (const id of ids) assertTrue(findSpell(id) !== null, `${sp.id} needs ${id}`);
   }
   assertTrue(spellsOnList('wizard', 0).length >= 3 && spellsOnList('wizard', 1).length >= 6 && spellsOnList('wizard', 2).length >= 2);

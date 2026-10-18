@@ -5,7 +5,8 @@
 // An attack option (what the attacker can use):
 //   { id, name, source: 'weapon' | 'spell' | 'channel' | 'monster',
 //     how: 'melee' | 'ranged' | 'save' | 'darts' | 'rays' | 'area' | 'self' | 'heal' | 'ward' |
-//          'teleport' | 'turn' | 'preserve' | 'multi' | 'spirit' | 'spirit-strike' | 'restore',
+//          'teleport' | 'turn' | 'preserve' | 'multi' | 'spirit' | 'spirit-strike' | 'restore' |
+//          'aura' | 'dispel' | 'revive',
 //     reach (feet, melee), range ([normal, long] feet, ranged), modifiers (to hit, for d20Test),
 //     damage: { dice, bonus, type, extraOnAdvantage } (null for spells that do no damage),
 //     saveDc, saveAbility, darts, rays,
@@ -21,14 +22,17 @@
 // Spells also carry: spellId, spellLevel, concentration, bonusAction, and how they're aimed,
 // targeting: 'foe' (choose a creature), 'direction' (an area that starts from you: Burning
 // Hands), 'point' (an area centred on a square within range: Shatter), 'self' (only you:
-// False Life), 'friend' (you or one companion within range: Cure Wounds, Sanctuary), 'party'
-// (you and your companions within range: Bless, Aid), 'square' (Misty Step) or 'nearest'
-// (Bane: the nearest `targets` foes in range); and from the spell's data, area, halfOnSave,
-// push, condition, foesOnly, touch, targets, creatureType, self, tempHp, hpBonus (Aid),
-// speedBonus, effect (a 'ward' spell's: 'blessed', 'sanctuary' or 'shield-of-faith'), ends (a
-// 'restore' spell's conditions it can end: Lesser Restoration) and heal
-// ({ dice, bonus, extra }: a healing spell's dice, spellcasting modifier, and Disciple of
-// Life's extra Hit Points) (see data/srd/spells.js).
+// False Life, Spirit Guardians), 'friend' (you or one companion within range: Cure Wounds,
+// Sanctuary, Revivify), 'party' (you and your companions within range: Bless, Aid, Mass Healing
+// Word), 'square' (Misty Step), 'nearest' (Bane: the nearest `targets` foes in range) or
+// 'dispel' (Dispel Magic: a foe's spell on someone, or a foe's spectral weapon); and from the
+// spell's data, area, halfOnSave, push, condition, foesOnly, sight, touch, targets,
+// creatureType, self, tempHp, hpBonus (Aid), speedBonus, effect (a 'ward' spell's: 'blessed',
+// 'sanctuary' or 'shield-of-faith'), ends (a 'restore' spell's conditions it can end: Lesser
+// Restoration), radius and halvesSpeed (an 'aura': Spirit Guardians), withinRounds and
+// component (Revivify's minute, and its diamond) and heal ({ dice, bonus, extra }: a healing
+// spell's dice, spellcasting modifier, and Disciple of Life's extra Hit Points) (see
+// data/srd/spells.js).
 // company: the hero has companions with them who can fight, so the words on the buttons talk
 // about friends too (a hero alone sees "your AC", as before companions).
 // Spiritual Weapon: casting it ('spirit') puts a spectral weapon beside a foe within 60 feet
@@ -178,6 +182,8 @@ export function heroAttackOptions(game) {
       if (!company && c.self === 'mage-armor' && character.armorId) continue;
       if (!company && c.lasts && (game.activeSpells || []).some((s) => s.id === spell.id)) continue;
       if (!company && c.kind === 'stabilise') continue; // Spare the Dying: for a fallen friend
+      // Revivify: for a companion who has died in this fight (only the hero casts it).
+      if (c.kind === 'revive' && (game.actorId || !(game.battle && game.battle.combatants.some((x) => x.companion)))) continue;
       // Lesser Restoration: a hero alone sees it only with a condition on them it can end.
       if (!company && !game.actorId && c.kind === 'restore' && !hasCondition(game, 'hero', c.ends)) continue;
       const modifiers = numbers.attackBonus.parts.map((p) => ({ ...p, source: `${group.label} spellcasting` }));
@@ -284,13 +290,13 @@ function channelOptions(game, company) {
 
 // How each kind of spell is aimed (see the option fields above). Spells that help ('self',
 // 'heal' and 'ward') are aimed as their data says (spells.js spellAim).
-const TARGETING = { attack: 'foe', save: 'foe', darts: 'foe', rays: 'foe', teleport: 'square', multi: 'nearest', spirit: 'foe' };
+const TARGETING = { attack: 'foe', save: 'foe', darts: 'foe', rays: 'foe', teleport: 'square', multi: 'nearest', spirit: 'foe', aura: 'self', dispel: 'dispel' };
 
 function spellOption(spell, slot, above, { modifiers, saveDc, level, potent, abilityMod, company }) {
   const c = spell.combat;
   const melee = c.kind === 'attack' && c.attack === 'melee';
   const helps = spellAim(spell); // 'self', 'friend' or 'party' for a spell that helps
-  const onYou = helps === 'self';
+  const onYou = helps === 'self' || c.kind === 'aura'; // (Spirit Guardians is round you)
   // Spare the Dying's range doubles at character levels 5, 11 and 17.
   const reach = c.rangeScales ? c.range * (level >= 17 ? 8 : level >= 11 ? 4 : level >= 5 ? 2 : 1) : c.range;
   return {
@@ -324,6 +330,11 @@ function spellOption(spell, slot, above, { modifiers, saveDc, level, potent, abi
     push: c.push || 0,
     condition: c.condition || null,
     foesOnly: Boolean(c.foesOnly),
+    sight: Boolean(c.sight),
+    radius: c.radius || null,
+    halvesSpeed: Boolean(c.halvesSpeed),
+    withinRounds: c.withinRounds || null,
+    component: c.component || null,
     creatureType: c.creatureType || null,
     self: c.self || null,
     tempHp: c.tempHp ? { dice: c.tempHp.dice, bonus: c.tempHp.bonus + above * (c.upcastTempHp || 0) } : null,
